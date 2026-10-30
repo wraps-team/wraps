@@ -683,7 +683,7 @@ export default function SendGridVsWrapsPage() {
                         <td className="p-4 font-medium">{row.volume}</td>
                         <td className="p-4 text-muted-foreground">
                           <span>{row.sendgridCost}</span>
-                          <span className="block text-muted-foreground/60 text-xs">
+                          <span className="block text-muted-foreground text-xs">
                             {row.sendgridTier}
                           </span>
                         </td>
@@ -691,17 +691,17 @@ export default function SendGridVsWrapsPage() {
                           <span className="font-medium text-primary">
                             {row.wrapsTotal}
                           </span>
-                          <span className="block text-muted-foreground/60 text-xs">
+                          <span className="block text-muted-foreground text-xs">
                             {row.wrapsPlatform} platform + {row.wrapsAws} AWS
                           </span>
                         </td>
                         <td className="p-4">
                           {row.savings ? (
-                            <span className="font-mono text-2xs text-brand uppercase tracking-widest">
+                            <span className="font-mono text-2xs text-brand-text uppercase tracking-widest">
                               {row.savings}
                             </span>
                           ) : (
-                            <span className="font-mono text-2xs text-muted-foreground/60 uppercase tracking-widest">
+                            <span className="font-mono text-2xs text-muted-foreground uppercase tracking-widest">
                               Comparable
                             </span>
                           )}

@@ -136,7 +136,7 @@ export const EmailHeaderScroller = () => {
                   {h.status.toUpperCase()}
                 </span>{" "}
                 <span className="text-info">From:</span> {h.from}{" "}
-                <span className="text-brand">{h.auth}</span>
+                <span className="text-brand-text">{h.auth}</span>
                 {h.type === "spoof" && (
                   <span className="ml-2 text-destructive">SPOOFED</span>
                 )}
@@ -241,10 +241,10 @@ export const DMARCSimulator = () => {
               className={`rounded px-3 py-1 font-mono text-sm transition-all ${
                 policy === p
                   ? p === "none"
-                    ? "bg-destructive text-white"
+                    ? "bg-destructive text-destructive-foreground"
                     : p === "quarantine"
-                      ? "bg-warning text-white"
-                      : "bg-success text-white"
+                      ? "bg-warning text-warning-foreground"
+                      : "bg-success text-success-foreground"
                   : "bg-muted text-muted-foreground hover:bg-accent"
               }`}
               key={p}
@@ -320,9 +320,9 @@ export const DMARCSimulator = () => {
             <div
               className={`rounded px-2 py-0.5 text-xs ${
                 email.outcome === "delivered" && !email.legit
-                  ? "bg-destructive text-white"
+                  ? "bg-destructive text-destructive-foreground"
                   : email.outcome === "delivered"
-                    ? "bg-success text-white"
+                    ? "bg-success text-success-foreground"
                     : email.outcome === "quarantined"
                       ? "bg-warning text-black"
                       : "bg-muted-foreground text-background"
@@ -512,19 +512,19 @@ export const BreachTimeline = () => {
     switch (color) {
       case "purple":
         return {
-          bg: "bg-info",
+          bg: "bg-info text-info-foreground",
           bgLight: "bg-info/10",
           text: "text-info",
         };
       case "orange":
         return {
-          bg: "bg-brand",
+          bg: "bg-brand text-brand-foreground",
           bgLight: "bg-brand/10",
-          text: "text-brand",
+          text: "text-brand-text",
         };
       default:
         return {
-          bg: "bg-destructive",
+          bg: "bg-destructive text-destructive-foreground",
           bgLight: "bg-destructive/10",
           text: "text-destructive",
         };
@@ -555,7 +555,7 @@ export const BreachTimeline = () => {
                 <div
                   className={`flex h-10 w-10 items-center justify-center rounded-full ${colors.bg} shadow-lg ring-4 ring-background`}
                 >
-                  <breach.icon className="h-5 w-5 text-white" />
+                  <breach.icon className="h-5 w-5" />
                 </div>
               </div>
 
@@ -827,8 +827,8 @@ export const DomainChecker = () => {
     B: "text-success bg-success/20 dark:text-success",
     "B-": "text-warning bg-warning/20 dark:text-warning",
     "C+": "text-warning bg-warning/20 dark:text-warning",
-    C: "text-brand bg-brand/20",
-    "C-": "text-brand bg-brand/20",
+    C: "text-brand-text bg-brand/20",
+    "C-": "text-brand-text bg-brand/20",
     D: "text-destructive bg-destructive/20 dark:text-destructive",
     F: "text-destructive bg-destructive/20 dark:text-destructive",
   };
@@ -1070,7 +1070,7 @@ export const DomainChecker = () => {
           result.dmarc.policy === "none") && (
           <div className="mt-4 rounded-xl border border-brand/30 bg-brand/5 p-4">
             <div className="mb-2 flex items-center gap-2">
-              <Terminal className="h-4 w-4 text-brand" />
+              <Terminal className="h-4 w-4 text-brand-text" />
               <p className="font-semibold text-foreground">
                 Fix this automatically
               </p>

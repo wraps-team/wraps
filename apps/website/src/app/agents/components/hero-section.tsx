@@ -21,27 +21,28 @@ export function AgentsHeroSection() {
 
             <h1 className="mb-6 text-pretty font-heading font-semibold text-4xl leading-tight tracking-tight sm:text-5xl">
               Give your agent an email address.{" "}
-              <span className="text-brand">Keep the leash.</span>
+              <span className="text-brand-text">Keep the leash.</span>
             </h1>
 
             {/* Mono anchor: the return type IS the marketing. Every send has
                 three possible endings, and one of them is "a human decides". */}
             <pre className="mb-6 overflow-x-auto rounded-lg border border-border bg-card/60 px-4 py-3 font-mono text-sm leading-relaxed text-foreground/90">
               <span className="text-muted-foreground">tool</span>{" "}
-              <span className="text-brand">send_email</span>
+              <span className="text-brand-text">send_email</span>
               {"("}
-              {"\n  "}from: <span className="text-foreground/60">string</span>,
-              {"\n  "}to: <span className="text-foreground/60">string</span>,
-              {"\n  "}subject:{" "}
-              <span className="text-foreground/60">string</span>,{"\n  "}html:{" "}
-              <span className="text-foreground/60">string</span>,{"\n"}
+              {"\n  "}from:{" "}
+              <span className="text-muted-foreground">string</span>,{"\n  "}to:{" "}
+              <span className="text-muted-foreground">string</span>,{"\n  "}
+              subject: <span className="text-muted-foreground">string</span>,
+              {"\n  "}html:{" "}
+              <span className="text-muted-foreground">string</span>,{"\n"}
               {"): { status: "}
               <span className="text-success">{'"sent"'}</span>
               {" | "}
               <span className="text-warning">{'"pending_approval"'}</span>
               {" | "}
               <span className="text-destructive">{'"blocked"'}</span>
-              <span className="text-foreground/60">{" | … }"}</span>
+              <span className="text-muted-foreground">{" | … }"}</span>
             </pre>
 
             <p className="mb-6 max-w-md text-muted-foreground">

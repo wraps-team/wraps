@@ -41,7 +41,7 @@ export function StatsSection() {
               <div className="rounded-xl border bg-background p-6 text-center transition-all hover:border-brand/50">
                 <div className="mb-3 flex justify-center">
                   <div className="flex aspect-square size-12 items-center justify-center rounded-full border-2 border-brand bg-brand/5">
-                    <stat.icon className="size-6 text-brand" />
+                    <stat.icon className="size-6 text-brand-text" />
                   </div>
                 </div>
                 <h3 className="font-bold text-2xl text-foreground sm:text-3xl">

@@ -23,7 +23,7 @@ export function SmsCtaSection() {
 
             {/* Headline */}
             <h2 className="mb-4 font-heading font-semibold text-3xl tracking-tight md:text-4xl">
-              Start sending SMS <span className="text-brand">today</span>
+              Start sending SMS <span className="text-brand-text">today</span>
             </h2>
 
             {/* Description */}
@@ -36,7 +36,10 @@ export function SmsCtaSection() {
             <div className="mb-8 flex flex-wrap gap-x-6 gap-y-3">
               {benefits.map((benefit) => (
                 <div className="flex items-center gap-2 text-sm" key={benefit}>
-                  <Check aria-hidden="true" className="size-4 text-brand" />
+                  <Check
+                    aria-hidden="true"
+                    className="size-4 text-brand-text"
+                  />
                   <span>{benefit}</span>
                 </div>
               ))}

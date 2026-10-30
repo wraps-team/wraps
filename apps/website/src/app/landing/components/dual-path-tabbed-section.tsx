@@ -82,7 +82,7 @@ function TabBar({
                 className={cn(
                   "group relative flex items-center gap-2 overflow-hidden rounded-full px-5 py-2.5 font-medium text-sm transition-all duration-300",
                   isActive
-                    ? "bg-brand text-white shadow-lg shadow-brand/30"
+                    ? "bg-primary text-primary-foreground shadow-lg shadow-brand/30"
                     : "text-muted-foreground hover:bg-brand/10 hover:text-foreground dark:hover:bg-brand/20"
                 )}
                 key={tab.key}
@@ -97,7 +97,7 @@ function TabBar({
                     "relative size-4 transition-transform duration-300",
                     isActive
                       ? "scale-110"
-                      : "group-hover:scale-110 group-hover:text-brand"
+                      : "group-hover:scale-110 group-hover:text-brand-text"
                   )}
                 />
                 <span className="relative">{tab.label}</span>
@@ -140,7 +140,7 @@ function ComparisonPanel({
           <span className="inline-flex items-center rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-medium text-success">
             Code
           </span>
-          <span className="text-sm text-foreground/50">for engineers</span>
+          <span className="text-sm text-muted-foreground">for engineers</span>
         </Link>
         <CodeBlock
           className="h-auto flex-1"
@@ -171,7 +171,7 @@ function ComparisonPanel({
             )}
           </CodeBlockBody>
         </CodeBlock>
-        <p className="mt-3 text-sm text-foreground/50">{codeCaption}</p>
+        <p className="mt-3 text-sm text-muted-foreground">{codeCaption}</p>
       </div>
 
       {/* Visual side */}
@@ -180,10 +180,10 @@ function ComparisonPanel({
           className="mb-3 flex items-center gap-2 rounded-full w-fit px-1 transition-colors hover:bg-brand/5"
           href="/platform"
         >
-          <span className="inline-flex items-center rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-medium text-brand">
+          <span className="inline-flex items-center rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-medium text-brand-text">
             Visual
           </span>
-          <span className="text-sm text-foreground/50">for your team</span>
+          <span className="text-sm text-muted-foreground">for your team</span>
         </Link>
         {imageLink ? (
           <Link
@@ -223,7 +223,7 @@ function ComparisonPanel({
             />
           </div>
         )}
-        <p className="mt-3 text-sm text-foreground/50">{visualCaption}</p>
+        <p className="mt-3 text-sm text-muted-foreground">{visualCaption}</p>
       </div>
     </div>
   );
@@ -242,7 +242,7 @@ export function DualPathTabbedSection() {
             Write it in TypeScript. Or drag it onto a canvas. Nobody files a
             ticket.
           </h2>
-          <p className="mx-auto max-w-3xl text-lg text-foreground/70 text-pretty">
+          <p className="mx-auto max-w-3xl text-lg text-muted-foreground text-pretty">
             Automations and templates that your whole team can own. Engineers
             get TypeScript, everyone else gets a visual editor. Same result
             either way.
@@ -296,24 +296,24 @@ export function DualPathTabbedSection() {
         <div className="mt-16 text-center">
           <div className="mx-auto mb-6 flex max-w-md items-center gap-3">
             <div className="h-px flex-1 bg-border" />
-            <span className="text-sm font-medium text-foreground/50">
+            <span className="text-sm font-medium text-muted-foreground">
               Same output
             </span>
             <div className="h-px flex-1 bg-border" />
           </div>
-          <p className="text-lg text-foreground/70">
+          <p className="text-lg text-muted-foreground">
             Same execution engine, same git history, same deploy pipeline.
             Switch whenever you want.
           </p>
           <div className="mt-6 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
-              className="inline-flex items-center text-sm font-medium text-brand hover:text-brand"
+              className="inline-flex items-center text-sm font-medium text-brand-text hover:text-brand-text"
               href="/docs/quickstart/email"
             >
               Start with code →
             </Link>
             <Link
-              className="inline-flex items-center text-sm font-medium text-foreground/70 hover:text-foreground"
+              className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground"
               href="/platform#automations"
             >
               See the visual builder →

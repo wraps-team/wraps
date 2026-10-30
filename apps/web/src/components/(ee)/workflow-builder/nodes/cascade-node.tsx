@@ -64,7 +64,7 @@ export function CascadeNode({ id, data, selected }: CascadeNodeProps) {
 
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-r from-blue-500 to-green-500 text-white">
+        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-r from-blue-500 to-green-700 text-white">
           <Layers className="h-4 w-4" />
         </div>
         <div className="min-w-0 flex-1">
@@ -89,8 +89,8 @@ export function CascadeNode({ id, data, selected }: CascadeNodeProps) {
                 className={cn(
                   "flex h-5 w-5 items-center justify-center rounded",
                   channel.type === "email"
-                    ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                    : "bg-green-500/10 text-green-600 dark:text-green-400"
+                    ? "bg-info/10 text-info"
+                    : "bg-success/10 text-success"
                 )}
               >
                 {channel.type === "email" ? (
@@ -120,7 +120,7 @@ export function CascadeNode({ id, data, selected }: CascadeNodeProps) {
 
       {/* Output handles */}
       <Handle
-        className="!h-3 !w-3 !border-2 !border-background !bg-green-500"
+        className="!h-3 !w-3 !border-2 !border-background !bg-success"
         id="engaged"
         position={Position.Bottom}
         style={{ left: "35%" }}

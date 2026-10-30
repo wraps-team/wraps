@@ -1446,7 +1446,7 @@ function ContactRow({ contact }: { contact: SampleContact }) {
     <div className="flex items-center gap-2 text-sm">
       <span className="text-muted-foreground">{contact.email}</span>
       {(name || contact.company) && (
-        <span className="text-muted-foreground/70">
+        <span className="text-muted-foreground">
           ({[name, contact.company].filter(Boolean).join(", ")})
         </span>
       )}
@@ -2268,7 +2268,7 @@ function ReviewStep({
                 ? "All sampled contacts are missing required template variables"
                 : `${coverageWarning.missingCount} of ${coverageWarning.totalSampled} contacts are missing template variables`}
             </p>
-            <p className="text-warning/80 text-xs">
+            <p className="text-warning text-xs">
               Missing: {coverageWarning.missingVariables.join(", ")}. Add these
               attributes to your contacts or set a fallback value in the
               template.
@@ -2285,7 +2285,7 @@ function ReviewStep({
             <p className="font-medium text-warning text-sm">
               This AWS account is still in the SES sandbox
             </p>
-            <p className="text-warning/80 text-xs">
+            <p className="text-warning text-xs">
               SES will reject every recipient that is not a verified address,
               and the sandbox daily quota is {dailyCapacity.toLocaleString()} —
               which is why the estimate below is what it is. Requesting
@@ -2305,7 +2305,7 @@ function ReviewStep({
             <p className="font-medium text-destructive text-sm">
               AWS has paused sending on this account, so this send is blocked.
             </p>
-            <p className="text-destructive/80 text-xs">{accountBlockReason}</p>
+            <p className="text-destructive text-xs">{accountBlockReason}</p>
           </div>
         </div>
       )}
@@ -2318,7 +2318,7 @@ function ReviewStep({
             <p className="font-medium text-warning text-sm">
               This AWS account is under review (probation)
             </p>
-            <p className="text-warning/80 text-xs">
+            <p className="text-warning text-xs">
               Sending still works, but further bounces or complaints can get the
               account paused. Consider holding non-essential sends until it
               clears.
@@ -2336,7 +2336,7 @@ function ReviewStep({
               Every contact is missing a required variable, so this send is
               blocked.
             </p>
-            <p className="text-destructive/80 text-xs">
+            <p className="text-destructive text-xs">
               Missing:{" "}
               {coverageResult?.success
                 ? coverageResult.missingVariables.join(", ")
@@ -2357,7 +2357,7 @@ function ReviewStep({
             <p className="font-medium text-warning text-sm">
               Some pre-send checks couldn't run.
             </p>
-            <p className="text-warning/80 text-xs">
+            <p className="text-warning text-xs">
               {coverageCheckFailed && durationCheckFailed
                 ? "The variable-coverage check and the send-duration estimate both failed"
                 : coverageCheckFailed
@@ -2380,7 +2380,7 @@ function ReviewStep({
               We couldn't count this audience. Sending is blocked until the
               count loads.
             </p>
-            <p className="text-warning/80 text-xs">
+            <p className="text-warning text-xs">
               Reload the page to try again — if it keeps failing, check that the
               selected topic or segment still exists. ({countError})
             </p>
@@ -2612,7 +2612,7 @@ function SchedulingCard({
                       value={nlText}
                     />
                     {formattedPreview && (
-                      <p className="flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400">
+                      <p className="flex items-center gap-1.5 text-sm text-success">
                         <Check className="h-3.5 w-3.5" />
                         {formattedPreview}
                       </p>

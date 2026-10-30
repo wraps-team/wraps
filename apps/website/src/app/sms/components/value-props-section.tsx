@@ -48,7 +48,7 @@ export function SmsValuePropsSection() {
             >
               <prop.icon
                 aria-hidden="true"
-                className="mb-4 size-5 text-brand"
+                className="mb-4 size-5 text-brand-text"
               />
               <h3 className="mb-2 font-medium">{prop.title}</h3>
               <p className="flex-1 text-muted-foreground text-sm">

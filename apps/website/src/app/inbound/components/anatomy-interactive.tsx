@@ -199,7 +199,7 @@ function JsonPreview({
       onHover={onHover}
     >
       <span className="text-foreground">"{key}"</span>
-      <span className="text-muted-foreground/60">: </span>
+      <span className="text-muted-foreground">: </span>
       <span
         className={cn(
           "text-muted-foreground",
@@ -208,7 +208,7 @@ function JsonPreview({
       >
         {value}
       </span>
-      {!isLast && <span className="text-muted-foreground/60">,</span>}
+      {!isLast && <span className="text-muted-foreground">,</span>}
     </FieldTarget>
   );
 
@@ -216,7 +216,7 @@ function JsonPreview({
     <div className="overflow-hidden rounded-lg border border-border bg-card">
       {/* Header */}
       <div className="flex items-center gap-2 border-border border-b bg-muted/30 px-4 py-3">
-        <Mail aria-hidden="true" className="size-3.5 text-brand" />
+        <Mail aria-hidden="true" className="size-3.5 text-brand-text" />
         <span className="font-mono text-muted-foreground text-xs">
           InboundEmail.json
         </span>
@@ -224,7 +224,7 @@ function JsonPreview({
 
       {/* JSON content */}
       <div className="overflow-x-auto p-4 font-mono text-sm">
-        <div className="text-muted-foreground/60">{"{"}</div>
+        <div className="text-muted-foreground">{"{"}</div>
         <div className="pl-4">
           {renderLine("emailId", emailJson.emailId)}
           {renderLine("from", emailJson.from)}
@@ -235,7 +235,7 @@ function JsonPreview({
           {renderLine("spamVerdict", emailJson.spamVerdict)}
           {renderLine("virusVerdict", emailJson.virusVerdict, true)}
         </div>
-        <div className="text-muted-foreground/60">{"}"}</div>
+        <div className="text-muted-foreground">{"}"}</div>
       </div>
     </div>
   );

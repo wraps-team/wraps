@@ -84,7 +84,7 @@ export function TriggerNode({ id, data, selected }: TriggerNodeProps) {
 
   return (
     <BaseNode
-      accentColor="bg-yellow-500"
+      accentColor="bg-yellow-700"
       description={description}
       errorMessage={errorMessage}
       hasInput={false}

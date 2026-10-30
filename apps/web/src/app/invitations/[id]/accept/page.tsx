@@ -58,7 +58,7 @@ export default async function AcceptInvitationPage({
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 p-4">
+    <div className="flex min-h-dvh items-center justify-center bg-gradient-to-br from-purple-50 to-info/15 p-4">
       <AcceptInvitationForm
         hasAccount={hasAccount}
         invitation={invitation}

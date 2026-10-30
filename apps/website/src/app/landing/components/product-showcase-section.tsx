@@ -168,7 +168,7 @@ export function ProductShowcaseSection() {
                  * so nothing readable ends up underneath it.
                  */}
                 <div className="absolute inset-x-0 bottom-0 flex items-baseline gap-2 bg-gradient-to-t from-background/95 via-background/80 to-transparent px-3.5 pt-6 pb-2.5">
-                  <span className="font-mono text-2xs text-brand">
+                  <span className="font-mono text-2xs text-brand-text">
                     {tile.index}
                   </span>
                   <span className="font-medium text-sm text-foreground">

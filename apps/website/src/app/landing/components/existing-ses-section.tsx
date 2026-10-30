@@ -49,7 +49,7 @@ export function ExistingSesSection() {
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-10 text-center">
-          <p className="mb-2 font-medium text-brand text-sm">
+          <p className="mb-2 font-medium text-brand-text text-sm">
             Already using SES?
           </p>
           <h2 className="mb-3 font-bold text-2xl tracking-tight sm:text-3xl">
@@ -75,7 +75,7 @@ export function ExistingSesSection() {
                 key={benefit.title}
               >
                 <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-brand/10">
-                  <Icon className="size-5 text-brand" />
+                  <Icon className="size-5 text-brand-text" />
                 </div>
                 <h3 className="mb-1 font-semibold">{benefit.title}</h3>
                 <p className="text-muted-foreground text-sm leading-relaxed">

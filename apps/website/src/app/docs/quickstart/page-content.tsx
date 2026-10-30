@@ -172,7 +172,7 @@ export default function QuickstartPageContent() {
       <Card className="group relative overflow-hidden transition-all hover:border-brand/50 hover:shadow-lg">
         <CardHeader>
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-brand/10">
-            <Blocks className="h-6 w-6 text-brand" />
+            <Blocks className="h-6 w-6 text-brand-text" />
           </div>
           <CardTitle className="text-2xl">{platformGuide.title}</CardTitle>
         </CardHeader>

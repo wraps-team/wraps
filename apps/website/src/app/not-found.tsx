@@ -23,7 +23,7 @@ export default function NotFound() {
             {NOT_FOUND_LINKS.map((link) => (
               <li className="text-sm" key={link.href}>
                 <a
-                  className="font-medium text-foreground underline underline-offset-4 hover:text-brand"
+                  className="font-medium text-foreground underline underline-offset-4 hover:text-brand-text"
                   href={link.href}
                 >
                   {link.label}

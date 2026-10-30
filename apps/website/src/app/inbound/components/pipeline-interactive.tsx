@@ -40,8 +40,8 @@ function AnimatedArrow({
     <div className="relative flex items-center justify-center px-1 sm:px-2">
       <ArrowRight
         className={cn(
-          "size-4 text-muted-foreground/40 transition-all duration-300 sm:size-5",
-          isActive && "text-brand"
+          "size-4 text-muted-foreground transition-all duration-300 sm:size-5",
+          isActive && "text-brand-text"
         )}
         style={{ transitionDelay: `${delay}ms` }}
       />
@@ -157,7 +157,7 @@ export function PipelineInteractive({ steps }: { steps: PipelineStep[] }) {
                     <Icon
                       className={cn(
                         "size-5 transition-all duration-300 sm:size-6",
-                        isActive ? "text-brand" : "text-muted-foreground/50"
+                        isActive ? "text-brand-text" : "text-muted-foreground"
                       )}
                     />
 
@@ -204,7 +204,7 @@ export function PipelineInteractive({ steps }: { steps: PipelineStep[] }) {
               {(() => {
                 const SelectedIcon = iconMap[selectedInfo.iconName];
                 return (
-                  <SelectedIcon className="mx-auto mb-3 size-8 text-brand" />
+                  <SelectedIcon className="mx-auto mb-3 size-8 text-brand-text" />
                 );
               })()}
               <h3 className="mb-2 font-heading font-semibold text-lg tracking-tight">

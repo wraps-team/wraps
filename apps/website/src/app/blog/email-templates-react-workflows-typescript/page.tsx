@@ -142,12 +142,12 @@ export default function Page() {
           <div className="absolute inset-0 bg-radial-top from-brand/20 via-transparent to-transparent" />
 
           <div className="relative mx-auto max-w-4xl px-6 pt-20 pb-16">
-            <div className="mb-4 flex items-center gap-2 font-medium text-brand text-sm">
+            <div className="mb-4 flex items-center gap-2 font-medium text-brand-text text-sm">
               <Code2 size={16} />
               <span>Developer Experience</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">10 min read</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">Wraps Team</span>
             </div>
 
@@ -166,19 +166,19 @@ export default function Page() {
 
             <div className="mt-8 flex flex-wrap gap-4">
               <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
-                <FileCode className="text-brand" size={16} />
+                <FileCode className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   React Email templates
                 </span>
               </div>
               <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
-                <Zap className="text-brand" size={16} />
+                <Zap className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   TypeScript workflows
                 </span>
               </div>
               <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
-                <GitBranch className="text-brand" size={16} />
+                <GitBranch className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Git-native version control
                 </span>
@@ -191,7 +191,7 @@ export default function Page() {
           {/* The Problem */}
           <section>
             <h2 className="mb-8 flex items-center gap-3 font-bold text-3xl">
-              <Type className="text-brand" />
+              <Type className="text-brand-text" />
               The Problem
             </h2>
 
@@ -229,7 +229,7 @@ export default function Page() {
                     files
                   </strong>
                   .{" "}
-                  <span className="font-semibold text-brand">
+                  <span className="font-semibold text-brand-text">
                     Your email infrastructure lives in your repo, reviewed in
                     PRs, deployed with your code.
                   </span>
@@ -241,7 +241,7 @@ export default function Page() {
           {/* Templates as React Components */}
           <section>
             <h2 className="mb-8 flex items-center gap-3 font-bold text-3xl">
-              <FileCode className="text-brand" />
+              <FileCode className="text-brand-text" />
               Templates as React Components
             </h2>
 
@@ -321,7 +321,7 @@ export default defineBrand({
           {/* How Compilation Works */}
           <section>
             <h2 className="mb-8 flex items-center gap-3 font-bold text-3xl">
-              <Zap className="text-brand" />
+              <Zap className="text-brand-text" />
               How Compilation Works
             </h2>
 
@@ -375,7 +375,7 @@ export default defineBrand({
           {/* Workflows as TypeScript */}
           <section>
             <h2 className="mb-8 flex items-center gap-3 font-bold text-3xl">
-              <Layers className="text-brand" />
+              <Layers className="text-brand-text" />
               Workflows as TypeScript
             </h2>
 
@@ -459,7 +459,7 @@ export default defineWorkflow({
           {/* Code and Dashboard Stay in Sync */}
           <section>
             <h2 className="mb-8 flex items-center gap-3 font-bold text-3xl">
-              <GitBranch className="text-brand" />
+              <GitBranch className="text-brand-text" />
               Code and Dashboard Stay in Sync
             </h2>
 
@@ -485,7 +485,7 @@ export default defineWorkflow({
                     className="flex items-center gap-2 text-foreground/80 text-sm"
                     key={item}
                   >
-                    <Check className="shrink-0 text-brand" size={14} />
+                    <Check className="shrink-0 text-brand-text" size={14} />
                     {item}
                   </li>
                 ))}
@@ -615,11 +615,11 @@ npx @wraps.dev/cli email workflows push`}
                 your AWS account with one command.
               </p>
               <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-                <div className="rounded-xl border bg-muted/30 px-6 py-3 font-mono text-brand">
+                <div className="rounded-xl border bg-muted/30 px-6 py-3 font-mono text-brand-text">
                   npx @wraps.dev/cli email templates init
                 </div>
                 <a
-                  className="flex items-center gap-2 rounded-xl bg-brand px-6 py-3 font-semibold text-white transition-colors hover:bg-brand/90"
+                  className="flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
                   href="/docs/guides/templates"
                 >
                   Get Started

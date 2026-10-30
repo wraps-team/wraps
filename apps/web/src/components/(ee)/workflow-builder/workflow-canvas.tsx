@@ -336,7 +336,7 @@ export function WorkflowCanvas({ smsEnabled = false }: WorkflowCanvasProps) {
           }
           return (
             <div
-              className="pointer-events-none absolute z-50 flex items-center gap-2 rounded-lg border-2 border-dashed border-orange-500/50 bg-background/80 px-3 py-2 shadow-lg backdrop-blur-sm ghost-preview-enter"
+              className="pointer-events-none absolute z-50 flex items-center gap-2 rounded-lg border-2 border-dashed border-warning/50 bg-background/80 px-3 py-2 shadow-lg backdrop-blur-sm ghost-preview-enter"
               style={{
                 left: ghostPreview.x,
                 top: ghostPreview.y,
@@ -351,7 +351,7 @@ export function WorkflowCanvas({ smsEnabled = false }: WorkflowCanvasProps) {
               >
                 {meta.icon}
               </div>
-              <span className="font-medium text-foreground/70 text-sm">
+              <span className="font-medium text-foreground text-sm">
                 {meta.label}
               </span>
             </div>

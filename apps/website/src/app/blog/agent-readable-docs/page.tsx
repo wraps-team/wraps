@@ -79,14 +79,14 @@ export default function Page() {
           <div className="absolute inset-0 bg-radial-top from-brand/20 via-transparent to-transparent" />
 
           <div className="relative mx-auto max-w-4xl px-6 pt-20 pb-16">
-            <div className="mb-4 flex items-center gap-2 font-medium text-brand text-sm">
+            <div className="mb-4 flex items-center gap-2 font-medium text-brand-text text-sm">
               <Bot size={16} />
               <span>Engineering</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">11 min read</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">Wraps Team</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">May 21, 2026</span>
             </div>
 
@@ -109,19 +109,19 @@ export default function Page() {
 
             <div className="mt-8 flex flex-wrap gap-4">
               <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
-                <FileText className="text-brand" size={16} />
+                <FileText className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Per-page markdown for 11 pages
                 </span>
               </div>
               <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
-                <Link2 className="text-brand" size={16} />
+                <Link2 className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   RFC 9727 api-catalog
                 </span>
               </div>
               <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
-                <Bot className="text-brand" size={16} />
+                <Bot className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Content-Signal: ai-train=no
                 </span>
@@ -178,7 +178,7 @@ export default function Page() {
           {/* Content negotiation */}
           <section>
             <h2 className="mb-6 flex items-center gap-3 font-bold text-3xl">
-              <FileText className="text-brand" />
+              <FileText className="text-brand-text" />
               Ask for markdown, get markdown
             </h2>
 
@@ -417,7 +417,7 @@ return new NextResponse(body, {
           {/* Discovery */}
           <section>
             <h2 className="mb-6 flex items-center gap-3 font-bold text-3xl">
-              <Link2 className="text-brand" />
+              <Link2 className="text-brand-text" />
               How a machine finds any of this
             </h2>
 
@@ -634,7 +634,7 @@ link: </docs>; rel="service-doc", </.well-known/api-catalog>; rel="api-catalog"`
           {/* WebMCP */}
           <section>
             <h2 className="mb-6 flex items-center gap-3 font-bold text-3xl">
-              <Bot className="text-brand" />
+              <Bot className="text-brand-text" />
               Five tools for a browser API that does not exist yet
             </h2>
 
@@ -1042,7 +1042,7 @@ Sitemap: https://wraps.dev/sitemap.xml`}
           {/* Try it */}
           <section>
             <h2 className="mb-6 flex items-center gap-3 font-bold text-3xl">
-              <Terminal className="text-brand" />
+              <Terminal className="text-brand-text" />
               Try it
             </h2>
 
@@ -1136,12 +1136,12 @@ curl https://api.wraps.dev/.well-known/oauth-authorization-server`}
                 without the markup you would not.
               </p>
               <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-                <div className="rounded-xl border bg-muted/30 px-6 py-3 font-mono text-brand text-sm">
+                <div className="rounded-xl border bg-muted/30 px-6 py-3 font-mono text-brand-text text-sm">
                   curl -H &quot;Accept: text/markdown&quot;
                   wraps.dev/docs/quickstart/email
                 </div>
                 <a
-                  className="flex items-center gap-2 rounded-xl bg-brand px-6 py-3 font-semibold text-white transition-colors hover:bg-brand"
+                  className="flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
                   href="/docs/quickstart/email/agents"
                 >
                   Agent Quickstart

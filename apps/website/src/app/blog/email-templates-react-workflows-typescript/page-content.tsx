@@ -117,10 +117,10 @@ export function CompilationDiagram() {
       glow: "shadow-warning/25",
     },
     violet: {
-      bg: "bg-violet-500/10 dark:bg-violet-500/20",
-      border: "border-violet-500/50",
-      text: "text-violet-600 dark:text-violet-400",
-      glow: "shadow-violet-500/25",
+      bg: "bg-info/10 dark:bg-info/20",
+      border: "border-info/50",
+      text: "text-info",
+      glow: "shadow-info/25",
     },
     blue: {
       bg: "bg-info/10 dark:bg-info/20",
@@ -131,7 +131,7 @@ export function CompilationDiagram() {
     orange: {
       bg: "bg-brand/10",
       border: "border-brand/50",
-      text: "text-brand",
+      text: "text-brand-text",
       glow: "shadow-brand/25",
     },
     green: {
@@ -141,10 +141,10 @@ export function CompilationDiagram() {
       glow: "shadow-success/25",
     },
     purple: {
-      bg: "bg-purple-500/10 dark:bg-purple-500/20",
-      border: "border-purple-500/50",
-      text: "text-purple-600 dark:text-purple-400",
-      glow: "shadow-purple-500/25",
+      bg: "bg-info/10 dark:bg-info/20",
+      border: "border-info/50",
+      text: "text-info",
+      glow: "shadow-info/25",
     },
   };
 
@@ -217,9 +217,7 @@ export function CompilationDiagram() {
                 <div className="flex items-center">
                   <ArrowRight
                     className={`transition-colors duration-300 ${
-                      index < activeStep
-                        ? "text-violet-600 dark:text-violet-500"
-                        : "text-muted-foreground/50"
+                      index < activeStep ? "text-info" : "text-muted-foreground"
                     }`}
                     size={16}
                   />
@@ -389,7 +387,7 @@ delay('short-pause', { minutes: 30 })`,
                 onClick={() => setExpandedRow(expandedRow === i ? null : i)}
               >
                 <td className="px-4 py-3">
-                  <code className="rounded bg-brand/10 px-2 py-1 font-mono text-brand text-sm">
+                  <code className="rounded bg-brand/10 px-2 py-1 font-mono text-brand-text text-sm">
                     {s.type}
                   </code>
                 </td>
@@ -591,7 +589,7 @@ export function CLIDemo() {
         ✓ 1 template pushed to SES
       </AnimatedSpan>
 
-      <AnimatedSpan className="text-brand" delay={9800}>
+      <AnimatedSpan className="text-brand-text" delay={9800}>
         ✓ Dashboard synced
       </AnimatedSpan>
 

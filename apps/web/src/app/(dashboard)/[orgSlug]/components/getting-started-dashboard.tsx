@@ -107,7 +107,7 @@ function CopyButton({ value }: { value: string }) {
       variant="ghost"
     >
       {copied ? (
-        <CheckIcon className="h-4 w-4 text-green-600 dark:text-green-400" />
+        <CheckIcon className="h-4 w-4 text-success" />
       ) : (
         <CopyIcon className="h-4 w-4" />
       )}
@@ -136,9 +136,7 @@ function ChecklistItemIcon({
     <div
       className={cn(
         "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
-        isComplete
-          ? "bg-green-500/10 text-green-600 dark:text-green-400"
-          : "bg-primary/10 text-primary"
+        isComplete ? "bg-success/10 text-success" : "bg-primary/10 text-primary"
       )}
     >
       {isComplete ? <CheckCircle2Icon className="h-5 w-5" /> : icon}
@@ -191,7 +189,7 @@ function ChecklistItemContent({
         <p
           className={cn(
             "mt-1 text-sm",
-            isComplete ? "text-muted-foreground/70" : "text-muted-foreground"
+            isComplete ? "text-muted-foreground" : "text-muted-foreground"
           )}
         >
           {description}
@@ -296,7 +294,7 @@ function FeatureStatusRow({
   return (
     <div className="flex items-center gap-2">
       {enabled ? (
-        <CheckCircle2Icon className="h-4 w-4 text-green-600 dark:text-green-400" />
+        <CheckCircle2Icon className="h-4 w-4 text-success" />
       ) : (
         <XCircleIcon className="h-4 w-4 text-muted-foreground" />
       )}
@@ -317,8 +315,8 @@ function ResultMessage({
       className={cn(
         "rounded-md border p-3",
         success
-          ? "border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200"
-          : "border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200"
+          ? "border-success/30 bg-success/15 text-success"
+          : "border-destructive/30 bg-destructive/15 text-destructive"
       )}
     >
       <div className="flex items-center gap-2 text-sm">
@@ -532,8 +530,8 @@ function WebhookSecretForm({
           className={cn(
             "rounded-md border p-3",
             result.success
-              ? "border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200"
-              : "border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200"
+              ? "border-success/30 bg-success/15 text-success"
+              : "border-destructive/30 bg-destructive/15 text-destructive"
           )}
         >
           <div className="flex items-center gap-2 text-sm">
@@ -582,7 +580,7 @@ function DomainVerification({
       <div className="space-y-2">
         {verifiedDomains.map((domain) => (
           <div className="flex items-center gap-2" key={domain}>
-            <CheckCircle2Icon className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <CheckCircle2Icon className="h-4 w-4 text-success" />
             <span className="font-mono text-sm">{domain}</span>
             <Badge variant="success">Verified</Badge>
           </div>
@@ -967,7 +965,7 @@ function CliCommandGuide({
           variant="ghost"
         >
           {copied ? (
-            <CheckCircle2Icon className="h-3.5 w-3.5 text-green-500" />
+            <CheckCircle2Icon className="h-3.5 w-3.5 text-success" />
           ) : (
             <CopyIcon className="h-3.5 w-3.5" />
           )}
@@ -1159,7 +1157,7 @@ function DeployConnectGuide({ organizationId }: { organizationId: string }) {
                     variant="ghost"
                   >
                     {copiedIndex === index ? (
-                      <CheckCircle2Icon className="h-3.5 w-3.5 text-green-500" />
+                      <CheckCircle2Icon className="h-3.5 w-3.5 text-success" />
                     ) : (
                       <CopyIcon className="h-3.5 w-3.5" />
                     )}
@@ -1203,7 +1201,7 @@ function DeployConnectGuide({ organizationId }: { organizationId: string }) {
 
           {cfnDeployed ? (
             <div className="space-y-3">
-              <div className="flex items-center gap-2 rounded-lg bg-green-500/10 p-3 text-green-600 dark:text-green-400">
+              <div className="flex items-center gap-2 rounded-lg bg-success/10 p-3 text-success">
                 <CheckCircle2Icon className="h-4 w-4" />
                 <span className="font-medium text-sm">
                   CloudFormation deployment started
@@ -1499,7 +1497,7 @@ export function GettingStartedDashboard({
                     {hasVerifiedDomain &&
                       setupStatus.sandboxStatus === true &&
                       !hasSentEmail && (
-                        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+                        <div className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/15 p-3 text-warning">
                           <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
                           <div className="space-y-2 text-sm">
                             <p>
@@ -1610,7 +1608,7 @@ export function GettingStartedDashboard({
                           className="flex items-center gap-2 text-sm"
                           key={domain}
                         >
-                          <CheckCircle2Icon className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                          <CheckCircle2Icon className="h-3.5 w-3.5 text-success" />
                           <span className="font-mono text-xs">{domain}</span>
                         </div>
                       ))}

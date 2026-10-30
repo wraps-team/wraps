@@ -39,7 +39,7 @@ export function CliCommand({ command, className }: CliCommandProps) {
           variant="ghost"
         >
           {copied ? (
-            <CheckIcon className="h-3.5 w-3.5 text-green-600" />
+            <CheckIcon className="h-3.5 w-3.5 text-success" />
           ) : (
             <CopyIcon className="h-3.5 w-3.5" />
           )}

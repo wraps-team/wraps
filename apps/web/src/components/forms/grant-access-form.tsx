@@ -68,9 +68,9 @@ export function GrantAccessForm({
     >
       {/* Form-level errors */}
       {formErrors.length > 0 ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/15 p-4">
           {formErrors.map((error) => (
-            <p className="text-red-600 text-sm" key={String(error)}>
+            <p className="text-destructive text-sm" key={String(error)}>
               {String(error)}
             </p>
           ))}
@@ -79,21 +79,19 @@ export function GrantAccessForm({
 
       {/* Success message */}
       {isSuccess ? (
-        <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-          <p className="text-green-600 text-sm">
-            ✓ Access granted successfully!
-          </p>
+        <div className="rounded-lg border border-success/30 bg-success/15 p-4">
+          <p className="text-success text-sm">✓ Access granted successfully!</p>
         </div>
       ) : null}
 
       {/* Error message */}
       {state && typeof state === "object" && "error" in state && state.error ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="font-medium text-red-600 text-sm">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/15 p-4">
+          <p className="font-medium text-destructive text-sm">
             {String(state.error) as string}
           </p>
           {"details" in state && state.details ? (
-            <p className="mt-1 text-red-500 text-xs">
+            <p className="mt-1 text-destructive text-xs">
               {String(state.details) as string}
             </p>
           ) : null}

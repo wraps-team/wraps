@@ -114,7 +114,7 @@ function TerminalTransition() {
         {/* Terminal window */}
         <motion.div
           animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-          className="overflow-hidden rounded-lg border border-terminal-border bg-terminal shadow-2xl"
+          className="dark overflow-hidden rounded-lg border border-terminal-border bg-terminal shadow-2xl"
           initial={{ opacity: 0, y: 20 }}
           transition={{ duration: 0.5 }}
         >
@@ -223,7 +223,9 @@ function TableRow({
       </div>
       <div className="flex justify-center">
         {typeof row.pro === "string" ? (
-          <span className="text-foreground text-xs sm:text-sm">{row.pro}</span>
+          <span className="font-medium text-foreground text-xs sm:text-sm">
+            {row.pro}
+          </span>
         ) : row.pro ? (
           <>
             <Check aria-hidden="true" className="size-5 text-success" />
@@ -238,7 +240,7 @@ function TableRow({
       </div>
       <div className="flex justify-center">
         {typeof row.business === "string" ? (
-          <span className="font-medium text-brand text-xs sm:text-sm">
+          <span className="font-medium text-brand-text text-xs sm:text-sm">
             {row.business}
           </span>
         ) : row.business ? (
@@ -265,7 +267,9 @@ export function UpgradeSection() {
     <section className="relative pt-16">
       {/* Header */}
       <FadeIn className="pb-12 text-center">
-        <p className="mb-2 font-medium text-brand text-sm">Ready for More?</p>
+        <p className="mb-2 font-medium text-brand-text text-sm">
+          Ready for More?
+        </p>
         <h2 className="mb-4 font-bold text-3xl tracking-tight md:text-4xl">
           Compare Plans
         </h2>
@@ -310,7 +314,7 @@ export function UpgradeSection() {
                     </p>
                   </div>
                   <div className="text-center">
-                    <span className="font-semibold text-brand text-sm">
+                    <span className="font-semibold text-brand-text text-sm">
                       Business
                     </span>
                     <p className="text-muted-foreground text-xs">

@@ -36,7 +36,7 @@ export function WhyWrapsSection() {
         <div className="grid items-center gap-12 md:grid-cols-[1fr_auto] md:gap-16 lg:gap-24">
           {/* Left column — narrative */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-eyebrow text-brand">
+            <p className="text-xs font-semibold uppercase tracking-eyebrow text-brand-text">
               Why Wraps
             </p>
 
@@ -50,7 +50,7 @@ export function WhyWrapsSection() {
 
               <p className="text-lg leading-relaxed text-muted-foreground md:text-xl">
                 <Link
-                  className="text-foreground underline underline-offset-2 hover:text-brand transition-colors"
+                  className="text-foreground underline underline-offset-2 hover:text-brand-text transition-colors"
                   href="/alternatives"
                 >
                   Postmark charges per email. Resend charges per email.
@@ -65,13 +65,13 @@ export function WhyWrapsSection() {
             <div className="my-8 h-px w-20 bg-brand" />
 
             <p className="font-condensed text-5xl uppercase leading-none tracking-tight text-foreground sm:text-6xl md:text-7xl lg:text-8xl">
-              So I built <span className="text-brand">Wraps.</span>
+              So I built <span className="text-brand-text">Wraps.</span>
             </p>
 
             <p className="mt-6 max-w-lg text-lg leading-relaxed text-foreground/80 md:text-xl">
               Deploy to your AWS and use the{" "}
               <Link
-                className="text-foreground underline underline-offset-2 hover:text-brand transition-colors"
+                className="text-foreground underline underline-offset-2 hover:text-brand-text transition-colors"
                 href="/platform"
               >
                 platform

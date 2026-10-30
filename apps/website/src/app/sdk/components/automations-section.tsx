@@ -196,7 +196,7 @@ export function SdkAutomationsSection() {
             </div>
 
             <a
-              className="inline-flex items-center gap-1 font-medium text-brand text-sm hover:text-brand"
+              className="inline-flex items-center gap-1 font-medium text-brand-text text-sm hover:text-brand-text"
               href="/docs/guides/workflows"
             >
               Workflow guide

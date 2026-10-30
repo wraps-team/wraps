@@ -247,7 +247,7 @@ export function CodeTemplateCodeView({
         <div className="flex items-center gap-2 text-muted-foreground text-sm">
           <span className="font-mono text-xs">{filePath}</span>
           {hasChanges && (
-            <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-600 text-xs">
+            <span className="rounded bg-warning/10 px-1.5 py-0.5 text-warning text-xs">
               Modified
             </span>
           )}
@@ -331,9 +331,9 @@ export function CodeTemplateCodeView({
 
       {/* Preview Error Banner (live preview errors — amber) */}
       {previewError && !compileError && (
-        <div className="flex items-start gap-2 border-b bg-amber-500/10 px-3 py-2">
-          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
-          <p className="text-amber-600 text-xs">{previewError}</p>
+        <div className="flex items-start gap-2 border-b bg-warning/10 px-3 py-2">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
+          <p className="text-warning text-xs">{previewError}</p>
         </div>
       )}
 

@@ -30,15 +30,13 @@ import { useRecentActivity } from "../hooks/use-analytics";
 
 const getActivityIcon = (type: string) => {
   if (type === "Delivery") {
-    return (
-      <CheckCircle2 className="h-4 w-4 text-green-700 dark:text-green-400" />
-    );
+    return <CheckCircle2 className="h-4 w-4 text-success" />;
   }
   if (type === "Send") {
     return <Clock className="h-4 w-4 text-muted-foreground" />;
   }
   if (type === "Open") {
-    return <Mail className="h-4 w-4 text-blue-700 dark:text-blue-400" />;
+    return <Mail className="h-4 w-4 text-info" />;
   }
   if (type === "Click") {
     return (
@@ -46,13 +44,13 @@ const getActivityIcon = (type: string) => {
     );
   }
   if (type === "Bounce") {
-    return <XCircle className="h-4 w-4 text-orange-700 dark:text-orange-400" />;
+    return <XCircle className="h-4 w-4 text-warning" />;
   }
   if (type === "Complaint") {
-    return <XCircle className="h-4 w-4 text-red-700 dark:text-red-400" />;
+    return <XCircle className="h-4 w-4 text-destructive" />;
   }
   if (type === "Reject") {
-    return <XCircle className="h-4 w-4 text-red-700 dark:text-red-400" />;
+    return <XCircle className="h-4 w-4 text-destructive" />;
   }
   return <Clock className="h-4 w-4 text-muted-foreground" />;
 };
@@ -159,7 +157,7 @@ export function RecentActivity({ orgSlug }: { orgSlug: string }) {
                           activity.eventType !== "Send" &&
                           activity.timestamp - activity.sentAt >
                             24 * 60 * 60 * 1000 && (
-                            <span className="text-muted-foreground/60">
+                            <span className="text-muted-foreground">
                               {" "}
                               · sent {formatRelativeTime(activity.sentAt)}
                             </span>

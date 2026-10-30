@@ -86,7 +86,7 @@ export function PricingComparisonSection() {
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-12">
-          <p className="text-brand font-medium text-sm mb-3 tracking-wide uppercase">
+          <p className="text-brand-text font-medium text-sm mb-3 tracking-wide uppercase">
             The real cost comparison
           </p>
           <h2 className="font-bold text-3xl md:text-4xl tracking-tight mb-4">
@@ -107,7 +107,7 @@ export function PricingComparisonSection() {
                 className={cn(
                   "group flex items-center gap-2 px-4 py-2.5 rounded-full border transition-all duration-200",
                   isActive
-                    ? "bg-brand border-brand text-white shadow-lg shadow-brand/25"
+                    ? "bg-primary border-brand text-primary-foreground shadow-lg shadow-brand/25"
                     : "bg-background border-border hover:border-brand/50 text-muted-foreground hover:text-foreground"
                 )}
                 key={useCase.id}
@@ -118,7 +118,7 @@ export function PricingComparisonSection() {
                   className={cn(
                     "size-4 transition-colors",
                     isActive
-                      ? "text-white"
+                      ? "text-brand-foreground"
                       : "text-muted-foreground group-hover:text-foreground"
                   )}
                 />
@@ -138,7 +138,7 @@ export function PricingComparisonSection() {
             <div className="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border">
               {/* Competitor Side */}
               <div className="p-8 md:p-10 relative">
-                <div className="absolute top-6 right-6 text-muted-foreground/50 text-xs font-medium uppercase tracking-wider">
+                <div className="absolute top-6 right-6 text-muted-foreground text-xs font-medium uppercase tracking-wider">
                   They charge
                 </div>
 
@@ -146,7 +146,7 @@ export function PricingComparisonSection() {
                   <p className="text-muted-foreground text-sm mb-1">
                     {activeCase.competitor.name}
                   </p>
-                  <p className="text-muted-foreground/70 text-xs">
+                  <p className="text-muted-foreground text-xs">
                     for {activeCase.competitor.metric}
                   </p>
                 </div>
@@ -154,10 +154,10 @@ export function PricingComparisonSection() {
                 <div className="relative inline-block">
                   {/* Strikethrough line */}
                   <div className="absolute top-1/2 -left-2 -right-2 h-0.5 bg-destructive/60 -rotate-6" />
-                  <span className="font-bold text-5xl md:text-6xl text-muted-foreground/40">
+                  <span className="font-bold text-5xl md:text-6xl text-muted-foreground">
                     ${activeCase.competitor.price}
                   </span>
-                  <span className="text-muted-foreground/40 text-xl ml-1">
+                  <span className="text-muted-foreground text-xl ml-1">
                     /mo
                   </span>
                 </div>
@@ -165,7 +165,7 @@ export function PricingComparisonSection() {
 
               {/* Wraps Side */}
               <div className="p-8 md:p-10 bg-linear-to-br from-brand/8 to-transparent relative">
-                <div className="absolute top-6 right-6 text-brand text-xs font-medium uppercase tracking-wider">
+                <div className="absolute top-6 right-6 text-brand-text text-xs font-medium uppercase tracking-wider">
                   You pay
                 </div>
 

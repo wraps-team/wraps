@@ -42,7 +42,7 @@ export function InfrastructureSection() {
               <StaggerItem key={point.text}>
                 <div className="flex items-start gap-4 rounded-lg border p-5 transition-colors hover:border-brand/50">
                   <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand/10">
-                    <Icon className="size-5 text-brand" />
+                    <Icon className="size-5 text-brand-text" />
                   </div>
                   <p className="text-foreground">{point.text}</p>
                 </div>

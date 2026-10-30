@@ -5,8 +5,8 @@ import { DEFAULT_PREFERENCE_THEME } from "../resolve";
 import { COLOR_TOKENS } from "../tokens";
 import { sanitizeTheme } from "../validate";
 
-// Reference L/C pairs parsed by hand from apps/web/src/app/globals.css's own
-// :root (lines 73-117) and .dark (lines 119-162) blocks. primary and
+// Reference L/C pairs parsed by hand from packages/ui/src/styles/theme.css's
+// own :root and .dark blocks. primary and
 // primary-foreground are intentionally excluded — buildThemeFromAccent always
 // overwrites those (accent itself + auto-contrast foreground), so they are
 // covered by the dedicated "auto foreground" test below instead.
@@ -27,12 +27,12 @@ const GLOBALS_CSS_REFERENCE: Record<
     "muted-foreground": { l: 0.556, c: 0 },
     accent: { l: 0.97, c: 0 },
     "accent-foreground": { l: 0.205, c: 0 },
-    destructive: { l: 0.577, c: 0.245 },
+    destructive: { l: 0.413, c: 0.167 },
     "destructive-foreground": { l: 0.985, c: 0 },
-    success: { l: 0.5, c: 0.15 },
+    success: { l: 0.39, c: 0.122 },
     "success-foreground": { l: 0.985, c: 0 },
-    warning: { l: 0.52, c: 0.125 },
-    "warning-foreground": { l: 0.205, c: 0 },
+    warning: { l: 0.411, c: 0.101 },
+    "warning-foreground": { l: 0.985, c: 0 },
     border: { l: 0.922, c: 0 },
     input: { l: 0.922, c: 0 },
     ring: { l: 0.708, c: 0 },
@@ -50,12 +50,12 @@ const GLOBALS_CSS_REFERENCE: Record<
     "muted-foreground": { l: 0.708, c: 0 },
     accent: { l: 0.269, c: 0 },
     "accent-foreground": { l: 0.985, c: 0 },
-    destructive: { l: 0.704, c: 0.191 },
-    "destructive-foreground": { l: 0.985, c: 0 },
-    success: { l: 0.65, c: 0.2 },
-    "success-foreground": { l: 0.985, c: 0 },
-    warning: { l: 0.8, c: 0.18 },
-    "warning-foreground": { l: 0.205, c: 0 },
+    destructive: { l: 0.811, c: 0.105 },
+    "destructive-foreground": { l: 0.145, c: 0 },
+    success: { l: 0.775, c: 0.2 },
+    "success-foreground": { l: 0.145, c: 0 },
+    warning: { l: 0.807, c: 0.126 },
+    "warning-foreground": { l: 0.145, c: 0 },
     border: { l: 1, c: 0 },
     input: { l: 1, c: 0 },
     ring: { l: 0.556, c: 0 },
@@ -72,7 +72,7 @@ function parseOutputOklch(value: string): { l: number; c: number; h: number } {
 
 describe("buildThemeFromAccent", () => {
   // Write this test first — it is the proof the ramp is seeded correctly.
-  it("reproduces globals.css's own values within tolerance for a zero-chroma accent", () => {
+  it("reproduces the dashboard theme's own values within tolerance for a zero-chroma accent", () => {
     const theme = buildThemeFromAccent(
       "oklch(0.205 0 0)",
       DEFAULT_PREFERENCE_THEME

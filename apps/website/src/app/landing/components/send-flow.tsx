@@ -25,7 +25,7 @@ const TIMELINE: Timeline = [
 
 export const SEND_FLOW = { final: 6, timeline: TIMELINE, loopMs: 9000 };
 
-const KW = "text-brand";
+const KW = "text-brand-text";
 const STR = "text-success";
 const FG = "text-foreground";
 const MUTED = "text-muted-foreground";

@@ -122,7 +122,7 @@ const faqSchema = {
   })),
 };
 
-const linkClass = "text-brand underline underline-offset-2";
+const linkClass = "text-brand-text underline underline-offset-2";
 
 export default function MxLookupPage() {
   return (
@@ -140,7 +140,7 @@ export default function MxLookupPage() {
                 <span>wraps · free tool</span>
               </div>
               <h1 className="mb-4 text-pretty font-heading font-semibold text-3xl tracking-tight sm:text-5xl">
-                MX Record <span className="text-brand">Lookup</span>
+                MX Record <span className="text-brand-text">Lookup</span>
               </h1>
               <p className="max-w-2xl text-base text-muted-foreground sm:text-lg">
                 Look up a domain's mail servers, their priorities, and whether

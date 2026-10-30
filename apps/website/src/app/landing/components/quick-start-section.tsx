@@ -102,7 +102,7 @@ export function QuickStartSection() {
             <div className="flex items-center gap-3">
               <IconBox highlighted icon={Terminal} />
               <div>
-                <h3 className="font-semibold text-brand">
+                <h3 className="font-semibold text-brand-text">
                   Deploy Infrastructure
                 </h3>
                 <p className="text-muted-foreground text-sm">
@@ -156,7 +156,7 @@ export function QuickStartSection() {
                 "Zero stored credentials (OIDC)",
               ].map((item) => (
                 <div className="flex items-center gap-2" key={item}>
-                  <Check className="size-4 text-brand" />
+                  <Check className="size-4 text-brand-text" />
                   <span className="text-sm">{item}</span>
                 </div>
               ))}
@@ -168,7 +168,7 @@ export function QuickStartSection() {
             <div className="flex items-center gap-3">
               <IconBox highlighted icon={Code2} />
               <div>
-                <h3 className="font-semibold text-brand">
+                <h3 className="font-semibold text-brand-text">
                   Install SDK & Send Emails
                 </h3>
                 <p className="text-muted-foreground text-sm">
@@ -244,7 +244,7 @@ export function QuickStartSection() {
                 "Detailed error messages",
               ].map((item) => (
                 <div className="flex items-center gap-2" key={item}>
-                  <Check className="size-4 text-brand" />
+                  <Check className="size-4 text-brand-text" />
                   <span className="text-sm">{item}</span>
                 </div>
               ))}

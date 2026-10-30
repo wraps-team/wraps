@@ -326,7 +326,7 @@ export function WorkflowToolbar({
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="flex items-center gap-1.5 text-red-600 text-sm">
+                <div className="flex items-center gap-1.5 text-destructive text-sm">
                   <AlertCircle className="h-4 w-4" />
                   <span>
                     {errorCount} issue{errorCount > 1 ? "s" : ""}

@@ -750,7 +750,7 @@ export default function KlaviyoVsWrapsPage() {
                           </div>
                         </td>
                         <td className="p-4">
-                          <span className="font-mono text-2xs text-brand tracking-widest">
+                          <span className="font-mono text-2xs text-brand-text tracking-widest">
                             {row.savings}
                           </span>
                         </td>

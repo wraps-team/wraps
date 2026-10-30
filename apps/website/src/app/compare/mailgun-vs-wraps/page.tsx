@@ -679,7 +679,7 @@ export default function MailgunVsWrapsPage() {
                         </td>
                         <td className="hidden p-4 sm:table-cell">
                           {row.savings ? (
-                            <span className="font-mono text-2xs text-brand uppercase tracking-widest">
+                            <span className="font-mono text-2xs text-brand-text uppercase tracking-widest">
                               {row.savings} less
                             </span>
                           ) : null}

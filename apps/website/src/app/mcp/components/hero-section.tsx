@@ -60,13 +60,13 @@ export function McpHeroSection() {
 
             <h1 className="mb-6 text-pretty font-heading font-semibold text-4xl leading-tight tracking-tight sm:text-5xl">
               The MCP server for email{" "}
-              <span className="text-brand">your agent owns.</span>
+              <span className="text-brand-text">your agent owns.</span>
             </h1>
 
             {/* Mono anchor: the install command IS the marketing */}
             <pre className="mb-6 overflow-x-auto rounded-lg border border-border bg-card/60 px-4 py-3 font-mono text-sm leading-relaxed text-foreground/90">
               <span className="text-muted-foreground">$</span> npx -y{" "}
-              <span className="text-brand">@wraps.dev/mcp</span>
+              <span className="text-brand-text">@wraps.dev/mcp</span>
             </pre>
 
             <p className="mb-6 max-w-md text-muted-foreground">

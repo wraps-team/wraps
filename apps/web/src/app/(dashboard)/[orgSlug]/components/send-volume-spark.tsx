@@ -121,8 +121,8 @@ export function SendVolumeSpark({
                 <span
                   className={
                     trend > 0
-                      ? "text-xs text-green-600 dark:text-green-400"
-                      : "text-xs text-red-600 dark:text-red-400"
+                      ? "text-xs text-success"
+                      : "text-xs text-destructive"
                   }
                 >
                   {trend > 0 ? "+" : ""}

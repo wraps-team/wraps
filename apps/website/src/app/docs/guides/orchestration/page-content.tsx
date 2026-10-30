@@ -227,7 +227,7 @@ export default function OrchestrationPageContent() {
           </div>
           <ArrowDown className="h-4 w-4 text-muted-foreground" />
           <div className="flex items-center gap-2 rounded-lg border bg-background px-4 py-2">
-            <GitBranch className="h-4 w-4 text-brand" />
+            <GitBranch className="h-4 w-4 text-brand-text" />
             <span className="font-medium text-sm">Opened?</span>
           </div>
           <div className="flex gap-8">

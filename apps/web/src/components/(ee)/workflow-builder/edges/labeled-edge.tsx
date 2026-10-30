@@ -75,22 +75,19 @@ export function LabeledEdge({
 
   if (sourceHandleId === "yes") {
     label = "Yes";
-    labelColor =
-      "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400";
+    labelColor = "bg-success/15 text-success";
   } else if (sourceHandleId === "no") {
     label = "No";
-    labelColor = "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-400";
+    labelColor = "bg-destructive/15 text-destructive";
   } else if (sourceHandleId === "timeout") {
     label = "Timeout";
-    labelColor =
-      "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-400";
+    labelColor = "bg-warning/15 text-warning";
   } else if (sourceHandleId === "default") {
     label = "Default";
     labelColor = "bg-muted text-muted-foreground";
   } else if (sourceHandleId === "engaged") {
     label = "Engaged";
-    labelColor =
-      "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400";
+    labelColor = "bg-success/15 text-success";
   } else if (sourceHandleId === "exhausted") {
     label = "Exhausted";
     labelColor = "bg-muted text-muted-foreground";

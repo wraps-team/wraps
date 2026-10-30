@@ -88,15 +88,15 @@ export function EmailArchiveViewer({
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <CheckCircle2 className="h-4 w-4 text-success" />
                 <span>View rendered HTML emails</span>
               </div>
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <CheckCircle2 className="h-4 w-4 text-success" />
                 <span>Access email attachments</span>
               </div>
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <CheckCircle2 className="h-4 w-4 text-success" />
                 <span>Inspect headers and SMTP metadata</span>
               </div>
             </div>
@@ -210,7 +210,7 @@ export function EmailArchiveViewer({
               <CardTitle className="flex items-center gap-2">
                 Email Archive
                 <Badge className="gap-1" variant="outline">
-                  <CheckCircle2 className="h-3 w-3 text-green-500" />
+                  <CheckCircle2 className="h-3 w-3 text-success" />
                   Archived
                 </Badge>
               </CardTitle>

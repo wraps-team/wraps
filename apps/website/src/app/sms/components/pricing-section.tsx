@@ -86,7 +86,9 @@ export function SmsPricingSection() {
                       <td className="py-3 font-mono text-muted-foreground">
                         {row.number}
                       </td>
-                      <td className="py-3 font-mono text-brand">{row.total}</td>
+                      <td className="py-3 font-mono text-brand-text">
+                        {row.total}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -116,7 +118,7 @@ export function SmsPricingSection() {
                   <tr className="text-left">
                     <th className={headerCellClass}>Feature</th>
                     <th className={`${headerCellClass} text-center`}>
-                      <span className="text-brand">Wraps</span>
+                      <span className="text-brand-text">Wraps</span>
                     </th>
                     <th className={`${headerCellClass} text-center`}>Twilio</th>
                   </tr>
@@ -129,7 +131,7 @@ export function SmsPricingSection() {
                         {row.wraps ? (
                           <Check
                             aria-label="Yes"
-                            className="mx-auto size-4 text-brand"
+                            className="mx-auto size-4 text-brand-text"
                           />
                         ) : (
                           <X

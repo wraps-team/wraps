@@ -30,7 +30,7 @@ export function SdkHeroSection() {
             </div>
 
             <h1 className="mb-6 text-pretty font-heading font-semibold text-4xl leading-tight tracking-tight sm:text-5xl">
-              Communication <span className="text-brand">as code.</span>
+              Communication <span className="text-brand-text">as code.</span>
             </h1>
 
             <p className="mb-5 max-w-md text-muted-foreground">

@@ -17,9 +17,9 @@ const sizeMap = {
 
 const fadeMap = {
   ellipse:
-    "[mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_70%,transparent_100%)]",
+    "[mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,black_70%,transparent_100%)]",
   circle:
-    "[mask-image:radial-gradient(circle_at_50%_50%,#000_70%,transparent_100%)]",
+    "[mask-image:radial-gradient(circle_at_50%_50%,black_70%,transparent_100%)]",
   none: "",
 };
 
@@ -38,7 +38,7 @@ export function DotPattern({
   return (
     <div
       className={cn(
-        "absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] dark:bg-[radial-gradient(#374151_1px,transparent_1px)]",
+        "absolute inset-0 bg-[radial-gradient(var(--border)_1px,transparent_1px)] dark:bg-[radial-gradient(var(--input)_1px,transparent_1px)]",
         sizeMap[size],
         fadeMap[fadeStyle],
         opacityMap[opacity],
@@ -63,7 +63,7 @@ export function DotPatternLight({
   return (
     <div
       className={cn(
-        "absolute inset-0 bg-[radial-gradient(#d1d5db_1px,transparent_1px)]",
+        "absolute inset-0 bg-[radial-gradient(var(--input)_1px,transparent_1px)]",
         sizeMap[size],
         fadeMap[fadeStyle],
         opacityMap[opacity],
@@ -88,7 +88,7 @@ export function DotPatternDark({
   return (
     <div
       className={cn(
-        "absolute inset-0 bg-[radial-gradient(#4b5563_1px,transparent_1px)]",
+        "absolute inset-0 bg-[radial-gradient(var(--muted-foreground)_1px,transparent_1px)]",
         sizeMap[size],
         fadeMap[fadeStyle],
         opacityMap[opacity],

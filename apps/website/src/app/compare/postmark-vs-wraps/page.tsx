@@ -671,7 +671,7 @@ export default function PostmarkVsWrapsPage() {
                           </div>
                         </td>
                         <td className="p-4">
-                          <span className="font-mono text-2xs text-brand uppercase tracking-widest">
+                          <span className="font-mono text-2xs text-brand-text uppercase tracking-widest">
                             {row.savings} less
                           </span>
                         </td>

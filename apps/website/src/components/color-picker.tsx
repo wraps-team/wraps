@@ -63,7 +63,7 @@ export function ColorPicker({
            * arbitrary user-chosen color, which Button's variant system
            * can't express since Button owns its own color. */}
           <button
-            className="h-8 w-8 cursor-pointer overflow-hidden rounded-md border bg-(--preview-color) shadow-xs outline-none transition-all focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="h-8 w-8 cursor-pointer overflow-hidden rounded-md border bg-(--preview-color) shadow-xs outline-none transition-all focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring"
             style={{ "--preview-color": displayColor } as React.CSSProperties}
             type="button"
           >

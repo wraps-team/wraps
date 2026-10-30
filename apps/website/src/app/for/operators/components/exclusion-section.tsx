@@ -52,7 +52,7 @@ export function OperatorsExclusionSection() {
               ].map(([field, ops]) => (
                 <li className="flex flex-col gap-0.5" key={field}>
                   <span className="text-foreground">{field}</span>
-                  <span className="text-muted-foreground/80">{ops}</span>
+                  <span className="text-muted-foreground">{ops}</span>
                 </li>
               ))}
             </ul>

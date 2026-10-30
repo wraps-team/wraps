@@ -130,7 +130,7 @@ export function createColumns({
       cell: ({ row }) => (
         <div className="max-w-[400px]">
           <Link
-            className="block truncate rounded-sm outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            className="block truncate rounded-sm outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring"
             href={`/${orgSlug}/emails/${row.original.id}${listQuery ? `?${listQuery}` : ""}`}
             onClick={(event) => {
               // The row's own handler would navigate a second time.

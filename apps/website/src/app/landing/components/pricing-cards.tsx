@@ -29,7 +29,7 @@ function PricingCard({
           <div className="mb-2 flex items-center gap-2">
             <h3 className="font-bold text-lg">{plan.name}</h3>
             {isFree && (
-              <span className="rounded-full bg-brand/10 px-2 py-0.5 font-semibold text-brand text-3xs">
+              <span className="rounded-full bg-brand/10 px-2 py-0.5 font-semibold text-brand-text text-3xs">
                 Free Forever
               </span>
             )}
@@ -49,7 +49,7 @@ function PricingCard({
         <ul className="mb-6 flex-1 space-y-2">
           {plan.features.map((feature) => (
             <li className="flex items-start gap-2" key={feature}>
-              <Check className="mt-0.5 size-3 shrink-0 text-brand/70" />
+              <Check className="mt-0.5 size-3 shrink-0 text-brand-text" />
               <span className="text-sm">{feature}</span>
             </li>
           ))}

@@ -210,7 +210,7 @@ export function SmsTemplateEditor({
                 <span
                   className={cn(
                     "text-muted-foreground",
-                    segmentInfo.length > SMS_SEGMENT_LENGTH && "text-yellow-600"
+                    segmentInfo.length > SMS_SEGMENT_LENGTH && "text-warning"
                   )}
                 >
                   {segmentInfo.length} / {segmentInfo.segmentLength} characters
@@ -221,7 +221,7 @@ export function SmsTemplateEditor({
                   )}
                 </span>
                 {segmentInfo.isUnicode && (
-                  <span className="text-yellow-600">
+                  <span className="text-warning">
                     Unicode detected (70 char/segment)
                   </span>
                 )}
@@ -233,7 +233,7 @@ export function SmsTemplateEditor({
         {/* Preview */}
         <div className="w-80 border-l bg-muted/30 p-6">
           <Label className="mb-3 block">Preview</Label>
-          <div className="rounded-2xl bg-green-600 p-3">
+          <div className="rounded-2xl bg-success p-3">
             <div className="rounded-xl bg-card p-3 text-sm">
               {body || (
                 <span className="text-muted-foreground italic">

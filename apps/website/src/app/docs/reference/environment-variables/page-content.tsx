@@ -156,7 +156,7 @@ function EnvTable({
               <td className="px-4 py-2">{row.description}</td>
               <td className="px-4 py-2">
                 {row.defaultValue === "-" ? (
-                  <span className="text-muted-foreground/50">-</span>
+                  <span className="text-muted-foreground">-</span>
                 ) : (
                   <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
                     {row.defaultValue}

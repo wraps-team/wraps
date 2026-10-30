@@ -11,10 +11,10 @@ export function FeatureCell({ value }: { value: FeatureValue }) {
     return <Check aria-label="Yes" className="size-4 text-success" />;
   }
   if (value === false || value === "no") {
-    return <X aria-label="No" className="size-4 text-muted-foreground/50" />;
+    return <X aria-label="No" className="size-4 text-muted-foreground" />;
   }
   if (value === "partial") {
-    return <Minus aria-label="Partial" className="size-4 text-brand" />;
+    return <Minus aria-label="Partial" className="size-4 text-brand-text" />;
   }
   return <span className="text-muted-foreground text-sm">{value}</span>;
 }

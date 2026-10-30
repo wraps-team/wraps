@@ -46,17 +46,11 @@ type ChannelHealth = {
 function getHealthIcon(level: HealthLevel) {
   switch (level) {
     case "healthy":
-      return (
-        <CheckCircleIcon className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
-      );
+      return <CheckCircleIcon className="h-3.5 w-3.5 text-success" />;
     case "warning":
-      return (
-        <AlertTriangleIcon className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-      );
+      return <AlertTriangleIcon className="h-3.5 w-3.5 text-warning" />;
     case "critical":
-      return (
-        <XCircleIcon className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
-      );
+      return <XCircleIcon className="h-3.5 w-3.5 text-destructive" />;
     case "unknown":
       return <CircleDashedIcon className="h-3.5 w-3.5 text-muted-foreground" />;
   }
@@ -72,21 +66,21 @@ const OVERALL_ICON = {
 const overallConfig = {
   healthy: {
     label: "All systems healthy",
-    color: "text-green-600 dark:text-green-400",
-    bg: "bg-green-500/10",
-    border: "border-green-500/20",
+    color: "text-success",
+    bg: "bg-success/10",
+    border: "border-success/20",
   },
   warning: {
     label: "Needs attention",
-    color: "text-amber-600 dark:text-amber-400",
-    bg: "bg-amber-500/10",
-    border: "border-amber-500/20",
+    color: "text-warning",
+    bg: "bg-warning/10",
+    border: "border-warning/20",
   },
   critical: {
     label: "Action required",
-    color: "text-red-600 dark:text-red-400",
-    bg: "bg-red-500/10",
-    border: "border-red-500/20",
+    color: "text-destructive",
+    bg: "bg-destructive/10",
+    border: "border-destructive/20",
   },
   unknown: {
     label: "Health not yet checked",

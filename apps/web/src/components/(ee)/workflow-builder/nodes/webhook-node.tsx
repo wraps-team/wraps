@@ -41,7 +41,7 @@ export function WebhookNode({ id, data, selected }: WebhookNodeProps) {
 
   return (
     <BaseNode
-      accentColor="bg-cyan-500"
+      accentColor="bg-cyan-700"
       description={description}
       errorMessage={errorMessage}
       hasInput={true}

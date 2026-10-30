@@ -114,7 +114,7 @@ export function AgentsRecipeSection() {
             <p className="mb-4 text-muted-foreground">
               Wire{" "}
               <Link
-                className="text-brand underline decoration-brand/30 underline-offset-4 hover:decoration-brand/60"
+                className="text-brand-text underline decoration-brand/30 underline-offset-4 hover:decoration-brand/60"
                 href="/docs/guides/context7"
               >
                 Context7
@@ -165,7 +165,7 @@ export function AgentsRecipeSection() {
 
         <Card className="mt-8 border-brand/30 bg-brand/5">
           <CardContent className="flex items-start gap-3 p-6">
-            <Bot className="mt-0.5 h-5 w-5 shrink-0 text-brand" />
+            <Bot className="mt-0.5 h-5 w-5 shrink-0 text-brand-text" />
             <div>
               <p className="font-medium">
                 3. Give your agent live access with the Wraps MCP server.
@@ -178,7 +178,7 @@ export function AgentsRecipeSection() {
                 suppression list as MCP tools — plus sending that refuses until
                 you enable it. Your credentials never leave your machine.{" "}
                 <Link
-                  className="text-brand underline decoration-brand/30 underline-offset-4 hover:decoration-brand/60"
+                  className="text-brand-text underline decoration-brand/30 underline-offset-4 hover:decoration-brand/60"
                   href="/mcp"
                 >
                   Meet the MCP server

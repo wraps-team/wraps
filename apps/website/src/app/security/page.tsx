@@ -331,7 +331,7 @@ export default function SecurityPage() {
                     <li className="flex gap-2.5" key={item}>
                       <X
                         aria-hidden="true"
-                        className="mt-0.5 size-4 shrink-0 text-muted-foreground/70"
+                        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
                       />
                       {item}
                     </li>
@@ -458,7 +458,7 @@ export default function SecurityPage() {
                         <td className="p-4 text-muted-foreground">
                           {row.where}
                           {row.ours ? (
-                            <span className="ml-2 inline-block rounded bg-brand/10 px-1.5 py-0.5 font-medium text-2xs text-brand/20">
+                            <span className="ml-2 inline-block rounded bg-brand/10 px-1.5 py-0.5 font-medium text-2xs text-brand-text">
                               Wraps holds this
                             </span>
                           ) : null}
@@ -509,7 +509,7 @@ export default function SecurityPage() {
                   ) : (
                     <X
                       aria-hidden="true"
-                      className="mt-0.5 size-5 shrink-0 text-muted-foreground/60"
+                      className="mt-0.5 size-5 shrink-0 text-muted-foreground"
                     />
                   )}
                   <div>

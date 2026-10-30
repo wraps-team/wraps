@@ -129,12 +129,12 @@ export default function Page() {
           <div className="absolute inset-0 bg-radial-top from-brand/20 via-transparent to-transparent" />
 
           <div className="relative mx-auto max-w-4xl px-6 pt-20 pb-16">
-            <div className="mb-4 flex items-center gap-2 font-medium text-brand text-sm">
+            <div className="mb-4 flex items-center gap-2 font-medium text-brand-text text-sm">
               <Inbox size={16} />
               <span>Engineering</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">8 min read</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">Wraps Team</span>
             </div>
 
@@ -153,19 +153,19 @@ export default function Page() {
 
             <div className="mt-8 flex flex-wrap gap-4">
               <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
-                <Clock className="text-brand" size={16} />
+                <Clock className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Deploy in minutes
                 </span>
               </div>
               <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
-                <Zap className="text-brand" size={16} />
+                <Zap className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Real-time webhooks
                 </span>
               </div>
               <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
-                <Shield className="text-brand" size={16} />
+                <Shield className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Spam &amp; virus detection
                 </span>
@@ -178,7 +178,7 @@ export default function Page() {
           {/* Why Inbound Email */}
           <section>
             <h2 className="mb-8 flex items-center gap-3 font-bold text-3xl">
-              <Inbox className="text-brand" />
+              <Inbox className="text-brand-text" />
               Why Inbound Email?
             </h2>
 
@@ -204,7 +204,7 @@ export default function Page() {
                     SES, S3, Lambda, and EventBridge
                   </strong>{" "}
                   working together.{" "}
-                  <span className="font-semibold text-brand">
+                  <span className="font-semibold text-brand-text">
                     Your data never leaves your AWS account.
                   </span>
                 </p>
@@ -221,7 +221,7 @@ export default function Page() {
           {/* Architecture */}
           <section>
             <h2 className="mb-8 flex items-center gap-3 font-bold text-3xl">
-              <Zap className="text-brand" />
+              <Zap className="text-brand-text" />
               How It Works
             </h2>
 
@@ -300,7 +300,7 @@ export default function Page() {
                     className="flex items-center gap-2 text-foreground/80 text-sm"
                     key={item}
                   >
-                    <Check className="text-brand" size={14} />
+                    <Check className="text-brand-text" size={14} />
                     {item}
                   </li>
                 ))}
@@ -470,11 +470,11 @@ TTL: 3600`}
                 Build support inboxes, automate workflows, and own your data.
               </p>
               <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-                <div className="rounded-xl border bg-muted/30 px-6 py-3 font-mono text-brand">
+                <div className="rounded-xl border bg-muted/30 px-6 py-3 font-mono text-brand-text">
                   npx @wraps.dev/cli email inbound init
                 </div>
                 <a
-                  className="flex items-center gap-2 rounded-xl bg-brand px-6 py-3 font-semibold text-white transition-colors hover:bg-brand/90"
+                  className="flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
                   href="/inbound"
                 >
                   Learn More

@@ -14,7 +14,8 @@ export type FaqItem = {
   richAnswer?: ReactNode;
 };
 
-const faqLink = "text-foreground underline underline-offset-2 hover:text-brand";
+const faqLink =
+  "text-foreground underline underline-offset-2 hover:text-brand-text";
 const faqCode =
   "rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground";
 

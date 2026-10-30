@@ -69,7 +69,7 @@ export function PlanSelector({
             {/* Early adopter badge */}
             {isEarlyAdopter && (
               <div className="-top-3 -translate-x-1/2 absolute left-1/2">
-                <span className="inline-flex items-center gap-1 rounded-full bg-green-600 px-3 py-1 font-medium text-primary-foreground text-xs">
+                <span className="inline-flex items-center gap-1 rounded-full bg-success px-3 py-1 font-medium text-primary-foreground text-xs">
                   Early Adopter
                 </span>
               </div>
@@ -123,7 +123,7 @@ export function PlanSelector({
                 </p>
               )}
               {id !== "free" && billingInterval === "annual" && annualTotal && (
-                <p className="mt-1 text-green-600 text-sm">${annualTotal}/yr</p>
+                <p className="mt-1 text-success text-sm">${annualTotal}/yr</p>
               )}
             </div>
 
@@ -131,7 +131,7 @@ export function PlanSelector({
             <ul className="space-y-2">
               {plan.featureList.map((feature) => (
                 <li className="flex items-start gap-2 text-sm" key={feature}>
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" />
                   <span className="text-muted-foreground">{feature}</span>
                 </li>
               ))}

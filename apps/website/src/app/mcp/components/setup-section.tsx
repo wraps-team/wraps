@@ -119,7 +119,7 @@ export function McpSetupSection() {
               GUI clients don't inherit your shell, so pass the region and
               profile explicitly. Full per-client setup lives in{" "}
               <Link
-                className="text-brand underline decoration-brand/30 underline-offset-4 hover:decoration-brand/60"
+                className="text-brand-text underline decoration-brand/30 underline-offset-4 hover:decoration-brand/60"
                 href="/docs/mcp-reference"
               >
                 the MCP reference
@@ -132,7 +132,7 @@ export function McpSetupSection() {
               <code className="text-foreground">dev.wraps/docs</code>, and are
               listed on Smithery:{" "}
               <a
-                className="text-brand underline decoration-brand/30 underline-offset-4 hover:decoration-brand/60"
+                className="text-brand-text underline decoration-brand/30 underline-offset-4 hover:decoration-brand/60"
                 href="https://smithery.ai/servers/wraps/email"
                 rel="noopener noreferrer"
                 target="_blank"
@@ -141,7 +141,7 @@ export function McpSetupSection() {
               </a>{" "}
               and{" "}
               <a
-                className="text-brand underline decoration-brand/30 underline-offset-4 hover:decoration-brand/60"
+                className="text-brand-text underline decoration-brand/30 underline-offset-4 hover:decoration-brand/60"
                 href="https://smithery.ai/servers/wraps/docs"
                 rel="noopener noreferrer"
                 target="_blank"

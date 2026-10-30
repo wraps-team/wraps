@@ -170,14 +170,14 @@ export default function Page() {
           <div className="absolute inset-0 bg-radial-top from-brand/20 via-transparent to-transparent" />
 
           <div className="relative mx-auto max-w-4xl px-6 pt-20 pb-16">
-            <div className="mb-4 flex items-center gap-2 font-medium text-brand text-sm">
+            <div className="mb-4 flex items-center gap-2 font-medium text-brand-text text-sm">
               <Receipt size={16} />
               <span>Research</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">12 min read</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">Wraps Team</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">July 21, 2026</span>
             </div>
 
@@ -199,19 +199,19 @@ export default function Page() {
 
             <div className="mt-8 flex flex-wrap gap-4">
               <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
-                <Globe className="text-brand" size={16} />
+                <Globe className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Set per account, per Region
                 </span>
               </div>
               <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
-                <Layers className="text-brand" size={16} />
+                <Layers className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   À la carte survives at $0.10/1K
                 </span>
               </div>
               <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
-                <Calculator className="text-brand" size={16} />
+                <Calculator className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Defaulted accounts can leave immediately
                 </span>
@@ -276,7 +276,7 @@ export default function Page() {
           {/* The table */}
           <section>
             <h2 className="mb-6 flex items-center gap-3 font-bold text-3xl">
-              <Layers className="text-brand" />
+              <Layers className="text-brand-text" />
               The four pricing modes
             </h2>
 
@@ -394,7 +394,7 @@ export default function Page() {
           {/* Per region */}
           <section>
             <h2 className="mb-6 flex items-center gap-3 font-bold text-3xl">
-              <Globe className="text-brand" />
+              <Globe className="text-brand-text" />
               Plans are per account <em>and</em> per Region
             </h2>
 
@@ -659,7 +659,7 @@ export default function Page() {
           {/* APIs */}
           <section>
             <h2 className="mb-6 flex items-center gap-3 font-bold text-3xl">
-              <Terminal className="text-brand" />
+              <Terminal className="text-brand-text" />
               Reading and setting the plan from the API
             </h2>
 
@@ -757,7 +757,7 @@ Content-type: application/json
           {/* What it costs */}
           <section>
             <h2 className="mb-6 flex items-center gap-3 font-bold text-3xl">
-              <Calculator className="text-brand" />
+              <Calculator className="text-brand-text" />
               What the difference actually costs
             </h2>
 
@@ -845,7 +845,7 @@ Content-type: application/json
             <p className="mb-4 text-foreground/80 text-lg leading-relaxed">
               You don't have to take our word for it. The same math runs behind{" "}
               <a
-                className="text-brand underline underline-offset-4 hover:text-brand"
+                className="text-brand-text underline underline-offset-4 hover:text-brand-text"
                 href="/tools/ses-calculator"
               >
                 the SES calculator
@@ -1069,11 +1069,11 @@ curl 'https://wraps.dev/api/pricing/estimate?emails=500000&events=250000&tier=gr
                 billed to your own AWS account.
               </p>
               <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-                <div className="rounded-xl border bg-muted/30 px-6 py-3 font-mono text-brand">
+                <div className="rounded-xl border bg-muted/30 px-6 py-3 font-mono text-brand-text">
                   GET /api/pricing/estimate
                 </div>
                 <a
-                  className="flex items-center gap-2 rounded-xl bg-brand px-6 py-3 font-semibold text-white transition-colors hover:bg-brand"
+                  className="flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
                   href="/tools/ses-calculator"
                 >
                   Open the Calculator

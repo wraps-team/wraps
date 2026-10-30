@@ -789,8 +789,9 @@ export default function AmazonSesVsWrapsPage() {
 
             <p className="mt-4 text-muted-foreground text-xs">
               <Check className="mb-0.5 inline size-3 text-success" /> = built-in
-              or included, <Minus className="mb-0.5 inline size-3 text-brand" />{" "}
-              = possible but requires manual setup,{" "}
+              or included,{" "}
+              <Minus className="mb-0.5 inline size-3 text-brand-text" /> =
+              possible but requires manual setup,{" "}
               <X className="mb-0.5 inline size-3 text-destructive" /> = not
               available
             </p>

@@ -47,7 +47,7 @@ export function CliHeroSection() {
             {/* Main Headline */}
             <h1 className="mb-6 text-pretty font-heading font-semibold text-4xl leading-tight tracking-tight sm:text-5xl">
               Deploy email, SMS, and CDN to your AWS{" "}
-              <span className="text-brand">in one command.</span>
+              <span className="text-brand-text">in one command.</span>
             </h1>
 
             {/* Subheading */}

@@ -247,7 +247,7 @@ export function LandingNavbar() {
                     <span className="inline-flex items-center gap-1.5">
                       {item.name}
                       {item.badge && (
-                        <span className="rounded-full bg-brand/10 px-1.5 py-0.5 font-medium text-3xs text-brand">
+                        <span className="rounded-full bg-brand/10 px-1.5 py-0.5 font-medium text-3xs text-brand-text">
                           {item.badge}
                         </span>
                       )}
@@ -439,7 +439,7 @@ export function LandingNavbar() {
                         >
                           {item.name}
                           {item.badge && (
-                            <span className="rounded-full bg-brand/10 px-2 py-0.5 font-medium text-brand text-xs">
+                            <span className="rounded-full bg-brand/10 px-2 py-0.5 font-medium text-brand-text text-xs">
                               {item.badge}
                             </span>
                           )}

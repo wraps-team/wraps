@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
  */
 export function underlineTabClass(active: boolean): string {
   return cn(
-    "inline-flex items-center gap-2 whitespace-nowrap rounded-none border-b-2 px-1 pt-1 pb-2.5 font-medium text-sm transition-colors focus-visible:outline-1 focus-visible:outline-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+    "inline-flex items-center gap-2 whitespace-nowrap rounded-none border-b-2 px-1 pt-1 pb-2.5 font-medium text-sm transition-colors focus-visible:outline-1 focus-visible:outline-ring focus-visible:ring-3 focus-visible:ring-ring",
     active
       ? "border-brand text-foreground"
       : "border-transparent text-muted-foreground hover:text-foreground"

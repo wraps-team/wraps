@@ -193,7 +193,7 @@ export default function UpgradePage() {
             <CardDescription>
               {plan.description}
               {hasEarlyAdopterPricing(plan) && (
-                <span className="ml-2 text-green-600">
+                <span className="ml-2 text-success">
                   Early adopter pricing - locked forever
                 </span>
               )}

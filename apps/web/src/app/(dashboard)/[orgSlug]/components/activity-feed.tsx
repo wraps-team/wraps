@@ -22,7 +22,7 @@ const typeConfig: Record<
 > = {
   broadcast: {
     icon: SendIcon,
-    color: "text-blue-600 dark:text-blue-400",
+    color: "text-info",
     label: "Broadcast",
   },
   event: {
@@ -32,7 +32,7 @@ const typeConfig: Record<
   },
   workflow: {
     icon: WorkflowIcon,
-    color: "text-amber-600 dark:text-amber-400",
+    color: "text-warning",
     label: "Workflow",
   },
 };

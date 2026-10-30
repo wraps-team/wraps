@@ -45,7 +45,7 @@ export function MarketingMeasurementSection() {
                 className="rounded-xl border border-border bg-card/60 p-5"
                 key={title}
               >
-                <div className="mb-2 font-mono text-2xs text-brand uppercase tracking-eyebrow">
+                <div className="mb-2 font-mono text-2xs text-brand-text uppercase tracking-eyebrow">
                   {stat}
                 </div>
                 <h3 className="mb-1.5 font-medium text-base tracking-tight">

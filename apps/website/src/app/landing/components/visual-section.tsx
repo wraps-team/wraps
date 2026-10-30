@@ -40,7 +40,7 @@ export function VisualSection() {
                 width={600}
               />
             </div>
-            <h3 className="font-semibold text-lg group-hover:text-brand transition-colors">
+            <h3 className="font-semibold text-lg group-hover:text-brand-text transition-colors">
               Template Editor
             </h3>
             <p className="text-sm text-muted-foreground">
@@ -69,7 +69,7 @@ export function VisualSection() {
                 width={600}
               />
             </div>
-            <h3 className="font-semibold text-lg group-hover:text-brand transition-colors">
+            <h3 className="font-semibold text-lg group-hover:text-brand-text transition-colors">
               Workflow Builder
             </h3>
             <p className="text-sm text-muted-foreground">
@@ -99,7 +99,7 @@ export function VisualSection() {
                 width={600}
               />
             </div>
-            <h3 className="font-semibold text-lg group-hover:text-brand transition-colors">
+            <h3 className="font-semibold text-lg group-hover:text-brand-text transition-colors">
               Broadcasts
             </h3>
             <p className="text-sm text-muted-foreground">

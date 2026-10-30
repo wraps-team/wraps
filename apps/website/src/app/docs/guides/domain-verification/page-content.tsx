@@ -178,7 +178,7 @@ export default function DomainVerificationPageContent() {
                     AWS Route53
                   </td>
                   <td className="py-2">
-                    <span className="text-muted-foreground/70">
+                    <span className="text-muted-foreground">
                       (uses AWS credentials)
                     </span>
                   </td>

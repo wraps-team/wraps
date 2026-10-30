@@ -222,7 +222,7 @@ export function OrganizationSettingsBilling({
               <span className="text-muted-foreground">
                 ${getPriceByInterval(planConfig, currentBillingInterval)}/mo
                 {isAnnual && getAnnualTotal(planConfig) && (
-                  <span className="ml-2 text-green-600">
+                  <span className="ml-2 text-success">
                     (${getAnnualTotal(planConfig)}/yr)
                   </span>
                 )}
@@ -240,8 +240,8 @@ export function OrganizationSettingsBilling({
           </ul>
 
           {isCancelled && periodEndsAt && (
-            <div className="flex items-center justify-between rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-4">
-              <p className="text-sm text-yellow-600 dark:text-yellow-400">
+            <div className="flex items-center justify-between rounded-lg border border-warning/20 bg-warning/10 p-4">
+              <p className="text-sm text-warning">
                 Your subscription will end on{" "}
                 {periodEndsAt.toLocaleDateString()}
               </p>
@@ -308,7 +308,7 @@ export function OrganizationSettingsBilling({
                       </div>
                       {upgradeBillingInterval === "annual" &&
                         getAnnualTotal(plan) && (
-                          <p className="mt-1 text-green-600 text-sm">
+                          <p className="mt-1 text-success text-sm">
                             ${getAnnualTotal(plan)} billed annually
                           </p>
                         )}

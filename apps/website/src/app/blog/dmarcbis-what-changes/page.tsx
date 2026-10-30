@@ -151,14 +151,14 @@ export default function Page() {
           <div className="absolute inset-0 bg-radial-top from-brand/20 via-transparent to-transparent" />
 
           <div className="relative mx-auto max-w-4xl px-6 pt-20 pb-16">
-            <div className="mb-4 flex items-center gap-2 font-medium text-brand text-sm">
+            <div className="mb-4 flex items-center gap-2 font-medium text-brand-text text-sm">
               <FileCheck size={16} />
               <span>Security</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">13 min read</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">Wraps Team</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">July 9, 2026</span>
             </div>
 
@@ -182,19 +182,19 @@ export default function Page() {
 
             <div className="mt-8 flex flex-wrap gap-4">
               <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
-                <Shield className="text-brand" size={16} />
+                <Shield className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Standards Track, May 2026
                 </span>
               </div>
               <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
-                <Network className="text-brand" size={16} />
+                <Network className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Tree walk replaces the PSL
                 </span>
               </div>
               <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
-                <FileCheck className="text-brand" size={16} />
+                <FileCheck className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   pct= removed, np= and t= added
                 </span>
@@ -281,7 +281,7 @@ export default function Page() {
           {/* Tree walk */}
           <section>
             <h2 className="mb-6 flex items-center gap-3 font-bold text-3xl">
-              <Network className="text-brand" />
+              <Network className="text-brand-text" />
               The tree walk replaces the Public Suffix List
             </h2>
 
@@ -887,7 +887,7 @@ _dmarc.example.com. IN TXT "v=DMARC1; p=bogus"`}
           {/* p=none */}
           <section>
             <h2 className="mb-6 flex items-center gap-3 font-bold text-3xl">
-              <Shield className="text-brand" />
+              <Shield className="text-brand-text" />
               What did not change, and one new protection
             </h2>
 
@@ -942,7 +942,7 @@ _dmarc.example.com. IN TXT "v=DMARC1; p=bogus"`}
               in a fortnight, that promise is not coming from the spec. The
               four-step ramp is covered in detail in{" "}
               <a
-                className="text-brand underline underline-offset-4 hover:text-brand"
+                className="text-brand-text underline underline-offset-4 hover:text-brand-text"
                 href="/blog/your-dmarc-policy-is-useless"
               >
                 Your DMARC Policy Is Useless
@@ -1220,7 +1220,7 @@ wraps email check example.com`}
             <p className="mt-4 mb-4 text-foreground/80 text-lg leading-relaxed">
               Or skip the install entirely and use the{" "}
               <a
-                className="text-brand underline underline-offset-4 hover:text-brand"
+                className="text-brand-text underline underline-offset-4 hover:text-brand-text"
                 href="/tools"
               >
                 checker on the site
@@ -1373,7 +1373,7 @@ wraps email check example.com`}
               <ul className="space-y-3 text-foreground/80 leading-relaxed">
                 <li>
                   <a
-                    className="text-brand underline underline-offset-4 hover:text-brand"
+                    className="text-brand-text underline underline-offset-4 hover:text-brand-text"
                     href="https://www.rfc-editor.org/rfc/rfc9989.txt"
                     rel="noopener noreferrer"
                     target="_blank"
@@ -1386,7 +1386,7 @@ wraps email check example.com`}
                 </li>
                 <li>
                   <a
-                    className="text-brand underline underline-offset-4 hover:text-brand"
+                    className="text-brand-text underline underline-offset-4 hover:text-brand-text"
                     href="https://www.rfc-editor.org/rfc/rfc9990.txt"
                     rel="noopener noreferrer"
                     target="_blank"
@@ -1397,7 +1397,7 @@ wraps email check example.com`}
                 </li>
                 <li>
                   <a
-                    className="text-brand underline underline-offset-4 hover:text-brand"
+                    className="text-brand-text underline underline-offset-4 hover:text-brand-text"
                     href="https://www.rfc-editor.org/rfc/rfc9991.txt"
                     rel="noopener noreferrer"
                     target="_blank"
@@ -1408,7 +1408,7 @@ wraps email check example.com`}
                 </li>
                 <li>
                   <a
-                    className="text-brand underline underline-offset-4 hover:text-brand"
+                    className="text-brand-text underline underline-offset-4 hover:text-brand-text"
                     href="https://datatracker.ietf.org/doc/draft-ietf-dmarc-dmarcbis/"
                     rel="noopener noreferrer"
                     target="_blank"
@@ -1487,11 +1487,11 @@ wraps email check example.com`}
                 something.
               </p>
               <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-                <div className="rounded-xl border bg-muted/30 px-6 py-3 font-mono text-brand">
+                <div className="rounded-xl border bg-muted/30 px-6 py-3 font-mono text-brand-text">
                   npx mail-audit example.com --json
                 </div>
                 <a
-                  className="flex items-center gap-2 rounded-xl bg-brand px-6 py-3 font-semibold text-white transition-colors hover:bg-brand"
+                  className="flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
                   href="/tools"
                 >
                   Run It in the Browser

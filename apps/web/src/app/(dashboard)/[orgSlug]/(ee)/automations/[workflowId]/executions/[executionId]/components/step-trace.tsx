@@ -88,13 +88,13 @@ function formatStepDuration(
 }
 
 const ENGAGEMENT_DOT_CONFIG = {
-  sent: { color: "bg-blue-500", label: "Sent" },
-  delivered: { color: "bg-green-500", label: "Delivered" },
+  sent: { color: "bg-info", label: "Sent" },
+  delivered: { color: "bg-success", label: "Delivered" },
   opened: { color: "bg-purple-500", label: "Opened" },
   clicked: { color: "bg-indigo-500", label: "Clicked" },
-  bounced: { color: "bg-red-500", label: "Bounced" },
-  complained: { color: "bg-orange-500", label: "Spam complaint" },
-  optedOut: { color: "bg-red-500", label: "Opted out" },
+  bounced: { color: "bg-destructive", label: "Bounced" },
+  complained: { color: "bg-warning", label: "Spam complaint" },
+  optedOut: { color: "bg-destructive", label: "Opted out" },
 } as const;
 
 function formatTimestampShort(date: Date): string {

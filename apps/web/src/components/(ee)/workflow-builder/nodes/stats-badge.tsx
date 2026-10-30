@@ -20,10 +20,10 @@ export function StatsBadge({ stats }: StatsBadgeProps) {
         stats.noBranchCount !== undefined &&
         (stats.yesBranchCount > 0 || stats.noBranchCount > 0) && (
           <>
-            <span className="rounded bg-green-100 px-1.5 py-0.5 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+            <span className="rounded bg-success/15 px-1.5 py-0.5 text-success">
               {stats.yesBranchCount} yes
             </span>
-            <span className="rounded bg-red-100 px-1.5 py-0.5 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+            <span className="rounded bg-destructive/15 px-1.5 py-0.5 text-destructive">
               {stats.noBranchCount} no
             </span>
           </>
@@ -32,7 +32,7 @@ export function StatsBadge({ stats }: StatsBadgeProps) {
       {/* Email/SMS engagement */}
       {hasEngagement && (
         <>
-          <span className="rounded bg-blue-100 px-1.5 py-0.5 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+          <span className="rounded bg-info/15 px-1.5 py-0.5 text-info">
             {stats.sentCount} sent
           </span>
           {(stats.openedCount ?? 0) > 0 && (

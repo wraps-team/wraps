@@ -25,11 +25,11 @@ export function StatCard({
   const trendColor =
     trend === "up"
       ? isPositive
-        ? "text-green-600 dark:text-green-400"
-        : "text-red-600 dark:text-red-400"
+        ? "text-success"
+        : "text-destructive"
       : isPositive
-        ? "text-red-600 dark:text-red-400"
-        : "text-green-600 dark:text-green-400";
+        ? "text-destructive"
+        : "text-success";
 
   return (
     <Card className="overflow-hidden">

@@ -140,7 +140,7 @@ type StepProps = {
 function Step({ number, title, children }: StepProps) {
   return (
     <div className="relative border-l-2 pb-12 pl-12 last:border-transparent last:pb-0 border-success">
-      <div className="absolute -left-5 flex h-10 w-10 items-center justify-center rounded-full font-bold text-lg bg-success text-white">
+      <div className="absolute -left-5 flex h-10 w-10 items-center justify-center rounded-full font-bold text-lg bg-success text-success-foreground">
         {number}
       </div>
       <div className="pt-1">
@@ -1073,7 +1073,7 @@ npm install @wraps.dev/email
 
             <div className="flex flex-wrap items-center justify-center gap-4">
               <a
-                className="inline-flex items-center gap-2 rounded-lg bg-success px-6 py-3 font-semibold text-white transition-colors hover:bg-success"
+                className="inline-flex items-center gap-2 rounded-lg bg-success px-6 py-3 font-semibold text-success-foreground transition-colors hover:bg-success"
                 href="/cli"
               >
                 Explore the CLI

@@ -23,7 +23,7 @@ export function SmsHeroSection() {
 
             {/* Main Headline */}
             <h1 className="mb-6 text-pretty font-heading font-semibold text-4xl leading-tight tracking-tight sm:text-5xl">
-              AWS SMS, <span className="text-brand">simplified.</span>
+              AWS SMS, <span className="text-brand-text">simplified.</span>
             </h1>
 
             {/* Subheading */}
@@ -67,19 +67,19 @@ export function SmsHeroSection() {
                   <span className="text-foreground">WrapsSMS</span>
                   {" } "}
                   <span className="text-muted-foreground">from</span>{" "}
-                  <span className="text-brand">'@wraps.dev/sms'</span>
+                  <span className="text-brand-text">'@wraps.dev/sms'</span>
                   {";\n\n"}
                   <span className="text-muted-foreground">const</span> sms ={" "}
                   <span className="text-muted-foreground">new</span>{" "}
                   <span className="text-foreground">WrapsSMS</span>();
                   {"\n\n"}
                   <span className="text-muted-foreground">await</span> sms.
-                  <span className="text-brand">send</span>({"{"}
+                  <span className="text-brand-text">send</span>({"{"}
                   {"\n  "}
-                  <span className="text-foreground/60">to</span>:{" "}
+                  <span className="text-muted-foreground">to</span>:{" "}
                   <span className="text-foreground">'+14155551234'</span>,
                   {"\n  "}
-                  <span className="text-foreground/60">message</span>:{" "}
+                  <span className="text-muted-foreground">message</span>:{" "}
                   <span className="text-foreground">'Your code is 123456'</span>
                   ,{"\n"}
                   {"});"}

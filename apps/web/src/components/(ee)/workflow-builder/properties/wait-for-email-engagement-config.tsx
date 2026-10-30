@@ -76,19 +76,19 @@ export function WaitForEmailEngagementConfig({
         <p className="font-medium text-xs">Output Paths:</p>
         <ul className="space-y-0.5 text-muted-foreground text-xs">
           <li>
-            <span className="font-medium text-green-600">Open</span> — Email was
+            <span className="font-medium text-success">Open</span> — Email was
             opened
           </li>
           <li>
-            <span className="font-medium text-blue-600">Click</span> — Link was
+            <span className="font-medium text-info">Click</span> — Link was
             clicked
           </li>
           <li>
-            <span className="font-medium text-red-600">Bounce</span> — Email
+            <span className="font-medium text-destructive">Bounce</span> — Email
             bounced
           </li>
           <li>
-            <span className="font-medium text-yellow-600">None</span> — No
+            <span className="font-medium text-warning">None</span> — No
             engagement within timeout
           </li>
         </ul>

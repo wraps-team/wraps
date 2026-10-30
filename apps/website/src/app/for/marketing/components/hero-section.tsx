@@ -19,7 +19,7 @@ export function MarketingHeroSection() {
 
             <h1 className="mb-6 text-pretty font-heading font-semibold text-4xl leading-tight tracking-tight sm:text-5xl">
               Grow the list.{" "}
-              <span className="text-brand">Watch the bill stay put.</span>
+              <span className="text-brand-text">Watch the bill stay put.</span>
             </h1>
 
             <p className="mb-6 max-w-md text-muted-foreground">

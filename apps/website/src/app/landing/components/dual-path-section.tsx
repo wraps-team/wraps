@@ -87,7 +87,7 @@ function ComparisonRow({
 }) {
   return (
     <div>
-      <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-foreground/50">
+      <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
         {label}
       </p>
       <div className="grid gap-4 md:gap-6 md:grid-cols-2">
@@ -122,7 +122,7 @@ function ComparisonRow({
               )}
             </CodeBlockBody>
           </CodeBlock>
-          <p className="mt-3 text-sm text-foreground/50">{codeCaption}</p>
+          <p className="mt-3 text-sm text-muted-foreground">{codeCaption}</p>
         </div>
 
         {/* Visual side */}
@@ -165,7 +165,7 @@ function ComparisonRow({
               />
             </div>
           )}
-          <p className="mt-3 text-sm text-foreground/50">{visualCaption}</p>
+          <p className="mt-3 text-sm text-muted-foreground">{visualCaption}</p>
         </div>
       </div>
     </div>
@@ -186,23 +186,27 @@ export function DualPathSection() {
               <span className="inline-flex items-center rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-medium text-success">
                 Code
               </span>
-              <span className="text-sm text-foreground/50">for engineers</span>
+              <span className="text-sm text-muted-foreground">
+                for engineers
+              </span>
             </Link>
-            <span className="text-sm text-foreground/50">+</span>
+            <span className="text-sm text-muted-foreground">+</span>
             <Link
               className="flex items-center gap-2 rounded-full px-3 py-1 transition-colors hover:bg-brand/5"
               href="/platform"
             >
-              <span className="inline-flex items-center rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-medium text-brand">
+              <span className="inline-flex items-center rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-medium text-brand-text">
                 Visual
               </span>
-              <span className="text-sm text-foreground/50">for marketers</span>
+              <span className="text-sm text-muted-foreground">
+                for marketers
+              </span>
             </Link>
           </div>
           <h2 className="mb-4 text-center font-bold text-3xl tracking-tight font-heading md:text-4xl">
             One platform. No more handoffs.
           </h2>
-          <p className="mx-auto max-w-3xl text-center text-lg text-foreground/70 text-pretty">
+          <p className="mx-auto max-w-3xl text-center text-lg text-muted-foreground text-pretty">
             Engineers define automations in TypeScript. Marketers drag nodes on
             a canvas. Same result, different tools — nobody waits on anyone.
           </p>
@@ -241,24 +245,24 @@ export function DualPathSection() {
         <div className="mt-16 text-center">
           <div className="mx-auto mb-6 flex max-w-md items-center gap-3">
             <div className="h-px flex-1 bg-border" />
-            <span className="text-sm font-medium text-foreground/50">
+            <span className="text-sm font-medium text-muted-foreground">
               Same output
             </span>
             <div className="h-px flex-1 bg-border" />
           </div>
-          <p className="text-lg text-foreground/70">
+          <p className="text-lg text-muted-foreground">
             Same execution engine. Same git history. Same deploy pipeline. Code
             or visual — your choice, every time.
           </p>
           <div className="mt-6 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
-              className="inline-flex items-center text-sm font-medium text-brand hover:text-brand"
+              className="inline-flex items-center text-sm font-medium text-brand-text hover:text-brand-text"
               href="/docs/quickstart/email"
             >
               Read the docs →
             </Link>
             <Link
-              className="inline-flex items-center text-sm font-medium text-foreground/70 hover:text-foreground"
+              className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground"
               href="/platform#automations"
             >
               Try the builder →

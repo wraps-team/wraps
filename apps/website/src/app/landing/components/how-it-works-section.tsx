@@ -138,10 +138,10 @@ function Connector({
       className={`flow-node hidden flex-col items-center justify-center gap-1 px-3 text-center md:flex ${place}`}
       style={{ "--d": `${index * STEP_GAP_S}s` } as React.CSSProperties}
     >
-      <span className="font-mono text-foreground/75 text-xs leading-tight">
+      <span className="font-mono text-muted-foreground text-xs leading-tight">
         {label}
       </span>
-      <Arrow className="size-5 text-brand" />
+      <Arrow className="size-5 text-brand-text" />
     </div>
   );
 }
@@ -207,7 +207,7 @@ export function HowItWorksSection() {
                   style={{ "--d": `${i * STEP_GAP_S}s` } as React.CSSProperties}
                 >
                   <div className="flex items-baseline gap-2.5">
-                    <span className="font-mono text-2xs text-brand">
+                    <span className="font-mono text-2xs text-brand-text">
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     <h3 className="font-semibold text-foreground text-sm">
@@ -228,7 +228,7 @@ export function HowItWorksSection() {
 
         <div className="mt-8">
           <Link
-            className="font-medium text-brand text-sm hover:text-brand hover:underline"
+            className="font-medium text-brand-text text-sm hover:text-brand-text hover:underline"
             href="/byoc"
           >
             What lives where, in full →

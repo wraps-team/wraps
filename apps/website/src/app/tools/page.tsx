@@ -78,7 +78,8 @@ export default function ToolsPage() {
                 <span>wraps · free tool</span>
               </div>
               <h1 className="mb-4 text-pretty font-heading font-semibold text-3xl tracking-tight sm:text-5xl">
-                Email Deliverability <span className="text-brand">Checker</span>
+                Email Deliverability{" "}
+                <span className="text-brand-text">Checker</span>
               </h1>
               <p className="max-w-2xl text-base text-muted-foreground sm:text-lg">
                 Check your domain's email authentication setup. We analyze SPF,
@@ -103,7 +104,7 @@ export default function ToolsPage() {
                   Sender Policy Framework (SPF) specifies which mail servers are
                   authorized to send email on behalf of your domain.{" "}
                   <a
-                    className="text-brand underline underline-offset-2 hover:text-brand"
+                    className="text-brand-text underline underline-offset-2 hover:text-brand-text"
                     href="/tools/spf-builder"
                   >
                     Build your SPF record →
@@ -146,7 +147,7 @@ export default function ToolsPage() {
                 <CardContent className="text-muted-foreground text-sm">
                   Read the policy, alignment modes, and reporting addresses.{" "}
                   <a
-                    className="text-brand underline underline-offset-2 hover:text-brand"
+                    className="text-brand-text underline underline-offset-2 hover:text-brand-text"
                     href="/tools/dmarc-checker"
                   >
                     Check DMARC →
@@ -162,7 +163,7 @@ export default function ToolsPage() {
                 <CardContent className="text-muted-foreground text-sm">
                   Test common selectors or enter your own.{" "}
                   <a
-                    className="text-brand underline underline-offset-2 hover:text-brand"
+                    className="text-brand-text underline underline-offset-2 hover:text-brand-text"
                     href="/tools/dkim-checker"
                   >
                     Check DKIM →
@@ -179,7 +180,7 @@ export default function ToolsPage() {
                   Query your domain against 5 blocklists and your mail server
                   IPs against 10.{" "}
                   <a
-                    className="text-brand underline underline-offset-2 hover:text-brand"
+                    className="text-brand-text underline underline-offset-2 hover:text-brand-text"
                     href="/tools/blacklist-check"
                   >
                     Check blocklists →
@@ -195,7 +196,7 @@ export default function ToolsPage() {
                 <CardContent className="text-muted-foreground text-sm">
                   See mail servers, priorities, and whether each one resolves.{" "}
                   <a
-                    className="text-brand underline underline-offset-2 hover:text-brand"
+                    className="text-brand-text underline underline-offset-2 hover:text-brand-text"
                     href="/tools/mx-lookup"
                   >
                     Look up MX →
@@ -216,7 +217,7 @@ export default function ToolsPage() {
                   Build a DMARC record and see what would break before you
                   publish it.{" "}
                   <a
-                    className="text-brand underline underline-offset-2 hover:text-brand"
+                    className="text-brand-text underline underline-offset-2 hover:text-brand-text"
                     href="/tools/dmarc-builder"
                   >
                     Build DMARC →
@@ -233,7 +234,7 @@ export default function ToolsPage() {
                   Paste raw headers and read the hops, auth results, and
                   alignment. Nothing leaves your browser.{" "}
                   <a
-                    className="text-brand underline underline-offset-2 hover:text-brand"
+                    className="text-brand-text underline underline-offset-2 hover:text-brand-text"
                     href="/tools/email-header-analyzer"
                   >
                     Analyze headers →
@@ -250,7 +251,7 @@ export default function ToolsPage() {
                   See where your rates sit against the SES review and pause
                   lines.{" "}
                   <a
-                    className="text-brand underline underline-offset-2 hover:text-brand"
+                    className="text-brand-text underline underline-offset-2 hover:text-brand-text"
                     href="/tools/bounce-rate-calculator"
                   >
                     Calculate rates →
@@ -282,7 +283,7 @@ export default function ToolsPage() {
                 <p className="mt-4 text-muted-foreground text-sm">
                   Not submitted yet? Work through the{" "}
                   <Link
-                    className="text-brand underline underline-offset-2"
+                    className="text-brand-text underline underline-offset-2"
                     href="/blog/ses-sandbox-guide#pre-request-checklist"
                   >
                     16-point pre-request checklist

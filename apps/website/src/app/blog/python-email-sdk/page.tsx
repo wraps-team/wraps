@@ -79,14 +79,14 @@ export default function Page() {
           <div className="absolute inset-0 bg-radial-top from-brand/20 via-transparent to-transparent" />
 
           <div className="relative mx-auto max-w-4xl px-6 pt-20 pb-16">
-            <div className="mb-4 flex items-center gap-2 font-medium text-brand text-sm">
+            <div className="mb-4 flex items-center gap-2 font-medium text-brand-text text-sm">
               <Package size={16} />
               <span>Product</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">9 min read</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">Wraps Team</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">July 15, 2026</span>
             </div>
 
@@ -108,19 +108,19 @@ export default function Page() {
 
             <div className="mt-8 flex flex-wrap gap-4">
               <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
-                <Terminal className="text-brand" size={16} />
+                <Terminal className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   pip install wraps-email
                 </span>
               </div>
               <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
-                <Shield className="text-brand" size={16} />
+                <Shield className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   SigV4 straight to SES
                 </span>
               </div>
               <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
-                <KeyRound className="text-brand" size={16} />
+                <KeyRound className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Python 3.10 &ndash; 3.13
                 </span>
@@ -272,7 +272,7 @@ email.send(
           {/* No Wraps in the path */}
           <section>
             <h2 className="mb-6 flex items-center gap-3 font-bold text-3xl">
-              <Shield className="text-brand" />
+              <Shield className="text-brand-text" />
               There is no Wraps in the request path
             </h2>
 
@@ -1018,11 +1018,11 @@ except SESError as err:
                 next five minutes.
               </p>
               <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-                <div className="rounded-xl border bg-muted/30 px-6 py-3 font-mono text-brand">
+                <div className="rounded-xl border bg-muted/30 px-6 py-3 font-mono text-brand-text">
                   pip install wraps-email
                 </div>
                 <a
-                  className="flex items-center gap-2 rounded-xl bg-brand px-6 py-3 font-semibold text-white transition-colors hover:bg-brand"
+                  className="flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
                   href="/docs/python-sdk-reference"
                 >
                   Read the Reference

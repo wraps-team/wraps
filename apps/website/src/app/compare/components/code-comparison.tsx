@@ -78,7 +78,7 @@ export function CodeComparison({
       <Card className={after.highlight ? "border-brand/40" : undefined}>
         <CardContent>
           <p
-            className={`mb-3 font-mono text-2xs uppercase tracking-widest ${after.highlight ? "text-brand" : "text-muted-foreground"}`}
+            className={`mb-3 font-mono text-2xs uppercase tracking-widest ${after.highlight ? "text-brand-text" : "text-muted-foreground"}`}
           >
             {after.label}
           </p>

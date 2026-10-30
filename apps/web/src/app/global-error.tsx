@@ -65,7 +65,7 @@ export default function GlobalError({
                   backgroundColor: "#000",
                   color: "#fff",
                   border: "none",
-                  borderRadius: "0.375rem",
+                  borderRadius: 0,
                   cursor: "pointer",
                 }}
                 type="button"
@@ -79,7 +79,7 @@ export default function GlobalError({
                   backgroundColor: "#fff",
                   color: "#000",
                   border: "1px solid #ccc",
-                  borderRadius: "0.375rem",
+                  borderRadius: 0,
                   textDecoration: "none",
                 }}
               >

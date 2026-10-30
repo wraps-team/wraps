@@ -254,8 +254,8 @@ function DeviceFlow() {
         <CardContent>
           <form className="grid gap-4" onSubmit={handleCreateOrg}>
             {error && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-                <p className="text-red-600 text-sm">{error}</p>
+              <div className="rounded-lg border border-destructive/30 bg-destructive/15 p-3">
+                <p className="text-destructive text-sm">{error}</p>
               </div>
             )}
             <div className="grid gap-2">
@@ -311,8 +311,8 @@ function DeviceFlow() {
         </CardHeader>
         <CardContent className="grid gap-4">
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-              <p className="text-red-600 text-sm">{error}</p>
+            <div className="rounded-lg border border-destructive/30 bg-destructive/15 p-3">
+              <p className="text-destructive text-sm">{error}</p>
             </div>
           )}
           <div className="rounded-lg border bg-muted/50 p-4 text-center">

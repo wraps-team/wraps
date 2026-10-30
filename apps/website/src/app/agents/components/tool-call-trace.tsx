@@ -92,7 +92,7 @@ export function ToolCallTrace() {
   const visible = steps.slice(0, cursor);
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-terminal-border bg-terminal shadow-2xl">
+    <div className="dark relative overflow-hidden rounded-xl border border-terminal-border bg-terminal shadow-2xl">
       <div className="flex items-center gap-2 border-terminal-border border-b bg-black/40 px-4 py-3">
         <div className="flex gap-1.5">
           <div className="size-2.5 rounded-full bg-destructive/80" />

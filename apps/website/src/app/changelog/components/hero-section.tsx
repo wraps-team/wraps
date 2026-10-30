@@ -18,7 +18,7 @@ export function ChangelogHeroSection() {
 
           {/* Main Headline */}
           <h1 className="mb-6 text-pretty font-heading font-semibold text-4xl leading-tight tracking-tight sm:text-5xl">
-            What&apos;s new <span className="text-brand">in Wraps.</span>
+            What&apos;s new <span className="text-brand-text">in Wraps.</span>
           </h1>
 
           {/* Subheading */}

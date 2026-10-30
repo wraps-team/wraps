@@ -42,7 +42,7 @@ export function McpGuardrailsSection() {
           {layers.map((layer) => (
             <Card key={layer.title}>
               <CardContent className="p-6">
-                <layer.icon className="mb-4 size-5 text-brand" />
+                <layer.icon className="mb-4 size-5 text-brand-text" />
                 <p className="mb-2 font-medium">{layer.title}</p>
                 <p className="text-muted-foreground text-sm">
                   {layer.description}
@@ -55,7 +55,7 @@ export function McpGuardrailsSection() {
         <p className="mt-8 text-muted-foreground text-sm">
           Every guardrail variable is documented in{" "}
           <Link
-            className="text-brand underline decoration-brand/30 underline-offset-4 hover:decoration-brand/60"
+            className="text-brand-text underline decoration-brand/30 underline-offset-4 hover:decoration-brand/60"
             href="/docs/mcp-reference"
           >
             the MCP reference

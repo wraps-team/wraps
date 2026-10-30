@@ -65,7 +65,7 @@ function _PlaceholderImage({
     <div className="relative aspect-video w-full overflow-hidden rounded-2xl border-2 border-muted-foreground/25 border-dashed bg-muted/50">
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center">
         <div className="flex aspect-square size-16 items-center justify-center rounded-full border-2 border-brand bg-brand/5">
-          <Icon className="size-8 text-brand" />
+          <Icon className="size-8 text-brand-text" />
         </div>
         <div>
           <p className="font-semibold text-foreground">{alt}</p>
@@ -127,14 +127,14 @@ export function BroadcastsSection() {
               key={feature.title}
             >
               <div className="mb-4 flex aspect-square size-10 items-center justify-center rounded-full border-2 border-brand bg-brand/5">
-                <feature.icon className="size-5 text-brand" />
+                <feature.icon className="size-5 text-brand-text" />
               </div>
               <div className="mb-2 flex items-center gap-2">
                 <h3 className="font-semibold text-lg">{feature.title}</h3>
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs ${
                     feature.plan === "Pro"
-                      ? "bg-brand/10 text-brand"
+                      ? "bg-brand/10 text-brand-text"
                       : "bg-muted text-muted-foreground"
                   }`}
                 >
@@ -156,7 +156,7 @@ export function BroadcastsSection() {
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="flex aspect-square size-10 items-center justify-center rounded-full border-2 border-brand bg-brand/5">
-                <Send className="size-5 text-brand" />
+                <Send className="size-5 text-brand-text" />
               </div>
               <h3 className="font-semibold text-xl">Compose & Send</h3>
             </div>
@@ -193,11 +193,11 @@ export function BroadcastsSection() {
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="flex aspect-square size-10 items-center justify-center rounded-full border-2 border-brand bg-brand/5">
-                <Calendar className="size-5 text-brand" />
+                <Calendar className="size-5 text-brand-text" />
               </div>
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-xl">Schedule Broadcasts</h3>
-                <span className="rounded-full bg-brand/10 px-2 py-0.5 text-brand text-xs">
+                <span className="rounded-full bg-brand/10 px-2 py-0.5 text-brand-text text-xs">
                   Pro
                 </span>
               </div>

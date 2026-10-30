@@ -878,7 +878,7 @@ export default function SPFBuilderWidget() {
             <div className="overflow-x-auto rounded-lg border bg-muted/50 p-4 font-mono text-sm">
               <span className="text-muted-foreground">v=spf1</span>
               {customIPs.map((ip) => (
-                <span className="text-brand" key={ip}>
+                <span className="text-brand-text" key={ip}>
                   {" "}
                   {ip.includes(":") ? "ip6:" : "ip4:"}
                   {ip}

@@ -38,7 +38,7 @@ export function FaqSection() {
         <p className="mt-8 text-muted-foreground text-sm">
           Still have questions?{" "}
           <a
-            className="text-brand underline-offset-4 hover:underline"
+            className="text-brand-text underline-offset-4 hover:underline"
             href="mailto:support@wraps.dev"
           >
             Contact support

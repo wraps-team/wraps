@@ -24,7 +24,7 @@ export function CTASection() {
               </SectionKicker>
               <h2 className="mx-auto max-w-xl text-balance font-heading font-semibold text-3xl text-foreground leading-tight tracking-tight md:text-4xl">
                 Your email, on your own AWS,{" "}
-                <span className="text-brand">in about two minutes.</span>
+                <span className="text-brand-text">in about two minutes.</span>
               </h2>
               <p className="mx-auto mt-4 max-w-md text-pretty text-base text-muted-foreground leading-relaxed">
                 Start free. Nothing already in your account is touched, and the

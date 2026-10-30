@@ -253,11 +253,11 @@ export default function Page() {
             <div className="mb-4 flex items-center gap-2 font-medium text-success text-sm dark:text-success">
               <Receipt size={16} />
               <span>Research</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">11 min read</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">Wraps Team</span>
-              <span className="text-muted-foreground/50">&bull;</span>
+              <span className="text-muted-foreground">&bull;</span>
               <span className="text-muted-foreground">August 21, 2026</span>
             </div>
 
@@ -1032,7 +1032,7 @@ wraps email plan --region us-east-1 --set NONE`}
                   GET /api/pricing/estimate
                 </div>
                 <a
-                  className="flex items-center gap-2 rounded-xl bg-success px-6 py-3 font-semibold text-white transition-colors hover:bg-success"
+                  className="flex items-center gap-2 rounded-xl bg-success px-6 py-3 font-semibold text-success-foreground transition-colors hover:bg-success"
                   href="/tools/ses-calculator"
                 >
                   Open the Calculator

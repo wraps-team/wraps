@@ -212,12 +212,12 @@ export function VariableMapper({
             <div className="flex items-center gap-2">
               <CardTitle className="text-base">Template Variables</CardTitle>
               {unmappedCount > 0 && (
-                <span className="rounded-full bg-yellow-100 px-2 py-0.5 font-medium text-xs text-yellow-700">
+                <span className="rounded-full bg-warning/15 px-2 py-0.5 font-medium text-xs text-warning">
                   {unmappedCount} needs mapping
                 </span>
               )}
               {unmappedCount === 0 && customVariables.length > 0 && (
-                <span className="rounded-full bg-green-100 px-2 py-0.5 font-medium text-green-700 text-xs">
+                <span className="rounded-full bg-success/15 px-2 py-0.5 font-medium text-success text-xs">
                   All mapped
                 </span>
               )}
@@ -245,7 +245,7 @@ export function VariableMapper({
                       className="flex items-center gap-2 text-sm"
                       key={v.name}
                     >
-                      <Check className="h-4 w-4 shrink-0 text-green-600" />
+                      <Check className="h-4 w-4 shrink-0 text-success" />
                       <span className="font-mono text-xs">{v.name}</span>
                       <span className="text-muted-foreground">→</span>
                       <span className="truncate">
@@ -276,7 +276,7 @@ export function VariableMapper({
                       className="flex items-center gap-2 text-sm"
                       key={v.name}
                     >
-                      <Check className="h-4 w-4 text-green-600" />
+                      <Check className="h-4 w-4 text-success" />
                       <span className="font-mono text-xs">{v.name}</span>
                       <span className="text-muted-foreground">→</span>
                       <span>{v.label || getCategoryLabel(v.category)}</span>

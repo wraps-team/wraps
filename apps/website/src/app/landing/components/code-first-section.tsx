@@ -135,7 +135,7 @@ export function CodeFirstSection() {
             from a prompt. One system. Two ways to work.
           </p>
           <a
-            className="mt-4 inline-flex items-center text-sm font-medium text-brand hover:text-brand"
+            className="mt-4 inline-flex items-center text-sm font-medium text-brand-text hover:text-brand-text"
             href="/docs/quickstart/email"
           >
             Read the docs →

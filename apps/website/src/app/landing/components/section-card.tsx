@@ -84,7 +84,7 @@ export function SectionWrapper({
   const badgeColorClasses = {
     default: "bg-background text-muted-foreground border-border",
     green: "border-success/30 bg-success/10 text-success",
-    orange: "border-brand/30 bg-brand/10 text-brand",
+    orange: "border-brand/30 bg-brand/10 text-brand-text",
   };
 
   const badgeClass = `mb-4 inline-block rounded-full border px-3 py-1 font-medium text-xs transition-colors ${
@@ -145,7 +145,7 @@ export function IconBox({
     <div
       className={`flex aspect-square items-center justify-center rounded-full border-2 bg-background transition-all ${sizeClasses[size]} ${
         highlighted
-          ? "border-brand bg-brand/5 text-brand"
+          ? "border-brand bg-brand/5 text-brand-text"
           : "border-border text-muted-foreground"
       }`}
     >
@@ -172,7 +172,7 @@ export function FeatureItem({
       <IconBox highlighted={highlighted} icon={Icon} />
       <div>
         <h3
-          className={`font-semibold ${highlighted ? "text-brand" : "text-foreground"}`}
+          className={`font-semibold ${highlighted ? "text-brand-text" : "text-foreground"}`}
         >
           {title}
         </h3>

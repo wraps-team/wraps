@@ -69,7 +69,7 @@ describe("EventItem bot detection", () => {
   it("does not show Automated badge for non-open events", () => {
     render(
       <EventItem
-        color="text-green-500"
+        color="text-success"
         event={{
           type: "delivery",
           timestamp: Date.now(),
@@ -160,7 +160,7 @@ describe("EventItem diagnostic panel", () => {
   it("renders a formatted SMTP response for a delivery event", () => {
     render(
       <EventItem
-        color="text-green-500"
+        color="text-success"
         event={{
           type: "delivery",
           timestamp: Date.now(),
@@ -184,7 +184,7 @@ describe("EventItem diagnostic panel", () => {
   it("renders the delay reason and retry-until for a delivery delay", () => {
     render(
       <EventItem
-        color="text-yellow-500"
+        color="text-warning"
         event={{
           type: "deliverydelay",
           // Fixed, non-today timestamp (unlike the other fixtures in this file)

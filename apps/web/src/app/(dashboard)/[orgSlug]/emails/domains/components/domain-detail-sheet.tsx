@@ -117,7 +117,7 @@ function renderHttpsPolicyWarning(
   }
 
   return (
-    <div className="mt-1 flex items-start gap-2 rounded-lg border border-amber-600/30 bg-amber-600/10 p-3 text-amber-700 text-xs dark:text-amber-400">
+    <div className="mt-1 flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-warning text-xs">
       <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
       {body}
     </div>

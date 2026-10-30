@@ -54,16 +54,14 @@ export function SaveStatusIndicator({
           tooltip: lastSavedAt
             ? `Last saved ${formatRelativeTime(lastSavedAt)}`
             : "All changes saved",
-          className: showSavedCheck
-            ? "text-green-600 dark:text-green-400"
-            : "text-muted-foreground",
+          className: showSavedCheck ? "text-success" : "text-muted-foreground",
         };
       case "unsaved":
         return {
           icon: <Cloud className="h-3.5 w-3.5" />,
           text: "Unsaved",
           tooltip: "Changes will be saved automatically",
-          className: "text-amber-600 dark:text-amber-400",
+          className: "text-warning",
         };
       case "offline":
         return {

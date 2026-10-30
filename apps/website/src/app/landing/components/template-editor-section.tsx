@@ -65,7 +65,7 @@ function _PlaceholderImage({
     >
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center">
         <div className="flex aspect-square size-16 items-center justify-center rounded-full border-2 border-brand bg-brand/5">
-          <LayoutGrid className="size-8 text-brand" />
+          <LayoutGrid className="size-8 text-brand-text" />
         </div>
         <div>
           <p className="font-semibold text-foreground">{alt}</p>
@@ -151,12 +151,12 @@ export function TemplateEditorSection() {
               key={feature.title}
             >
               <div className="mb-4 flex aspect-square size-10 items-center justify-center rounded-full border-2 border-brand bg-brand/5">
-                <feature.icon className="size-5 text-brand" />
+                <feature.icon className="size-5 text-brand-text" />
               </div>
               <div className="mb-2 flex items-center gap-2">
                 <h3 className="font-semibold text-lg">{feature.title}</h3>
                 {"premium" in feature && feature.premium && (
-                  <span className="rounded-full bg-brand/10 px-2 py-0.5 text-brand text-xs">
+                  <span className="rounded-full bg-brand/10 px-2 py-0.5 text-brand-text text-xs">
                     AI
                   </span>
                 )}
@@ -176,7 +176,7 @@ export function TemplateEditorSection() {
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="flex aspect-square size-10 items-center justify-center rounded-full border-2 border-brand bg-brand/5">
-                <Sparkles className="size-5 text-brand" />
+                <Sparkles className="size-5 text-brand-text" />
               </div>
               <h3 className="font-semibold text-xl">AI Content Assistant</h3>
             </div>
@@ -214,7 +214,7 @@ export function TemplateEditorSection() {
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="flex aspect-square size-10 items-center justify-center rounded-full border-2 border-brand bg-brand/5">
-                <LayoutGrid className="size-5 text-brand" />
+                <LayoutGrid className="size-5 text-brand-text" />
               </div>
               <h3 className="font-semibold text-xl">Raw Code Editor</h3>
             </div>

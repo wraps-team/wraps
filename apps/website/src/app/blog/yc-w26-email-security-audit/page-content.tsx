@@ -22,7 +22,7 @@ export function DomainChecker() {
     <div className="space-y-3">
       <div className="flex gap-2">
         <input
-          className="flex-1 rounded-lg border bg-background px-4 py-3 text-sm outline-none transition-colors placeholder:text-muted-foreground/50 focus:border-foreground/20"
+          className="flex-1 rounded-lg border bg-background px-4 py-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground/20"
           onChange={(e) => setDomain(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleCheck()}
           placeholder="yourdomain.com"
@@ -97,31 +97,31 @@ export function GradeDistribution() {
     {
       grade: "A",
       count: 45,
-      color: "text-success border-success bg-success",
+      color: "text-success-foreground border-success bg-success",
       description: "SPF + DKIM + DMARC enforcing",
     },
     {
       grade: "B",
       count: 54,
-      color: "text-warning border-warning bg-warning",
+      color: "text-warning-foreground border-warning bg-warning",
       description: "All present, not enforcing",
     },
     {
       grade: "C",
       count: 38,
-      color: "text-brand border-brand bg-brand",
+      color: "text-primary-foreground border-brand bg-primary",
       description: "Missing one record",
     },
     {
       grade: "D",
       count: 40,
-      color: "text-destructive border-destructive bg-destructive",
+      color: "text-destructive-foreground border-destructive bg-destructive",
       description: "Missing two records",
     },
     {
       grade: "F",
       count: 23,
-      color: "text-destructive border-destructive bg-destructive",
+      color: "text-destructive-foreground border-destructive bg-destructive",
       description: "No auth or critical failure",
     },
   ];

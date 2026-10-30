@@ -217,7 +217,7 @@ const fateStyles: Record<Fate, { label: string; className: string }> = {
   },
   moves: {
     label: "You rebuild it",
-    className: "bg-brand/10 text-brand/20",
+    className: "bg-brand/10 text-brand-text",
   },
   stays: {
     label: "Unaffected",
@@ -610,7 +610,7 @@ export default function MigrateFromAmazonPinpointPage() {
                     <li className="flex gap-2.5" key={item}>
                       <X
                         aria-hidden="true"
-                        className="mt-0.5 size-4 shrink-0 text-muted-foreground/70"
+                        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
                       />
                       {item}
                     </li>

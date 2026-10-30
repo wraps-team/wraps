@@ -74,7 +74,7 @@ function ChannelCard({ channel }: { channel: Channel }) {
     <>
       <Icon
         aria-hidden="true"
-        className="mb-3 size-5 text-foreground transition-colors group-hover:text-brand"
+        className="mb-3 size-5 text-foreground transition-colors group-hover:text-brand-text"
       />
       <h3 className="mb-1.5 font-heading font-semibold text-base text-foreground">
         {channel.title}
@@ -82,7 +82,7 @@ function ChannelCard({ channel }: { channel: Channel }) {
       <p className="mb-3 text-sm text-muted-foreground leading-relaxed">
         {channel.description}
       </p>
-      <span className="inline-flex items-center gap-1.5 font-mono text-2xs text-muted-foreground uppercase tracking-eyebrow transition-colors group-hover:text-brand">
+      <span className="inline-flex items-center gap-1.5 font-mono text-2xs text-muted-foreground uppercase tracking-eyebrow transition-colors group-hover:text-brand-text">
         {channel.action}
         <ArrowUpRight aria-hidden="true" className="size-3" />
       </span>
@@ -297,7 +297,7 @@ export function ContactPageContent() {
           </div>
 
           <h1 className="mb-4 text-pretty font-heading font-semibold text-4xl leading-tight tracking-tight sm:text-5xl">
-            Book a call <span className="text-brand">with us</span>
+            Book a call <span className="text-brand-text">with us</span>
           </h1>
 
           <p className="text-lg text-muted-foreground">

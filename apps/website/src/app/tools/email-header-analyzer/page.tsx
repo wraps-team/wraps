@@ -121,7 +121,7 @@ const faqSchema = {
   })),
 };
 
-const linkClass = "text-brand underline underline-offset-2";
+const linkClass = "text-brand-text underline underline-offset-2";
 
 export default function EmailHeaderAnalyzerPage() {
   return (
@@ -139,7 +139,7 @@ export default function EmailHeaderAnalyzerPage() {
                 <span>wraps · free tool</span>
               </div>
               <h1 className="mb-4 text-pretty font-heading font-semibold text-3xl tracking-tight sm:text-5xl">
-                Email Header <span className="text-brand">Analyzer</span>
+                Email Header <span className="text-brand-text">Analyzer</span>
               </h1>
               <p className="max-w-2xl text-base text-muted-foreground sm:text-lg">
                 Paste raw headers and read the hop chain, the SPF, DKIM and

@@ -44,7 +44,7 @@ export function EntryCard({ release, linkTitle, isLatest }: EntryCardProps) {
             {formatReleaseDate(release.date)}
           </span>
           {isLatest && (
-            <span className="rounded-full border border-brand/40 px-2 py-0.5 font-mono text-3xs text-brand uppercase tracking-eyebrow">
+            <span className="rounded-full border border-brand/40 px-2 py-0.5 font-mono text-3xs text-brand-text uppercase tracking-eyebrow">
               Latest
             </span>
           )}
@@ -52,7 +52,7 @@ export function EntryCard({ release, linkTitle, isLatest }: EntryCardProps) {
         <h3 className="mt-2 font-heading font-semibold text-lg tracking-tight">
           {linkTitle ? (
             <Link
-              className="hover:text-brand"
+              className="hover:text-brand-text"
               href={`/changelog/${release.slug}`}
             >
               {release.title}

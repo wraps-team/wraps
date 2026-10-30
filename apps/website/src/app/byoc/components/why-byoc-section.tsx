@@ -40,7 +40,7 @@ export function WhyByocSection() {
                 key={card.title}
               >
                 <div className="mb-4 flex size-10 items-center justify-center rounded-lg bg-brand/10">
-                  <Icon aria-hidden="true" className="size-5 text-brand" />
+                  <Icon aria-hidden="true" className="size-5 text-brand-text" />
                 </div>
                 <h3 className="mb-2 font-medium">{card.title}</h3>
                 <p className="text-muted-foreground text-sm leading-relaxed">

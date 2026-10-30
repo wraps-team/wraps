@@ -61,7 +61,7 @@ export default async function ChangelogEntryPage({
       <LandingNavbar />
       <main className="mx-auto max-w-3xl px-4 pt-32 pb-24 sm:px-6 lg:px-8">
         <Link
-          className="font-mono text-2xs text-muted-foreground uppercase tracking-eyebrow hover:text-brand"
+          className="font-mono text-2xs text-muted-foreground uppercase tracking-eyebrow hover:text-brand-text"
           href="/changelog"
         >
           ← All changes
@@ -71,7 +71,7 @@ export default async function ChangelogEntryPage({
         </div>
         {release.docs ? (
           <Link
-            className="mt-6 inline-block text-brand text-sm hover:underline"
+            className="mt-6 inline-block text-brand-text text-sm hover:underline"
             href={release.docs}
           >
             Read the docs →

@@ -42,7 +42,7 @@ export function CopyCommand({
       onClick={copy}
       type="button"
     >
-      <span aria-hidden="true" className="text-brand">
+      <span aria-hidden="true" className="text-brand-text">
         $
       </span>
       <span className="min-w-0 break-all text-left text-foreground">

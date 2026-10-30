@@ -1,0 +1,228 @@
+/*
+ * The one Wraps theme, shared by the dashboard (apps/web) and the marketing
+ * site (apps/website). Before this file each app carried its own copy of the
+ * tokens and they drifted: the website still had the original success /
+ * warning / info values (warning text measured 2.37:1 on white) long after the
+ * dashboard had fixed them. Change a colour here and both apps move together.
+ *
+ * Every text token is tuned for WCAG 2.2 AAA: 7:1 against the worst ground it
+ * sits on. That ground is usually not the card but a tinted badge
+ * (`bg-success/15` composited over --card) or the --muted surface, both of which
+ * are always worse than the card behind them. Lightness was searched at a fixed
+ * hue per token and gamut-clamped to sRGB, so a value that looks arbitrary is
+ * the edge of the passing band, not a taste call: nudging one lighter (light
+ * theme) or darker (dark theme) drops it under 7:1.
+ *
+ * Coloured fills follow one rule per theme. Light: the fill is dark and its
+ * label is near-white. Dark: the fill is light and its label is ink, the same
+ * pattern --primary has always used. `text-white` on a coloured fill bypasses
+ * this - use the matching `text-*-foreground`.
+ *
+ * Opacity on a text colour (`text-muted-foreground/70`) takes every token here
+ * below 7:1. Keep alpha for disabled and decorative marks only.
+ *
+ * Non-text (chart lines, input borders) needs 3:1 under 1.4.11; focus rings
+ * need 3:1 against the unfocused state under 2.4.13 - use `ring-ring` solid,
+ * never `ring-ring/50`.
+ */
+
+@theme inline {
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-body: var(--font-inter), system-ui, sans-serif;
+  --font-heading: var(--font-space-grotesk), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-3xs: 0.625rem;
+  --text-3xs--line-height: 0.875rem;
+  --tracking-eyebrow: 0.16em;
+  /* Rounded outer cards, straight boxes inside. rounded-2xl (16px) and up is
+     reserved for the outermost container: Card, Dialog, marketing panels.
+     Everything nested in one (rows, inputs, buttons, inner boxes, badges)
+     uses rounded-xl or below, which is square. rounded-full (avatars, dots,
+     pills, switches) stays round. --radius here is what bare `rounded`
+     compiles to; Tailwind inlines it, so the :root variable alone does not
+     reach it. 2xl-4xl keep Tailwind's defaults. */
+  --radius: 0;
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-text: var(--brand-text);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  /* Bare `rounded` reads this. Kept at 0 with the scale above. */
+  --radius: 0;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  /* 7.06:1 on --muted, 7.70:1 on white. Close to --foreground by design:
+     separate the two with size and weight, not lightness. */
+  --muted-foreground: oklch(0.442 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.413 0.167 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  /* Hairline dividers stay faint (decorative, exempt). --input is the
+     boundary of a control and must clear 3:1 against the page. */
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.665 0 0);
+  --ring: oklch(0.544 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.668 0.137 84.429);
+  --chart-5: oklch(0.672 0.144 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.544 0 0);
+  /*
+   * Status colours carry text (`text-success`, badges on `bg-success/15`) and
+   * solid fills with a near-white label. Both pass 7:1 at these values.
+   *
+   * --warning-foreground flipped from near-black to near-white when --warning
+   * darkened enough to carry it; apps/web/src/lib/preference-theme/ramp.ts
+   * hardcodes the same pair for customer-authored themes - keep them together.
+   */
+  --success: oklch(0.39 0.122 145);
+  --success-foreground: oklch(0.985 0 0);
+  --warning: oklch(0.411 0.101 55);
+  --warning-foreground: oklch(0.985 0 0);
+  --info: oklch(0.402 0.113 250);
+  --info-foreground: oklch(0.985 0 0);
+  /*
+   * Brand orange is a fill and an accent, never text on white: #ff6900
+   * measures 2.89:1 there, which fails even large text. Orange text uses
+   * --brand-text (`text-brand-text`). White on the fill is 2.77:1, so brand
+   * CTAs are ink (`bg-primary`, and `<Button variant="brand">` renders that)
+   * and the orange carries only non-text accents: borders, dots, checkmarks.
+   * If text ever must sit on the fill, its label is pure black (7.26:1);
+   * near-black only reaches 6.84:1.
+   */
+  --brand: oklch(0.705 0.213 47.604);
+  --brand-foreground: oklch(0 0 0);
+  --brand-text: oklch(0.435 0.119 47.604);
+
+  /*
+   * Chart series palette.
+   *
+   * Hue is fixed per series and only lightness moves between themes, so a line
+   * keeps its identity when the theme flips and when the reader moves between
+   * pages. Named by role rather than by metric so a new chart has somewhere to
+   * land: attention covers opens and suppression, secondary covers inbound and
+   * the second channel in a two-channel chart. All clear 3:1 against --card.
+   */
+  --series-volume: oklch(0.5 0.15 250);
+  --series-success: oklch(0.48 0.15 160);
+  --series-attention: oklch(0.55 0.15 80);
+  --series-engagement: oklch(0.48 0.2 320);
+  --series-failure: oklch(0.52 0.19 25);
+  --series-secondary: oklch(0.5 0.11 200);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.761 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.811 0.105 22.216);
+  --destructive-foreground: oklch(0.145 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(0.505 0 0);
+  --ring: oklch(0.601 0 0);
+  --chart-1: oklch(0.522 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.801 0.099 264.376);
+  --sidebar-primary-foreground: oklch(0.145 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.601 0 0);
+  --success: oklch(0.775 0.2 145);
+  --success-foreground: oklch(0.145 0 0);
+  --warning: oklch(0.807 0.126 55);
+  --warning-foreground: oklch(0.145 0 0);
+  --info: oklch(0.797 0.106 250);
+  --info-foreground: oklch(0.145 0 0);
+  --brand: oklch(0.75 0.183 55.934);
+  --brand-foreground: oklch(0.145 0 0);
+  --brand-text: oklch(0.792 0.139 55.934);
+
+  /* Same hues as :root, lifted for a dark surface. */
+  --series-volume: oklch(0.7 0.13 250);
+  --series-success: oklch(0.68 0.14 160);
+  --series-attention: oklch(0.75 0.14 80);
+  --series-engagement: oklch(0.72 0.16 320);
+  --series-failure: oklch(0.7 0.17 25);
+  --series-secondary: oklch(0.72 0.1 200);
+}

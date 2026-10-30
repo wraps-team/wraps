@@ -148,7 +148,7 @@ export default function WhyWrapsPage() {
           {/* 01 — risk */}
           <section className="mb-16">
             <div className="mb-3 flex items-baseline gap-3">
-              <span className="font-mono text-brand text-xs">01</span>
+              <span className="font-mono text-brand-text text-xs">01</span>
               <h2 className="font-heading font-semibold text-2xl tracking-tight">
                 What you are actually buying down
               </h2>
@@ -203,7 +203,7 @@ export default function WhyWrapsPage() {
           {/* 02 — cost */}
           <section className="mb-16">
             <div className="mb-3 flex items-baseline gap-3">
-              <span className="font-mono text-brand text-xs">02</span>
+              <span className="font-mono text-brand-text text-xs">02</span>
               <h2 className="font-heading font-semibold text-2xl tracking-tight">
                 What it costs, all in
               </h2>
@@ -250,7 +250,7 @@ export default function WhyWrapsPage() {
           {/* 03 — exit */}
           <section className="mb-16">
             <div className="mb-3 flex items-baseline gap-3">
-              <span className="font-mono text-brand text-xs">03</span>
+              <span className="font-mono text-brand-text text-xs">03</span>
               <h2 className="font-heading font-semibold text-2xl tracking-tight">
                 What happens if Wraps goes away
               </h2>
@@ -281,7 +281,7 @@ export default function WhyWrapsPage() {
           {/* 05 — bad fit */}
           <section className="mb-16">
             <div className="mb-3 flex items-baseline gap-3">
-              <span className="font-mono text-brand text-xs">05</span>
+              <span className="font-mono text-brand-text text-xs">05</span>
               <h2 className="font-heading font-semibold text-2xl tracking-tight">
                 When the answer is no
               </h2>

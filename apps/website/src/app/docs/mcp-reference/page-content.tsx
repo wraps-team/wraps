@@ -274,7 +274,7 @@ export default function McpReferencePageContent() {
         <p className="text-muted-foreground">
           A manifest covering both servers is published at{" "}
           <a
-            className="text-brand underline underline-offset-4"
+            className="text-brand-text underline underline-offset-4"
             href="/.well-known/mcp.json"
           >
             /.well-known/mcp.json

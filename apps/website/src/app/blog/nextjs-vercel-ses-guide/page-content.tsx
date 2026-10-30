@@ -89,7 +89,7 @@ export function OIDCDiagram() {
             <div
               className={`flex h-12 w-12 items-center justify-center rounded-full transition-all duration-300 ${
                 i <= activeStep
-                  ? "scale-110 bg-success text-white"
+                  ? "scale-110 bg-success text-success-foreground"
                   : "bg-muted text-muted-foreground"
               }`}
             >
@@ -97,7 +97,7 @@ export function OIDCDiagram() {
             </div>
             <span
               className={`mt-2 text-center text-xs transition-colors duration-300 ${
-                i <= activeStep ? "text-success" : "text-muted-foreground/50"
+                i <= activeStep ? "text-success" : "text-muted-foreground"
               }`}
             >
               {step.label}

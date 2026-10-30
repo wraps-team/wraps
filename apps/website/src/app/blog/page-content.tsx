@@ -427,7 +427,7 @@ function PostArt({ post }: { post: BlogPost }) {
         <div>{post.date}</div>
         <div>{shortReadTime(post.readTime)}</div>
       </div>
-      <span className={`${META_RULE} text-muted-foreground/50`}>wraps.dev</span>
+      <span className={`${META_RULE} text-muted-foreground`}>wraps.dev</span>
     </div>
   );
 }
@@ -447,7 +447,7 @@ function FeaturedCard({ post }: { post: BlogPost }) {
           <div
             className={`${META_RULE} mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-muted-foreground`}
           >
-            <span className="text-brand">{post.category}</span>
+            <span className="text-brand-text">{post.category}</span>
             <span aria-hidden="true">/</span>
             <span>{post.author}</span>
             <span aria-hidden="true">/</span>
@@ -456,7 +456,7 @@ function FeaturedCard({ post }: { post: BlogPost }) {
             <span>{post.readTime}</span>
           </div>
 
-          <h3 className="font-heading font-semibold text-2xl text-foreground leading-tight tracking-tight transition-colors group-hover:text-brand md:text-3xl dark:group-hover:text-brand">
+          <h3 className="font-heading font-semibold text-2xl text-foreground leading-tight tracking-tight transition-colors group-hover:text-brand-text md:text-3xl dark:group-hover:text-brand-text">
             {post.title}
           </h3>
 
@@ -486,12 +486,12 @@ function PostCard({ post }: { post: BlogPost }) {
       <div
         className={`${META_RULE} mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-muted-foreground`}
       >
-        <span className="text-brand">{post.category}</span>
+        <span className="text-brand-text">{post.category}</span>
         <span aria-hidden="true">/</span>
         <span>{shortReadTime(post.readTime)}</span>
       </div>
 
-      <h3 className="mb-2 font-semibold text-base text-foreground leading-snug transition-colors group-hover:text-brand dark:group-hover:text-brand">
+      <h3 className="mb-2 font-semibold text-base text-foreground leading-snug transition-colors group-hover:text-brand-text dark:group-hover:text-brand-text">
         {post.title}
       </h3>
 
@@ -499,7 +499,7 @@ function PostCard({ post }: { post: BlogPost }) {
         {post.description}
       </p>
 
-      <span className={`${META_RULE} mt-3 block text-muted-foreground/70`}>
+      <span className={`${META_RULE} mt-3 block text-muted-foreground`}>
         {post.date}
       </span>
     </a>

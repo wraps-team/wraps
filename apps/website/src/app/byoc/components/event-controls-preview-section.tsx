@@ -193,7 +193,7 @@ export function EventControlsPreviewSection() {
           including Full. Hover or focus a locked type above for why. Interested
           in this before it ships? Tell us at{" "}
           <a
-            className="text-brand underline underline-offset-2 hover:text-brand"
+            className="text-brand-text underline underline-offset-2 hover:text-brand-text"
             href="/contact"
           >
             /contact

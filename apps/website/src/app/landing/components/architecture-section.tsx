@@ -73,7 +73,7 @@ function IconBox({
         compact ? "size-10" : "size-14"
       } ${
         highlighted
-          ? "border-brand bg-brand/5 text-brand"
+          ? "border-brand bg-brand/5 text-brand-text"
           : "border-border text-muted-foreground"
       }`}
     >
@@ -119,14 +119,14 @@ function SimpleNode({
           compact ? "size-11" : "size-14"
         } ${
           highlighted
-            ? "border-brand bg-brand/5 text-brand"
+            ? "border-brand bg-brand/5 text-brand-text"
             : "border-border text-muted-foreground"
         }`}
       >
         <Icon className={compact ? "size-5" : "size-6"} />
       </div>
       <span
-        className={`font-medium text-xs ${highlighted ? "text-brand" : "text-muted-foreground"}`}
+        className={`font-medium text-xs ${highlighted ? "text-brand-text" : "text-muted-foreground"}`}
       >
         {label}
       </span>
@@ -174,7 +174,7 @@ function AWSAccountBox({
               compact ? "h-12 w-12" : "h-16 w-16"
             } ${
               sesHighlighted
-                ? "border-brand bg-brand/5 text-brand"
+                ? "border-brand bg-brand/5 text-brand-text"
                 : "border-border bg-background text-muted-foreground"
             }`}
           >
@@ -182,7 +182,7 @@ function AWSAccountBox({
           </div>
           <span
             className={`font-medium text-xs ${
-              sesHighlighted ? "text-brand" : "text-muted-foreground"
+              sesHighlighted ? "text-brand-text" : "text-muted-foreground"
             }`}
           >
             SES
@@ -245,14 +245,14 @@ function MobileNode({
       <div
         className={`flex aspect-square size-14 items-center justify-center rounded-full border-2 ${
           highlighted
-            ? "border-brand bg-brand/5 text-brand"
+            ? "border-brand bg-brand/5 text-brand-text"
             : "border-border bg-background text-muted-foreground"
         }`}
       >
         <Icon className="h-11 w-11" />
       </div>
       <span
-        className={`text-xs ${highlighted ? "text-brand" : "text-muted-foreground"}`}
+        className={`text-xs ${highlighted ? "text-brand-text" : "text-muted-foreground"}`}
       >
         {label}
       </span>
@@ -307,9 +307,13 @@ function MobileFlow({ activeTab }: { activeTab: ArchitectureTabKey }) {
         <div className={nodeOffset}>
           <MobileNode highlighted icon={Code2} label="Your App" />
         </div>
-        <ArrowRight className={`h-4 w-4 shrink-0 text-brand ${arrowOffset}`} />
+        <ArrowRight
+          className={`h-4 w-4 shrink-0 text-brand-text ${arrowOffset}`}
+        />
         <MobileAWSBox sesHighlighted showWraps={false} />
-        <ArrowRight className={`h-4 w-4 shrink-0 text-brand ${arrowOffset}`} />
+        <ArrowRight
+          className={`h-4 w-4 shrink-0 text-brand-text ${arrowOffset}`}
+        />
         <div className={nodeOffset}>
           <MobileNode highlighted icon={Users} label="Recipients" />
         </div>
@@ -323,7 +327,9 @@ function MobileFlow({ activeTab }: { activeTab: ArchitectureTabKey }) {
         <div className={nodeOffset}>
           <MobileNode highlighted icon={Users} label="Recipients" />
         </div>
-        <ArrowRight className={`h-4 w-4 shrink-0 text-brand ${arrowOffset}`} />
+        <ArrowRight
+          className={`h-4 w-4 shrink-0 text-brand-text ${arrowOffset}`}
+        />
         <MobileAWSBox sesHighlighted wrapsHighlighted />
       </div>
     );
@@ -335,7 +341,9 @@ function MobileFlow({ activeTab }: { activeTab: ArchitectureTabKey }) {
       <div className={nodeOffset}>
         <MobileNode highlighted icon={Terminal} label="CLI" />
       </div>
-      <ArrowRight className={`h-4 w-4 shrink-0 text-brand ${arrowOffset}`} />
+      <ArrowRight
+        className={`h-4 w-4 shrink-0 text-brand-text ${arrowOffset}`}
+      />
       <MobileAWSBox sesHighlighted wrapsHighlighted />
     </div>
   );
@@ -705,14 +713,14 @@ export function InteractiveArchitectureDiagram({
                 {activeTab === "send" && compact && (
                   <div className="flex flex-col items-center gap-1">
                     <div className="flex gap-1">
-                      <div className="flex h-5 w-5 items-center justify-center rounded-full border border-brand/50 bg-brand/10 text-brand">
+                      <div className="flex h-5 w-5 items-center justify-center rounded-full border border-brand/50 bg-brand/10 text-brand-text">
                         <Eye className="h-2.5 w-2.5" />
                       </div>
-                      <div className="flex h-5 w-5 items-center justify-center rounded-full border border-brand/50 bg-brand/10 text-brand">
+                      <div className="flex h-5 w-5 items-center justify-center rounded-full border border-brand/50 bg-brand/10 text-brand-text">
                         <MousePointerClick className="h-2.5 w-2.5" />
                       </div>
                     </div>
-                    <span className="text-3xs text-brand/70">
+                    <span className="text-3xs text-brand-text">
                       opens · clicks
                     </span>
                   </div>
@@ -721,17 +729,17 @@ export function InteractiveArchitectureDiagram({
                 {activeTab === "track" && !compact && (
                   <div className="flex flex-col items-center gap-2">
                     <div className="flex gap-1.5">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full border border-brand/50 bg-brand/10 text-brand">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full border border-brand/50 bg-brand/10 text-brand-text">
                         <Eye className="h-3.5 w-3.5" />
                       </div>
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full border border-brand/50 bg-brand/10 text-brand">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full border border-brand/50 bg-brand/10 text-brand-text">
                         <MousePointerClick className="h-3.5 w-3.5" />
                       </div>
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full border border-brand/50 bg-brand/10 text-brand">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full border border-brand/50 bg-brand/10 text-brand-text">
                         <AlertTriangle className="h-3.5 w-3.5" />
                       </div>
                     </div>
-                    <span className="text-3xs text-brand">
+                    <span className="text-3xs text-brand-text">
                       opens · clicks · bounces
                     </span>
                   </div>
