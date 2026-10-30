@@ -62,11 +62,23 @@ describe("runtime pool connection string", () => {
     expect(connectionString).toContain("sslmode=verify-full");
   });
 
-  it("passes an ordinary Neon URL through untouched", async () => {
-    const neon =
-      "postgresql://u:pw@ep-x.us-east-1.aws.neon.tech/neondb?sslmode=require";
+  it("spells a Neon sslmode=require as the verify-full pg applies", async () => {
+    // pg-connection-string prints a SECURITY WARNING on every process that
+    // parses `require`; the dashboard dev server surfaced it on every page.
+    const connectionString = await connectionStringForDatabaseUrl(
+      "postgresql://u:pw@ep-x.us-east-1.aws.neon.tech/neondb?sslmode=require"
+    );
 
-    expect(await connectionStringForDatabaseUrl(neon)).toBe(neon);
+    expect(connectionString).toBe(
+      "postgresql://u:pw@ep-x.us-east-1.aws.neon.tech/neondb?sslmode=verify-full"
+    );
+  });
+
+  it("passes a URL with no aliased sslmode through untouched", async () => {
+    const url =
+      "postgresql://u:pw@ep-x.us-east-1.aws.neon.tech/neondb?sslmode=verify-full";
+
+    expect(await connectionStringForDatabaseUrl(url)).toBe(url);
   });
 
   it("tolerates an unset DATABASE_URL without throwing at import time", async () => {
