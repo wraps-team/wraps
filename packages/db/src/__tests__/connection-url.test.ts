@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import {
   assertPostgresUrl,
@@ -7,6 +8,13 @@ import {
   normalizeDatabaseUrl,
   resolveDirectDatabaseUrl,
 } from "../connection-url";
+
+// The parser pg itself runs on a connection string. Only a transitive
+// dependency under pnpm's strict layout, so resolve it from pg.
+const parsePgConnectionString: (url: string) => Record<string, unknown> =
+  createRequire(createRequire(import.meta.url).resolve("pg"))(
+    "pg-connection-string"
+  ).parse;
 
 // PlanetScale documents this exact shape for Postgres, and pg cannot use it
 // verbatim: sslrootcert=system is read as a filename.
@@ -137,13 +145,83 @@ describe("normalizeDatabaseUrl", () => {
     expect(notes).toHaveLength(0);
   });
 
-  it("leaves an ordinary Neon URL untouched", () => {
-    const neon =
+  describe("sslmodes pg aliases to verify-full", () => {
+    // pg-connection-string v2 already connects `prefer`/`require`/`verify-ca`
+    // as verify-full, but prints a SECURITY WARNING the first time it parses
+    // one. Spelling the mode out keeps the connection identical and quiet.
+    const NEON =
       "postgresql://user:pw@ep-damp-heart-123.us-east-1.aws.neon.tech/neondb?sslmode=require";
-    const { url, notes } = normalizeDatabaseUrl(neon);
 
-    expect(url).toBe(neon);
-    expect(notes).toHaveLength(0);
+    it("rewrites a Neon sslmode=require and changes nothing else", () => {
+      const { url, notes } = normalizeDatabaseUrl(NEON);
+
+      expect(url).toBe(NEON.replace("sslmode=require", "sslmode=verify-full"));
+      // Not an adjustment worth logging — pg already applied this mode.
+      expect(notes).toHaveLength(0);
+    });
+
+    it.each(["prefer", "verify-ca"])("rewrites sslmode=%s too", (mode) => {
+      const { url } = normalizeDatabaseUrl(
+        `postgres://u:p@h/db?sslmode=${mode}`
+      );
+
+      expect(url).toBe("postgres://u:p@h/db?sslmode=verify-full");
+    });
+
+    it("collapses duplicates to the value pg honors — the last", () => {
+      const { url } = normalizeDatabaseUrl(
+        "postgres://u:p@h/db?sslmode=disable&sslmode=require"
+      );
+
+      expect(url).toBe("postgres://u:p@h/db?sslmode=verify-full");
+    });
+
+    it("leaves uselibpqcompat=true alone, where require means encrypt-only", () => {
+      const compat = "postgres://u:p@h/db?uselibpqcompat=true&sslmode=require";
+
+      expect(normalizeDatabaseUrl(compat).url).toBe(compat);
+    });
+
+    it("leaves a key pg would not read alone", () => {
+      // pg reads `sslmode` case-sensitively; it ignores `SSLMODE=require`, so
+      // adding a real `sslmode` beside it would change the connection.
+      const upper = "postgres://u:p@h/db?SSLMODE=require";
+
+      expect(normalizeDatabaseUrl(upper).url).toBe(upper);
+    });
+
+    it.each(["disable", "no-verify", "verify-full"])(
+      "leaves sslmode=%s untouched",
+      (mode) => {
+        const raw = `postgres://u:p@h/db?sslmode=${mode}`;
+
+        expect(normalizeDatabaseUrl(raw).url).toBe(raw);
+      }
+    );
+
+    it("parses to the same pg config apart from sslmode", () => {
+      // The rewrite re-serializes the whole URL, so prove pg's own parser reads
+      // the credentials, host and every other parameter back unchanged.
+      const raw =
+        "postgresql://neondb_owner:p+w%25d%20@s@ep-x-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require&options=-c%20search_path%3Dx";
+      const before = parsePgConnectionString(raw);
+      const after = parsePgConnectionString(normalizeDatabaseUrl(raw).url);
+
+      expect(after.sslmode).toBe("verify-full");
+      expect({ ...after, sslmode: undefined }).toEqual({
+        ...before,
+        sslmode: undefined,
+      });
+    });
+
+    it("leaves a URL pg re-encodes before parsing alone", () => {
+      // A raw space sends pg through encodeURI, which turns this `%3D` into a
+      // literal "%3D". Re-serialized, the same URL would parse it as "=".
+      const raw =
+        "postgresql://u:p s@h/db?sslmode=require&options=-c%20search_path%3Dx";
+
+      expect(normalizeDatabaseUrl(raw).url).toBe(raw);
+    });
   });
 
   it("passes an empty value through instead of throwing", () => {

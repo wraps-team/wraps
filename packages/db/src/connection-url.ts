@@ -67,6 +67,47 @@ function pinVerification(parsed: URL): string | undefined {
     : "Pinned sslmode=verify-full — without the CA reference the original mode would have connected unverified (or in cleartext).";
 }
 
+/**
+ * sslmode values pg-connection-string v2 treats as aliases for `verify-full`,
+ * emitting a SECURITY WARNING the first time it parses one. Neon and most
+ * managed providers hand out `sslmode=require`, so every process that connects
+ * printed it.
+ */
+const VERIFY_FULL_ALIASES = new Set(["prefer", "require", "verify-ca"]);
+
+/**
+ * pg-connection-string's own test for a string it runs `encodeURI` over before
+ * parsing. That pass double-encodes escapes like `%3D`, so pg reads such a URL
+ * differently once `URL` has re-serialized it with the space already encoded.
+ */
+const PG_REENCODES = / |%[^a-f0-9]|%[a-f0-9][^a-f0-9]/i;
+
+/**
+ * Spell an aliased sslmode as the `verify-full` pg already applies to it.
+ * Connections are unchanged today, the warning goes quiet, and the URL keeps
+ * verifying once pg's next major gives `require` libpq's encrypt-only meaning.
+ * Returns whether it rewrote anything.
+ */
+function spellOutVerifyFull(raw: string, parsed: URL): boolean {
+  // Re-serializing is only lossless for a URL pg parses verbatim. The rest
+  // keep the warning rather than risk a changed password or option.
+  if (PG_REENCODES.test(raw)) {
+    return false;
+  }
+  // Read the key exactly as pg does: case-sensitive, decoded, last value wins.
+  // pg ignores `SSLMODE=`, so matching it here would add a second key that
+  // changes the connection.
+  const effective = parsed.searchParams.getAll("sslmode").at(-1);
+  // `uselibpqcompat=true` opts into libpq semantics, under which `require`
+  // really does mean encrypt-only. pg does not warn there; leave it alone.
+  const compat = parsed.searchParams.getAll("uselibpqcompat").at(-1);
+  if (!(effective && VERIFY_FULL_ALIASES.has(effective)) || compat === "true") {
+    return false;
+  }
+  parsed.searchParams.set("sslmode", "verify-full");
+  return true;
+}
+
 export type NormalizedDatabaseUrl = {
   url: string;
   /** Human-readable description of each adjustment made, for logging. */
@@ -93,15 +134,20 @@ export function normalizeDatabaseUrl(raw: string): NormalizedDatabaseUrl {
   );
   const sslRootCert = certKey ? parsed.searchParams.get(certKey) : undefined;
   if (!(sslRootCert && TRUST_STORE_SENTINELS.has(sslRootCert.toLowerCase()))) {
-    // Nothing to strip — hand back the caller's string byte-for-byte rather
-    // than a re-serialized equivalent.
-    return { url, notes };
+    // The sslmode rewrite gets no note: it is the mode pg already applies, not
+    // an adjustment. When nothing changed, hand back the caller's string
+    // byte-for-byte rather than a re-serialized equivalent.
+    return spellOutVerifyFull(url, parsed)
+      ? { url: parsed.toString(), notes }
+      : { url, notes };
   }
 
   parsed.searchParams.delete(certKey as string);
   notes.push(
     `Dropped sslrootcert=${sslRootCert} — node-postgres would read it as a filename. TLS stays on and the certificate is verified against Node's bundled CA set (set NODE_EXTRA_CA_CERTS for a private CA).`
   );
+  // pinVerification leaves either verify-full or an explicit opt-out, so the
+  // aliased modes never survive this branch.
   const pinNote = pinVerification(parsed);
   if (pinNote) {
     notes.push(pinNote);
