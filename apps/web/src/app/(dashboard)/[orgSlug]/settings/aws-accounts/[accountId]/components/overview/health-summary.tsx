@@ -2,15 +2,11 @@
 
 import { Badge } from "@wraps/ui/components/ui/badge";
 import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
-import {
-  AccountFlags,
-  QuotaMeter,
-  RateMeter,
-} from "@/app/(dashboard)/[orgSlug]/components/ses-survival-strip";
+import { AccountFlags } from "@/app/(dashboard)/[orgSlug]/components/ses-survival-strip";
+import { QuotaMeter, RateMeter } from "@/components/ses-meter";
 import type { SesHealthDetail } from "@/hooks/use-ses-health-queries";
 import type { AccountStatus } from "@/lib/aws/account-status";
 import { humanizeSesHealthReason } from "@/lib/ses-health-reasons";
-import { SES_THRESHOLDS } from "@/lib/ses-thresholds";
 import { formatRelativeTime } from "@/lib/utils";
 import { LEVEL_BADGE_VARIANT } from "../../lib/role-status";
 
@@ -71,28 +67,14 @@ export function HealthSummary({
           <>
             <div className="grid gap-6 sm:grid-cols-3">
               <RateMeter
-                label="Bounce rate"
-                pause={SES_THRESHOLDS.bounce.pause}
-                review={SES_THRESHOLDS.bounce.review}
+                metric="bounce"
                 value={healthDetail?.bounceRate ?? null}
               />
               <RateMeter
-                digits={2}
-                label="Complaint rate"
-                pause={SES_THRESHOLDS.complaint.pause}
-                review={SES_THRESHOLDS.complaint.review}
+                metric="complaint"
                 value={healthDetail?.complaintRate ?? null}
               />
-              {healthDetail ? (
-                <QuotaMeter detail={healthDetail} />
-              ) : (
-                <div className="space-y-1.5">
-                  <p className="text-muted-foreground text-xs">24h quota</p>
-                  <p className="font-semibold text-lg text-muted-foreground">
-                    —
-                  </p>
-                </div>
-              )}
+              <QuotaMeter detail={healthDetail} />
             </div>
             {healthDetail && (
               <AccountFlags detail={healthDetail} orgSlug={orgSlug} />

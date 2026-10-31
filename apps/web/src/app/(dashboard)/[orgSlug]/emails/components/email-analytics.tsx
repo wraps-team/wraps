@@ -11,6 +11,7 @@ import { Skeleton } from "@wraps/ui/components/ui/skeleton";
 import { CircleAlert, Loader2, RotateCw } from "lucide-react";
 import { useMemo } from "react";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { RateMeter } from "@/components/ses-meter";
 import { Button } from "@/components/ui/button";
 import { useHubDays } from "@/hooks/use-hub-days";
 import {
@@ -20,14 +21,8 @@ import {
 import { countYAxisProps } from "@/lib/chart-axis";
 import { SERIES_COLOR } from "@/lib/chart-series";
 import { HUB_RANGES } from "@/lib/emails-hub";
-import {
-  formatThreshold,
-  meterGeometry,
-  SES_THRESHOLDS,
-} from "@/lib/ses-thresholds";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { cn } from "@/lib/utils";
-import { LEVEL_TEXT, ThresholdBar } from "../../components/ses-survival-strip";
 import { useEmailChartData } from "../analytics/hooks/use-analytics";
 import { captureEmailsErrorRetried } from "../lib/analytics";
 import { ReputationScope, UpdatedAgo } from "./summary-rail";
@@ -180,68 +175,8 @@ function Stat({
   );
 }
 
-/**
- * A reputation rate, drawn against the lines where AWS reviews and pauses the
- * account when the rate is SES's own. A bare "0.05%" left the reader to know
- * that AWS reviews at 5%; the bar says how much room is left.
- *
- * `value` is a percentage (0.05 = 0.05%), as the chart payload carries it; the
- * thresholds are decimals. Window arithmetic is a different population from
- * the one AWS enforces on, so it gets the number without the lines.
- */
-function RateStat({
-  label,
-  value,
-  digits,
-  thresholds,
-}: {
-  label: string;
-  value: number;
-  digits: number;
-  thresholds: { review: number; pause: number } | null;
-}) {
-  const geometry = thresholds
-    ? meterGeometry(value / 100, thresholds.review, thresholds.pause)
-    : null;
-
-  return (
-    <div className="flex flex-1 flex-col justify-center border-t py-3">
-      {/*
-        One line at every width: a second line here would push the panel past
-        the chart's height at narrow desktop widths, where there is no slack.
-        When the words do not fit, the coloured ticks carry them.
-      */}
-      <div className="flex items-baseline justify-between gap-4 whitespace-nowrap font-mono text-2xs text-muted-foreground uppercase tracking-eyebrow">
-        <span>{label}</span>
-        {thresholds ? (
-          <span className="tabular-nums">
-            <span className="hidden @[20rem]/account:inline">Review </span>
-            {formatThreshold(thresholds.review)} ·{" "}
-            <span className="hidden @[20rem]/account:inline">pause </span>
-            {formatThreshold(thresholds.pause)}
-          </span>
-        ) : null}
-      </div>
-      <div className="mt-1.5 flex items-center gap-4">
-        <span
-          className={cn(
-            "font-heading font-semibold text-2xl leading-none tabular-nums",
-            geometry ? LEVEL_TEXT[geometry.level] : null
-          )}
-        >
-          {value.toFixed(digits)}%
-        </span>
-        {geometry ? (
-          // The default muted track all but vanishes on the panel's tint.
-          <ThresholdBar
-            className="min-w-0 flex-1 bg-foreground/10"
-            geometry={geometry}
-          />
-        ) : null}
-      </div>
-    </div>
-  );
-}
+/** Each rate is a ruled row taking an equal share of the panel's height. */
+const RATE_ROW = "flex-1 justify-center border-t py-3";
 
 /**
  * The account's figures as ruled rows. Two populations, split by the rule
@@ -279,17 +214,21 @@ function AccountFigures({
           value={(overview?.totalDelivered ?? 0).toLocaleString()}
         />
       </div>
-      <RateStat
-        digits={2}
-        label="Bounce rate"
-        thresholds={rated ? SES_THRESHOLDS.bounce : null}
-        value={overview?.bounceRate ?? 0}
+      {/*
+        The payload carries percentages (0.05 = 0.05%); the meter takes the
+        decimals AWS states its lines in.
+      */}
+      <RateMeter
+        className={RATE_ROW}
+        metric="bounce"
+        rated={rated}
+        value={(overview?.bounceRate ?? 0) / 100}
       />
-      <RateStat
-        digits={3}
-        label="Complaint rate"
-        thresholds={rated ? SES_THRESHOLDS.complaint : null}
-        value={overview?.complaintRate ?? 0}
+      <RateMeter
+        className={RATE_ROW}
+        metric="complaint"
+        rated={rated}
+        value={(overview?.complaintRate ?? 0) / 100}
       />
       {/*
         Stays on the surface rather than going into the popover: a rate
@@ -599,7 +538,7 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
       </Panel>
 
       <Panel
-        className="@container/account flex flex-col lg:col-span-2"
+        className="flex flex-col lg:col-span-2"
         label={<PanelTitle>Your SES account</PanelTitle>}
         variant="own"
       >

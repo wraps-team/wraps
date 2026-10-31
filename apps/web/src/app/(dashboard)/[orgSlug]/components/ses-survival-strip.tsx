@@ -3,174 +3,13 @@
 import { Badge } from "@wraps/ui/components/ui/badge";
 import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import Link from "next/link";
+import { QuotaMeter, RateMeter } from "@/components/ses-meter";
 import type {
   SesHealthAccount,
   SesHealthDetail,
 } from "@/hooks/use-ses-health-queries";
 import { useSesHealth } from "@/hooks/use-ses-health-queries";
-import {
-  formatRate,
-  formatThreshold,
-  type MeterGeometry,
-  type MeterLevel,
-  meterGeometry,
-  SES_THRESHOLDS,
-} from "@/lib/ses-thresholds";
-import { cn, formatRelativeTime } from "@/lib/utils";
-
-const LEVEL_FILL: Record<MeterLevel, string> = {
-  ok: "bg-foreground",
-  review: "bg-warning",
-  pause: "bg-destructive",
-};
-
-export const LEVEL_TEXT: Record<MeterLevel, string> = {
-  ok: "text-foreground",
-  review: "text-warning",
-  pause: "text-destructive",
-};
-
-/** The bar with AWS's review and pause ticks. `meterGeometry` lays it out. */
-export function ThresholdBar({
-  geometry,
-  className,
-}: {
-  geometry: MeterGeometry;
-  className?: string;
-}) {
-  const { valuePct, reviewPct, pausePct, level } = geometry;
-  return (
-    <div
-      aria-hidden="true"
-      className={cn("relative h-1.5 w-full bg-muted", className)}
-      data-slot="threshold-bar"
-    >
-      <div
-        className={cn("h-full", LEVEL_FILL[level])}
-        data-slot="threshold-fill"
-        style={{ width: `${valuePct}%` }}
-      />
-      <span
-        className="absolute top-[-2px] h-[10px] w-px bg-warning/70"
-        style={{ left: `${reviewPct}%` }}
-      />
-      <span
-        className="absolute top-[-2px] h-[10px] w-px bg-destructive/70"
-        style={{ left: `${pausePct}%` }}
-      />
-    </div>
-  );
-}
-
-/**
- * One rate drawn against AWS's own review and pause lines.
- *
- * The lines are the point of the component: a bounce rate of 4% means nothing
- * on its own and everything next to "AWS reviews at 5%". A bare colour would
- * say "bad" without ever saying how much room is left.
- */
-export function RateMeter({
-  label,
-  value,
-  review,
-  pause,
-  digits,
-}: {
-  label: string;
-  value: number | null;
-  review: number;
-  pause: number;
-  digits?: number;
-}) {
-  if (value === null) {
-    return (
-      <div className="space-y-1.5">
-        <p className="text-muted-foreground text-xs">{label}</p>
-        <p className="font-semibold text-lg text-muted-foreground">—</p>
-        <p className="text-muted-foreground text-xs">
-          No metrics published yet
-        </p>
-      </div>
-    );
-  }
-
-  const geometry = meterGeometry(value, review, pause);
-
-  return (
-    <div className="space-y-1.5">
-      <p className="text-muted-foreground text-xs">{label}</p>
-      <p
-        className={cn(
-          "font-semibold text-lg tabular-nums",
-          LEVEL_TEXT[geometry.level]
-        )}
-      >
-        {formatRate(value, digits)}
-      </p>
-      <ThresholdBar geometry={geometry} />
-      <p className="text-muted-foreground text-xs tabular-nums">
-        review {formatThreshold(review)} · pause {formatThreshold(pause)}
-      </p>
-    </div>
-  );
-}
-
-/** Quota has no AWS enforcement line — running out is just running out. */
-export function QuotaMeter({ detail }: { detail: SesHealthDetail }) {
-  const { sentLast24Hours, max24HourSend, maxSendRate, quotaUsedRatio } =
-    detail;
-
-  if (sentLast24Hours === null || max24HourSend === null) {
-    return (
-      <div className="space-y-1.5">
-        <p className="text-muted-foreground text-xs">24h quota</p>
-        <p className="font-semibold text-lg text-muted-foreground">—</p>
-        <p className="text-muted-foreground text-xs">Quota not reported</p>
-      </div>
-    );
-  }
-
-  // SES reports an unlimited-in-practice quota as -1 on some account types.
-  const isUnlimited = max24HourSend < 0;
-  const ratio = quotaUsedRatio ?? 0;
-  const isHigh = !isUnlimited && ratio >= SES_THRESHOLDS.quotaWarnRatio;
-
-  return (
-    <div className="space-y-1.5">
-      <p className="text-muted-foreground text-xs">24h quota</p>
-      <p
-        className={cn(
-          "font-semibold text-lg tabular-nums",
-          isHigh ? "text-warning" : "text-foreground"
-        )}
-      >
-        {sentLast24Hours.toLocaleString()}
-        <span className="font-normal text-muted-foreground text-sm">
-          {isUnlimited ? " sent" : ` / ${max24HourSend.toLocaleString()}`}
-        </span>
-      </p>
-      {isUnlimited ? (
-        <div className="h-1.5" />
-      ) : (
-        <div className="relative h-1.5 w-full bg-muted">
-          <div
-            className={cn("h-full", isHigh ? "bg-warning" : "bg-foreground")}
-            style={{ width: `${Math.min(100, ratio * 100)}%` }}
-          />
-          <span
-            aria-hidden="true"
-            className="absolute top-[-2px] h-[10px] w-px bg-warning/70"
-            style={{ left: `${SES_THRESHOLDS.quotaWarnRatio * 100}%` }}
-          />
-        </div>
-      )}
-      <p className="text-muted-foreground text-xs tabular-nums">
-        {isUnlimited ? "No daily cap" : `${formatRate(ratio, 1)} used`}
-        {maxSendRate !== null && ` · ${maxSendRate}/s max rate`}
-      </p>
-    </div>
-  );
-}
+import { formatRelativeTime } from "@/lib/utils";
 
 /**
  * The states that decide whether this account can send at all, as opposed to
@@ -261,27 +100,9 @@ function AccountBlock({
         </div>
       )}
       <div className="grid gap-6 sm:grid-cols-3">
-        <RateMeter
-          label="Bounce rate"
-          pause={SES_THRESHOLDS.bounce.pause}
-          review={SES_THRESHOLDS.bounce.review}
-          value={detail?.bounceRate ?? null}
-        />
-        <RateMeter
-          digits={2}
-          label="Complaint rate"
-          pause={SES_THRESHOLDS.complaint.pause}
-          review={SES_THRESHOLDS.complaint.review}
-          value={detail?.complaintRate ?? null}
-        />
-        {detail ? (
-          <QuotaMeter detail={detail} />
-        ) : (
-          <div className="space-y-1.5">
-            <p className="text-muted-foreground text-xs">24h quota</p>
-            <p className="font-semibold text-lg text-muted-foreground">—</p>
-          </div>
-        )}
+        <RateMeter metric="bounce" value={detail?.bounceRate ?? null} />
+        <RateMeter metric="complaint" value={detail?.complaintRate ?? null} />
+        <QuotaMeter detail={detail} />
       </div>
       {detail && <AccountFlags detail={detail} orgSlug={orgSlug} />}
     </div>
