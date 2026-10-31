@@ -175,6 +175,18 @@ const tools = [
       "Check up to 100 email addresses with SES Email Address Insights and return a deliverability verdict (HIGH, MEDIUM, LOW, or UNKNOWN) for each.",
   },
   {
+    name: "export_contacts",
+    write: false,
+    description:
+      "Export the contacts that match optional filters, newest first, up to 1,000 rows per call. truncated is true when more contacts matched; there is no paging, so narrow the filters and call again.",
+  },
+  {
+    name: "import_contacts",
+    write: true,
+    description:
+      "Import up to 10,000 contacts in one call and get back created, updated, skipped and invalid counts, with the reason for each rejected row. Changing existing contacts (duplicateStrategy update) needs confirm: true.",
+  },
+  {
     name: "list_segments",
     write: false,
     description:
@@ -277,6 +289,12 @@ const tools = [
       "Publish a Wraps template to SES, so sends and workflows that use it get this content. Needs confirm: true.",
   },
   {
+    name: "delete_template",
+    write: true,
+    description:
+      "Permanently delete up to 100 templates, with their versions, and their published SES copies where no other template uses the same SES name. Refused with 409 (nothing deleted) while a scheduled, queued or processing broadcast, or an enabled workflow, uses one. Needs confirm: true.",
+  },
+  {
     name: "list_broadcasts",
     write: false,
     description:
@@ -364,6 +382,12 @@ const tools = [
     description: "Record a custom event for one contact. Needs confirm: true.",
   },
   {
+    name: "add_suppression",
+    write: true,
+    description:
+      "Add up to 100 addresses to the SES account-level suppression list of one AWS account, so Wraps stops sending to them. Undo one address at a time with remove_suppression. Needs confirm: true.",
+  },
+  {
     name: "remove_suppression",
     write: true,
     description:
@@ -424,6 +448,30 @@ const tools = [
       "Cancel a workflow execution that is still running (pending, active, paused or waiting), so no further steps run for that contact and its scheduled steps are removed. Needs confirm: true.",
   },
   {
+    name: "list_agents",
+    write: false,
+    description:
+      "List the leashed agents in your organization: each one's sending address, send policy (hourly and daily caps and recipient allowlists), and whether it is ACTIVE or KILLED.",
+  },
+  {
+    name: "create_agent",
+    write: true,
+    description:
+      "Create a leashed agent: a named sender with its own address and send policy. Recorded in Wraps only; its AWS resources are deployed with the CLI. Needs an owner or admin. Not registered in enforced mode.",
+  },
+  {
+    name: "kill_agent",
+    write: true,
+    description:
+      "Kill one leashed agent so it can no longer send. Irreversible: no route returns a killed agent to ACTIVE. Needs an owner or admin and confirm: true. Not registered in enforced mode.",
+  },
+  {
+    name: "set_agent_policy",
+    write: true,
+    description:
+      "Replace one leashed agent's send policy in full: hourly and daily caps and both recipient allowlists. Overwrites the previous policy. Needs an owner or admin and confirm: true. Not registered in enforced mode.",
+  },
+  {
     name: "list_agent_approvals",
     write: false,
     description:
@@ -458,6 +506,18 @@ const tools = [
     write: false,
     description:
       "Get one parsed inbound email from the customer's SES inbound bucket by emailId, with its from/to/cc, subject, date, headers, text body, HTML body and attachment metadata.",
+  },
+  {
+    name: "get_account_health",
+    write: false,
+    description:
+      "Get the SES sending health of the AWS accounts connected to your organization: status, when it was last checked, quota, reputation and the reasons for the status. Reads the verdict the hourly sweep last saved, with no AWS calls.",
+  },
+  {
+    name: "email_check",
+    write: false,
+    description:
+      "Check a domain's SPF, DKIM, DMARC, MX, blacklist and related setup, and return a grade with the issues that cost points. Read-only, sends no mail. The request is public and rate limited to 10 per minute per IP.",
   },
   {
     name: "list_brand_kits",
@@ -831,13 +891,20 @@ export default function McpReferencePageContent() {
           is set (enforced mode),{" "}
           <code className="rounded bg-muted px-1.5 py-0.5">
             approve_agent_approval
-          </code>{" "}
-          and{" "}
+          </code>
+          ,{" "}
           <code className="rounded bg-muted px-1.5 py-0.5">
             reject_agent_approval
+          </code>
+          , <code className="rounded bg-muted px-1.5 py-0.5">create_agent</code>
+          , <code className="rounded bg-muted px-1.5 py-0.5">kill_agent</code>{" "}
+          and{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">
+            set_agent_policy
           </code>{" "}
           are not registered, so an enforced agent cannot approve or reject its
-          own sends.
+          own sends, or create agents, kill them or change their policies.
+          list_agents stays registered.
         </p>
       </section>
 
