@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, asc, desc, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { db, eq, escapeIlike } from "../index";
 import { contact, contactTopic, topic } from "../schema/contacts";
 
@@ -287,6 +287,63 @@ export async function findContactByEmailHash(
     )
     .limit(1);
   return result ?? null;
+}
+
+/**
+ * Marks the org's contact for `email` as `suppressed`, for a suppression added
+ * by hand to the SES suppression list. Broadcasts choose recipients from
+ * `email_status` and never read the SES list, so without this the next
+ * broadcast still sends to the address and SES reports it as a bounce.
+ *
+ * Only a sendable contact changes (NULL, `active`, `soft_bounced`): an
+ * `unsubscribed`, `bounced` or `complained` contact is already skipped, and
+ * its status says more. Returns whether a contact changed.
+ */
+export async function suppressContactByEmail(
+  organizationId: string,
+  email: string,
+  dbClient: DbClient = db
+): Promise<boolean> {
+  const rows = await dbClient
+    .update(contact)
+    .set({ emailStatus: "suppressed", emailSuppressedAt: new Date() })
+    .where(
+      and(
+        eq(contact.organizationId, organizationId),
+        eq(contact.emailHash, hashContactValue(email)),
+        or(
+          isNull(contact.emailStatus),
+          inArray(contact.emailStatus, ["active", "soft_bounced"])
+        )
+      )
+    )
+    .returning({ id: contact.id });
+  return rows.length > 0;
+}
+
+/**
+ * The reverse of `suppressContactByEmail`, for an address taken off the SES
+ * suppression list: a `suppressed` contact becomes `active` so broadcasts
+ * include it again. Any other status is left alone. Returns whether a contact
+ * changed.
+ */
+export async function unsuppressContactByEmail(
+  organizationId: string,
+  email: string,
+  dbClient: DbClient = db
+): Promise<boolean> {
+  const rows = await dbClient
+    .update(contact)
+    .set({ emailStatus: "active" })
+    .where(
+      and(
+        eq(contact.organizationId, organizationId),
+        eq(contact.emailHash, hashContactValue(email)),
+        eq(contact.emailStatus, "suppressed")
+      )
+    )
+    .returning({ id: contact.id });
+  return rows.length > 0;
 }
 
 export async function findContactByPhoneHash(

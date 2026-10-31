@@ -4,6 +4,7 @@
  * stores. Split out of routes/webhooks.ts; nothing here touches the database.
  */
 
+import { isSuppressionBounceSubType } from "@wraps/core/bounce-classification";
 import type { MessageSendDiagnosticInput } from "@wraps/db";
 import {
   extractBounceDiagnostic,
@@ -168,8 +169,7 @@ export function sdkDiagnosticFor(
   recipient: string
 ): Omit<MessageSendDiagnosticInput, "organizationId" | "messageSendId"> | null {
   if (eventType === "Bounce") {
-    const subType = detail.bounce?.bounceSubType;
-    if (subType === "Suppressed" || subType === "EmailValidationSuppressed") {
+    if (isSuppressionBounceSubType(detail.bounce?.bounceSubType)) {
       return null;
     }
     return {

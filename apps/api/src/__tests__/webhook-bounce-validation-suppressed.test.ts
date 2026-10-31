@@ -1,5 +1,6 @@
 /**
- * Webhook Bounce — bounceSubType="EmailValidationSuppressed" Tests
+ * Webhook Bounce — bounceSubType="EmailValidationSuppressed",
+ * "OnAccountSuppressionList" and "OnTenantSuppressionList" Tests
  *
  * SES Auto Validation drops a send before any delivery attempt, on the
  * strength of a validation verdict, and reports it as a Bounce event with
@@ -176,7 +177,14 @@ function setupMocks(opts: MockOpts = {}) {
   return { updateCalls };
 }
 
-describe("Webhook: Bounce with bounceSubType=EmailValidationSuppressed", () => {
+// OnAccountSuppressionList / OnTenantSuppressionList: SES refused the send
+// because the address is on the account's (or tenant's) suppression list. No
+// delivery was attempted, so it is a suppression, the same as the two above.
+describe.each([
+  "EmailValidationSuppressed",
+  "OnAccountSuppressionList",
+  "OnTenantSuppressionList",
+])("Webhook: Bounce with bounceSubType=%s", (suppressionSubType) => {
   let app: ReturnType<typeof createTestApp>;
 
   beforeEach(() => {
@@ -189,7 +197,7 @@ describe("Webhook: Bounce with bounceSubType=EmailValidationSuppressed", () => {
 
     const event = buildBounceEvent({
       bounceType: "Permanent",
-      bounceSubType: "EmailValidationSuppressed",
+      bounceSubType: suppressionSubType,
     });
     const response = await sendWebhookEvent(app, event);
 
@@ -211,7 +219,7 @@ describe("Webhook: Bounce with bounceSubType=EmailValidationSuppressed", () => {
 
     const event = buildBounceEvent({
       bounceType: "Permanent",
-      bounceSubType: "EmailValidationSuppressed",
+      bounceSubType: suppressionSubType,
     });
     await sendWebhookEvent(app, event);
 
@@ -238,7 +246,7 @@ describe("Webhook: Bounce with bounceSubType=EmailValidationSuppressed", () => {
 
     const event = buildBounceEvent({
       bounceType: "Permanent",
-      bounceSubType: "EmailValidationSuppressed",
+      bounceSubType: suppressionSubType,
     });
     await sendWebhookEvent(app, event);
 
@@ -280,7 +288,7 @@ describe("Webhook: Bounce with bounceSubType=EmailValidationSuppressed", () => {
 
     const event = buildBounceEvent({
       bounceType: "Permanent",
-      bounceSubType: "EmailValidationSuppressed",
+      bounceSubType: suppressionSubType,
     });
     await sendWebhookEvent(app, event);
 
@@ -310,7 +318,7 @@ describe("Webhook: Bounce with bounceSubType=EmailValidationSuppressed", () => {
 
     const event = buildBounceEvent({
       bounceType: "Permanent",
-      bounceSubType: "EmailValidationSuppressed",
+      bounceSubType: suppressionSubType,
     });
     await sendWebhookEvent(app, event);
 
@@ -325,7 +333,7 @@ describe("Webhook: Bounce with bounceSubType=EmailValidationSuppressed", () => {
 
     const event = buildBounceEvent({
       bounceType: "Permanent",
-      bounceSubType: "EmailValidationSuppressed",
+      bounceSubType: suppressionSubType,
     });
     await sendWebhookEvent(app, event);
 
@@ -337,7 +345,7 @@ describe("Webhook: Bounce with bounceSubType=EmailValidationSuppressed", () => {
 
     const event = buildBounceEvent({
       bounceType: "Permanent",
-      bounceSubType: "EmailValidationSuppressed",
+      bounceSubType: suppressionSubType,
     });
     await sendWebhookEvent(app, event);
 
@@ -368,7 +376,7 @@ describe("Webhook: Bounce with bounceSubType=EmailValidationSuppressed", () => {
 
     const event = buildBounceEvent({
       bounceType: "Permanent",
-      bounceSubType: "EmailValidationSuppressed",
+      bounceSubType: suppressionSubType,
     });
     await sendWebhookEvent(app, event);
 
