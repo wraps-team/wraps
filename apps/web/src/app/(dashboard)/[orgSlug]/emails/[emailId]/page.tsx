@@ -7,6 +7,7 @@ import { and, eq, or } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { Suspense } from "react";
 import { EmailArchiveViewer } from "@/components/email-archive-viewer";
 import { Button } from "@/components/ui/button";
 import { queryEmailEvents, queryEventsByMessageIds } from "@/lib/aws/dynamodb";
@@ -22,7 +23,9 @@ import { EmailFields } from "./components/email-fields";
 import { EmailUnavailable } from "./components/email-unavailable";
 import { EventItem } from "./components/event-item";
 import { EventTimeline } from "./components/event-timeline";
+import { SuppressionStep } from "./components/suppression-step";
 import { TimelineState } from "./components/timeline-state";
+import { findHardBounce } from "./hard-bounce";
 import {
   classifyLookupError,
   classifyTimelineFailure,
@@ -49,11 +52,15 @@ type EmailDetailPageProps = {
   }>;
 };
 
+type AwsAccountRow = typeof awsAccount.$inferSelect;
+
 type EmailLookupResult =
   | {
       ok: true;
       email: Email & { archivingEnabled: boolean };
       timeline: EmailTimelineState;
+      /** The account whose history held the events; null for the PG-only view. */
+      account: AwsAccountRow | null;
     }
   | ({ ok: false } & EmailLookupFailure);
 
@@ -240,6 +247,7 @@ async function fetchEmail(
               pgAccount.features?.email?.archivingEnabled ?? false
             ),
             timeline: { status: "ok", accountId: pgAccount.accountId },
+            account: pgAccount,
           };
         }
       } catch (error) {
@@ -297,6 +305,7 @@ async function fetchEmail(
             account.features?.email?.archivingEnabled ?? false
           ),
           timeline: { status: "ok", accountId: account.accountId },
+          account,
         };
       }
     }
@@ -353,6 +362,7 @@ async function fetchEmail(
         events: [],
       },
       timeline,
+      account: null,
     };
   } catch (error) {
     logger.error({ err: error, emailId, organizationId }, "fetchEmail failed");
@@ -438,6 +448,8 @@ export default async function EmailDetailPage({
   // neutral instead of blanking (audit F12).
   const statusConfig = getEmailStatusConfig(email.status);
   const StatusIcon = statusConfig.icon;
+  // A hard bounce gets one more step: whether SES suppressed the address.
+  const hardBounce = result.account ? findHardBounce(email.events) : null;
 
   return (
     <>
@@ -500,10 +512,22 @@ export default async function EmailDetailPage({
                 color={getEmailStatusConfig(event.type).tone.text}
                 event={event}
                 iconType={event.type}
-                isLast={index === email.events.length - 1}
+                isLast={!hardBounce && index === email.events.length - 1}
                 key={`${event.type}-${event.timestamp}`}
               />
             ))
+          )}
+          {hardBounce && result.account && (
+            // Streams in: the lookup is a live SES call, and the rest of the
+            // page should not wait on it.
+            <Suspense fallback={null}>
+              <SuppressionStep
+                account={result.account}
+                hardBounce={hardBounce}
+                organizationId={orgWithMembership.id}
+                orgSlug={orgSlug}
+              />
+            </Suspense>
           )}
         </EventTimeline>
 

@@ -149,6 +149,24 @@ vi.mock("../components/email-fields", () => ({
   EmailFields: () => null,
 }));
 
+// The live SES lookup is covered in components/__tests__/suppression-step.
+// Here a stub shows whether the page asks for the step, and for what.
+vi.mock("../components/suppression-step", () => ({
+  SuppressionStep: ({
+    account,
+    hardBounce,
+  }: {
+    account: { id: string };
+    hardBounce: { addresses: string[] };
+  }) => (
+    <div
+      data-account={account.id}
+      data-addresses={hardBounce.addresses.join(",")}
+      data-testid="suppression-step"
+    />
+  ),
+}));
+
 type ListFilters = { days?: string; q?: string; status?: string };
 
 async function renderDetailPage(
@@ -567,5 +585,76 @@ describe("Email detail page — resolution order", () => {
 
     expect(screen.getByText("No events recorded")).toBeInTheDocument();
     expect(screen.queryByText("Event timeline unavailable")).toBeNull();
+  });
+});
+
+/**
+ * A hard bounce gets one more lifecycle step: whether SES suppressed the
+ * address. Soft bounces, and bounces SES raised because the address was
+ * already suppressed, do not.
+ */
+describe("Email detail page — suppression after a hard bounce", () => {
+  const RAW_MESSAGE_ID = SENT_PG_RECORD.messageId;
+  const AT = Date.parse("2026-10-31T07:00:46.000Z");
+
+  function event(eventType: string, additionalData: unknown = null) {
+    return {
+      messageId: RAW_MESSAGE_ID,
+      eventType,
+      sentAt: 1,
+      createdAt: AT,
+      mailSentAt: AT,
+      from: SENT_PG_RECORD.from,
+      to: [SENT_PG_RECORD.recipient],
+      subject: SENT_PG_RECORD.subject,
+      additionalData: additionalData ? JSON.stringify(additionalData) : null,
+    };
+  }
+
+  function bounce(bounceType: string, bounceSubType: string) {
+    return event("Bounce", {
+      bounceType,
+      bounceSubType,
+      bouncedRecipients: [{ emailAddress: "Customer@Example.com" }],
+    });
+  }
+
+  beforeEach(() => {
+    selectMessageSendMock.mockResolvedValue([SENT_PG_RECORD]);
+  });
+
+  it("asks for the step for the bounced address, in the account that sent it", async () => {
+    queryEventsByMessageIdsMock.mockResolvedValue([
+      event("Send"),
+      bounce("Permanent", "General"),
+    ]);
+
+    await renderDetailPage();
+
+    const step = screen.getByTestId("suppression-step");
+    expect(step).toHaveAttribute("data-account", "acc-1");
+    expect(step).toHaveAttribute("data-addresses", "customer@example.com");
+  });
+
+  it("adds no step for a soft bounce", async () => {
+    queryEventsByMessageIdsMock.mockResolvedValue([
+      event("Send"),
+      bounce("Transient", "MailboxFull"),
+    ]);
+
+    await renderDetailPage();
+
+    expect(screen.queryByTestId("suppression-step")).toBeNull();
+  });
+
+  it("adds no step when SES skipped the send because the address was already suppressed", async () => {
+    queryEventsByMessageIdsMock.mockResolvedValue([
+      event("Send"),
+      bounce("Permanent", "Suppressed"),
+    ]);
+
+    await renderDetailPage();
+
+    expect(screen.queryByTestId("suppression-step")).toBeNull();
   });
 });
