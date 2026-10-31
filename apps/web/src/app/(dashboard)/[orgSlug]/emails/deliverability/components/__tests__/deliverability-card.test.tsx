@@ -321,6 +321,21 @@ describe("chart and metric toggle", () => {
     expect(screen.getByText("SES review line · 5%")).toBeInTheDocument();
   });
 
+  it("keeps the pause line off a chart that stays under the review line", () => {
+    // Drawn at 10%, it would flatten a healthy bounce line onto the floor.
+    loadHealthy();
+    renderCard();
+    expect(screen.queryByText(/SES pause line ·/)).not.toBeInTheDocument();
+  });
+
+  it("adds the 10% pause line once the bounce rate reaches review", () => {
+    loadHealthy();
+    state.bounce = bounceRows(6);
+    renderCard();
+    expect(screen.getByText("SES review line · 5%")).toBeInTheDocument();
+    expect(screen.getByText("SES pause line · 10%")).toBeInTheDocument();
+  });
+
   it("draws the complaint chart and its 0.1% review line from metric=complaint", () => {
     loadHealthy();
     renderCard({ metric: "complaint" });

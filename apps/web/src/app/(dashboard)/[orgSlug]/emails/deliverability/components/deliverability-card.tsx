@@ -21,6 +21,7 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  ReferenceArea,
   ReferenceDot,
   ReferenceLine,
   XAxis,
@@ -83,26 +84,35 @@ const METRIC_COLOR: Record<Metric, string> = {
   suppression: SERIES_COLOR.attention,
 };
 
-/** The SES review line for a metric, in percent, or null when it has none. */
-function reviewPercent(metric: Metric): number | null {
-  if (metric === "bounce") {
-    return Number((SES_THRESHOLDS.bounce.review * 100).toFixed(3));
+type SesLines = {
+  /** The review and pause lines in percent, the chart's unit. */
+  review: number;
+  pause: number;
+  reviewText: string;
+  pauseText: string;
+};
+
+/** AWS's review and pause lines for a metric, or null when it has none. */
+function sesLines(metric: Metric): SesLines | null {
+  if (metric === "suppression") {
+    return null;
   }
-  if (metric === "complaint") {
-    return Number((SES_THRESHOLDS.complaint.review * 100).toFixed(3));
-  }
-  return null;
+  const { review, pause } = SES_THRESHOLDS[metric];
+  const percent = (value: number) => Number((value * 100).toFixed(3));
+  return {
+    review: percent(review),
+    pause: percent(pause),
+    reviewText: formatThreshold(review),
+    pauseText: formatThreshold(pause),
+  };
 }
 
-function reviewLabel(metric: Metric): string | null {
-  if (metric === "bounce") {
-    return formatThreshold(SES_THRESHOLDS.bounce.review);
-  }
-  if (metric === "complaint") {
-    return formatThreshold(SES_THRESHOLDS.complaint.review);
-  }
-  return null;
-}
+/**
+ * How faint the review and pause zones are. Enough to read as a region behind
+ * the line, the way the account panel's meter reads as a track behind its
+ * fill, without competing with the series.
+ */
+const ZONE_OPACITY = 0.08;
 
 const CHART_HEIGHT = "h-[180px]";
 
@@ -171,6 +181,77 @@ function InfoPopover({
   );
 }
 
+/**
+ * The zones and lines AWS's thresholds draw on a trend chart.
+ *
+ * A function rather than a component: recharts 2 finds reference elements by
+ * type among the chart's direct children, so a wrapper component would hide
+ * them. Labels stay muted because amber text on a white card is too faint.
+ */
+function sesLineElements(lines: SesLines, showPause: boolean, top: number) {
+  const lineLabel = (
+    value: string,
+    position: "insideTopRight" | "insideBottomRight"
+  ) => ({
+    value,
+    position,
+    fill: "var(--muted-foreground)",
+    fontSize: 11,
+  });
+
+  const elements = [
+    <ReferenceArea
+      fill="var(--warning)"
+      fillOpacity={ZONE_OPACITY}
+      ifOverflow="hidden"
+      key="review-zone"
+      y1={lines.review}
+      y2={showPause ? lines.pause : top}
+    />,
+    <ReferenceLine
+      ifOverflow="extendDomain"
+      key="review-line"
+      label={lineLabel(
+        `SES review line · ${lines.reviewText}`,
+        "insideTopRight"
+      )}
+      stroke="var(--warning)"
+      strokeDasharray="6 4"
+      strokeWidth={1.5}
+      y={lines.review}
+    />,
+  ];
+
+  if (showPause) {
+    elements.push(
+      <ReferenceArea
+        fill="var(--destructive)"
+        fillOpacity={ZONE_OPACITY}
+        ifOverflow="hidden"
+        key="pause-zone"
+        y1={lines.pause}
+        y2={top}
+      />,
+      <ReferenceLine
+        ifOverflow="extendDomain"
+        key="pause-line"
+        // Above its line, in the red zone: below it, the label collides with
+        // the latest-value label of a rate climbing toward the line.
+        label={lineLabel(
+          `SES pause line · ${lines.pauseText}`,
+          "insideBottomRight"
+        )}
+        stroke="var(--destructive)"
+        strokeDasharray="6 4"
+        strokeWidth={1.5}
+        y={lines.pause}
+      />
+    );
+  }
+
+  return elements;
+}
+
 function ChartBox({
   children,
   dashed = false,
@@ -189,8 +270,14 @@ function ChartBox({
 }
 
 /**
- * The trend for one metric. Its axes, tooltip and
- * change-marker lines, with the SES review line as the only dashed element.
+ * The trend for one metric. Its axes, tooltip and change-marker lines, with
+ * AWS's lines as the only dashed elements, in the colours the account panel's
+ * meter uses for its ticks: amber for review, red for pause.
+ *
+ * The pause line joins only once the rate reaches the review line. Drawn
+ * always, it would stretch the axis to 12% for bounces and flatten a healthy
+ * 0.05% line onto the floor; until review is crossed, the faint amber zone
+ * above the review line is the warning the reader needs.
  */
 function TrendChart({
   metric,
@@ -210,8 +297,7 @@ function TrendChart({
   clickable: boolean;
 }) {
   const [, setDay] = useQueryState("day", parseAsString);
-  const review = reviewPercent(metric);
-  const reviewText = reviewLabel(metric);
+  const lines = sesLines(metric);
   const color = METRIC_COLOR[metric];
   const decimals = metric === "complaint" ? 2 : 1;
   const fmt = (value: number) => `${value.toFixed(decimals)}%`;
@@ -221,19 +307,20 @@ function TrendChart({
   } satisfies ChartConfig;
 
   const maxValue = Math.max(0, ...points.map((p) => p.value));
-  const top = Math.max(
-    review === null ? 0 : review * 1.2,
-    maxValue * 1.1,
-    0.01
-  );
+  const showPause = lines !== null && maxValue >= lines.review;
+  let lineTop = 0;
+  if (lines) {
+    lineTop = showPause ? lines.pause * 1.2 : lines.review * 1.2;
+  }
+  const top = Math.max(lineTop, maxValue * 1.1, 0.01);
   const last = points.at(-1);
   const ariaLabel =
     last === undefined
       ? `${METRIC_NOUN[metric]} over the last ${days} days`
       : `${METRIC_NOUN[metric]} over the last ${days} days, ending at ${fmt(last.value)}${
-          review === null || reviewText === null
+          lines === null
             ? ""
-            : `, against the ${reviewText} SES review line`
+            : `, against the ${lines.reviewText} SES review line`
         }`;
   const gradientId = `fillDeliverability-${metric}`;
 
@@ -315,21 +402,7 @@ function TrendChart({
               />
             }
           />
-          {review === null || reviewText === null ? null : (
-            <ReferenceLine
-              ifOverflow="extendDomain"
-              label={{
-                value: `SES review line · ${reviewText}`,
-                position: "insideTopRight",
-                fill: "var(--muted-foreground)",
-                fontSize: 11,
-              }}
-              stroke="var(--muted-foreground)"
-              strokeDasharray="6 4"
-              strokeWidth={1.5}
-              y={review}
-            />
-          )}
+          {lines === null ? null : sesLineElements(lines, showPause, top)}
           <Area
             dataKey="value"
             fill={`url(#${gradientId})`}
