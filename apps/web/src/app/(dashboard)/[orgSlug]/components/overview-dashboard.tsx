@@ -79,44 +79,49 @@ export function OverviewDashboard({
   return (
     <>
       <EventUsageBanner orgSlug={orgSlug} />
-      <div className="space-y-6 px-4 lg:px-6 py-6">
-        <div className="flex items-center justify-end gap-3">
-          <ButtonGroup className="hidden sm:flex">
-            {availableOptions.map((opt) => (
-              <Button
-                aria-pressed={timeRange === opt.value}
-                key={opt.value}
-                onClick={() => setTimeRange(opt.value)}
-                size="touch"
-                variant="outline"
-              >
-                {opt.label}
-              </Button>
-            ))}
-            <RefreshButton onRefresh={handleRefresh} />
-          </ButtonGroup>
-          <Select
-            onValueChange={(v) => setTimeRange(v as TimeRange)}
-            value={timeRange}
-          >
-            <SelectTrigger
-              aria-label="Select time range"
-              className="flex sm:hidden w-28"
-              size="touch"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
+      <div className="space-y-6 px-4 lg:px-6 pt-4 pb-6">
+        {/* Health on the left, range controls on the right: on their own
+            rows they spent a full band of the first screen on one short
+            sentence. Below sm the controls stack above the health line. */}
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <HealthStatus days={days} orgSlug={orgSlug} />
+          <div className="flex shrink-0 items-center justify-end gap-3">
+            <ButtonGroup className="hidden sm:flex">
               {availableOptions.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
+                <Button
+                  aria-pressed={timeRange === opt.value}
+                  key={opt.value}
+                  onClick={() => setTimeRange(opt.value)}
+                  size="touch"
+                  variant="outline"
+                >
                   {opt.label}
-                </SelectItem>
+                </Button>
               ))}
-            </SelectContent>
-          </Select>
-          <RefreshButton className="sm:hidden" onRefresh={handleRefresh} />
+              <RefreshButton onRefresh={handleRefresh} />
+            </ButtonGroup>
+            <Select
+              onValueChange={(v) => setTimeRange(v as TimeRange)}
+              value={timeRange}
+            >
+              <SelectTrigger
+                aria-label="Select time range"
+                className="flex sm:hidden w-28"
+                size="touch"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {availableOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <RefreshButton className="sm:hidden" onRefresh={handleRefresh} />
+          </div>
         </div>
-        <HealthStatus days={days} orgSlug={orgSlug} />
         <SesSurvivalStrip orgSlug={orgSlug} />
         <InsightsSection
           days={days}

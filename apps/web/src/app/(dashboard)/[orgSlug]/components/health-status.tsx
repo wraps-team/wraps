@@ -235,7 +235,7 @@ export function HealthStatus({
   // would make that indistinguishable from a banner that never ran.
   if (overallLevel === "healthy") {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 sm:self-center">
         <OverallIcon className={cn("h-4 w-4 shrink-0", config.color)} />
         <p className="text-muted-foreground text-xs">{config.label}</p>
       </div>
@@ -243,7 +243,13 @@ export function HealthStatus({
   }
 
   return (
-    <div className={cn("rounded-lg border", config.bg, config.border)}>
+    <div
+      className={cn(
+        "min-w-0 flex-1 rounded-lg border",
+        config.bg,
+        config.border
+      )}
+    >
       {/* Overall status header */}
       <div className="flex items-center gap-3 p-4">
         <OverallIcon className={cn("h-5 w-5 shrink-0", config.color)} />
