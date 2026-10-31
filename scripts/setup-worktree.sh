@@ -1,4 +1,14 @@
-#!/usr/bin/env zsh
+#!/bin/sh
+# Runs under zsh when it is installed, otherwise bash; the body is written for
+# both. Re-exec happens before `set -euo pipefail`, which plain sh lacks.
+if [ -z "${ZSH_VERSION:-}" ]; then
+  if command -v zsh >/dev/null 2>&1; then exec zsh "$0" "$@"; fi
+  # Not bash at all: re-exec into bash. Bash run as sh: just turn posix off.
+  case "${BASH_VERSION:-}" in
+    "") exec bash "$0" "$@" ;;
+    *) set +o posix ;;
+  esac
+fi
 # Setup a git worktree with env files, .claude context, and ai-notes.
 # Uses symlinks so updates in any worktree are reflected everywhere.
 #
@@ -65,7 +75,7 @@ for f in "${ENV_FILES[@]}"; do
 done
 echo "Linked $linked env file(s)"
 
-if (( ${#missing} )); then
+if (( ${#missing[@]} )); then
   echo "WARNING — absent from the main checkout, so NOT linked:"
   printf '  %s\n' "${missing[@]}"
 fi
@@ -82,7 +92,7 @@ SHARED_DIRS=(ai-notes notes)
 if [[ "${WORKTREE_KEEP_CLAUDE:-0}" == "1" ]]; then
   echo "Keeping the worktree's own .claude (WORKTREE_KEEP_CLAUDE=1)"
 else
-  SHARED_DIRS=(.claude $SHARED_DIRS)
+  SHARED_DIRS=(.claude "${SHARED_DIRS[@]}")
 fi
 
 shared_linked=0
