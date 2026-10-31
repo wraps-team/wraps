@@ -76,6 +76,19 @@ const writeModeConfig = `{
   }
 }`;
 
+const apiKeyConfig = `{
+  "mcpServers": {
+    "wraps": {
+      "command": "npx",
+      "args": ["-y", "@wraps.dev/mcp"],
+      "env": {
+        "AWS_REGION": "us-east-1",
+        "WRAPS_API_KEY": "wraps_..."
+      }
+    }
+  }
+}`;
+
 const tools = [
   {
     name: "list_recent_sends",
@@ -106,6 +119,12 @@ const tools = [
       "Monthly Wraps + AWS cost for a send volume, including which SES pricing plan the account is on — needs no AWS credentials",
   },
   {
+    name: "get_setup_status",
+    write: false,
+    description:
+      "Check whether the account is in the SES sandbox, and get the next step toward a first send",
+  },
+  {
     name: "send_email",
     write: true,
     description:
@@ -116,6 +135,363 @@ const tools = [
     write: false,
     description:
       "Poll the outcome of a pending_approval send by approvalId (enforced mode only)",
+  },
+  {
+    name: "list_contacts",
+    write: false,
+    description:
+      "List contacts in your Wraps organization, optionally filtered by email status, SMS status, preferred channel, or a search string on email or phone.",
+  },
+  {
+    name: "get_contact",
+    write: false,
+    description: "Get one contact in full, including its topic subscriptions.",
+  },
+  {
+    name: "create_contact",
+    write: true,
+    description: "Create one new contact.",
+  },
+  {
+    name: "update_contact",
+    write: true,
+    description: "Change one existing contact.",
+  },
+  {
+    name: "set_contact_topics",
+    write: true,
+    description: "REPLACE the full topic subscription list of one contact.",
+  },
+  {
+    name: "delete_contact",
+    write: true,
+    description:
+      "Permanently delete ONE contact by UUID, email, or externalId. Needs confirm: true.",
+  },
+  {
+    name: "validate_contact_emails",
+    write: false,
+    description:
+      "Check up to 100 email addresses with SES Email Address Insights and return a deliverability verdict (HIGH, MEDIUM, LOW, or UNKNOWN) for each.",
+  },
+  {
+    name: "list_segments",
+    write: false,
+    description:
+      "List the audience segments saved in this Wraps organization, with each segment's live member count.",
+  },
+  {
+    name: "get_segment",
+    write: false,
+    description:
+      "Get one audience segment by id, including its full filter condition and live member count.",
+  },
+  {
+    name: "preview_segment",
+    write: false,
+    description:
+      "Preview the audience an unsaved filter condition would reach, without saving a segment.",
+  },
+  {
+    name: "create_segment",
+    write: true,
+    description: "Save a new audience segment from a filter condition.",
+  },
+  {
+    name: "update_segment",
+    write: true,
+    description:
+      "Change an existing audience segment: rename it, edit its description, replace its condition, or toggle trackMembership.",
+  },
+  {
+    name: "delete_segment",
+    write: true,
+    description: "Permanently delete an audience segment. Needs confirm: true.",
+  },
+  {
+    name: "list_topics",
+    write: false,
+    description:
+      "List the organization's subscription topics with live audience counts: subscriberCount (opted in), sendableCount (a broadcast would reach now) and pendingCount (waiting on double opt-in).",
+  },
+  {
+    name: "get_topic",
+    write: false,
+    description:
+      "Get one subscription topic by id, with its audience counts (subscriberCount, sendableCount, pendingCount) and its creator.",
+  },
+  {
+    name: "list_topic_subscribers",
+    write: false,
+    description:
+      "List the contacts subscribed to one topic, filtered by status (subscribed, pending for double opt-in not yet confirmed, or unsubscribed).",
+  },
+  {
+    name: "create_topic",
+    write: true,
+    description:
+      "Create a subscription topic that contacts can subscribe to and broadcasts can target.",
+  },
+  {
+    name: "update_topic",
+    write: true,
+    description:
+      "Change a subscription topic's name, slug, description, public flag or double opt-in setting.",
+  },
+  {
+    name: "delete_topic",
+    write: true,
+    description:
+      "Permanently delete a subscription topic and every subscription to it. Needs confirm: true.",
+  },
+  {
+    name: "list_templates",
+    write: false,
+    description: "List the Wraps email and SMS templates in your organization.",
+  },
+  {
+    name: "get_template",
+    write: false,
+    description:
+      "Get one Wraps template by id: its metadata, status, variables, and by default its React Email source, compiled HTML, and compiled text.",
+  },
+  {
+    name: "create_template",
+    write: true,
+    description: "Create a new Wraps email or SMS template as a DRAFT.",
+  },
+  {
+    name: "update_template",
+    write: true,
+    description: "Change an existing Wraps template.",
+  },
+  {
+    name: "duplicate_template",
+    write: true,
+    description: "Copy an existing Wraps template to start a variant.",
+  },
+  {
+    name: "publish_template",
+    write: true,
+    description:
+      "Publish a Wraps template to SES, so sends and workflows that use it get this content. Needs confirm: true.",
+  },
+  {
+    name: "list_broadcasts",
+    write: false,
+    description:
+      "List broadcasts (email or SMS batch sends) for your organization, with their status and delivery counts.",
+  },
+  {
+    name: "get_broadcast",
+    write: false,
+    description: "Get the status and delivery counts of ONE broadcast by id.",
+  },
+  {
+    name: "list_broadcast_recipients",
+    write: false,
+    description:
+      "List the per-recipient outcome of one broadcast: who was sent to, and whether each send was delivered, bounced, suppressed or failed, with the error reason.",
+  },
+  {
+    name: "get_broadcast_clicks",
+    write: false,
+    description:
+      "Get the link-click breakdown for ONE broadcast: which URLs were clicked and how often, plus the unsubscribe click count.",
+  },
+  {
+    name: "create_broadcast",
+    write: true,
+    description: "Create a NEW broadcast as a draft.",
+  },
+  {
+    name: "update_broadcast",
+    write: true,
+    description:
+      "Edit a SCHEDULED broadcast before it sends: its content, sender, audience, template, AWS account or send time.",
+  },
+  {
+    name: "duplicate_broadcast",
+    write: true,
+    description:
+      "Copy an existing broadcast into a NEW draft, whatever the status of the original.",
+  },
+  {
+    name: "send_broadcast",
+    write: true,
+    description:
+      "Send a DRAFT broadcast to its audience, now or at scheduledFor. Needs confirm: true.",
+  },
+  {
+    name: "resume_broadcast",
+    write: true,
+    description:
+      "Resume an email broadcast that stopped part-way, from the last chunk it finished, so recipients who were not yet sent to get the message. Needs confirm: true.",
+  },
+  {
+    name: "cancel_broadcast",
+    write: true,
+    description:
+      "Cancel a broadcast that is scheduled, queued or processing, so the messages that have not gone out yet are not sent. Needs confirm: true.",
+  },
+  {
+    name: "list_events",
+    write: false,
+    description:
+      "List custom events tracked for this Wraps organization, newest first, optionally filtered by event name, contact, text search, or date range.",
+  },
+  {
+    name: "get_event",
+    write: false,
+    description:
+      "Get one custom event by id: its name, properties, time, and the contact it belongs to.",
+  },
+  {
+    name: "get_event_analytics",
+    write: false,
+    description:
+      "Get custom-event totals for this organization over the last 7 or 30 days: events in the period, active contacts, average events per contact, a zero-filled daily series, and the top event names.",
+  },
+  {
+    name: "list_event_names",
+    write: false,
+    description:
+      "List every distinct custom event name recorded for this Wraps organization, sorted.",
+  },
+  {
+    name: "track_event",
+    write: true,
+    description: "Record a custom event for one contact. Needs confirm: true.",
+  },
+  {
+    name: "remove_suppression",
+    write: true,
+    description:
+      "Remove one address from the SES account-level suppression list of one AWS account, so Wraps sends to it again. Needs confirm: true.",
+  },
+  {
+    name: "list_workflows",
+    write: false,
+    description:
+      "List the email and SMS automation workflows in your Wraps organization, newest first, with status and execution counts.",
+  },
+  {
+    name: "get_workflow",
+    write: false,
+    description:
+      "Get one workflow by id, including its trigger config, steps and transitions, so you can see what it does before triggering it or changing its schedule.",
+  },
+  {
+    name: "list_workflow_executions",
+    write: false,
+    description:
+      "List the executions of one workflow (one run per contact), newest first, each with its contact and status.",
+  },
+  {
+    name: "get_workflow_execution",
+    write: false,
+    description:
+      "Get one workflow execution by id, with its step trace (every step it reached and that step status), its contact, the workflow name and per-step engagement.",
+  },
+  {
+    name: "enable_workflow_schedule",
+    write: true,
+    description:
+      "Turn on the recurring schedule of a schedule-triggered workflow by creating its next one-time run from a cron expression and timezone.",
+  },
+  {
+    name: "disable_workflow_schedule",
+    write: true,
+    description:
+      "Turn off the recurring schedule of a schedule-triggered workflow by deleting its pending scheduled run.",
+  },
+  {
+    name: "trigger_workflow",
+    write: true,
+    description:
+      "Start one run of an API-triggered workflow for one contact, so the workflow steps begin for that contact now. Needs confirm: true.",
+  },
+  {
+    name: "retry_workflow_execution",
+    write: true,
+    description:
+      "Retry a failed workflow execution from the step where it failed. Needs confirm: true.",
+  },
+  {
+    name: "cancel_workflow_execution",
+    write: true,
+    description:
+      "Cancel a workflow execution that is still running (pending, active, paused or waiting), so no further steps run for that contact and its scheduled steps are removed. Needs confirm: true.",
+  },
+  {
+    name: "list_agent_approvals",
+    write: false,
+    description:
+      "List the approval queue for agents: the sends that an agent asked to make and that were held for a human decision.",
+  },
+  {
+    name: "approve_agent_approval",
+    write: true,
+    description:
+      "Approve one send that an agent asked to make and that was held for a human decision, so Wraps sends it now. Needs confirm: true.",
+  },
+  {
+    name: "reject_agent_approval",
+    write: true,
+    description:
+      "Reject one send that an agent asked to make and that was held for a human decision, so it is never delivered. Needs confirm: true.",
+  },
+  {
+    name: "get_email_metrics",
+    write: false,
+    description:
+      "Get aggregate email sending metrics for this organization over a time window: sent, delivered, bounced (split into permanent, transient and undetermined), complained, suppressed, opened, clicked, failed, and an estimated costUsd.",
+  },
+  {
+    name: "list_inbound_emails",
+    write: false,
+    description:
+      "List one page of parsed inbound emails that the customer's SES inbound bucket received, across the organization's connected AWS accounts.",
+  },
+  {
+    name: "get_inbound_email",
+    write: false,
+    description:
+      "Get one parsed inbound email from the customer's SES inbound bucket by emailId, with its from/to/cc, subject, date, headers, text body, HTML body and attachment metadata.",
+  },
+  {
+    name: "list_brand_kits",
+    write: false,
+    description:
+      "List the organization's brand kits: name, logo, colors, fonts, button style, company details and social links, with isDefault marking the one default kit.",
+  },
+  {
+    name: "get_brand_kit",
+    write: false,
+    description:
+      "Get one brand kit by id: logo, colors, fonts, button style, company details, social links, and isDefault.",
+  },
+  {
+    name: "create_brand_kit",
+    write: true,
+    description:
+      "Create a brand kit: a name, logo, colors, fonts, button style, company details and social links that email templates can use.",
+  },
+  {
+    name: "update_brand_kit",
+    write: true,
+    description:
+      "Change one or more fields of a brand kit: name, logo, colors, fonts, button style, company details, social links.",
+  },
+  {
+    name: "set_default_brand_kit",
+    write: true,
+    description: "Make one brand kit the default for the organization.",
+  },
+  {
+    name: "delete_brand_kit",
+    write: true,
+    description: "Delete a brand kit permanently. Needs confirm: true.",
   },
 ];
 
@@ -142,7 +518,8 @@ const configVars = [
     name: "WRAPS_WRITE_ENABLED",
     required: "No",
     defaultValue: "false",
-    description: "Set to true to enable send_email",
+    description:
+      "Set to true to enable send_email and every write or destructive API-backed tool",
   },
   {
     name: "WRAPS_FROM_EMAIL",
@@ -156,6 +533,26 @@ const configVars = [
     defaultValue: "—",
     description:
       "SES configuration set applied to sends (enables open/click tracking)",
+  },
+  {
+    name: "WRAPS_API_KEY",
+    required: "No",
+    defaultValue: "—",
+    description:
+      "Wraps API key (wraps_...) for the API-backed tools. Without it, the session from wraps auth login is used",
+  },
+  {
+    name: "WRAPS_API_URL",
+    required: "No",
+    defaultValue: "https://api.wraps.dev",
+    description: "Wraps API base URL. Set it for a self-hosted control plane",
+  },
+  {
+    name: "WRAPS_ORG_ID",
+    required: "No",
+    defaultValue: "—",
+    description:
+      "Organization to act in when the session belongs to several. Sent as x-organization-id",
   },
 ];
 
@@ -306,6 +703,10 @@ export default function McpReferencePageContent() {
               AWS credentials configured in your environment — the same profile
               the Wraps CLI uses
             </li>
+            <li>
+              A Wraps API key (WRAPS_API_KEY) or a wraps auth login session, for
+              the API-backed tools
+            </li>
           </ul>
         </CardContent>
       </Card>
@@ -314,9 +715,10 @@ export default function McpReferencePageContent() {
       <section className="mb-12">
         <h2 className="mb-4 font-bold text-2xl">Tools</h2>
         <p className="mb-4 text-muted-foreground">
-          The server exposes six tools. Only{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5">send_email</code>{" "}
-          writes anything, and it stays disabled until you opt in.
+          The server exposes the AWS tools and, with a Wraps API credential, the
+          API-backed tools. Tools marked write change data and stay disabled
+          until WRAPS_WRITE_ENABLED=true. Destructive tools also need confirm:
+          true.
         </p>
         <Card>
           <CardContent className="p-6">
@@ -396,6 +798,49 @@ export default function McpReferencePageContent() {
         />
       </section>
 
+      {/* API-backed tools */}
+      <section className="mb-12">
+        <h2 className="mb-4 font-bold text-2xl">API-backed tools</h2>
+        <p className="mb-4 text-muted-foreground">
+          The API-backed tools call the Wraps API for your organization. They
+          register at startup only when a credential is present. Write tools
+          need{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">
+            WRAPS_WRITE_ENABLED=true
+          </code>
+          . Destructive tools also need{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">confirm: true</code>{" "}
+          in the call, so set it only after the user has confirmed the change.
+        </p>
+        <p className="mb-4 text-muted-foreground">
+          The server uses{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">WRAPS_API_KEY</code>{" "}
+          when it is set. Otherwise it reuses the unexpired session that{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">
+            wraps auth login
+          </code>{" "}
+          stored. An expired or revoked credential does not stop startup; the
+          call returns a tool error that names the fix.
+        </p>
+        <div className="mb-4">
+          <ConfigBlock code={apiKeyConfig} filename=".mcp.json" />
+        </div>
+        <p className="text-muted-foreground">
+          When{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">WRAPS_AGENT_ID</code>{" "}
+          is set (enforced mode),{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">
+            approve_agent_approval
+          </code>{" "}
+          and{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">
+            reject_agent_approval
+          </code>{" "}
+          are not registered, so an enforced agent cannot approve or reject its
+          own sends.
+        </p>
+      </section>
+
       {/* Configuration */}
       <section className="mb-12">
         <h2 className="mb-4 font-bold text-2xl">Configuration</h2>
@@ -441,7 +886,7 @@ export default function McpReferencePageContent() {
           <code className="rounded bg-muted px-1.5 py-0.5">
             WRAPS_WRITE_ENABLED=true
           </code>{" "}
-          to enable it. The{" "}
+          to enable it, along with every other write tool. The{" "}
           <code className="rounded bg-muted px-1.5 py-0.5">from</code> address
           must belong to a domain verified in your SES account.
         </p>
@@ -465,9 +910,9 @@ export default function McpReferencePageContent() {
       <section className="mb-12">
         <h2 className="mb-4 font-bold text-2xl">Send guardrails</h2>
         <p className="mb-4 text-muted-foreground">
-          When write mode is enabled, use these variables to restrict the
-          agent's sending scope. A recipient is allowed if it matches either the
-          address list or the domain list.
+          These variables apply to send_email only. When write mode is enabled,
+          use them to restrict the agent's sending scope. A recipient is allowed
+          if it matches either the address list or the domain list.
         </p>
         <Card>
           <CardContent className="p-6">

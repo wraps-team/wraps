@@ -73,7 +73,8 @@ vi.mock("../middleware/auth", () => ({
   createAuthenticatedRoutes: vi.fn((prefix: string) =>
     new Elysia({ prefix }).derive(() => ({
       auth: {
-        apiKeyId: null,
+        apiKeyId: "key-123",
+        apiKeyScopes: [...FULL_ACCESS_PERMISSIONS],
         organizationId: "org-123",
         userId: "user-123",
         planId: "pro",
@@ -97,6 +98,7 @@ vi.mock("../lib/logger", () => ({
 }));
 
 const { workflowsRoutes } = await import("../(ee)/routes/workflows");
+const { FULL_ACCESS_PERMISSIONS } = await import("../services/api-keys");
 
 function createApp() {
   return new Elysia().use(workflowsRoutes);

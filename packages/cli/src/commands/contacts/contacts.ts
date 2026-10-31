@@ -191,7 +191,7 @@ function httpFailure(
       code: "FORBIDDEN",
       message: detail,
       suggestion:
-        "The credentials are valid but cannot access this contact. Check that the key belongs to the organization that owns it, then retry.",
+        "Your role or this API key's scopes do not allow this. A signed-in session (wraps auth login) is checked against your role; an API key is checked against its own scopes. Ask an owner or admin for contacts write access, or use a key with the contacts:write scope, then retry.",
     };
   }
   if (status === 404) {

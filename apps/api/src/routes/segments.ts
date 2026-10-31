@@ -32,6 +32,7 @@ import {
 } from "@wraps/db";
 import { inArray } from "drizzle-orm";
 import { t } from "elysia";
+import { requirePermission } from "../lib/require-permission";
 import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
 import { planGateMiddleware } from "../middleware/plan-gate";
 import { rateLimitMiddleware } from "../middleware/rate-limit";
@@ -192,6 +193,10 @@ export const segmentsRoutes = createAuthenticatedRoutes("/v1/segments")
   .post(
     "/",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "segments", ["write"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const { body, set } = ctx;
       const authContext = getAuth(ctx);
 
@@ -240,7 +245,11 @@ export const segmentsRoutes = createAuthenticatedRoutes("/v1/segments")
         condition: conditionSchema,
         trackMembership: t.Optional(t.Boolean()),
       }),
-      response: { 201: segmentDetailSchema, 400: errorResponse },
+      response: {
+        201: segmentDetailSchema,
+        400: errorResponse,
+        403: errorResponse,
+      },
       detail: {
         tags: ["segments"],
         summary: "Create a segment",
@@ -252,6 +261,10 @@ export const segmentsRoutes = createAuthenticatedRoutes("/v1/segments")
   .patch(
     "/:id",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "segments", ["write"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const { params, body, set } = ctx;
       const authContext = getAuth(ctx);
 
@@ -331,6 +344,7 @@ export const segmentsRoutes = createAuthenticatedRoutes("/v1/segments")
       response: {
         200: segmentDetailSchema,
         400: errorResponse,
+        403: errorResponse,
         404: errorResponse,
       },
       detail: {
@@ -344,6 +358,10 @@ export const segmentsRoutes = createAuthenticatedRoutes("/v1/segments")
   .delete(
     "/:id",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "segments", ["delete"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const { params, set } = ctx;
       const authContext = getAuth(ctx);
 
@@ -381,6 +399,7 @@ export const segmentsRoutes = createAuthenticatedRoutes("/v1/segments")
       params: t.Object({ id: t.String({ maxLength: 36 }) }),
       response: {
         200: t.Object({ success: t.Boolean() }),
+        403: errorResponse,
         404: errorResponse,
         409: errorResponse,
       },
@@ -395,6 +414,10 @@ export const segmentsRoutes = createAuthenticatedRoutes("/v1/segments")
   .post(
     "/preview",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "segments", ["read"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const { body, set } = ctx;
       const authContext = getAuth(ctx);
 
@@ -430,6 +453,7 @@ export const segmentsRoutes = createAuthenticatedRoutes("/v1/segments")
           sample: t.Array(t.String()),
         }),
         400: errorResponse,
+        403: errorResponse,
       },
       detail: {
         tags: ["segments"],

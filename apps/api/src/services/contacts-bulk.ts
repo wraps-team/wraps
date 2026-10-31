@@ -309,7 +309,8 @@ export type ImportResult = {
 
 export type ImportInput = {
   organizationId: string;
-  userId: string;
+  /** For an API key, its creator (null once gone). */
+  userId: string | null;
   contacts: ImportContactRow[];
   topicIds?: string[];
   duplicateStrategy: "skip" | "update";
@@ -754,17 +755,19 @@ export async function importContactsForOrg(
 
       // The actor's email, read through the membership so the lookup is
       // org-scoped (the user table itself has no organizationId).
-      const [actor] = await tx
-        .select({ email: user.email })
-        .from(member)
-        .innerJoin(user, eq(user.id, member.userId))
-        .where(
-          and(
-            eq(member.organizationId, organizationId),
-            eq(member.userId, userId)
-          )
-        )
-        .limit(1);
+      const [actor] = userId
+        ? await tx
+            .select({ email: user.email })
+            .from(member)
+            .innerJoin(user, eq(user.id, member.userId))
+            .where(
+              and(
+                eq(member.organizationId, organizationId),
+                eq(member.userId, userId)
+              )
+            )
+            .limit(1)
+        : [];
       await tx.insert(auditLog).values({
         organizationId,
         userId,
@@ -785,23 +788,26 @@ export async function importContactsForOrg(
       .where(eq(organization.id, organizationId))
       .limit(1);
     try {
-      await notifyUser({
-        userId,
-        organizationId,
-        type: "contact.imported",
-        title: `Contact import finished: ${created} created, ${updated} updated`,
-        body:
-          skipped > 0 || errors.length > 0
-            ? `${skipped} skipped, ${errors.length} rows had errors.`
-            : undefined,
-        href: `/${org?.slug ?? ""}/contacts`,
-        data: {
-          created,
-          updated,
-          skipped,
-          errorCount: errors.length,
-        },
-      });
+      // An API key whose creator is gone has nobody to notify.
+      if (userId) {
+        await notifyUser({
+          userId,
+          organizationId,
+          type: "contact.imported",
+          title: `Contact import finished: ${created} created, ${updated} updated`,
+          body:
+            skipped > 0 || errors.length > 0
+              ? `${skipped} skipped, ${errors.length} rows had errors.`
+              : undefined,
+          href: `/${org?.slug ?? ""}/contacts`,
+          data: {
+            created,
+            updated,
+            skipped,
+            errorCount: errors.length,
+          },
+        });
+      }
     } catch (notifyError) {
       log.error("Failed to write contact-import notification", notifyError);
     }

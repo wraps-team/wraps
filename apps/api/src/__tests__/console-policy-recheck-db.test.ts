@@ -11,7 +11,7 @@
  * File suffix `-db.test.ts` = real Neon test branch (no `@wraps/db` mocks).
  */
 
-import { awsAccount, db, eq } from "@wraps/db";
+import { awsAccount, db, eq, member } from "@wraps/db";
 import {
   afterAll,
   afterEach,
@@ -69,22 +69,28 @@ const TEST_PREFIX = "console-policy-recheck";
 // is using at the same time.
 let ids: Awaited<ReturnType<typeof seedBaseOrg>>["ids"];
 
-function appFor(organizationId: string) {
+// A session, not an API key: the recheck route is awsAccounts write and refuses
+// keys. `userId` must be a member of `organizationId` for the gate to pass.
+function appFor(organizationId: string, userId: string = ids.user) {
   const { app } = createErrorHarness();
   return app
     .derive(() => ({
       auth: {
-        apiKeyId: "key-1",
+        apiKeyId: null,
         organizationId,
-        userId: null,
+        userId,
         planId: "pro",
       },
     }))
     .use(accountRoutes);
 }
 
-function recheck(organizationId: string, awsAccountId: string) {
-  return appFor(organizationId).handle(
+function recheck(
+  organizationId: string,
+  awsAccountId: string,
+  userId: string = ids.user
+) {
+  return appFor(organizationId, userId).handle(
     new Request(
       `http://localhost/v1/account/console-policy/${awsAccountId}/recheck`,
       { method: "POST" }
@@ -107,8 +113,19 @@ async function readStoredPolicy() {
   return row;
 }
 
+const OTHER_ORG_MEMBER = `${TEST_PREFIX}-member-other-org`;
+
 beforeAll(async () => {
   ids = (await seedBaseOrg(TEST_PREFIX)).ids;
+  // The owner also belongs to the other org, so the cross-org case is a real
+  // member of that org asking about this org's account.
+  await db.insert(member).values({
+    id: OTHER_ORG_MEMBER,
+    organizationId: ids.otherOrg,
+    userId: ids.user,
+    role: "owner",
+    createdAt: new Date(),
+  });
 });
 
 beforeEach(() => {
@@ -126,6 +143,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  await db.delete(member).where(eq(member.id, OTHER_ORG_MEMBER));
   await cleanupBaseOrg(TEST_PREFIX);
 });
 
@@ -146,8 +164,9 @@ describe("POST /v1/account/console-policy/:id/recheck — auth and scoping", () 
 
   it("404s on another org's account, and never resolves its credentials", async () => {
     // An account id alone is a cross-org read, and this route hands back a
-    // fact derived from that account's credentials.
-    const res = await recheck(ids.otherOrg, ids.awsAccount);
+    // fact derived from that account's credentials. The caller is a real
+    // owner of the other org, so the gate passes and the org scope is what 404s.
+    const res = await recheck(ids.otherOrg, ids.awsAccount, ids.user);
 
     expect(res.status).toBe(404);
     expect(mockGetCredentials).not.toHaveBeenCalled();

@@ -25,6 +25,7 @@ import {
 } from "vitest";
 
 import { workflowsSyncRoutes } from "../(ee)/routes/workflows-sync";
+import { FULL_ACCESS_PERMISSIONS } from "../services/api-keys";
 
 vi.mock("../lib/activation-tracking", () => ({
   trackFirstResourceCreated: vi.fn(),
@@ -63,6 +64,7 @@ const testMember = {
 
 const mockAuth = {
   apiKeyId: `${P}-key`,
+  apiKeyScopes: [...FULL_ACCESS_PERMISSIONS],
   organizationId: org.id,
   userId: testUser.id,
   planId: "pro" as string | null,

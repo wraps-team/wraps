@@ -18,6 +18,11 @@ export type AuthContext = {
   organizationId: string;
   userId: string | null;
   planId: string | null; // null if no valid subscription
+  /**
+   * The key's scopes (`api_key.permissions`), set only for API key auth.
+   * `requirePermission` checks these instead of the creator's role.
+   */
+  apiKeyScopes?: string[];
 };
 
 /**
@@ -84,6 +89,7 @@ async function validateApiKey(key: string): Promise<AuthContext | null> {
       id: apiKey.id,
       organizationId: apiKey.organizationId,
       createdBy: apiKey.createdBy,
+      permissions: apiKey.permissions,
       expiresAt: apiKey.expiresAt,
       plan: subscription.plan,
       subStatus: subscription.status,
@@ -121,6 +127,9 @@ async function validateApiKey(key: string): Promise<AuthContext | null> {
     organizationId: result.organizationId,
     userId: result.createdBy,
     planId: licenseOverride.valid ? licenseOverride.tier : extractPlan(result),
+    apiKeyScopes: Array.isArray(result.permissions)
+      ? (result.permissions as string[])
+      : [],
   };
 }
 

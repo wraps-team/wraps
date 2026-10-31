@@ -84,6 +84,9 @@ const mockAuth = {
   organizationId: "org-test-123",
   userId: "user-test",
   planId: "free",
+  // POST / and DELETE /:id pass keyScopes: [], so any key with a scope list
+  // gets through. Without this field the gate would deny the key.
+  apiKeyScopes: [],
 };
 
 function createTestApp(authOverrides?: Partial<typeof mockAuth>) {

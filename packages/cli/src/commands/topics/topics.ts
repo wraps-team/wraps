@@ -248,7 +248,7 @@ function apiErrorSpec(status: number, text: string): ErrorSpec {
       code: "FORBIDDEN",
       message: text,
       suggestion:
-        "Your account does not have the topics permission for this action. Ask an organization admin to grant it, then retry.",
+        "Your role or this API key's scopes do not allow this. A signed-in session (wraps auth login) is checked against your role; an API key is checked against its own scopes. Ask an owner or admin for topics access, or use a key with the topics:read or topics:write scope it needs, then retry.",
     };
   }
   if (status === 404) {

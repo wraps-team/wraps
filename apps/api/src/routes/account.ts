@@ -20,6 +20,7 @@ import {
   probeConsolePolicyVersion,
 } from "../lib/console-policy-version";
 import { log } from "../lib/logger";
+import { requirePermission } from "../lib/require-permission";
 import { rollUpSesHealth, SES_THRESHOLDS } from "../lib/ses-health";
 import {
   type AuthContext,
@@ -220,6 +221,13 @@ export const accountRoutes = createAuthenticatedRoutes("/v1/account")
   .post(
     "/console-policy/:awsAccountId/recheck",
     async (ctx) => {
+      // The probe persists the reading, so it is a write, matching the
+      // dashboard's recheckConsolePolicyAction (awsAccounts write). API keys
+      // are refused: no keyScopes, and awsAccounts has no key scope.
+      const gate = await requirePermission(ctx, "awsAccounts", ["write"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const { params, set } = ctx;
       const authContext = getAuth(ctx);
 
@@ -330,6 +338,7 @@ export const accountRoutes = createAuthenticatedRoutes("/v1/account")
       }),
       response: {
         200: CONSOLE_POLICY_VIEW,
+        403: t.Object({ error: t.String() }),
       },
       detail: {
         tags: ["account"],

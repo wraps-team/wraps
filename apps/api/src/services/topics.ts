@@ -71,7 +71,8 @@ export type UpdateTopicInput = {
 
 /** The person behind the request. Mutations are audited against this. */
 export type TopicActor = {
-  userId: string;
+  /** For an API key, its creator (null once gone). */
+  userId: string | null;
   ipAddress: string | null;
   userAgent: string | null;
 };
@@ -127,7 +128,10 @@ function toView(
   };
 }
 
-async function actorEmail(userId: string): Promise<string | null> {
+async function actorEmail(userId: string | null): Promise<string | null> {
+  if (!userId) {
+    return null;
+  }
   const [row] = await db
     .select({ email: user.email })
     .from(user)

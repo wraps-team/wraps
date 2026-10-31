@@ -24,8 +24,8 @@ import {
   it,
   vi,
 } from "vitest";
-
 import { contactsRoutes } from "../routes/contacts";
+import { FULL_ACCESS_PERMISSIONS } from "../services/api-keys";
 
 // Mock @wraps/email to track confirmation email calls
 vi.mock("@wraps/email", () => ({
@@ -107,6 +107,7 @@ const mockAuth = {
   organizationId: testOrg.id,
   userId: testUser.id,
   planId: "pro",
+  apiKeyScopes: [...FULL_ACCESS_PERMISSIONS],
 };
 
 // Create test app with mocked auth (bypasses actual API key validation)

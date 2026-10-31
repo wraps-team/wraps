@@ -26,6 +26,7 @@ import { t } from "elysia";
 import { trackFirstResourceCreated } from "../../lib/activation-tracking";
 import { log } from "../../lib/logger";
 import { checkWorkflowTriggerEntitlements } from "../../lib/plan-features";
+import { requirePermission } from "../../lib/require-permission";
 import type { AuthContext } from "../../middleware/auth";
 import { createAuthenticatedRoutes, getAuth } from "../../middleware/auth";
 import { checkWorkflowPushLimit } from "../lib/workflow-limit";
@@ -33,6 +34,13 @@ import {
   deleteWorkflowSchedule,
   updateWorkflowSchedule,
 } from "../services/workflow-scheduler";
+
+// 403 bodies: the permission denial ({ error }) and the push limit and plan
+// denials ({ error, message }) share this schema.
+const pushDeniedResponse = t.Object({
+  error: t.String(),
+  message: t.Optional(t.String()),
+});
 
 type DbOrTx =
   | typeof db
@@ -47,6 +55,10 @@ export const workflowsSyncRoutes = createAuthenticatedRoutes("/v1/workflows")
   .post(
     "/push",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "workflows", ["write"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const authContext = getAuth(ctx);
       const { body } = ctx;
 
@@ -193,6 +205,9 @@ export const workflowsSyncRoutes = createAuthenticatedRoutes("/v1/workflows")
         description:
           "Upserts a workflow parsed from TypeScript source. Used by `wraps email workflows push`.",
       },
+      response: {
+        403: pushDeniedResponse,
+      },
     }
   )
 
@@ -200,6 +215,10 @@ export const workflowsSyncRoutes = createAuthenticatedRoutes("/v1/workflows")
   .post(
     "/push/batch",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "workflows", ["write"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const authContext = getAuth(ctx);
       const { body } = ctx;
 
@@ -361,6 +380,9 @@ export const workflowsSyncRoutes = createAuthenticatedRoutes("/v1/workflows")
         tags: ["workflows"],
         summary: "Push multiple workflows from CLI",
         description: "Batch upsert workflows parsed from TypeScript source.",
+      },
+      response: {
+        403: pushDeniedResponse,
       },
     }
   )

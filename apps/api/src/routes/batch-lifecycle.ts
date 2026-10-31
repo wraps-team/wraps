@@ -285,6 +285,12 @@ export const batchLifecycleRoutes = createAuthenticatedRoutes("/v1/batch")
               "A scheduled broadcast needs a send time and an AWS account. Cancel it to unschedule.",
           };
         }
+        // Editing a scheduled broadcast changes what goes out and when, so it
+        // also needs send, as the dashboard's updateScheduledBatchSend does.
+        const sendGate = await requirePermission(ctx, "broadcasts", ["send"]);
+        if (!sendGate.ok) {
+          return sendGate.body;
+        }
         return editScheduledBroadcast(ctx, body as ScheduledEditBody);
       }
       if (existing.status !== "draft") {

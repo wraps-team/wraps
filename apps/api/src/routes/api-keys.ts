@@ -147,7 +147,7 @@ export const apiKeysRoutes = createAuthenticatedRoutes("/v1/api-keys")
       }
 
       const { organizationId } = getAuth(ctx);
-      const actor = await findApiKeyActor(gate.userId);
+      const actor = gate.userId ? await findApiKeyActor(gate.userId) : null;
       if (!actor) {
         set.status = 403;
         return { error: "You don't have permission to perform this action" };
@@ -238,7 +238,7 @@ export const apiKeysRoutes = createAuthenticatedRoutes("/v1/api-keys")
       }
 
       const { organizationId } = getAuth(ctx);
-      const actor = await findApiKeyActor(gate.userId);
+      const actor = gate.userId ? await findApiKeyActor(gate.userId) : null;
       if (!actor) {
         set.status = 403;
         return { error: "You don't have permission to perform this action" };

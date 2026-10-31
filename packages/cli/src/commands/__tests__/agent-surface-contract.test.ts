@@ -41,9 +41,18 @@ import {
 } from "../api-keys/api-keys.js";
 import { auditLogsExport, auditLogsList } from "../audit-logs/audit-logs.js";
 import {
+  brandKitsCreate,
+  brandKitsDelete,
+  brandKitsGet,
+  brandKitsList,
+  brandKitsSetDefault,
+  brandKitsUpdate,
+} from "../brand-kits/brand-kits.js";
+import {
   broadcastsRecipients,
   broadcastsStatus,
 } from "../broadcasts/broadcasts.js";
+import { broadcastsDraft } from "../broadcasts/draft.js";
 import {
   broadcastsCancel,
   broadcastsDuplicate,
@@ -66,6 +75,10 @@ import {
   agentApprovalsReject,
 } from "../email/agent-approvals.js";
 import { emailHealth } from "../email/health.js";
+import {
+  inboundEmailsGet,
+  inboundEmailsList,
+} from "../email/inbound-emails.js";
 import { emailMetrics } from "../email/metrics.js";
 import { suppressionsList, suppressionsRemove } from "../email/suppressions.js";
 import {
@@ -228,6 +241,10 @@ const CASES: Case[] = [
     takesId: true,
     run: (id = "bc_1") => broadcastsUpdate({ id, subject: "n", json: true }),
   },
+  {
+    name: "broadcasts draft",
+    run: () => broadcastsDraft({ name: "Spring sale", json: true }),
+  },
   { name: "email templates list", run: () => templatesList({ json: true }) },
   {
     name: "email templates get",
@@ -279,6 +296,15 @@ const CASES: Case[] = [
     run: (id = "ex_1") => workflowsExecution({ executionId: id, json: true }),
   },
   { name: "email metrics", run: () => emailMetrics({ json: true }) },
+  {
+    name: "email inbound list",
+    run: () => inboundEmailsList({ json: true }),
+  },
+  {
+    name: "email inbound get",
+    takesId: true,
+    run: (id = "em_1") => inboundEmailsGet({ emailId: id, json: true }),
+  },
   { name: "audit-logs list", run: () => auditLogsList({ json: true }) },
   { name: "audit-logs export", run: () => auditLogsExport({ json: true }) },
   {
@@ -296,6 +322,31 @@ const CASES: Case[] = [
       }),
   },
   { name: "email health", run: () => emailHealth({ json: true }) },
+  { name: "brand-kits list", run: () => brandKitsList({ json: true }) },
+  {
+    name: "brand-kits get",
+    takesId: true,
+    run: (id = "bk_1") => brandKitsGet({ id, json: true }),
+  },
+  {
+    name: "brand-kits create",
+    run: () => brandKitsCreate({ name: "Acme", json: true }),
+  },
+  {
+    name: "brand-kits update",
+    takesId: true,
+    run: (id = "bk_1") => brandKitsUpdate({ id, name: "Acme", json: true }),
+  },
+  {
+    name: "brand-kits delete",
+    takesId: true,
+    run: (id = "bk_1") => brandKitsDelete({ id, yes: true, json: true }),
+  },
+  {
+    name: "brand-kits set-default",
+    takesId: true,
+    run: (id = "bk_1") => brandKitsSetDefault({ id, json: true }),
+  },
   { name: "topics list", run: () => topicsList({ json: true }) },
   {
     name: "topics get",

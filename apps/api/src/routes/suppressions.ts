@@ -82,7 +82,10 @@ export const suppressionsRoutes = createAuthenticatedRoutes("/v1/suppressions")
     async (ctx) => {
       const { query, set, request } = ctx;
       const authContext = getAuth(ctx);
-      const gate = await requirePermission(ctx, "awsAccounts", ["read"]);
+      const gate = await requirePermission(ctx, "awsAccounts", ["read"], {
+        // A suppression is an address; for API keys it falls under Contacts.
+        keyScopes: ["contacts:read"],
+      });
       if (!gate.ok) {
         return gate.body;
       }
@@ -164,7 +167,9 @@ export const suppressionsRoutes = createAuthenticatedRoutes("/v1/suppressions")
     async (ctx) => {
       const { params, query, set, request } = ctx;
       const authContext = getAuth(ctx);
-      const gate = await requirePermission(ctx, "awsAccounts", ["write"]);
+      const gate = await requirePermission(ctx, "awsAccounts", ["write"], {
+        keyScopes: ["contacts:write"],
+      });
       if (!gate.ok) {
         return gate.body;
       }
@@ -238,11 +243,13 @@ export const suppressionsRoutes = createAuthenticatedRoutes("/v1/suppressions")
       }
 
       try {
-        const [actor] = await db
-          .select({ email: user.email })
-          .from(user)
-          .where(eq(user.id, gate.userId))
-          .limit(1);
+        const [actor] = gate.userId
+          ? await db
+              .select({ email: user.email })
+              .from(user)
+              .where(eq(user.id, gate.userId))
+              .limit(1)
+          : [];
         await db.insert(auditLog).values({
           organizationId,
           userId: gate.userId,

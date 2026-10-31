@@ -30,7 +30,9 @@ import { agentsWebhookRoutes } from "./routes/agents-webhook";
 import { apiKeysRoutes } from "./routes/api-keys";
 import { auditLogsRoutes } from "./routes/audit-logs";
 import { batchRoutes } from "./routes/batch";
+import { batchDraftRoutes } from "./routes/batch-drafts";
 import { batchLifecycleRoutes } from "./routes/batch-lifecycle";
+import { brandKitsRoutes } from "./routes/brand-kits";
 import { connectionsRoutes } from "./routes/connections";
 import { contactsRoutes } from "./routes/contacts";
 import { contactsBulkRoutes } from "./routes/contacts-bulk";
@@ -40,6 +42,7 @@ import { emailLogsRoutes } from "./routes/email-logs";
 import { eventsRoutes } from "./routes/events";
 import { eventsReadRoutes } from "./routes/events-read";
 import { healthRoutes } from "./routes/health";
+import { inboundEmailsRoutes } from "./routes/inbound-emails";
 import { metricsRoutes } from "./routes/metrics";
 import { preferenceEventsRoutes } from "./routes/preference-events";
 import { segmentsRoutes } from "./routes/segments";
@@ -96,6 +99,10 @@ const openApiDocumentation = {
     },
   ],
   tags: [
+    {
+      name: "brand-kits",
+      description: "Brand kit CRUD and the organization's default brand kit",
+    },
     { name: "health", description: "Health check and API info endpoints" },
     {
       name: "contacts",
@@ -150,6 +157,11 @@ const openApiDocumentation = {
       name: "audit-logs",
       description:
         "Read and export the organization's audit log. Owners and admins only; export requires the Business plan.",
+    },
+    {
+      name: "Inbound",
+      description:
+        "Inbound email reads from the customer's S3 inbound bucket. Read-only; nothing is stored in Wraps.",
     },
     {
       name: "suppressions",
@@ -289,16 +301,19 @@ export const app = new Elysia()
   .use(connectionsRoutes)
   .use(domainsRoutes)
   .use(emailLogsRoutes)
+  .use(inboundEmailsRoutes)
   .use(metricsRoutes)
   .use(contactsRoutes)
   .use(contactsBulkRoutes)
   .use(contactsTopicsRoutes)
+  .use(batchDraftRoutes)
   .use(batchRoutes)
   .use(batchLifecycleRoutes)
   .use(segmentsRoutes)
   .use(apiKeysRoutes)
   .use(suppressionsRoutes)
   .use(topicsRoutes)
+  .use(brandKitsRoutes)
   .use(eventsRoutes)
   .use(eventsReadRoutes)
   .use(workflowsRoutes)

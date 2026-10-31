@@ -247,20 +247,21 @@ Commands that send email, make a live change or delete data refuse to run withou
 - `broadcasts create`, `broadcasts send`, `broadcasts resume`, `broadcasts cancel`
 - `workflows trigger`, `workflows enable`, `workflows retry`, `workflows cancel`
 - `email agent approvals approve`, `email agent approvals reject`
+- `brand-kits delete`
 
 Exceptions. `email templates pull` fetches without `--yes`, but refuses to overwrite existing local files unless `--yes` is given. `contacts export --output` and `audit-logs export --output` also refuse to overwrite an existing file unless `--yes` is given. `workflows disable` needs no `--yes` because it only stops future runs. `broadcasts duplicate` and `broadcasts update` are not destructive and need no `--yes`.
 
-`--dry-run` is supported on `contacts delete`, `contacts import`, `contacts validate`, `segments delete`, `topics delete`, `email suppressions remove`, `broadcasts create`, `broadcasts cancel`, `api-keys revoke`, `workflows trigger` and `email templates pull`. A dry run makes no changes. `broadcasts create --dry-run` validates the payload locally and makes no request.
+`--dry-run` is supported on `contacts delete`, `contacts import`, `contacts validate`, `segments delete`, `topics delete`, `email suppressions remove`, `broadcasts create`, `broadcasts cancel`, `api-keys revoke`, `workflows trigger`, `email templates pull` and `brand-kits delete`. A dry run makes no changes. `broadcasts create --dry-run` validates the payload locally and makes no request.
 
 ### Pagination
 
 - List commands take `--limit` and `--cursor`. Their `data` includes `nextCursor`, which is `null` when there are no more results.
 - Pass `nextCursor` back unchanged as `--cursor`. Do not construct it. Its form depends on the command:
-  - Opaque: `email suppressions list` (repeat the same `--account` and `--reason` with it), `audit-logs list`.
+  - Opaque: `email suppressions list` (repeat the same `--account` and `--reason` with it), `audit-logs list`, `email inbound list`.
   - Page number (starts at 1): `contacts list`, `events list`, `topics subscribers`, `workflows list`, `workflows executions`.
   - Offset: `topics list` (the route returns every topic, so the CLI pages the list itself), `segments list`, `broadcasts recipients`.
-- `--limit` ranges: contacts list 1-100; segments list 1-100 (default 20); templates list 1-100; broadcasts recipients 1-1000; topics list 1-100 (default 20); topics subscribers 1-100 (default 50); events list 1-100 (default 50); audit-logs list 1-100 (default 50).
-- `email agent approvals list` has no `--limit` or `--cursor`. It returns the whole queue, and `nextCursor` is always `null`. `api-keys list` is not paginated either. `email metrics` is not paginated. `contacts import` takes at most 10,000 rows per call, and `contacts export` returns at most 50,000 rows with no cursor.
+- `--limit` ranges: contacts list 1-100; segments list 1-100 (default 20); templates list 1-100; broadcasts recipients 1-1000; topics list 1-100 (default 20); topics subscribers 1-100 (default 50); events list 1-100 (default 50); audit-logs list 1-100 (default 50); email inbound list 1-100 (default 20).
+- `email agent approvals list` has no `--limit` or `--cursor`. It returns the whole queue, and `nextCursor` is always `null`. `api-keys list` and `brand-kits list` are not paginated either. `email metrics` is not paginated. `contacts import` takes at most 10,000 rows per call, and `contacts export` returns at most 50,000 rows with no cursor.
 
 ### Contacts
 
@@ -294,6 +295,17 @@ Contact fields: `id`, `externalId`, `email`, `phone`, `firstName`, `lastName`, `
 - `wraps email templates publish <id> --yes [--aws-account-id <id>]`. Publishes to SES and is LIVE. If the organization has exactly one AWS account it is used automatically. If it has several, pass `--aws-account-id`. Data: `id`, `publishedAt`, `sesTemplateName`, `awsAccountId`.
 - `wraps email templates duplicate <id>`. Creates a copy that is always a `DRAFT`. Data: the same keys as `get`.
 
+### Brand kits
+
+A brand kit holds a name, logo, colors, fonts, button style, company details and social links that email templates can use. An organization can have several. One of them is the default.
+
+- `wraps brand-kits list`. Lists every brand kit in one response. It is not paginated. The JSON output includes a total.
+- `wraps brand-kits get <id>`. Shows one brand kit.
+- `wraps brand-kits create [--name] [--primary-color] [--secondary-color] [--background-color] [--text-color] [--font-family] [--heading-font-family] [--button-style] [--button-radius] [--company-name] [--company-address] [--social-links <json array>] [--logo-url] [--source-domain] [--default]`. The first kit in the organization becomes the default. `--default` makes this kit the default and clears the previous default.
+- `wraps brand-kits update <id> [the same flags as create]`. Changes only the flags you pass; at least one is required. Pass `null` to clear a nullable field: logo, heading font, company name, company address or source domain.
+- `wraps brand-kits delete <id> --yes [--dry-run]`. Deletes a brand kit. Templates that used it lose the link to it. If it was the default, another kit is promoted. `--dry-run` previews the delete.
+- `wraps brand-kits set-default <id>`. Makes the kit the organization's default and clears the previous default.
+
 ### Email metrics and health
 
 - `wraps email metrics [--start-date <date>] [--end-date <date>] [--timezone <tz>] [--granularity <g>] [--dimensions <d>] [--broadcast-id <id>] [--template-id <id>] [--aws-account-id <id>]`. Aggregate sends, opens, clicks, bounces and cost. `--granularity` is `hourly`, `daily`, `weekly` or `monthly`. `--dimensions` takes `period`, `domain`, `broadcast`, `template`, `source`, `account` or `region`. ID filters take up to 100 comma-separated values. Dates are ISO 8601. Data: `object`, `totals`, `data`, `meta`. Errors: `INVALID_DATE`, `INVALID_DATE_RANGE`, `INVALID_GRANULARITY`.
@@ -306,18 +318,26 @@ Contact fields: `id`, `externalId`, `email`, `phone`, `firstName`, `lastName`, `
 
 Flags for `email logs` are not covered in this section.
 
+### Inbound email (read)
+
+Reads the emails that each connected AWS account's SES inbound bucket has received. Wraps stores nothing: the emails are read live from the customer's account. Attachments are listed as metadata only, and their contents cannot be downloaded.
+
+- `wraps email inbound list [--account <id>] [--limit <n>] [--cursor <c>]`. Lists one page. `--limit` is 1-100 (default 20). Results come in S3 key order, not received time, so the newest email is not necessarily first. A page can be empty, or hold fewer than `--limit` entries, while `nextCursor` is still set. Keep going until it is null. The cursor is opaque. `--account` takes the Wraps account id that `wraps email health` lists. The REST route also returns `deniedAccountIds` and `unreachableAccountIds`; when either is not empty, the listing is incomplete.
+- `wraps email inbound get <emailId> [--account <id>] [--json]`. Shows one email: headers, text body, HTML body and attachment metadata. Without `--account`, every account is tried in order and the first match is returned. `htmlTruncated` is true when the HTML body was longer than 200 KB and was cut, so read `text` as well. `html` is null when the email has no HTML part.
+
 ### Broadcasts
 
 `--aws-account-id` takes the account `id` that `wraps email health` lists.
 
+- `wraps broadcasts draft [--name <name>] [--subject <text>] [--template-id <id>] [--audience-type all|topic|segment] [--topic-id <id> | --segment-id <id>] [--aws-account-id <id>] [--html-content <html>] [--scheduled-for <ISO time>]`. Saves a new draft and sends nothing. The output prints the `wraps broadcasts send` command to run next. On current main the API does not edit drafts, so set the subject, audience and content here. Send the draft with `broadcasts send`.
 - `wraps broadcasts create --aws-account-id <id> --subject <text> [--channel email|sms] [--audience-type all|topic|segment] [--topic-id] [--segment-id] [--preview-text] [--from] [--from-name] [--reply-to] [--template-id] [--html-content] [--body] [--sender-id] [--variable-mappings] [--scheduled-for <ISO time>] --yes [--dry-run]`. Queues a broadcast. It sends immediately unless you pass `--scheduled-for`. Data: `id`, `status`, `channel`, `createdAt`, `totalRecipients`, `payload`, `dryRun`, `warning`.
-- `wraps broadcasts send <id> --aws-account-id <id> --total-recipients <n> --yes`. Sends a draft that was created in the dashboard. It does not send broadcasts created with `broadcasts create`, which are already queued or scheduled. Read `totalRecipients` from `broadcasts status`. Data: `id`, `status`, `warning`. Returns `NOT_DRAFT` for a broadcast that is not a draft.
+- `wraps broadcasts send <id> --aws-account-id <id> --total-recipients <n> --yes`. Sends a draft, whether it was made with `broadcasts draft`, through the API or in the dashboard. It does not send broadcasts created with `broadcasts create`, which are already queued or scheduled. Read `totalRecipients` from `broadcasts status`. Data: `id`, `status`, `warning`. Returns `NOT_DRAFT` for a broadcast that is not a draft.
 - `wraps broadcasts status <id>`. Data: `id`, `name`, `channel`, `status`, `totalRecipients`, `processedRecipients`, `sent`, `delivered`, `failed`, `opened`, `clicked`, `bounced`, `complained`, `suppressed`, `startedAt`, `completedAt`, `createdAt`.
 - `wraps broadcasts recipients <id> [--status <s>] [--limit <n>] [--cursor <c>]`. The cursor is an offset. Data: `id`, `recipients`, `total`, `limit`, `offset`, `nextCursor`.
 - `wraps broadcasts resume <id> --yes [--from-chunk-index <n>]`. Resumes a stopped broadcast. Data: `id`, `resumed`, `fromChunkIndex`. Can return `RESUME_DISABLED`.
 - `wraps broadcasts cancel <id> --yes [--dry-run]`. Cancels a scheduled, queued or processing broadcast. It calls the existing `DELETE /v1/batch/{id}`; there is no cancel route. Other statuses return `NOT_CANCELLABLE`. Data: `id`, `status`, `cancelled`, `dryRun`.
 - `wraps broadcasts duplicate <id>`. Copies any broadcast into a new draft named `<name> (copy)`. The copy keeps the content, audience and sender, but not the schedule. No `--yes` needed. Data: `id`, `status`, `name`, `sourceId`.
-- `wraps broadcasts update <id> [the content flags of broadcasts create] [--clear-<field>]`. Edits a draft only. A broadcast that is not a draft returns `CONFLICT` with its status, and the error points to `broadcasts duplicate`. `--clear-<field>` unsets a nullable field. Setting a topic or segment audience, or a schedule, needs the plan that allows it, as `create` does. Data: `id`, `status`, `name`, `channel`, `subject`, `audienceType`, `topicId`, `segmentId`, `awsAccountId`, `scheduledFor`, `updatedFields`.
+- `wraps broadcasts update <id> [the content flags of broadcasts create] [--clear-<field>]`. Edits a draft or a scheduled broadcast. A draft stays a draft and a scheduled broadcast stays scheduled; nothing is sent. Any other status returns 409. `--clear-<field>` unsets a nullable field. Setting a topic or segment audience, or a schedule, needs the plan that allows it, as `create` does. Data: `id`, `status`, `name`, `channel`, `subject`, `audienceType`, `topicId`, `segmentId`, `awsAccountId`, `scheduledFor`, `updatedFields`.
 
 ### Workflow runs
 
@@ -388,6 +408,12 @@ Destructive routes need `confirm=true` in the query string and return 400 withou
 
 Permissions are shown as `resource:action`. Plan requirements are stated per route.
 
+Who the permission applies to depends on how the request authenticates:
+
+- A session (dashboard, or the CLI after `wraps auth login`) is a person. Their role in the organization must allow the action. A `read-only` or `billing` member can read but not change data, and a `marketing` member cannot change segments, topics or workflows.
+- An API key belongs to the organization, not to the person who created it. The key's own scopes, chosen when it was created, must cover the action: `contacts:read` or `contacts:write` for contacts (import counts as write, export as read) and suppressions; `topics:*`, `segments:*` and `workflows:*` for those resources; `campaigns:read` or `campaigns:write` for templates, brand kits and broadcasts; `campaigns:write` plus `send:email` to send or resume a broadcast; `analytics:read` for events. A key created with `--permissions readonly` can read but every write returns 403. A key keeps working after its creator leaves the organization. Keys cannot manage API keys or read the audit log. Any key can still connect or disconnect an AWS account (`wraps platform connect` and `disconnect` in CI), whatever its scopes.
+- A refused request returns 403 with `{"error":"You don't have permission to perform this action"}` and changes nothing.
+
 ### Topics (Pro plan)
 
 - `GET /v1/topics`: list topics with subscriber, sendable and pending counts. Needs `topics:read`. Returns every topic in one response, with no paging.
@@ -417,9 +443,24 @@ Permissions are shown as `resource:action`. Plan requirements are stated per rou
 
 ### Broadcasts
 
-- `DELETE /v1/batch/{id}`: cancel a scheduled, queued or processing broadcast. This is the existing route; there is no `/cancel` route.
+- `POST /v1/batch/drafts`: create a broadcast draft. Nothing is sent. Body: `channel`, `name`, `subject`, `previewText`, `from`, `fromName`, `replyTo`, `templateId`, `htmlContent`, `variableMappings`, `body`, `senderId`, `recipientFilter`, `awsAccountId`, `scheduledFor`. Returns 201 with the new draft. Every ID in the body (`templateId`, `segmentId`, `topicId`, `awsAccountId`) must belong to the organization. Send the draft with `POST /v1/batch/{id}/send`. Needs `broadcasts:write`.
+- `DELETE /v1/batch/{id}`: cancel a scheduled, queued or processing broadcast. This is the existing route; there is no `/cancel` route. Needs `broadcasts:write`.
 - `POST /v1/batch/{id}/duplicate`: copy any broadcast into a new draft with ` (copy)` added to its name. The schedule is not copied. Needs `broadcasts:write`.
-- `PATCH /v1/batch/{id}`: edit a draft or a scheduled broadcast. Only fields in the body change, and `null` clears a nullable field. Setting `audienceType` or `scheduledFor` applies the plan entitlements that creating a broadcast applies. A scheduled broadcast stays scheduled: `scheduledFor` must be in the future and neither it nor `awsAccountId` can be `null`, and within 60 seconds of the send time it returns 409. Any other status returns 409 with the status. Needs `broadcasts:write`.
+- `PATCH /v1/batch/{id}`: edit a draft or a scheduled broadcast. Only fields in the body change, and `null` clears a nullable field. Setting `audienceType` or `scheduledFor` applies the plan entitlements that creating a broadcast applies. A scheduled broadcast stays scheduled: `scheduledFor` must be in the future and neither it nor `awsAccountId` can be `null`, and within 60 seconds of the send time it returns 409. Any other status returns 409 with the status. A draft edit needs `broadcasts:write`; a scheduled edit also needs `broadcasts:send`.
+
+### Inbound email
+
+- `GET /v1/email/inbound`: one page of parsed inbound emails, read live from the inbound bucket in each connected AWS account. Query `awsAccountId` (one account only; 404 when it is not in the organization), `limit` (1-100, default 20) and `cursor`. Pass `nextCursor` back unchanged as `cursor`; it is null on the last page. A page can hold fewer than `limit` entries, or none, while `nextCursor` is set. Results are in S3 key order, not received time. `deniedAccountIds` lists accounts that refused access and `unreachableAccountIds` lists accounts that could not be read; the listing is incomplete when either is not empty. Attachments are metadata only. Requires authentication only.
+- `GET /v1/email/inbound/{emailId}`: one parsed inbound email. Query `awsAccountId`. Without it, every account is tried in account id order and the first match is returned. Returns 404 when no account read has the email, or when `awsAccountId` is not in the organization. `htmlTruncated: true` means the HTML body was cut to a 200 KB prefix when it was received, so `html` may be incomplete markup. `html` is null when the email has no HTML part. No endpoint downloads attachment contents. Requires authentication only.
+
+### Brand kits
+
+- `GET /v1/brand-kits`: every brand kit in one response, with `count`. Not paginated: there is no `limit` or `cursor`. The default kit comes first, then the most recently updated. Requires authentication only.
+- `POST /v1/brand-kits`: create a brand kit. A blank name becomes "Untitled Brand Kit". The first kit in the organization is the default; later kits become the default only with `isDefault: true`, which clears the previous default. Needs `templates:write`.
+- `GET /v1/brand-kits/{id}`: one brand kit. Returns 404 when it is not in the organization. Requires authentication only.
+- `PATCH /v1/brand-kits/{id}`: change only the fields sent. A blank name is refused with 400. To change the default, use `POST /v1/brand-kits/{id}/default`. Needs `templates:write`.
+- `DELETE /v1/brand-kits/{id}?confirm=true`: delete a brand kit. Deleting the default promotes another kit, and templates that used the kit lose the link. Needs `templates:write`.
+- `POST /v1/brand-kits/{id}/default`: make this kit the organization's only default. The previous default is cleared in the same transaction. Needs `templates:write`.
 
 ### Workflows
 
@@ -1074,9 +1115,9 @@ Detailed comparisons:
 
 ## MCP Server (@wraps.dev/mcp)
 
-MCP server for Wraps email infrastructure. Gives AI agents access to your AWS SES sending history, delivery events, domain status, and suppression list — and, optionally, the ability to send email. Runs locally via stdio; AWS credentials never leave the machine.
+MCP server for Wraps email infrastructure. Gives AI agents access to your AWS SES sending history, delivery events, domain status, and suppression list — and, optionally, the ability to send email. With a Wraps API credential it also reads and changes Wraps data through the Wraps API: contacts, segments, topics, templates, broadcasts, events, workflows, agent approvals, metrics, inbound email and brand kits. Runs locally via stdio; AWS credentials never leave the machine.
 
-Prerequisites: a deployed Wraps email stack (`wraps email init`) and AWS credentials in the environment (same profile the CLI uses).
+Prerequisites: for the AWS tools, a deployed Wraps email stack (`wraps email init`) and AWS credentials in the environment (same profile the CLI uses). For the API-backed tools, a Wraps API key or a `wraps auth login` session (see Credentials for API-backed tools below).
 
 ### Tools
 
@@ -1088,7 +1129,96 @@ Prerequisites: a deployed Wraps email stack (`wraps email init`) and AWS credent
 | `verify_domain_status` | Verification and DKIM status of a sending domain | No |
 | `list_suppressions` | Addresses on the SES suppression list, filterable by BOUNCE or COMPLAINT | No |
 | `estimate_cost` | Monthly Wraps + AWS cost for a send volume, including the account's SES pricing plan. Needs no AWS credentials | No |
+| `get_setup_status` | Check whether the account is in the SES sandbox, and get the next step toward a first send | No |
 | `check_send_status` | Poll the outcome of a `pending_approval` send by `approvalId` (enforced mode only) | No |
+
+### API-backed tools
+
+These tools call the Wraps API for your organization. Each one is a read (R), a write (W) or a destructive call (X). Write and destructive tools need `WRAPS_WRITE_ENABLED=true`; destructive tools also need `confirm: true`. The tool descriptions say when to use each tool and how to page through results. Paginated tools return `hasMore`. Segment and topic tools need a Pro plan or higher.
+
+#### Contacts
+- Read: `list_contacts`, `get_contact`, `validate_contact_emails`
+- Write: `create_contact`, `update_contact`, `set_contact_topics`
+- Destructive: `delete_contact`
+
+#### Segments
+- Read: `list_segments`, `get_segment`, `preview_segment`
+- Write: `create_segment`, `update_segment`
+- Destructive: `delete_segment`
+
+#### Topics
+- Read: `list_topics`, `get_topic`, `list_topic_subscribers`
+- Write: `create_topic`, `update_topic`
+- Destructive: `delete_topic`
+
+#### Templates
+- Read: `list_templates`, `get_template`
+- Write: `create_template`, `update_template`, `duplicate_template`
+- Destructive: `publish_template`
+
+#### Broadcasts
+- Read: `list_broadcasts`, `get_broadcast`, `list_broadcast_recipients`, `get_broadcast_clicks`
+- Write: `create_broadcast`, `update_broadcast`, `duplicate_broadcast`
+- Destructive: `send_broadcast`, `resume_broadcast`, `cancel_broadcast`
+
+#### Events
+- Read: `list_events`, `get_event`, `get_event_analytics`, `list_event_names`
+- Destructive: `track_event`
+
+#### Suppressions
+- Destructive: `remove_suppression`
+
+#### Workflows
+- Read: `list_workflows`, `get_workflow`, `list_workflow_executions`, `get_workflow_execution`
+- Write: `enable_workflow_schedule`, `disable_workflow_schedule`
+- Destructive: `trigger_workflow`, `retry_workflow_execution`, `cancel_workflow_execution`
+
+#### Agent approvals
+- Read: `list_agent_approvals`
+- Destructive: `approve_agent_approval`, `reject_agent_approval`
+
+#### Metrics
+- Read: `get_email_metrics`
+
+#### Inbound email
+- Read: `list_inbound_emails`, `get_inbound_email`
+
+#### Brand kits
+- Read: `list_brand_kits`, `get_brand_kit`
+- Write: `create_brand_kit`, `update_brand_kit`, `set_default_brand_kit`
+- Destructive: `delete_brand_kit`
+
+### Credentials for API-backed tools
+
+The API-backed tools register at startup only when a credential is present. The server uses the first of these that it finds:
+
+1. `WRAPS_API_KEY`, a `wraps_...` key, set in the server's `env`.
+2. The unexpired session that `wraps auth login` stored in `~/.wraps`, or the session from `wraps selfhost login` for a self-hosted instance.
+
+With neither, only the AWS tools are registered. An expired or revoked credential does not stop startup. A later call returns a tool error that names `wraps auth login` or the key fix.
+
+`WRAPS_API_URL` changes the API base URL (default `https://api.wraps.dev`). `WRAPS_ORG_ID` picks the organization when a session belongs to more than one; it is sent as the `x-organization-id` header. A self-hosted session with no stored API URL returns a tool error that asks you to run `wraps selfhost login` again.
+
+```json
+{
+  "mcpServers": {
+    "wraps": {
+      "command": "npx",
+      "args": ["-y", "@wraps.dev/mcp"],
+      "env": {
+        "AWS_REGION": "us-east-1",
+        "WRAPS_API_KEY": "wraps_..."
+      }
+    }
+  }
+}
+```
+
+### Write gate and confirm
+
+Every API-backed write (W) and destructive (X) tool is refused unless `WRAPS_WRITE_ENABLED=true`. Read (R) tools work without it. Destructive tools also require `confirm: true` in the call, and the server refuses the call without it. Set `confirm: true` only after the user has confirmed the change. Several destructive tools cannot be undone, including `delete_contact`, `publish_template`, `send_broadcast` and `trigger_workflow`.
+
+When `WRAPS_AGENT_ID` is set (enforced mode), `approve_agent_approval` and `reject_agent_approval` are not registered, so an enforced agent cannot approve or reject its own sends.
 
 ### Setup
 
@@ -1132,10 +1262,15 @@ Claude Desktop / Cursor / Windsurf (GUI clients inherit nothing from the shell, 
 | `AWS_REGION` | Yes | — | AWS region where the Wraps stack is deployed |
 | `WRAPS_HISTORY_TABLE_NAME` | No | `wraps-email-history` | DynamoDB table for email history |
 | `WRAPS_ACCOUNT_ID` | No | auto-detected via STS | AWS account ID (skips the STS call if set) |
-| `WRAPS_WRITE_ENABLED` | No | `false` | Set to `true` to enable `send_email` |
+| `WRAPS_WRITE_ENABLED` | No | `false` | Set to `true` to enable `send_email` and every write or destructive API-backed tool |
 | `WRAPS_FROM_EMAIL` | No | — | Default `from` address for `send_email` |
+| `WRAPS_API_KEY` | No | — | Wraps API key (`wraps_...`) for the API-backed tools. Without it, the session from `wraps auth login` is used |
+| `WRAPS_API_URL` | No | `https://api.wraps.dev` | Wraps API base URL. Set it for a self-hosted control plane |
+| `WRAPS_ORG_ID` | No | — | Organization to act in when the session belongs to several. Sent as `x-organization-id` |
 
 ### Send guardrails (write mode)
+
+These variables apply to `send_email` only. They do not restrict `send_broadcast` or the other API-backed tools.
 
 | Variable | Default | Description |
 |----------|---------|-------------|

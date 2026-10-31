@@ -244,6 +244,14 @@ const DATA_COMMAND_GROUPS: DataCommandGroup[] = [
     title: "Broadcasts",
     commands: [
       {
+        command: "broadcasts draft",
+        summary: "Save a new broadcast draft. Sends nothing.",
+        flags:
+          "--name, --subject, --template-id, --audience-type (all, topic or segment), --topic-id or --segment-id, --aws-account-id, --html-content, --scheduled-for (ISO time)",
+        notes:
+          "The output prints the broadcasts send command to run next. Draft content is fixed when the draft is created, because the API does not edit drafts on current main.",
+      },
+      {
         command: "broadcasts create",
         summary:
           "Queue a broadcast. It sends immediately unless --scheduled-for is set.",
@@ -255,7 +263,7 @@ const DATA_COMMAND_GROUPS: DataCommandGroup[] = [
       {
         command: "broadcasts send <id>",
         summary:
-          "Send a draft made in the dashboard. Broadcasts made with create are already queued.",
+          "Send a draft, from broadcasts draft or the dashboard. Broadcasts made with create are already queued.",
         flags:
           "--yes (required), --aws-account-id (from email health), --total-recipients (read it from broadcasts status)",
         data: "id, status, warning",
@@ -298,11 +306,11 @@ const DATA_COMMAND_GROUPS: DataCommandGroup[] = [
       {
         command: "broadcasts update <id>",
         summary:
-          "Edit a draft. Takes the same content flags as broadcasts create, plus --clear-<field>.",
+          "Edit a draft or scheduled broadcast. Takes the same content flags as broadcasts create, plus --clear-<field>.",
         flags: "--clear-<field> unsets a nullable field",
         data: "id, status, name, channel, subject, audienceType, topicId, segmentId, awsAccountId, scheduledFor, updatedFields",
         notes:
-          "Only drafts can be edited. A broadcast that is not a draft returns CONFLICT with its status, and the error points to broadcasts duplicate.",
+          "A draft stays a draft and a scheduled broadcast stays scheduled; nothing is sent. Any other status is refused with CONFLICT. Editing a scheduled broadcast with an API key also needs the send:email scope.",
       },
     ],
   },
@@ -475,6 +483,69 @@ const DATA_COMMAND_GROUPS: DataCommandGroup[] = [
         summary: "Cancel an in-progress execution.",
         flags: "--yes (required)",
         data: "executionId, cancelled",
+      },
+    ],
+  },
+  {
+    title: "Inbound Email (read)",
+    commands: [
+      {
+        command: "email inbound list",
+        summary:
+          "List inbound emails across the connected AWS accounts, read live from the SES inbound bucket.",
+        flags:
+          "--account (a Wraps account id), --limit (1-100, default 20), --cursor (opaque)",
+        notes:
+          "Results are in S3 key order, not received time. A page can be empty while nextCursor is set; keep going until it is null. Denied or unreadable accounts make the listing incomplete.",
+      },
+      {
+        command: "email inbound get <emailId>",
+        summary: "Show one inbound email.",
+        flags: "--account (a Wraps account id), --json",
+        notes:
+          "htmlTruncated is true when the HTML body was longer than 200 KB and was cut. Attachments are listed as metadata only; their contents cannot be downloaded.",
+      },
+    ],
+  },
+  {
+    title: "Brand Kits",
+    commands: [
+      {
+        command: "brand-kits list",
+        summary: "List every brand kit in the organization.",
+        notes: "Not paginated: one response. The JSON output includes a total.",
+      },
+      {
+        command: "brand-kits get <id>",
+        summary: "Show one brand kit.",
+      },
+      {
+        command: "brand-kits create",
+        summary: "Create a brand kit. Pass --default to make it the default.",
+        flags:
+          "--name, --primary-color, --secondary-color, --background-color, --text-color, --font-family, --heading-font-family, --button-style, --button-radius, --company-name, --company-address, --social-links (a JSON array), --logo-url, --source-domain, --default",
+        notes:
+          "The first kit in the organization becomes the default. --default clears the previous default.",
+      },
+      {
+        command: "brand-kits update <id>",
+        summary:
+          "Change any of the create fields. At least one flag is required.",
+        flags: "The same flags as brand-kits create",
+        notes:
+          "Pass null to clear a nullable field: logo, heading font, company name, company address or source domain.",
+      },
+      {
+        command: "brand-kits delete <id>",
+        summary: "Delete a brand kit.",
+        flags: "--yes (required), --dry-run",
+        notes:
+          "Templates that used the kit lose the link to it. Deleting the default promotes another kit.",
+      },
+      {
+        command: "brand-kits set-default <id>",
+        summary: "Make a brand kit the organization's default.",
+        notes: "The previous default is cleared.",
       },
     ],
   },
@@ -750,8 +821,8 @@ export default function CLIReferencePageContent() {
               suppressions remove, email templates publish, broadcasts create,
               broadcasts send, broadcasts resume, broadcasts cancel, workflows
               trigger, workflows enable, workflows retry, workflows cancel,
-              email agent approvals approve, email agent approvals reject, and
-              api-keys revoke.
+              email agent approvals approve, email agent approvals reject,
+              api-keys revoke, and brand-kits delete.
             </p>
             <p className="text-muted-foreground text-sm">
               email templates pull fetches without --yes, but it refuses to
@@ -774,9 +845,9 @@ export default function CLIReferencePageContent() {
               cursor is a page number for contacts list, events list, topics
               subscribers, workflows list and workflows executions. It is an
               offset for topics list, segments list and broadcasts recipients.
-              It is opaque for email suppressions list and audit-logs list.
-              email agent approvals list, api-keys list and email metrics are
-              not paginated.
+              It is opaque for email suppressions list, audit-logs list and
+              email inbound list. email agent approvals list, api-keys list,
+              brand-kits list and email metrics are not paginated.
             </p>
           </CardContent>
         </Card>

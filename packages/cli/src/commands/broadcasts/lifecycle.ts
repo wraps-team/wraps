@@ -7,8 +7,9 @@
  *              Needs --yes (or --dry-run, which makes no request).
  * - duplicate: POST /v1/batch/:id/duplicate. Copies any broadcast into a new
  *              draft. Not destructive, so no --yes.
- * - update:    PATCH /v1/batch/:id. Edits a DRAFT only. A non-draft returns 409
- *              naming its status, and the error points at duplicate.
+ * - update:    PATCH /v1/batch/:id. Edits a DRAFT or a SCHEDULED broadcast (the API
+ *              picks the branch by status). Any other status returns 409
+ *              naming it, and the error points at duplicate.
  *
  * broadcasts.ts does not export its helpers (requireYes, mapHttpError,
  * callApi), so the ones these commands need are defined here. That file is
@@ -253,7 +254,7 @@ function mapHttpError(
       code: "FORBIDDEN",
       message,
       suggestion:
-        "Your role cannot change broadcasts in this organization. Ask an owner or admin for broadcasts write access, then retry.",
+        "Your role or this API key's scopes do not allow this. A signed-in session (wraps auth login) is checked against your role; an API key is checked against its own scopes. Changing a broadcast needs broadcasts write access (key scope campaigns:write); editing a scheduled one or sending also needs send access (key scope send:email). Ask an owner or admin, then retry.",
     };
   }
   if (status === 404) {
@@ -663,8 +664,8 @@ function conflict(setFlag: string, clearFlag: string): CliError {
 }
 
 /**
- * Edit a DRAFT broadcast. Only the flags passed change. Non-drafts return 409
- * naming their status. Field flags match `broadcasts create`.
+ * Edit a DRAFT or SCHEDULED broadcast. Only the flags passed change. Other
+ * statuses return 409 naming their status. Field flags match `broadcasts create`.
  */
 export async function broadcastsUpdate(
   options: BroadcastsUpdateOptions

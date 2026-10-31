@@ -562,22 +562,16 @@ describe("permissions", () => {
     expect(await batchIdsFor(ids.org)).toEqual(before);
   });
 
-  // Known gap, not a regression test for new code. The existing DELETE
-  // /v1/batch/:id has no write gate (batch.ts is not owned by this node), so a
-  // read-only member can cancel. `it.fails` keeps the suite green while the
-  // gap exists and turns red as soon as batch.ts gates the route.
-  it.fails(
-    "KNOWN GAP: DELETE /v1/batch/:id by a read-only member should be 403",
-    async () => {
-      const queuedId = await insertBatch(ids.org, { status: "queued" });
+  it("DELETE /v1/batch/:id by a read-only member is 403 and the broadcast is not cancelled", async () => {
+    const queuedId = await insertBatch(ids.org, { status: "queued" });
 
-      const res = await deleteReq(
-        appFor(batchRoutes, ids.org, roUserId),
-        `/v1/batch/${queuedId}`
-      );
-      expect(res.status).toBe(403);
-    }
-  );
+    const res = await deleteReq(
+      appFor(batchRoutes, ids.org, roUserId),
+      `/v1/batch/${queuedId}`
+    );
+    expect(res.status).toBe(403);
+    expect((await readBatch(queuedId)).status).toBe("queued");
+  });
 });
 
 describe("audit log", () => {

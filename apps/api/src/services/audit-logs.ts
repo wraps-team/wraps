@@ -170,12 +170,15 @@ export type ExportAuditLogsResult = {
 };
 
 export type AuditActor = {
-  userId: string;
+  userId: string | null;
   ipAddress: string | null;
   userAgent: string | null;
 };
 
-async function actorEmailFor(userId: string): Promise<string | null> {
+async function actorEmailFor(userId: string | null): Promise<string | null> {
+  if (!userId) {
+    return null;
+  }
   const [row] = await db
     .select({ email: user.email })
     .from(user)

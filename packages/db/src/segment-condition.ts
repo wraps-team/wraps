@@ -101,18 +101,33 @@ function validateFilter(filter: SegmentFilter): string | null {
   return null;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 // Validate a filter condition
 export function validateCondition(condition: FilterCondition): string | null {
-  if (!condition.groups || condition.groups.length === 0) {
+  // The API takes the condition as untyped JSON, so a wrong shape must come
+  // back as a message, not a TypeError (which surfaced as a 500).
+  if (!isRecord(condition)) {
+    return "Condition must be an object with logic and groups";
+  }
+  if (!Array.isArray(condition.groups) || condition.groups.length === 0) {
     return "At least one filter group is required";
   }
 
   for (const group of condition.groups) {
-    if (!group.filters || group.filters.length === 0) {
+    if (
+      !(isRecord(group) && Array.isArray(group.filters)) ||
+      group.filters.length === 0
+    ) {
       return "Each group must have at least one filter";
     }
 
     for (const filter of group.filters) {
+      if (!isRecord(filter)) {
+        return "Each filter must be an object with field, operator and value";
+      }
       const filterError = validateFilter(filter);
       if (filterError) {
         return filterError;

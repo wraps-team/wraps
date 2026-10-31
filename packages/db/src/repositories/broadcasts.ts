@@ -544,7 +544,7 @@ export async function deleteDraftBroadcast(
 export async function duplicateBroadcast(
   source: BroadcastRecord,
   organizationId: string,
-  createdBy: string,
+  createdBy: string | null,
   dbClient: DbClient = db
 ): Promise<BroadcastRecord | null> {
   const [result] = await dbClient

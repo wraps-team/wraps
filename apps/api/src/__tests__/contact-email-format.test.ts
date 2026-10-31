@@ -8,6 +8,7 @@
 
 import { Elysia } from "elysia";
 import { beforeAll, describe, expect, it, vi } from "vitest";
+import { FULL_ACCESS_PERMISSIONS } from "../services/api-keys";
 
 // Mocks must be declared before any imports that use them
 vi.mock("@wraps/db", async () => ({
@@ -145,6 +146,7 @@ const mockAuthContext = {
   organizationId: "org-123",
   userId: "user-123",
   planId: "starter",
+  apiKeyScopes: [...FULL_ACCESS_PERMISSIONS],
 };
 
 function createTestApp() {

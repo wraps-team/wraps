@@ -27,6 +27,7 @@ import {
 } from "vitest";
 
 import { batchRoutes } from "../routes/batch";
+import { FULL_ACCESS_PERMISSIONS } from "../services/api-keys";
 
 // Mock the queue service (we don't want to actually enqueue jobs in tests)
 vi.mock("../services/queue", () => ({
@@ -106,6 +107,7 @@ const foreignSegment = {
 // Mock auth context
 const mockAuth = {
   apiKeyId: `${TEST_PREFIX}-key-1`,
+  apiKeyScopes: [...FULL_ACCESS_PERMISSIONS],
   organizationId: testOrg.id,
   userId: testUser.id,
   planId: "pro", // Growth plan has batch access

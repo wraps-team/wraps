@@ -24,6 +24,7 @@
     "@aws-sdk/client-dynamodb": "catalog:",
     "@aws-sdk/client-lambda": "catalog:",
     "@aws-sdk/client-pinpoint-sms-voice-v2": "catalog:",
+    "@aws-sdk/client-s3": "catalog:",
     "@aws-sdk/client-scheduler": "catalog:",
     "@aws-sdk/client-ses": "catalog:",
     "@aws-sdk/client-sesv2": "catalog:",

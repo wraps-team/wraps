@@ -12,12 +12,18 @@ import { and } from "drizzle-orm";
 import { t } from "elysia";
 
 import { log } from "../../lib/logger";
+import { requirePermission } from "../../lib/require-permission";
 import { createAuthenticatedRoutes, getAuth } from "../../middleware/auth";
 import {
   createNextWorkflowSchedule,
   deleteWorkflowSchedule,
   updateWorkflowSchedule,
 } from "../services/workflow-scheduler";
+
+// Body returned when requirePermission denies the caller.
+const permissionDeniedResponse = t.Object({
+  error: t.String(),
+});
 
 /**
  * Verify the workflow belongs to the authenticated organization.
@@ -54,6 +60,10 @@ export const workflowScheduleRoutes = createAuthenticatedRoutes(
   .post(
     "/:workflowId/enable",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "workflows", ["write"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const { params, body, set } = ctx;
       const auth = getAuth(ctx);
 
@@ -99,6 +109,9 @@ export const workflowScheduleRoutes = createAuthenticatedRoutes(
         cronExpression: t.String(),
         timezone: t.Optional(t.String()),
       }),
+      response: {
+        403: permissionDeniedResponse,
+      },
     }
   )
 
@@ -112,6 +125,10 @@ export const workflowScheduleRoutes = createAuthenticatedRoutes(
   .post(
     "/:workflowId/disable",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "workflows", ["write"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const { params, set } = ctx;
       const auth = getAuth(ctx);
 
@@ -147,6 +164,9 @@ export const workflowScheduleRoutes = createAuthenticatedRoutes(
       params: t.Object({
         workflowId: t.String(),
       }),
+      response: {
+        403: permissionDeniedResponse,
+      },
     }
   )
 
@@ -160,6 +180,10 @@ export const workflowScheduleRoutes = createAuthenticatedRoutes(
   .put(
     "/:workflowId",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "workflows", ["write"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const { params, body, set } = ctx;
       const auth = getAuth(ctx);
 
@@ -206,5 +230,8 @@ export const workflowScheduleRoutes = createAuthenticatedRoutes(
         cronExpression: t.String(),
         timezone: t.Optional(t.String()),
       }),
+      response: {
+        403: permissionDeniedResponse,
+      },
     }
   );

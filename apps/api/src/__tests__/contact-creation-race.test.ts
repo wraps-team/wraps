@@ -18,8 +18,8 @@ import {
   it,
   vi,
 } from "vitest";
-
 import { contactsRoutes } from "../routes/contacts";
+import { FULL_ACCESS_PERMISSIONS } from "../services/api-keys";
 
 vi.mock("@wraps/email", () => ({
   sendTopicConfirmationEmail: vi.fn().mockResolvedValue(true),
@@ -61,6 +61,7 @@ const mockAuth = {
   organizationId: testOrg.id,
   userId: testUser.id,
   planId: "pro",
+  apiKeyScopes: [...FULL_ACCESS_PERMISSIONS],
 };
 
 function createTestApp() {
