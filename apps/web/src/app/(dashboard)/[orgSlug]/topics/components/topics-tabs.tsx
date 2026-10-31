@@ -1,21 +1,25 @@
 "use client";
 
 import type { topicSettings } from "@wraps/db";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@wraps/ui/components/ui/tabs";
 import { useQueryState } from "nuqs";
+import type { ReactNode } from "react";
+import { UnderlineTabs } from "@/components/underline-tabs";
 import type { TopicWithMeta } from "@/lib/topics";
 import { DoubleOptInSettings } from "./double-opt-in-settings";
+import {
+  TOPICS_TAB_ID_PREFIX,
+  TOPICS_TAB_LABEL,
+  TOPICS_TABS,
+  topicsTabParser,
+} from "./lib/tabs";
 import { PreferenceCenterSettings } from "./preference-center-settings";
 import { TopicsTable } from "./topics-table";
 
 type TopicSettingsType = typeof topicSettings.$inferSelect;
 
 type TopicsTabsProps = {
+  /** The page heading, kept in one block with the tabs so they sit under it. */
+  heading: ReactNode;
   orgSlug: string;
   organizationId: string;
   topics: TopicWithMeta[];
@@ -28,6 +32,7 @@ type TopicsTabsProps = {
 };
 
 export function TopicsTabs({
+  heading,
   orgSlug,
   organizationId,
   topics,
@@ -38,45 +43,60 @@ export function TopicsTabs({
   orgName,
   orgLogo,
 }: TopicsTabsProps) {
-  const [activeTab, setActiveTab] = useQueryState("tab", {
-    defaultValue: "list",
-  });
+  const [activeTab, setActiveTab] = useQueryState("tab", topicsTabParser);
 
   return (
-    <Tabs onValueChange={setActiveTab} value={activeTab}>
-      <TabsList className="grid w-full grid-cols-3">
-        <TabsTrigger value="list">Topics</TabsTrigger>
-        <TabsTrigger value="double-opt-in">Double Opt-In</TabsTrigger>
-        <TabsTrigger value="preference-center">Preference Center</TabsTrigger>
-      </TabsList>
+    <>
+      {/* One block so the tabs sit under the description, as on /emails. */}
+      <div className="flex flex-col gap-3">
+        {heading}
+        <div className="px-4 lg:px-6">
+          <UnderlineTabs
+            idPrefix={TOPICS_TAB_ID_PREFIX}
+            label="Topics sections"
+            onValueChange={setActiveTab}
+            tabs={TOPICS_TABS.map((tab) => ({
+              value: tab,
+              label: TOPICS_TAB_LABEL[tab],
+            }))}
+            value={activeTab}
+          />
+        </div>
+      </div>
 
-      <TabsContent className="mt-6" value="list">
-        <TopicsTable
-          organizationId={organizationId}
-          orgSlug={orgSlug}
-          topics={topics}
-          userRole={userRole}
-        />
-      </TabsContent>
+      <div
+        aria-labelledby={`${TOPICS_TAB_ID_PREFIX}-${activeTab}`}
+        className="@container/main px-4 lg:px-6"
+        role="tabpanel"
+      >
+        {activeTab === "list" ? (
+          <TopicsTable
+            organizationId={organizationId}
+            orgSlug={orgSlug}
+            topics={topics}
+            userRole={userRole}
+          />
+        ) : null}
 
-      <TabsContent className="mt-6" value="double-opt-in">
-        <DoubleOptInSettings
-          organizationId={organizationId}
-          settings={settings}
-          verifiedDomains={verifiedDomains}
-        />
-      </TabsContent>
+        {activeTab === "double-opt-in" ? (
+          <DoubleOptInSettings
+            organizationId={organizationId}
+            settings={settings}
+            verifiedDomains={verifiedDomains}
+          />
+        ) : null}
 
-      <TabsContent className="mt-6" value="preference-center">
-        <PreferenceCenterSettings
-          brandColor={brandColor}
-          organizationId={organizationId}
-          orgLogo={orgLogo}
-          orgName={orgName}
-          orgSlug={orgSlug}
-          settings={settings}
-        />
-      </TabsContent>
-    </Tabs>
+        {activeTab === "preference-center" ? (
+          <PreferenceCenterSettings
+            brandColor={brandColor}
+            organizationId={organizationId}
+            orgLogo={orgLogo}
+            orgName={orgName}
+            orgSlug={orgSlug}
+            settings={settings}
+          />
+        ) : null}
+      </div>
+    </>
   );
 }

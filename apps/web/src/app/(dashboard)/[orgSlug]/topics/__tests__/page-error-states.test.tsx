@@ -51,12 +51,13 @@ vi.mock("@wraps/auth", () => ({
   },
 }));
 
+const userRole = vi.hoisted(() => ({ current: "owner" }));
 vi.mock("@/lib/organization", () => ({
   getOrganizationWithMembership: vi.fn(async () => ({
     id: ORG_ID,
     slug: ORG_SLUG,
     name: "Acme",
-    userRole: "owner" as const,
+    userRole: userRole.current,
     brandColor: null,
     logo: null,
   })),
@@ -99,10 +100,16 @@ vi.mock("@wraps/db", () => ({
   },
 }));
 
-// The tabs component is owned elsewhere and under active edit; this suite
-// only needs to know which branch page.tsx picked.
+// This suite only needs to know which branch page.tsx picked, and what
+// heading it handed the tabs.
 vi.mock("../components/topics-tabs", () => ({
-  TopicsTabs: () => <div data-testid="topics-tabs" />,
+  TopicsTabs: ({ heading }: { heading: React.ReactNode }) => (
+    <div data-testid="topics-tabs">{heading}</div>
+  ),
+}));
+
+vi.mock("../components/create-topic-button", () => ({
+  CreateTopicButton: () => <button type="button">Create Topic</button>,
 }));
 
 vi.mock("@/components/feature-gate", () => ({
@@ -121,6 +128,7 @@ afterEach(cleanup);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  userRole.current = "owner";
   topicSettingsFindFirstMock.mockResolvedValue(null);
   awsAccountFindFirstMock.mockResolvedValue(null);
 });
@@ -188,6 +196,45 @@ describe('Topics page — a failed fetch is not "No topics found"', () => {
     await renderTopicsPage();
 
     expect(screen.getByTestId("topics-tabs")).toBeInTheDocument();
+  });
+});
+
+describe("Topics page — Create Topic on the heading row", () => {
+  it("puts Create Topic beside the <h1> for an owner", async () => {
+    listTopicsMock.mockResolvedValue({ success: true, topics: [] });
+
+    await renderTopicsPage();
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Topics" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Create Topic" })
+    ).toBeInTheDocument();
+  });
+
+  it("leaves it out for a member, who cannot create topics", async () => {
+    userRole.current = "member";
+    listTopicsMock.mockResolvedValue({ success: true, topics: [] });
+
+    await renderTopicsPage();
+
+    expect(
+      screen.queryByRole("button", { name: "Create Topic" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("leaves it out when the topics failed to load", async () => {
+    listTopicsMock.mockResolvedValue({
+      success: false,
+      error: "Failed to fetch topics",
+    });
+
+    await renderTopicsPage();
+
+    expect(
+      screen.queryByRole("button", { name: "Create Topic" })
+    ).not.toBeInTheDocument();
   });
 });
 

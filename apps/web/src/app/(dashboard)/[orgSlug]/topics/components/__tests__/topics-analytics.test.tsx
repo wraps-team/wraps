@@ -14,6 +14,7 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TopicWithMeta } from "@/lib/topics";
 
@@ -46,6 +47,7 @@ vi.mock("@/actions/topics", () => ({
   updateTopic: (...args: unknown[]) => updateTopic(...args),
 }));
 
+import { CreateTopicButton } from "../create-topic-button";
 import { TopicsTable } from "../topics-table";
 
 // jsdom has no ResizeObserver, which Radix's Select/Tabs measure with, and
@@ -114,11 +116,21 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
+// The page heading's Create Topic owns its dialog; it reads `?tab=` so a
+// create from another tab lands on the list.
+function renderCreateTopicButton() {
+  return render(
+    <NuqsTestingAdapter searchParams={{}}>
+      <CreateTopicButton organizationId="org-1" />
+    </NuqsTestingAdapter>
+  );
+}
+
 describe("topic_created", () => {
   it("captures double_opt_in and public only on success", async () => {
     createTopic.mockResolvedValue({ success: true, topic: makeTopic() });
 
-    render(<TopicsTable {...baseProps} topics={[]} />);
+    renderCreateTopicButton();
 
     await userEvent.click(
       screen.getByRole("button", { name: /^create topic$/i })
@@ -140,7 +152,7 @@ describe("topic_created", () => {
   it("does not capture when creation fails", async () => {
     createTopic.mockResolvedValue({ success: false, error: "nope" });
 
-    render(<TopicsTable {...baseProps} topics={[]} />);
+    renderCreateTopicButton();
 
     await userEvent.click(
       screen.getByRole("button", { name: /^create topic$/i })

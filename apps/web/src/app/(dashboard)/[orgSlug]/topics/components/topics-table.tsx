@@ -23,6 +23,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@wraps/ui/components/ui/dropdown-menu";
+import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import {
   Table,
   TableBody,
@@ -31,15 +32,15 @@ import {
   TableHeader,
   TableRow,
 } from "@wraps/ui/components/ui/table";
-import { Clock, Eye, EyeOff, MoreHorizontal, Plus, Users } from "lucide-react";
+import { Clock, Eye, EyeOff, MoreHorizontal, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { createTopic, deleteTopic, updateTopic } from "@/actions/topics";
+import { deleteTopic, updateTopic } from "@/actions/topics";
 import { Button } from "@/components/ui/button";
 import type { TopicWithMeta } from "@/lib/topics";
+import { CreateTopicButton } from "./create-topic-button";
 import {
-  captureTopicCreated,
   captureTopicDeleted,
   captureTopicSubscribersOpened,
   captureTopicUpdated,
@@ -67,7 +68,6 @@ export function TopicsTable({
   const [sorting, setSorting] = useState<SortingState>([]);
 
   // Dialog/sheet state
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [subscribersSheetOpen, setSubscribersSheetOpen] = useState(false);
@@ -225,44 +225,6 @@ export function TopicsTable({
   });
 
   // Handlers
-  const handleCreateTopic = async (data: {
-    name?: string;
-    slug?: string;
-    description?: string | null;
-    public?: boolean;
-    doubleOptIn?: boolean;
-  }) => {
-    if (!data.name) {
-      toast.error("Error", { description: "Name is required" });
-      return;
-    }
-    const name = data.name; // Narrow the type
-    startTransition(async () => {
-      const result = await createTopic(organizationId, {
-        name,
-        slug: data.slug,
-        description: data.description || undefined,
-        public: data.public,
-        doubleOptIn: data.doubleOptIn,
-      });
-      if (result.success) {
-        captureTopicCreated({
-          double_opt_in: Boolean(data.doubleOptIn),
-          public: data.public ?? true,
-        });
-        toast.success("Topic created", {
-          description: `${name} has been created.`,
-        });
-        setCreateDialogOpen(false);
-        router.refresh();
-      } else {
-        toast.error("Error", {
-          description: result.error,
-        });
-      }
-    });
-  };
-
   const handleUpdateTopic = async (data: {
     name?: string;
     slug?: string;
@@ -321,19 +283,20 @@ export function TopicsTable({
   };
 
   return (
-    <div className="w-full space-y-4">
-      {/* Actions Bar */}
-      <div className="flex items-center justify-end">
-        {canEdit && (
-          <Button onClick={() => setCreateDialogOpen(true)} size="sm">
-            <Plus className="mr-2 h-4 w-4" />
-            Create Topic
-          </Button>
-        )}
-      </div>
-
-      {/* Table */}
-      <div className="rounded-md border">
+    // The ruled table runs edge to edge in its panel, as Messages does on
+    // /emails. The count sits in the border so the label is not a third
+    // "Topics" under the h1 and the tab.
+    <Panel
+      className="w-full"
+      label={<PanelTitle>All topics</PanelTitle>}
+      meta={
+        <span className="font-mono text-muted-foreground text-xs">
+          {topics.length.toLocaleString()}{" "}
+          {topics.length === 1 ? "topic" : "topics"}
+        </span>
+      }
+    >
+      <div className="-mx-4">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -413,14 +376,11 @@ export function TopicsTable({
                   <div className="flex flex-col items-center gap-2">
                     <p className="text-muted-foreground">No topics found</p>
                     {canEdit && (
-                      <Button
-                        onClick={() => setCreateDialogOpen(true)}
-                        size="sm"
+                      <CreateTopicButton
+                        label="Create your first topic"
+                        organizationId={organizationId}
                         variant="outline"
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Create your first topic
-                      </Button>
+                      />
                     )}
                   </div>
                 </TableCell>
@@ -429,15 +389,6 @@ export function TopicsTable({
           </TableBody>
         </Table>
       </div>
-
-      {/* Create Dialog */}
-      <TopicFormDialog
-        isPending={isPending}
-        mode="create"
-        onOpenChange={setCreateDialogOpen}
-        onSubmit={handleCreateTopic}
-        open={createDialogOpen}
-      />
 
       {/* Edit Dialog */}
       <TopicFormDialog
@@ -506,6 +457,6 @@ export function TopicsTable({
         organizationId={organizationId}
         topic={selectedTopic}
       />
-    </div>
+    </Panel>
   );
 }

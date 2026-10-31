@@ -18,6 +18,8 @@ import { getCurrentSession } from "@/lib/current-session";
 import { getOrganizationWithMembership } from "@/lib/organization";
 import { checkFeatureAccess, getOrganizationPlan } from "@/lib/plan-limits";
 import { getRequiredPlan, type PlanId } from "@/lib/plans";
+import { CreateTopicButton } from "./components/create-topic-button";
+import { TopicsHeading } from "./components/topics-heading";
 import { TopicsTabs } from "./components/topics-tabs";
 
 type TopicsPageProps = {
@@ -62,14 +64,7 @@ export default async function TopicsPage({ params }: TopicsPageProps) {
   if (!featureCheck.allowed) {
     return (
       <>
-        <div className="px-4 lg:px-6">
-          <div className="flex flex-col gap-2">
-            <h1 className="font-bold text-2xl tracking-tight">Topics</h1>
-            <p className="text-muted-foreground">
-              Manage subscription topics for your audience
-            </p>
-          </div>
-        </div>
+        <TopicsHeading />
         <div className="px-4 lg:px-6">
           <FeatureGate
             currentPlanId={currentPlanId}
@@ -99,16 +94,10 @@ export default async function TopicsPage({ params }: TopicsPageProps) {
 
   // Every page state - error or populated - gets the same heading, so
   // assistive tech and tab-switching always have a page identity (audit F19).
-  const heading = (
-    <div className="px-4 lg:px-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="font-bold text-2xl tracking-tight">Topics</h1>
-        <p className="text-muted-foreground">
-          Manage subscription topics for your audience
-        </p>
-      </div>
-    </div>
-  );
+  // Create Topic only joins it once the topics have loaded.
+  const canEdit =
+    orgWithMembership.userRole === "owner" ||
+    orgWithMembership.userRole === "admin";
 
   // A failed fetch must never fall through to "No topics found" - that is
   // audit finding F6. Read the result before deciding anything about
@@ -117,7 +106,7 @@ export default async function TopicsPage({ params }: TopicsPageProps) {
   if (!topicsResult.success) {
     return (
       <>
-        {heading}
+        <TopicsHeading />
         <div className="px-4 lg:px-6">
           <TopicsLoadError
             isUnauthorized={topicsResult.error === UNAUTHORIZED}
@@ -145,24 +134,26 @@ export default async function TopicsPage({ params }: TopicsPageProps) {
   }
 
   return (
-    <>
-      {heading}
-
-      {/* Topics Tabs */}
-      <div className="@container/main px-4 lg:px-6">
-        <TopicsTabs
-          brandColor={orgWithMembership.brandColor}
-          organizationId={orgWithMembership.id}
-          orgLogo={orgWithMembership.logo}
-          orgName={orgWithMembership.name}
-          orgSlug={orgSlug}
-          settings={settings ?? null}
-          topics={topics}
-          userRole={orgWithMembership.userRole}
-          verifiedDomains={verifiedDomains}
+    <TopicsTabs
+      brandColor={orgWithMembership.brandColor}
+      heading={
+        <TopicsHeading
+          action={
+            canEdit ? (
+              <CreateTopicButton organizationId={orgWithMembership.id} />
+            ) : null
+          }
         />
-      </div>
-    </>
+      }
+      organizationId={orgWithMembership.id}
+      orgLogo={orgWithMembership.logo}
+      orgName={orgWithMembership.name}
+      orgSlug={orgSlug}
+      settings={settings ?? null}
+      topics={topics}
+      userRole={orgWithMembership.userRole}
+      verifiedDomains={verifiedDomains}
+    />
   );
 }
 
