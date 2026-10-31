@@ -18,6 +18,7 @@ import { and, inArray, sql } from "drizzle-orm";
 import { t } from "elysia";
 
 import { log } from "../../lib/logger";
+import { requirePermission } from "../../lib/require-permission";
 import { createAuthenticatedRoutes, getAuth } from "../../middleware/auth";
 import { rateLimitMiddleware } from "../../middleware/rate-limit";
 import {
@@ -42,6 +43,11 @@ const dataSchema = t.Optional(
   )
 );
 
+// Body returned when requirePermission denies the caller.
+const permissionDeniedResponse = t.Object({
+  error: t.String(),
+});
+
 export const workflowsRoutes = createAuthenticatedRoutes("/v1/workflows")
   .use(rateLimitMiddleware)
 
@@ -56,6 +62,10 @@ export const workflowsRoutes = createAuthenticatedRoutes("/v1/workflows")
   .post(
     "/:workflowId/trigger",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "workflows", ["write"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const { params, body } = ctx;
       const auth = getAuth(ctx);
       const { workflowId } = params;
@@ -182,6 +192,7 @@ export const workflowsRoutes = createAuthenticatedRoutes("/v1/workflows")
           contactId: t.Optional(t.String()),
           error: t.Optional(t.String()),
         }),
+        403: permissionDeniedResponse,
       },
       detail: {
         summary: "Trigger workflow",
@@ -202,6 +213,10 @@ export const workflowsRoutes = createAuthenticatedRoutes("/v1/workflows")
   .post(
     "/:workflowId/trigger/batch",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "workflows", ["write"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const { params, body } = ctx;
       const auth = getAuth(ctx);
       const { workflowId } = params;
@@ -384,6 +399,7 @@ export const workflowsRoutes = createAuthenticatedRoutes("/v1/workflows")
           ),
           error: t.Optional(t.String()),
         }),
+        403: permissionDeniedResponse,
       },
       detail: {
         summary: "Batch trigger workflow",
@@ -405,6 +421,10 @@ export const workflowsRoutes = createAuthenticatedRoutes("/v1/workflows")
   .post(
     "/executions/:executionId/retry",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "workflows", ["write"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const { params } = ctx;
       const auth = getAuth(ctx);
       const { executionId } = params;
@@ -589,6 +609,7 @@ export const workflowsRoutes = createAuthenticatedRoutes("/v1/workflows")
           message: t.Optional(t.String()),
           error: t.Optional(t.String()),
         }),
+        403: permissionDeniedResponse,
       },
       detail: {
         summary: "Retry failed execution",
@@ -609,6 +630,10 @@ export const workflowsRoutes = createAuthenticatedRoutes("/v1/workflows")
   .post(
     "/executions/:executionId/cancel",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "workflows", ["write"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const { params } = ctx;
       const auth = getAuth(ctx);
 
@@ -629,6 +654,7 @@ export const workflowsRoutes = createAuthenticatedRoutes("/v1/workflows")
           success: t.Boolean(),
           error: t.Optional(t.String()),
         }),
+        403: permissionDeniedResponse,
       },
       detail: {
         summary: "Cancel workflow execution",

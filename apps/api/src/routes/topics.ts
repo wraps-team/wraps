@@ -99,7 +99,10 @@ function toSubscriberResponse(s: TopicSubscriberView) {
   };
 }
 
-function actorFrom(ctx: { request: Request }, userId: string): TopicActor {
+function actorFrom(
+  ctx: { request: Request },
+  userId: string | null
+): TopicActor {
   const forwarded = ctx.request.headers.get("x-forwarded-for");
   return {
     userId,

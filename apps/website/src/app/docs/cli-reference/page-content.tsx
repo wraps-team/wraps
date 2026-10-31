@@ -306,11 +306,11 @@ const DATA_COMMAND_GROUPS: DataCommandGroup[] = [
       {
         command: "broadcasts update <id>",
         summary:
-          "Edit a scheduled broadcast. Takes the same content flags as broadcasts create, plus --clear-<field>.",
+          "Edit a draft or scheduled broadcast. Takes the same content flags as broadcasts create, plus --clear-<field>.",
         flags: "--clear-<field> unsets a nullable field",
         data: "id, status, name, channel, subject, audienceType, topicId, segmentId, awsAccountId, scheduledFor, updatedFields",
         notes:
-          "On current main the API edits scheduled broadcasts only. A draft is refused with a 400 that names its status, so set a draft's content with broadcasts draft.",
+          "A draft stays a draft and a scheduled broadcast stays scheduled; nothing is sent. Any other status is refused with CONFLICT. Editing a scheduled broadcast with an API key also needs the send:email scope.",
       },
     ],
   },

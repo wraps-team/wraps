@@ -8,6 +8,7 @@
 
 import { Elysia } from "elysia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { FULL_ACCESS_PERMISSIONS } from "../services/api-keys";
 
 const { mockSelectLimit, mockUpdateWhere, mockEnqueueJob } = vi.hoisted(() => ({
   mockSelectLimit: vi.fn(),
@@ -87,6 +88,7 @@ vi.mock("../middleware/auth", () => ({
     new Elysia({ prefix }).derive(() => ({
       auth: {
         apiKeyId: "key-123",
+        apiKeyScopes: [...FULL_ACCESS_PERMISSIONS],
         organizationId: "org-123",
         userId: "user-456",
         planId: "pro",

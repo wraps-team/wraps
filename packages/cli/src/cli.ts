@@ -631,7 +631,7 @@ function showHelp() {
     `  ${pc.cyan("broadcasts duplicate <id>")} Copy any broadcast into a new draft`
   );
   console.log(
-    `  ${pc.cyan("broadcasts update <id>")}    Edit a draft: create's flags, plus --clear-<field> to unset a field\n`
+    `  ${pc.cyan("broadcasts update <id>")}    Edit a draft or scheduled broadcast: create's flags, plus --clear-<field> to unset a field\n`
   );
   console.log(
     `  ${pc.dim("--aws-account-id is the AWS account row id; wraps email health lists each id.")}\n`

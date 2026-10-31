@@ -7,8 +7,9 @@
  *              Needs --yes (or --dry-run, which makes no request).
  * - duplicate: POST /v1/batch/:id/duplicate. Copies any broadcast into a new
  *              draft. Not destructive, so no --yes.
- * - update:    PATCH /v1/batch/:id. Edits a DRAFT only. A non-draft returns 409
- *              naming its status, and the error points at duplicate.
+ * - update:    PATCH /v1/batch/:id. Edits a DRAFT or a SCHEDULED broadcast (the API
+ *              picks the branch by status). Any other status returns 409
+ *              naming it, and the error points at duplicate.
  *
  * broadcasts.ts does not export its helpers (requireYes, mapHttpError,
  * callApi), so the ones these commands need are defined here. That file is
@@ -663,8 +664,8 @@ function conflict(setFlag: string, clearFlag: string): CliError {
 }
 
 /**
- * Edit a DRAFT broadcast. Only the flags passed change. Non-drafts return 409
- * naming their status. Field flags match `broadcasts create`.
+ * Edit a DRAFT or SCHEDULED broadcast. Only the flags passed change. Other
+ * statuses return 409 naming their status. Field flags match `broadcasts create`.
  */
 export async function broadcastsUpdate(
   options: BroadcastsUpdateOptions

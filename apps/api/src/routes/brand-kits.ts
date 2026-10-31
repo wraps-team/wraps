@@ -124,7 +124,10 @@ function toBrandKitResponse(row: BrandKitRow) {
   };
 }
 
-function actorFrom(ctx: { request: Request }, userId: string): BrandKitActor {
+function actorFrom(
+  ctx: { request: Request },
+  userId: string | null
+): BrandKitActor {
   const forwarded = ctx.request.headers.get("x-forwarded-for");
   return {
     userId,

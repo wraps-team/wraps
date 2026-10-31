@@ -40,6 +40,7 @@ import { sql } from "drizzle-orm";
 import { t } from "elysia";
 
 import { log } from "../lib/logger";
+import { requirePermission } from "../lib/require-permission";
 import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
 import {
   checkSegmentEntry,
@@ -396,6 +397,10 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
   .post(
     "/",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "contacts", ["write"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const { body } = ctx;
       const authContext = getAuth(ctx);
 
@@ -646,6 +651,7 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
           ),
         }),
         400: errorResponse,
+        403: errorResponse,
         409: errorResponse,
       },
       detail: {
@@ -659,6 +665,10 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
   .patch(
     "/:id",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "contacts", ["write"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const { params, body } = ctx;
       const authContext = getAuth(ctx);
 
@@ -1092,6 +1102,7 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
             })
           ),
         }),
+        403: errorResponse,
         404: errorResponse,
         409: errorResponse,
       },
@@ -1106,6 +1117,10 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
   .delete(
     "/:id",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "contacts", ["delete"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const { params } = ctx;
       const authContext = getAuth(ctx);
 
@@ -1134,6 +1149,7 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
         200: t.Object({
           success: t.Boolean(),
         }),
+        403: errorResponse,
         404: errorResponse,
       },
       detail: {
@@ -1147,6 +1163,10 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
   .delete(
     "/",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "contacts", ["delete"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const { body } = ctx;
       const authContext = getAuth(ctx);
 
@@ -1179,6 +1199,7 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
           deleted: t.Number({ description: "Number of contacts deleted" }),
         }),
         400: errorResponse,
+        403: errorResponse,
       },
       detail: {
         tags: ["contacts"],

@@ -337,7 +337,7 @@ Reads the emails that each connected AWS account's SES inbound bucket has receiv
 - `wraps broadcasts resume <id> --yes [--from-chunk-index <n>]`. Resumes a stopped broadcast. Data: `id`, `resumed`, `fromChunkIndex`. Can return `RESUME_DISABLED`.
 - `wraps broadcasts cancel <id> --yes [--dry-run]`. Cancels a scheduled, queued or processing broadcast. It calls the existing `DELETE /v1/batch/{id}`; there is no cancel route. Other statuses return `NOT_CANCELLABLE`. Data: `id`, `status`, `cancelled`, `dryRun`.
 - `wraps broadcasts duplicate <id>`. Copies any broadcast into a new draft named `<name> (copy)`. The copy keeps the content, audience and sender, but not the schedule. No `--yes` needed. Data: `id`, `status`, `name`, `sourceId`.
-- `wraps broadcasts update <id> [the content flags of broadcasts create] [--clear-<field>]`. Edits a scheduled broadcast only. On current main the API route behind this command accepts only scheduled broadcasts, so a draft is refused with a 400 that names its status. Set a draft's content with `broadcasts draft` instead. `--clear-<field>` unsets a nullable field. Setting a topic or segment audience, or a schedule, needs the plan that allows it, as `create` does. Data: `id`, `status`, `name`, `channel`, `subject`, `audienceType`, `topicId`, `segmentId`, `awsAccountId`, `scheduledFor`, `updatedFields`.
+- `wraps broadcasts update <id> [the content flags of broadcasts create] [--clear-<field>]`. Edits a draft or a scheduled broadcast. A draft stays a draft and a scheduled broadcast stays scheduled; nothing is sent. Any other status returns 409. `--clear-<field>` unsets a nullable field. Setting a topic or segment audience, or a schedule, needs the plan that allows it, as `create` does. Data: `id`, `status`, `name`, `channel`, `subject`, `audienceType`, `topicId`, `segmentId`, `awsAccountId`, `scheduledFor`, `updatedFields`.
 
 ### Workflow runs
 
@@ -408,6 +408,12 @@ Destructive routes need `confirm=true` in the query string and return 400 withou
 
 Permissions are shown as `resource:action`. Plan requirements are stated per route.
 
+Who the permission applies to depends on how the request authenticates:
+
+- A session (dashboard, or the CLI after `wraps auth login`) is a person. Their role in the organization must allow the action. A `read-only` or `billing` member can read but not change data, and a `marketing` member cannot change segments, topics or workflows.
+- An API key belongs to the organization, not to the person who created it. The key's own scopes, chosen when it was created, must cover the action: `contacts:read` or `contacts:write` for contacts (import counts as write, export as read) and suppressions; `topics:*`, `segments:*` and `workflows:*` for those resources; `campaigns:read` or `campaigns:write` for templates, brand kits and broadcasts; `campaigns:write` plus `send:email` to send or resume a broadcast; `analytics:read` for events. A key created with `--permissions readonly` can read but every write returns 403. A key keeps working after its creator leaves the organization. Keys cannot manage API keys or read the audit log. Any key can still connect or disconnect an AWS account (`wraps platform connect` and `disconnect` in CI), whatever its scopes.
+- A refused request returns 403 with `{"error":"You don't have permission to perform this action"}` and changes nothing.
+
 ### Topics (Pro plan)
 
 - `GET /v1/topics`: list topics with subscriber, sendable and pending counts. Needs `topics:read`. Returns every topic in one response, with no paging.
@@ -438,9 +444,9 @@ Permissions are shown as `resource:action`. Plan requirements are stated per rou
 ### Broadcasts
 
 - `POST /v1/batch/drafts`: create a broadcast draft. Nothing is sent. Body: `channel`, `name`, `subject`, `previewText`, `from`, `fromName`, `replyTo`, `templateId`, `htmlContent`, `variableMappings`, `body`, `senderId`, `recipientFilter`, `awsAccountId`, `scheduledFor`. Returns 201 with the new draft. Every ID in the body (`templateId`, `segmentId`, `topicId`, `awsAccountId`) must belong to the organization. Send the draft with `POST /v1/batch/{id}/send`. Needs `broadcasts:write`.
-- `DELETE /v1/batch/{id}`: cancel a scheduled, queued or processing broadcast. This is the existing route; there is no `/cancel` route.
+- `DELETE /v1/batch/{id}`: cancel a scheduled, queued or processing broadcast. This is the existing route; there is no `/cancel` route. Needs `broadcasts:write`.
 - `POST /v1/batch/{id}/duplicate`: copy any broadcast into a new draft with ` (copy)` added to its name. The schedule is not copied. Needs `broadcasts:write`.
-- `PATCH /v1/batch/{id}`: edit a draft or a scheduled broadcast. Only fields in the body change, and `null` clears a nullable field. Setting `audienceType` or `scheduledFor` applies the plan entitlements that creating a broadcast applies. A scheduled broadcast stays scheduled: `scheduledFor` must be in the future and neither it nor `awsAccountId` can be `null`, and within 60 seconds of the send time it returns 409. Any other status returns 409 with the status. Needs `broadcasts:write`.
+- `PATCH /v1/batch/{id}`: edit a draft or a scheduled broadcast. Only fields in the body change, and `null` clears a nullable field. Setting `audienceType` or `scheduledFor` applies the plan entitlements that creating a broadcast applies. A scheduled broadcast stays scheduled: `scheduledFor` must be in the future and neither it nor `awsAccountId` can be `null`, and within 60 seconds of the send time it returns 409. Any other status returns 409 with the status. A draft edit needs `broadcasts:write`; a scheduled edit also needs `broadcasts:send`.
 
 ### Inbound email
 

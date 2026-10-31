@@ -13,8 +13,11 @@ import { lt } from "drizzle-orm";
 import { t } from "elysia";
 import { trackFirstResourceCreated } from "../lib/activation-tracking";
 import { parseCursorParam } from "../lib/cursor";
+import { requirePermission } from "../lib/require-permission";
 import type { AuthContext } from "../middleware/auth";
 import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
+
+const errorResponse = t.Object({ error: t.String() });
 
 type DbOrTx =
   | typeof db
@@ -25,6 +28,10 @@ export const templatesSyncRoutes = createAuthenticatedRoutes("/v1/templates")
   .post(
     "/push",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "templates", ["write"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const authContext = getAuth(ctx);
       const { body } = ctx;
 
@@ -108,6 +115,7 @@ export const templatesSyncRoutes = createAuthenticatedRoutes("/v1/templates")
         description:
           "Upserts a template compiled from React Email source. Used by `wraps push`.",
       },
+      response: { 403: errorResponse },
     }
   )
 
@@ -115,6 +123,10 @@ export const templatesSyncRoutes = createAuthenticatedRoutes("/v1/templates")
   .post(
     "/push/batch",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "templates", ["write"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const authContext = getAuth(ctx);
       const { body } = ctx;
 
@@ -216,6 +228,7 @@ export const templatesSyncRoutes = createAuthenticatedRoutes("/v1/templates")
         summary: "Push multiple templates from CLI",
         description: "Batch upsert templates compiled from React Email source.",
       },
+      response: { 403: errorResponse },
     }
   )
 

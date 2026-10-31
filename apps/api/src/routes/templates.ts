@@ -45,9 +45,12 @@ import { ilike, lt } from "drizzle-orm";
 import { t } from "elysia";
 import { trackFirstResourceCreated } from "../lib/activation-tracking";
 import { parseCursorParam } from "../lib/cursor";
+import { requirePermission } from "../lib/require-permission";
 import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
 import { rateLimitMiddleware } from "../middleware/rate-limit";
 import { getCredentials } from "../services/credentials";
+
+const errorResponse = t.Object({ error: t.String() });
 
 function sha256hex(source: string): string {
   return createHash("sha256").update(source).digest("hex");
@@ -457,6 +460,10 @@ export const templatesRoutes = createAuthenticatedRoutes("/v1/templates")
   .post(
     "/",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "templates", ["write"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const authContext = getAuth(ctx);
       const { body, set } = ctx;
 
@@ -515,7 +522,11 @@ export const templatesRoutes = createAuthenticatedRoutes("/v1/templates")
           )
         ),
       }),
-      response: { 201: DETAIL_ITEM, 409: CONFLICT_RESPONSE },
+      response: {
+        201: DETAIL_ITEM,
+        403: errorResponse,
+        409: CONFLICT_RESPONSE,
+      },
       detail: {
         tags: ["templates"],
         summary: "Create a template",
@@ -527,6 +538,10 @@ export const templatesRoutes = createAuthenticatedRoutes("/v1/templates")
   .patch(
     "/:id",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "templates", ["write"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const authContext = getAuth(ctx);
       const { params, body, set } = ctx;
 
@@ -608,7 +623,11 @@ export const templatesRoutes = createAuthenticatedRoutes("/v1/templates")
           })
         ),
       }),
-      response: { 200: DETAIL_ITEM, 409: PATCH_CONFLICT_RESPONSE },
+      response: {
+        200: DETAIL_ITEM,
+        403: errorResponse,
+        409: PATCH_CONFLICT_RESPONSE,
+      },
       detail: {
         tags: ["templates"],
         summary: "Update a template",
@@ -620,6 +639,10 @@ export const templatesRoutes = createAuthenticatedRoutes("/v1/templates")
   .post(
     "/:id/publish",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "templates", ["publish"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const authContext = getAuth(ctx);
       const { params, body, set } = ctx;
 
@@ -757,6 +780,7 @@ export const templatesRoutes = createAuthenticatedRoutes("/v1/templates")
           sesTemplateName: t.String(),
           publishedAt: t.String(),
         }),
+        403: errorResponse,
       },
       detail: {
         tags: ["templates"],
@@ -769,6 +793,10 @@ export const templatesRoutes = createAuthenticatedRoutes("/v1/templates")
   .post(
     "/:id/duplicate",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "templates", ["write"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const authContext = getAuth(ctx);
       const { params, set } = ctx;
 
@@ -833,7 +861,7 @@ export const templatesRoutes = createAuthenticatedRoutes("/v1/templates")
     },
     {
       params: t.Object({ id: t.String({ maxLength: 36 }) }),
-      response: { 201: DETAIL_ITEM },
+      response: { 201: DETAIL_ITEM, 403: errorResponse },
       detail: {
         tags: ["templates"],
         summary: "Duplicate a template",

@@ -15,8 +15,8 @@ export type BatchAuditAction =
   | "broadcast.draft_updated";
 
 export type BatchAuditActor = {
-  /** The person behind the request. API keys act as their creator. */
-  userId: string;
+  /** The person behind the request; for an API key, its creator (null once gone). */
+  userId: string | null;
   request: Request;
 };
 
@@ -37,7 +37,10 @@ function auditRequestContext(request: Request) {
   };
 }
 
-async function actorEmail(userId: string): Promise<string | null> {
+async function actorEmail(userId: string | null): Promise<string | null> {
+  if (!userId) {
+    return null;
+  }
   const row = await db.query.user.findFirst({
     where: eq(user.id, userId),
     columns: { email: true },

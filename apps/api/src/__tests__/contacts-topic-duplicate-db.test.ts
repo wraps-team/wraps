@@ -43,9 +43,9 @@ import {
   it,
   vi,
 } from "vitest";
-
 import { contactsRoutes } from "../routes/contacts";
 import { contactsTopicsRoutes } from "../routes/contacts-topics";
+import { FULL_ACCESS_PERMISSIONS } from "../services/api-keys";
 import { emitTopicSubscribed } from "../services/workflow-events";
 
 // ─── Boundary mocks ─────────────────────────────────────────────────────────
@@ -161,6 +161,7 @@ const mockAuth = {
   organizationId: org.id,
   userId: testUser.id,
   planId: "pro",
+  apiKeyScopes: [...FULL_ACCESS_PERMISSIONS],
 };
 
 function createContactsApp() {

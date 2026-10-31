@@ -23,6 +23,7 @@ import { t } from "elysia";
 import { trackAwsConnected } from "../lib/activation-tracking";
 import { log } from "../lib/logger";
 import { isPlanId, type PlanId } from "../lib/plan-ids";
+import { requirePermission } from "../lib/require-permission";
 import { resolveApiUrl } from "../lib/urls";
 import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
 
@@ -64,6 +65,16 @@ export const connectionsRoutes = createAuthenticatedRoutes("/v1/connections")
   .post(
     "/",
     async (ctx) => {
+      // Sessions need awsAccounts write. API keys are deliberately NOT scope-
+      // checked here: `keyScopes: []` lets any key through, so
+      // `wraps platform connect` in CI with WRAPS_API_KEY keeps working.
+      // Follow-up: give this a dedicated key scope and drop the exception.
+      const gate = await requirePermission(ctx, "awsAccounts", ["write"], {
+        keyScopes: [],
+      });
+      if (!gate.ok) {
+        return gate.body;
+      }
       const authContext = getAuth(ctx);
       const { body } = ctx;
 
@@ -227,6 +238,9 @@ export const connectionsRoutes = createAuthenticatedRoutes("/v1/connections")
       };
     },
     {
+      response: {
+        403: t.Object({ error: t.String() }),
+      },
       body: t.Object({
         accountId: t.String({ description: "AWS account ID (12 digits)" }),
         region: t.String({ description: "AWS region (e.g. us-east-1)" }),
@@ -299,6 +313,14 @@ export const connectionsRoutes = createAuthenticatedRoutes("/v1/connections")
   .delete(
     "/:id",
     async (ctx) => {
+      // Same rule as POST /: sessions need awsAccounts write; API keys keep
+      // today's behavior via `keyScopes: []` (follow-up: dedicated scope).
+      const gate = await requirePermission(ctx, "awsAccounts", ["write"], {
+        keyScopes: [],
+      });
+      if (!gate.ok) {
+        return gate.body;
+      }
       const authContext = getAuth(ctx);
       const { id } = ctx.params;
 
@@ -338,6 +360,9 @@ export const connectionsRoutes = createAuthenticatedRoutes("/v1/connections")
       params: t.Object({
         id: t.String({ description: "Connection ID" }),
       }),
+      response: {
+        403: t.Object({ error: t.String() }),
+      },
       detail: {
         tags: ["connections"],
         summary: "Disconnect an AWS account",

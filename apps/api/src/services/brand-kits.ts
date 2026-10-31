@@ -31,7 +31,8 @@ export type ServiceResult<T> = { ok: true; value: T } | ServiceFailure;
 
 /** The person behind the request. Mutations are audited against this. */
 export type BrandKitActor = {
-  userId: string;
+  /** For an API key, its creator (null once gone). */
+  userId: string | null;
   ipAddress: string | null;
   userAgent: string | null;
 };
@@ -67,7 +68,10 @@ function fail(status: ServiceFailure["status"], error: string): ServiceFailure {
   return { ok: false, status, error };
 }
 
-async function actorEmail(userId: string): Promise<string | null> {
+async function actorEmail(userId: string | null): Promise<string | null> {
+  if (!userId) {
+    return null;
+  }
   const [row] = await db
     .select({ email: user.email })
     .from(user)

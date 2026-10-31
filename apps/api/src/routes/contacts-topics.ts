@@ -18,6 +18,7 @@ import { and } from "drizzle-orm";
 import { t } from "elysia";
 
 import { log } from "../lib/logger";
+import { requirePermission } from "../lib/require-permission";
 import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
 import {
   checkSegmentEntry,
@@ -37,6 +38,10 @@ export const contactsTopicsRoutes = createAuthenticatedRoutes("/v1/contacts")
   .put(
     "/:id/topics",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "contacts", ["write"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const { params, body } = ctx;
       const authContext = getAuth(ctx);
 
@@ -319,6 +324,7 @@ export const contactsTopicsRoutes = createAuthenticatedRoutes("/v1/contacts")
           ),
           pendingTopics: t.Optional(t.Array(t.String())),
         }),
+        403: errorResponse,
         404: errorResponse,
       },
       detail: {

@@ -194,18 +194,20 @@ type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
  */
 async function withDraftSavedAudit<T>(
   organizationId: string,
-  actor: { userId: string; request: Request },
+  actor: { userId: string | null; request: Request },
   fn: (tx: DbTransaction) => Promise<T>,
   entry: (result: T) => {
     resourceId: string;
     metadata: Record<string, unknown>;
   }
 ): Promise<T> {
-  const [actorRow] = await db
-    .select({ email: user.email })
-    .from(user)
-    .where(eq(user.id, actor.userId))
-    .limit(1);
+  const [actorRow] = actor.userId
+    ? await db
+        .select({ email: user.email })
+        .from(user)
+        .where(eq(user.id, actor.userId))
+        .limit(1)
+    : [];
   const forwarded = actor.request.headers.get("x-forwarded-for");
   const ipAddress = forwarded ? forwarded.split(",")[0].trim() : null;
   const userAgent = actor.request.headers.get("user-agent");

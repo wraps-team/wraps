@@ -7,6 +7,7 @@
 
 import { Elysia } from "elysia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { FULL_ACCESS_PERMISSIONS } from "../services/api-keys";
 
 const {
   mockListContacts,
@@ -89,6 +90,7 @@ vi.mock("../middleware/auth", () => ({
         organizationId: "org-123",
         userId: "user-123",
         planId: "pro",
+        apiKeyScopes: [...FULL_ACCESS_PERMISSIONS],
       },
       authError: null,
     }))

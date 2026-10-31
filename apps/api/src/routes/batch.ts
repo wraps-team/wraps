@@ -28,6 +28,7 @@ import {
 } from "@wraps/db";
 import { type Static, t } from "elysia";
 import { checkBroadcastEntitlements } from "../lib/plan-features";
+import { requirePermission } from "../lib/require-permission";
 import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
 import { planGateMiddleware } from "../middleware/plan-gate";
 import { rateLimitMiddleware } from "../middleware/rate-limit";
@@ -146,6 +147,7 @@ const batchResponseSchema = t.Object({
 
 // Same shape the segments routes return for an unknown or foreign id.
 const notFoundResponseSchema = t.Object({ error: t.String() });
+const errorResponseSchema = t.Object({ error: t.String() });
 
 /**
  * A `scheduledFor` in the past used to fall through to `isScheduled = false`
@@ -525,6 +527,11 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
       const { body, set } = ctx;
       const authContext = getAuth(ctx);
 
+      const gate = await requirePermission(ctx, "broadcasts", ["send"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
+
       // Validate awsAccountId belongs to the authenticated organization
       const account = await findAwsAccountForOrg(
         body.awsAccountId,
@@ -647,7 +654,11 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
     },
     {
       body: createBatchSchema,
-      response: { 200: batchResponseSchema, 404: notFoundResponseSchema },
+      response: {
+        200: batchResponseSchema,
+        403: errorResponseSchema,
+        404: notFoundResponseSchema,
+      },
       detail: {
         tags: ["batch"],
         summary: "Create batch send",
@@ -991,6 +1002,11 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
       const { body, params, set } = ctx;
       const authContext = getAuth(ctx);
 
+      const gate = await requirePermission(ctx, "broadcasts", ["send"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
+
       // Load the batch scoped by (id, orgId) — without status filter so we can
       // distinguish 404 (no row in org) from 400 (row exists but not draft).
       const existing = await findBroadcast(
@@ -1162,6 +1178,7 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
           status: t.String(),
           warning: t.Optional(t.String()),
         }),
+        403: errorResponseSchema,
       },
       detail: {
         tags: ["batch"],
@@ -1176,6 +1193,11 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
     async (ctx) => {
       const { params, set } = ctx;
       const authContext = getAuth(ctx);
+
+      const gate = await requirePermission(ctx, "broadcasts", ["write"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
 
       // Find the batch (scoped by organization)
       const batch = await findBroadcast(params.id, authContext.organizationId);
@@ -1212,6 +1234,7 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
           id: t.String(),
           status: t.String(),
         }),
+        403: errorResponseSchema,
       },
       detail: {
         tags: ["batch"],
@@ -1226,6 +1249,11 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
     async (ctx) => {
       const { params, body, set } = ctx;
       const authContext = getAuth(ctx);
+
+      const gate = await requirePermission(ctx, "broadcasts", ["send"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
 
       // Kill switch — turn off without a redeploy if resume starts misbehaving.
       if (process.env.BROADCAST_RESUME_ENABLED === "false") {
@@ -1349,6 +1377,9 @@ export const batchRoutes = createAuthenticatedRoutes("/v1/batch")
           ),
         })
       ),
+      response: {
+        403: errorResponseSchema,
+      },
       detail: {
         tags: ["batch"],
         summary: "Resume batch send",
