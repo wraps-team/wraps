@@ -80,8 +80,13 @@ import {
   inboundEmailsList,
 } from "../email/inbound-emails.js";
 import { emailMetrics } from "../email/metrics.js";
-import { suppressionsList, suppressionsRemove } from "../email/suppressions.js";
 import {
+  suppressionsAdd,
+  suppressionsList,
+  suppressionsRemove,
+} from "../email/suppressions.js";
+import {
+  templatesDelete,
   templatesDuplicate,
   templatesGet,
   templatesList,
@@ -263,6 +268,17 @@ const CASES: Case[] = [
       templatesPublish({ id, yes: true, awsAccountId: "acct_1", json: true }),
   },
   {
+    name: "email templates delete",
+    takesId: true,
+    run: (id = "tpl_1") =>
+      templatesDelete({ ids: [id], yes: true, json: true }),
+  },
+  {
+    name: "email templates delete (bulk)",
+    run: (id = "tpl_1") =>
+      templatesDelete({ ids: [id, "tpl_2"], yes: true, json: true }),
+  },
+  {
     name: "workflows disable",
     takesId: true,
     run: (id = "wf_1") => workflowsDisable({ workflowId: id, json: true }),
@@ -317,6 +333,17 @@ const CASES: Case[] = [
       suppressionsRemove({
         email: "a@example.com",
         account: "acc_1",
+        yes: true,
+        json: true,
+      }),
+  },
+  {
+    name: "email suppressions add",
+    run: () =>
+      suppressionsAdd({
+        emails: ["a@example.com"],
+        account: "acc_1",
+        reason: "bounce",
         yes: true,
         json: true,
       }),
