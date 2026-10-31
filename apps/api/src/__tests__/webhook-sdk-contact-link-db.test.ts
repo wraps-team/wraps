@@ -260,6 +260,21 @@ describe("webhook SDK-send contact linking (real DB)", () => {
     expect(row.emailSuppressedAt?.toISOString()).toBe(T0.toISOString());
   });
 
+  it("4b. an OnAccountSuppressionList Bounce as the first event marks the contact suppressed, not bounced", async () => {
+    await post200(
+      buildBounceEvent({
+        mail: mailFor(nextMessageId()),
+        bounceType: "Permanent",
+        bounceSubType: "OnAccountSuppressionList",
+        bouncedAt: T0.toISOString(),
+      })
+    );
+
+    const row = await readContact(fixture.ids.contact);
+    expect(row.emailStatus).toBe("suppressed");
+    expect(row.emailSuppressedAt?.toISOString()).toBe(T0.toISOString());
+  });
+
   it("5. Send then a hard Bounce: the row has no contact before, the contact is bounced after", async () => {
     const messageId = nextMessageId();
     await post200(sendEvent(messageId));

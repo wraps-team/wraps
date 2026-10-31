@@ -696,7 +696,21 @@ export async function queryMessageAttributionRows(
 // the result with has_detail = false.
 
 const REASON_GROUP_LIMIT = 500;
-const SUPPRESSION_SUBTYPES = ["Suppressed", "EmailValidationSuppressed"];
+// Bounce sub-types where SES refused the send itself (no delivery attempt).
+// A copy of SUPPRESSION_BOUNCE_SUBTYPES in packages/core/src/bounce-classification.ts,
+// which this package cannot import. Change both together.
+const SUPPRESSION_SUBTYPES = [
+  "Suppressed",
+  "OnAccountSuppressionList",
+  "OnTenantSuppressionList",
+  "EmailValidationSuppressed",
+];
+/** `bounce_sub_type` is not a suppression. COALESCE so a NULL subtype (a real bounce) is kept. */
+const notSuppressionSubtype = () =>
+  sql`COALESCE(${messageSend.bounceSubType}, '') NOT IN (${sql.join(
+    SUPPRESSION_SUBTYPES.map((subType) => sql`${subType}`),
+    sql`, `
+  )})`;
 
 export type ReasonsMetric = "bounce" | "complaint";
 
@@ -790,10 +804,7 @@ function reasonConditions(query: ReasonsQuery, metric: ReasonsMetric): SQL[] {
   const conditions = reasonWindowConditions(query);
   if (metric === "bounce") {
     conditions.push(isNotNull(messageSend.bouncedAt));
-    // COALESCE: a bare NOT IN is NULL for a NULL subtype and would drop a real bounce.
-    conditions.push(
-      sql`COALESCE(${messageSend.bounceSubType}, '') NOT IN ('Suppressed', 'EmailValidationSuppressed')`
-    );
+    conditions.push(notSuppressionSubtype());
   } else {
     conditions.push(isNotNull(messageSend.complainedAt));
   }
@@ -928,9 +939,7 @@ export async function queryReasonsFallbackSince(
     isNotNull(eventAt),
   ];
   if (metric === "bounce") {
-    conditions.push(
-      sql`COALESCE(${messageSend.bounceSubType}, '') NOT IN ('Suppressed', 'EmailValidationSuppressed')`
-    );
+    conditions.push(notSuppressionSubtype());
   }
 
   const [row] = await dbClient

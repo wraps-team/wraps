@@ -1,7 +1,14 @@
 "use server";
 
 import type { SuppressionListReason } from "@aws-sdk/client-sesv2";
-import { and, awsAccount, db, eq } from "@wraps/db";
+import {
+  and,
+  awsAccount,
+  db,
+  eq,
+  suppressContactByEmail,
+  unsuppressContactByEmail,
+} from "@wraps/db";
 import { revalidatePath } from "next/cache";
 import { normalizeAddressInput } from "@/lib/address-explanation";
 import {
@@ -123,6 +130,13 @@ export const removeSuppression = orgAction(
       return { success: false, error: PERMISSION_DENIED_ERROR };
     }
 
+    // Broadcasts read the contact's status, not the SES list: put a contact
+    // this address's suppression had parked back in the audience.
+    const contactRestored = await unsuppressContactByEmail(
+      organizationId,
+      email
+    );
+
     try {
       await ctx.audited(
         // No DB write here — the mutation already happened against AWS
@@ -137,6 +151,7 @@ export const removeSuppression = orgAction(
             email,
             reason: current.address.reason,
             awsAccountId,
+            contactRestored,
           },
         })
       );
@@ -220,6 +235,9 @@ async function suppressOne(
     (current.address.reason === reason ||
       current.address.reason === "COMPLAINT")
   ) {
+    // SES already has it, but the contact may not: a list entry SES added
+    // itself, or one written before contacts were kept in step. Idempotent.
+    await suppressContactByEmail(organizationId, address);
     return { success: true, email: address, alreadyPresent: true };
   }
 
@@ -234,6 +252,16 @@ async function suppressOne(
     return { success: false, error: PERMISSION_DENIED_ERROR };
   }
 
+  // Broadcasts choose recipients from the contact's status and never read the
+  // SES list, so the contact has to say "suppressed" too or the next broadcast
+  // still sends to it. Outside the audit transaction, so a failed audit write
+  // cannot roll it back; if this throws, the action reports failure and a
+  // retry takes the already-present path above, which repeats it.
+  const contactSuppressed = await suppressContactByEmail(
+    organizationId,
+    address
+  );
+
   try {
     await ctx.audited(
       // No DB write here — the mutation already happened against AWS above.
@@ -247,6 +275,7 @@ async function suppressOne(
           reason,
           awsAccountId,
           source: "manual",
+          contactSuppressed,
         },
       })
     );

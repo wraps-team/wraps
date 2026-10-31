@@ -23,6 +23,30 @@ export const CONTENT_BOUNCE_SUBTYPES = [
 ] as const;
 const CONTENT_SUBTYPES = new Set<string>(CONTENT_BOUNCE_SUBTYPES);
 
+/**
+ * Bounce sub-types SES uses when it refused the send itself, before any
+ * delivery attempt: the SES global list (`Suppressed`), the account's or
+ * tenant's own suppression list, and Auto Validation. They arrive as
+ * `Permanent` bounces but are suppressions, and AWS leaves them out of
+ * Reputation.BounceRate. The event-processor Lambda applies the same rule.
+ *
+ * `packages/db` (message-metrics.ts) keeps a copy of this list for its SQL; it
+ * cannot import this package. Change both together.
+ */
+export const SUPPRESSION_BOUNCE_SUBTYPES = [
+  "Suppressed",
+  "OnAccountSuppressionList",
+  "OnTenantSuppressionList",
+  "EmailValidationSuppressed",
+] as const;
+const SUPPRESSION_SUBTYPES = new Set<string>(SUPPRESSION_BOUNCE_SUBTYPES);
+
+export function isSuppressionBounceSubType(
+  bounceSubType?: string | null
+): boolean {
+  return bounceSubType != null && SUPPRESSION_SUBTYPES.has(bounceSubType);
+}
+
 export function classifyBounce(
   bounceType?: string | null,
   bounceSubType?: string | null

@@ -6,7 +6,10 @@
 
 import { timingSafeEqual } from "node:crypto";
 import { notifyOrg } from "@wraps/auth/notify";
-import { classifyBounce } from "@wraps/core/bounce-classification";
+import {
+  classifyBounce,
+  isSuppressionBounceSubType,
+} from "@wraps/core/bounce-classification";
 import {
   awsAccount,
   batchSend,
@@ -860,15 +863,12 @@ async function processBounce(
     reasonKey: null,
   }
 ): Promise<void> {
-  // Auto Validation (SES Pro/Enterprise, or an add-on elsewhere) drops the
-  // send before any delivery attempt is made, on the strength of a validation
-  // verdict rather than a real bounce. AWS excludes it from
-  // Reputation.BounceRate for that reason, so it is a suppression, not a
-  // bounce, even though it arrives as one (plan 373).
-  if (
-    bounceSubType === "Suppressed" ||
-    bounceSubType === "EmailValidationSuppressed"
-  ) {
+  // SES refused the send before any delivery attempt: the address is on the
+  // SES global list, the account's or tenant's suppression list, or Auto
+  // Validation dropped it (plan 373). AWS excludes these from
+  // Reputation.BounceRate, so they are suppressions, not bounces, even though
+  // they arrive as Bounce events.
+  if (isSuppressionBounceSubType(bounceSubType)) {
     await processSuppression(message, organizationId, bounceSubType, timestamp);
     if (message.contactId) {
       await resumeWaitingExecutions(

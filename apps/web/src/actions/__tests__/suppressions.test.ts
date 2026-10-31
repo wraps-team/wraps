@@ -15,12 +15,14 @@
 import {
   auditLog,
   awsAccount,
+  contact,
   db,
+  hashContactValue,
   member,
   organization,
   user,
 } from "@wraps/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   afterAll,
   beforeAll,
@@ -308,6 +310,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await db
+    .delete(contact)
+    .where(inArray(contact.organizationId, [testOrg.id, otherOrg.id]));
   await db.delete(auditLog).where(eq(auditLog.organizationId, testOrg.id));
   await db.delete(auditLog).where(eq(auditLog.organizationId, otherOrg.id));
   await db.delete(awsAccount).where(eq(awsAccount.id, testAwsAccount.id));
@@ -328,6 +333,9 @@ beforeEach(async () => {
   });
   mockSend.mockReset();
   await db.delete(auditLog).where(eq(auditLog.organizationId, testOrg.id));
+  await db
+    .delete(contact)
+    .where(inArray(contact.organizationId, [testOrg.id, otherOrg.id]));
 });
 
 // ─── removeSuppression ──────────────────────────────────────────────────────
@@ -806,4 +814,188 @@ describe("addSuppressions", () => {
     });
     expect(mockSend).not.toHaveBeenCalled();
   });
+});
+
+// ─── Contact sync ───────────────────────────────────────────────────────────
+// Broadcasts choose recipients from contact.email_status, never from the SES
+// list, so a suppression the dashboard writes to SES has to reach the contact
+// too or the next broadcast still sends to it (and SES reports a bounce).
+
+let contactSeq = 0;
+async function seedContact(
+  email: string,
+  emailStatus:
+    | "active"
+    | "soft_bounced"
+    | "unsubscribed"
+    | "bounced"
+    | "complained"
+    | "suppressed"
+    | null,
+  organizationId: string = testOrg.id
+) {
+  contactSeq += 1;
+  const id = `suppression-296-contact-${contactSeq}`;
+  await db.insert(contact).values({
+    id,
+    organizationId,
+    email,
+    emailHash: hashContactValue(email),
+    emailStatus,
+    createdAt: new Date("2026-01-01"),
+    updatedAt: new Date("2026-01-01"),
+  });
+  return id;
+}
+
+async function contactStatus(id: string) {
+  const [row] = await db
+    .select({
+      emailStatus: contact.emailStatus,
+      emailSuppressedAt: contact.emailSuppressedAt,
+    })
+    .from(contact)
+    .where(eq(contact.id, id));
+  return row;
+}
+
+describe("addSuppression keeps the contact in step", () => {
+  it.each(["active", "soft_bounced", null] as const)(
+    "marks a %s contact with that address suppressed, matching case-insensitively",
+    async (status) => {
+      mockSesState();
+      const id = await seedContact("Sync-Add-296@Example.com", status);
+
+      const result = await addSuppression(
+        testOrg.id,
+        testAwsAccount.id,
+        "sync-add-296@example.com",
+        "BOUNCE"
+      );
+
+      expect(result).toMatchObject({ success: true, alreadyPresent: false });
+      const row = await contactStatus(id);
+      expect(row.emailStatus).toBe("suppressed");
+      expect(row.emailSuppressedAt).toBeInstanceOf(Date);
+      const audit = await addedAuditRows();
+      expect(audit[0].metadata).toMatchObject({ contactSuppressed: true });
+    }
+  );
+
+  it("marks the contact even when SES already had the address (alreadyPresent)", async () => {
+    mockSesState({ existing: "BOUNCE" });
+    const id = await seedContact("sync-present-296@example.com", "active");
+
+    const result = await addSuppression(
+      testOrg.id,
+      testAwsAccount.id,
+      "sync-present-296@example.com",
+      "BOUNCE"
+    );
+
+    expect(result).toMatchObject({ success: true, alreadyPresent: true });
+    expect(callsOf("PutSuppressedDestinationCommand")).toHaveLength(0);
+    expect((await contactStatus(id)).emailStatus).toBe("suppressed");
+  });
+
+  it.each(["unsubscribed", "bounced", "complained"] as const)(
+    "leaves a %s contact as it is: it is already unsendable and that status says more",
+    async (status) => {
+      mockSesState();
+      const id = await seedContact(
+        `sync-keep-${status}-296@example.com`,
+        status
+      );
+
+      await addSuppression(
+        testOrg.id,
+        testAwsAccount.id,
+        `sync-keep-${status}-296@example.com`,
+        "BOUNCE"
+      );
+
+      expect((await contactStatus(id)).emailStatus).toBe(status);
+      const audit = await addedAuditRows();
+      expect(audit[0].metadata).toMatchObject({ contactSuppressed: false });
+    }
+  );
+
+  it("never touches another org's contact with the same address", async () => {
+    mockSesState();
+    const ours = await seedContact("sync-shared-296@example.com", "active");
+    const theirs = await seedContact(
+      "sync-shared-296@example.com",
+      "active",
+      otherOrg.id
+    );
+
+    await addSuppression(
+      testOrg.id,
+      testAwsAccount.id,
+      "sync-shared-296@example.com",
+      "BOUNCE"
+    );
+
+    expect((await contactStatus(ours)).emailStatus).toBe("suppressed");
+    expect((await contactStatus(theirs)).emailStatus).toBe("active");
+  });
+
+  it("addSuppressions marks each address's contact", async () => {
+    mockSesState();
+    const a = await seedContact("sync-batch-a-296@example.com", "active");
+    const b = await seedContact("sync-batch-b-296@example.com", "active");
+
+    await addSuppressions(testOrg.id, [
+      {
+        awsAccountId: testAwsAccount.id,
+        email: "sync-batch-a-296@example.com",
+        reason: "BOUNCE",
+      },
+      {
+        awsAccountId: testAwsAccount.id,
+        email: "sync-batch-b-296@example.com",
+        reason: "BOUNCE",
+      },
+    ]);
+
+    expect((await contactStatus(a)).emailStatus).toBe("suppressed");
+    expect((await contactStatus(b)).emailStatus).toBe("suppressed");
+  });
+});
+
+describe("removeSuppression keeps the contact in step", () => {
+  it("returns a suppressed contact to active, so broadcasts include it again", async () => {
+    mockGetSuppressedDestination("BOUNCE");
+    const id = await seedContact("sync-remove-296@example.com", "suppressed");
+
+    const result = await removeSuppression(
+      testOrg.id,
+      testAwsAccount.id,
+      "sync-remove-296@example.com",
+      false
+    );
+
+    expect(result.success).toBe(true);
+    expect((await contactStatus(id)).emailStatus).toBe("active");
+  });
+
+  it.each(["bounced", "complained", "unsubscribed"] as const)(
+    "leaves a %s contact as it is",
+    async (status) => {
+      mockGetSuppressedDestination("BOUNCE");
+      const id = await seedContact(
+        `sync-remove-${status}-296@example.com`,
+        status
+      );
+
+      await removeSuppression(
+        testOrg.id,
+        testAwsAccount.id,
+        `sync-remove-${status}-296@example.com`,
+        false
+      );
+
+      expect((await contactStatus(id)).emailStatus).toBe(status);
+    }
+  );
 });

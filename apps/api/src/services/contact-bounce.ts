@@ -23,6 +23,7 @@
 
 import {
   classifyBounce,
+  isSuppressionBounceSubType,
   SOFT_BOUNCE_ESCALATION_THRESHOLD,
   SOFT_BOUNCE_MIN_GAP_HOURS,
 } from "@wraps/core/bounce-classification";
@@ -262,10 +263,7 @@ export async function applyLifecycleToContact({
       const bounceType = detail.bounce?.bounceType;
       const bounceSubType = detail.bounce?.bounceSubType;
       const bouncedAt = eventTime(detail.bounce?.timestamp);
-      if (
-        bounceSubType === "Suppressed" ||
-        bounceSubType === "EmailValidationSuppressed"
-      ) {
+      if (isSuppressionBounceSubType(bounceSubType)) {
         await markContactSuppressed({
           organizationId,
           contactId,

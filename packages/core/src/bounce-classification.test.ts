@@ -3,6 +3,8 @@ import {
   type BounceKind,
   CONTENT_BOUNCE_SUBTYPES,
   classifyBounce,
+  isSuppressionBounceSubType,
+  SUPPRESSION_BOUNCE_SUBTYPES,
 } from "./bounce-classification";
 
 describe("classifyBounce", () => {
@@ -34,6 +36,39 @@ describe("classifyBounce", () => {
       "MessageTooLarge",
       "ContentRejected",
       "AttachmentRejected",
+    ]);
+  });
+});
+
+describe("isSuppressionBounceSubType", () => {
+  it.each([
+    "Suppressed",
+    "OnAccountSuppressionList",
+    "OnTenantSuppressionList",
+    "EmailValidationSuppressed",
+  ])("%s is a suppression: SES never attempted delivery", (subType) => {
+    expect(isSuppressionBounceSubType(subType)).toBe(true);
+  });
+
+  it.each([
+    "General",
+    "NoEmail",
+    "MailboxFull",
+    "Undetermined",
+    "onaccountsuppressionlist",
+    "",
+    null,
+    undefined,
+  ])("%s is not a suppression", (subType) => {
+    expect(isSuppressionBounceSubType(subType)).toBe(false);
+  });
+
+  it("exports the same sub-types the predicate accepts", () => {
+    expect([...SUPPRESSION_BOUNCE_SUBTYPES]).toEqual([
+      "Suppressed",
+      "OnAccountSuppressionList",
+      "OnTenantSuppressionList",
+      "EmailValidationSuppressed",
     ]);
   });
 });

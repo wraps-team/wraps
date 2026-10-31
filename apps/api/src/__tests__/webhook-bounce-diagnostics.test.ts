@@ -306,11 +306,16 @@ describe("Webhook: Bounce diagnostics", () => {
     expect(diagnosticUpserts[1].values.enhancedStatus).toBe("5.7.1");
   });
 
-  it("suppressed-subtype Bounce writes no diagnostic row", async () => {
+  it.each([
+    "Suppressed",
+    "OnAccountSuppressionList",
+    "OnTenantSuppressionList",
+    "EmailValidationSuppressed",
+  ])("%s Bounce writes no diagnostic row", async (bounceSubType) => {
     const response = await sendWebhookEvent(
       app,
       buildBounceEvent({
-        bounceSubType: "Suppressed",
+        bounceSubType,
         status: "5.1.1",
         diagnosticCode: "smtp; 550 5.1.1 user unknown",
       })
@@ -348,7 +353,12 @@ describe("Webhook: Bounce diagnostics", () => {
     );
   });
 
-  it("SDK-path suppression-subtype Bounce writes no diagnostic row", async () => {
+  it.each([
+    "Suppressed",
+    "OnAccountSuppressionList",
+    "OnTenantSuppressionList",
+    "EmailValidationSuppressed",
+  ])("SDK-path %s Bounce writes no diagnostic row", async (bounceSubType) => {
     setupMocks({
       message: null,
       sdkInsertRows: [{ id: "sdk-send-2" }],
@@ -357,7 +367,7 @@ describe("Webhook: Bounce diagnostics", () => {
     const response = await sendWebhookEvent(
       app,
       buildBounceEvent({
-        bounceSubType: "EmailValidationSuppressed",
+        bounceSubType,
         status: "5.1.1",
         diagnosticCode: "smtp; 550 5.1.1 user unknown",
       })

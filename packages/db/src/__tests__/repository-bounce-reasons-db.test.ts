@@ -240,6 +240,14 @@ beforeAll(async () => {
     bounceType: "Permanent",
     bounceSubType: "EmailValidationSuppressed",
   });
+  seed({
+    organizationId: ORG,
+    recipient: "h@example.org",
+    sentAt: sent,
+    bouncedAt: bounced,
+    bounceType: "Permanent",
+    bounceSubType: "OnAccountSuppressionList",
+  });
 
   // Complaints: one with a null feedback type on a recorded row, one with a type.
   seed({
@@ -369,17 +377,18 @@ describe("bounce and complaint reasons repository (DB)", () => {
     ).toBe(true);
   });
 
-  it("reasons query excludes Suppressed and EmailValidationSuppressed subtypes", async () => {
+  it("reasons query excludes every suppression subtype", async () => {
     const rows = await queryBounceReasonRows(ALL_TIME);
     expect(
       rows.some(
         (row) =>
           row.bounceSubType === "Suppressed" ||
-          row.bounceSubType === "EmailValidationSuppressed"
+          row.bounceSubType === "EmailValidationSuppressed" ||
+          row.bounceSubType === "OnAccountSuppressionList"
       )
     ).toBe(false);
     const suppressions = await queryReasonsSuppressionCount(ALL_TIME);
-    expect(suppressions).toBe(2);
+    expect(suppressions).toBe(3);
   });
 
   it("a bounce with a NULL bounce_sub_type is kept by the reasons query", async () => {
