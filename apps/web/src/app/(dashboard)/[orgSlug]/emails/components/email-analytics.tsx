@@ -20,8 +20,14 @@ import {
 import { countYAxisProps } from "@/lib/chart-axis";
 import { SERIES_COLOR } from "@/lib/chart-series";
 import { HUB_RANGES } from "@/lib/emails-hub";
+import {
+  formatThreshold,
+  meterGeometry,
+  SES_THRESHOLDS,
+} from "@/lib/ses-thresholds";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { cn } from "@/lib/utils";
+import { LEVEL_TEXT, ThresholdBar } from "../../components/ses-survival-strip";
 import { useEmailChartData } from "../analytics/hooks/use-analytics";
 import { captureEmailsErrorRetried } from "../lib/analytics";
 import { ReputationScope, UpdatedAgo } from "./summary-rail";
@@ -130,9 +136,9 @@ const chartConfig: ChartConfig = {
  * The plot used to be pinned at 280px beside a text column that rendered
  * anywhere from 340px to 480px depending on which conditional lines the
  * reputation tile owed the reader - so the chart sat in a cell up to 180px
- * taller than itself and no single number could have fixed it. The summary is
- * a horizontal rail now, so the chart owns the full width and this height is
- * the only one in play.
+ * taller than itself. The account panel beside it is now shorter than the
+ * chart at every width and spreads its rows to the chart's height, so this is
+ * the height that sets the row and the only one in play.
  */
 const PLOT_HEIGHT = "h-[260px] @[540px]/card:h-[320px]";
 
@@ -158,7 +164,7 @@ function Stat({
   className?: string;
 }) {
   return (
-    <div className={cn("py-3", className)}>
+    <div className={cn("flex flex-col justify-center py-3", className)}>
       <div className="font-mono text-2xs text-muted-foreground uppercase tracking-eyebrow">
         {label}
       </div>
@@ -175,25 +181,93 @@ function Stat({
 }
 
 /**
- * The account's figures as a 2x2 ruled grid. Two populations, split by the
- * rule between the rows: the top row counts the selected window, the bottom
- * row is the account's all-time reputation, which the source line's scope
- * popover explains. A reader who assumes the bounce rate is window-scoped will
- * misread it, so the split is carried by the rule and by the window in the top
- * labels.
+ * A reputation rate, drawn against the lines where AWS reviews and pauses the
+ * account when the rate is SES's own. A bare "0.05%" left the reader to know
+ * that AWS reviews at 5%; the bar says how much room is left.
+ *
+ * `value` is a percentage (0.05 = 0.05%), as the chart payload carries it; the
+ * thresholds are decimals. Window arithmetic is a different population from
+ * the one AWS enforces on, so it gets the number without the lines.
+ */
+function RateStat({
+  label,
+  value,
+  digits,
+  thresholds,
+}: {
+  label: string;
+  value: number;
+  digits: number;
+  thresholds: { review: number; pause: number } | null;
+}) {
+  const geometry = thresholds
+    ? meterGeometry(value / 100, thresholds.review, thresholds.pause)
+    : null;
+
+  return (
+    <div className="flex flex-1 flex-col justify-center border-t py-3">
+      {/*
+        One line at every width: a second line here would push the panel past
+        the chart's height at narrow desktop widths, where there is no slack.
+        When the words do not fit, the coloured ticks carry them.
+      */}
+      <div className="flex items-baseline justify-between gap-4 whitespace-nowrap font-mono text-2xs text-muted-foreground uppercase tracking-eyebrow">
+        <span>{label}</span>
+        {thresholds ? (
+          <span className="tabular-nums">
+            <span className="hidden @[20rem]/account:inline">Review </span>
+            {formatThreshold(thresholds.review)} ·{" "}
+            <span className="hidden @[20rem]/account:inline">pause </span>
+            {formatThreshold(thresholds.pause)}
+          </span>
+        ) : null}
+      </div>
+      <div className="mt-1.5 flex items-center gap-4">
+        <span
+          className={cn(
+            "font-heading font-semibold text-2xl leading-none tabular-nums",
+            geometry ? LEVEL_TEXT[geometry.level] : null
+          )}
+        >
+          {value.toFixed(digits)}%
+        </span>
+        {geometry ? (
+          // The default muted track all but vanishes on the panel's tint.
+          <ThresholdBar
+            className="min-w-0 flex-1 bg-foreground/10"
+            geometry={geometry}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The account's figures as ruled rows. Two populations, split by the rule
+ * under the top row: the top row counts the selected window, the rates below
+ * are the account's all-time reputation, which the source line's scope popover
+ * explains. A reader who assumes the bounce rate is window-scoped will misread
+ * it, so the split is carried by the rule and by the window in the top labels.
+ *
+ * Beside the chart the panel is stretched to the chart's height, so every row
+ * takes an equal share of it rather than leaving the slack under the last one.
  */
 function AccountFigures({
   overview,
   rangeShort,
   reputationPartial,
+  rated,
 }: {
   overview: AccountOverview;
   rangeShort: string;
   reputationPartial: string | null;
+  /** The rates are SES's own, so AWS's enforcement lines apply to them. */
+  rated: boolean;
 }) {
   return (
-    <div>
-      <div className="grid grid-cols-2">
+    <div className="flex flex-1 flex-col">
+      <div className="grid flex-1 grid-cols-2">
         <Stat
           label={`Sent · ${rangeShort}`}
           value={(overview?.totalSent ?? 0).toLocaleString()}
@@ -204,17 +278,19 @@ function AccountFigures({
           label={`Delivered · ${rangeShort}`}
           value={(overview?.totalDelivered ?? 0).toLocaleString()}
         />
-        <Stat
-          className="border-t"
-          label="Bounce rate"
-          value={`${(overview?.bounceRate ?? 0).toFixed(2)}%`}
-        />
-        <Stat
-          className="border-t border-l pl-4"
-          label="Complaint rate"
-          value={`${(overview?.complaintRate ?? 0).toFixed(3)}%`}
-        />
       </div>
+      <RateStat
+        digits={2}
+        label="Bounce rate"
+        thresholds={rated ? SES_THRESHOLDS.bounce : null}
+        value={overview?.bounceRate ?? 0}
+      />
+      <RateStat
+        digits={3}
+        label="Complaint rate"
+        thresholds={rated ? SES_THRESHOLDS.complaint : null}
+        value={overview?.complaintRate ?? 0}
+      />
       {/*
         Stays on the surface rather than going into the popover: a rate
         computed from an incomplete set of AWS accounts is a caveat about the
@@ -523,21 +599,23 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
       </Panel>
 
       <Panel
-        className="lg:col-span-2"
+        className="@container/account flex flex-col lg:col-span-2"
         label={<PanelTitle>Your SES account</PanelTitle>}
         variant="own"
       >
         {isLoading && (
-          <div className="grid grid-cols-2 gap-4 py-3">
-            <Skeleton className="h-11" />
-            <Skeleton className="h-11" />
+          <div className="flex flex-1 flex-col justify-around gap-4 py-3">
+            <div className="grid grid-cols-2 gap-4">
+              <Skeleton className="h-11" />
+              <Skeleton className="h-11" />
+            </div>
             <Skeleton className="h-11" />
             <Skeleton className="h-11" />
           </div>
         )}
 
         {!isLoading && isError && (
-          <p className="py-3 text-muted-foreground text-sm">
+          <p className="flex-1 py-3 text-muted-foreground text-sm">
             These figures did not load. Retry from the activity panel.
           </p>
         )}
@@ -546,6 +624,7 @@ export function EmailAnalytics({ orgSlug }: EmailAnalyticsProps) {
           <AccountFigures
             overview={overview}
             rangeShort={range.short}
+            rated={meta?.reputationScope === "ses-account"}
             reputationPartial={reputationPartial}
           />
         )}

@@ -219,4 +219,42 @@ describe("EmailAnalytics", () => {
       screen.getByText(/1 of 3 AWS accounts did not report reputation/i)
     ).toBeInTheDocument();
   });
+
+  it("draws the SES rates against AWS's review and pause lines", () => {
+    // The payload carries percentages (6 = 6%) and the lines are decimals: a
+    // 6% bounce rate sits 48% along a bar that ends at 125% of the 10% pause
+    // line. Read as a decimal it would pin the bar at 100%.
+    const data = payload(
+      [{ date: "2026-08-17", sent: 5, delivered: 5, opens: 1, clicks: 0 }],
+      {}
+    );
+    data.overview.bounceRate = 6;
+    queryResult.data = data;
+
+    const { container } = render(<EmailAnalytics orgSlug="acme" />);
+
+    // The words are split into spans so a narrow panel can drop them.
+    expect(container.textContent).toMatch(/review 5% · pause 10%/i);
+    expect(container.textContent).toMatch(/review 0\.1% · pause 0\.5%/i);
+    const fills = container.querySelectorAll<HTMLElement>(
+      '[data-slot="threshold-fill"]'
+    );
+    expect(fills).toHaveLength(2);
+    expect(fills[0]?.style.width).toBe("48%");
+  });
+
+  it("leaves AWS's lines off a rate computed from the window", () => {
+    // Window arithmetic is not the population AWS enforces on.
+    queryResult.data = payload(
+      [{ date: "2026-08-17", sent: 5, delivered: 5, opens: 1, clicks: 0 }],
+      { reputationScope: "window" }
+    );
+
+    const { container } = render(<EmailAnalytics orgSlug="acme" />);
+
+    expect(container.textContent).not.toMatch(/review 5%/i);
+    expect(
+      container.querySelector('[data-slot="threshold-bar"]')
+    ).not.toBeInTheDocument();
+  });
 });

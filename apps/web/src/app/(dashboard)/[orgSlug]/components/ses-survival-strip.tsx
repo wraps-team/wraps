@@ -11,6 +11,7 @@ import { useSesHealth } from "@/hooks/use-ses-health-queries";
 import {
   formatRate,
   formatThreshold,
+  type MeterGeometry,
   type MeterLevel,
   meterGeometry,
   SES_THRESHOLDS,
@@ -23,11 +24,43 @@ const LEVEL_FILL: Record<MeterLevel, string> = {
   pause: "bg-destructive",
 };
 
-const LEVEL_TEXT: Record<MeterLevel, string> = {
+export const LEVEL_TEXT: Record<MeterLevel, string> = {
   ok: "text-foreground",
   review: "text-warning",
   pause: "text-destructive",
 };
+
+/** The bar with AWS's review and pause ticks. `meterGeometry` lays it out. */
+export function ThresholdBar({
+  geometry,
+  className,
+}: {
+  geometry: MeterGeometry;
+  className?: string;
+}) {
+  const { valuePct, reviewPct, pausePct, level } = geometry;
+  return (
+    <div
+      aria-hidden="true"
+      className={cn("relative h-1.5 w-full bg-muted", className)}
+      data-slot="threshold-bar"
+    >
+      <div
+        className={cn("h-full", LEVEL_FILL[level])}
+        data-slot="threshold-fill"
+        style={{ width: `${valuePct}%` }}
+      />
+      <span
+        className="absolute top-[-2px] h-[10px] w-px bg-warning/70"
+        style={{ left: `${reviewPct}%` }}
+      />
+      <span
+        className="absolute top-[-2px] h-[10px] w-px bg-destructive/70"
+        style={{ left: `${pausePct}%` }}
+      />
+    </div>
+  );
+}
 
 /**
  * One rate drawn against AWS's own review and pause lines.
@@ -61,36 +94,20 @@ export function RateMeter({
     );
   }
 
-  const { valuePct, reviewPct, pausePct, level } = meterGeometry(
-    value,
-    review,
-    pause
-  );
+  const geometry = meterGeometry(value, review, pause);
 
   return (
     <div className="space-y-1.5">
       <p className="text-muted-foreground text-xs">{label}</p>
       <p
-        className={cn("font-semibold text-lg tabular-nums", LEVEL_TEXT[level])}
+        className={cn(
+          "font-semibold text-lg tabular-nums",
+          LEVEL_TEXT[geometry.level]
+        )}
       >
         {formatRate(value, digits)}
       </p>
-      <div className="relative h-1.5 w-full bg-muted">
-        <div
-          className={cn("h-full", LEVEL_FILL[level])}
-          style={{ width: `${valuePct}%` }}
-        />
-        <span
-          aria-hidden="true"
-          className="absolute top-[-2px] h-[10px] w-px bg-warning/70"
-          style={{ left: `${reviewPct}%` }}
-        />
-        <span
-          aria-hidden="true"
-          className="absolute top-[-2px] h-[10px] w-px bg-destructive/70"
-          style={{ left: `${pausePct}%` }}
-        />
-      </div>
+      <ThresholdBar geometry={geometry} />
       <p className="text-muted-foreground text-xs tabular-nums">
         review {formatThreshold(review)} · pause {formatThreshold(pause)}
       </p>
