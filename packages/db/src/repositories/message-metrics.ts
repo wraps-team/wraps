@@ -175,8 +175,16 @@ function periodExpr(
   }
 }
 
+/**
+ * Sending domain of `from`. Display-form "Name <a@b.com>" (SDK and broadcast
+ * sends) reduces to the bracketed address first; a plain split_part would
+ * yield "b.com>" and split one domain into two groups. Literal regex text, not
+ * a bound parameter, so SELECT and GROUP BY stay identical.
+ */
 function domainExpr(): SQL<string | null> {
-  return sql<string | null>`lower(split_part(${messageSend.from}, '@', 2))`;
+  return sql<
+    string | null
+  >`lower(btrim(split_part(coalesce(substring(${messageSend.from} from '<([^>]+)>'), ${messageSend.from}), '@', 2)))`;
 }
 
 function buildWhereConditions(query: MetricsQuery): SQL[] {
@@ -574,10 +582,9 @@ function attributionKey(by: AttributionBy): DimensionColumn {
     case "template":
       return messageSend.emailTemplateId;
     default:
-      // Display-form "Name <addr>" from SDK sends reduces to the address; the
-      // domainExpr split_part would otherwise yield "b.com>". Literal regex
-      // text, not a bound parameter: a `$n` would differ between SELECT and
-      // GROUP BY and Postgres rejects the query.
+      // Display-form "Name <addr>" from SDK sends reduces to the address, as
+      // in domainExpr. Literal regex text, not a bound parameter: a `$n` would
+      // differ between SELECT and GROUP BY and Postgres rejects the query.
       return sql`lower(coalesce(substring(${messageSend.from} from '<([^>]+)>'), ${messageSend.from}))`;
   }
 }

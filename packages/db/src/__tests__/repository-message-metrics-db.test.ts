@@ -244,6 +244,14 @@ function seedDomainShape(organizationId: string, awsAccountId: string) {
     sentAt: new Date("2026-08-27T02:00:00Z"),
     from: "b@two.example",
   });
+  // Display-name form, as SDK and broadcast sends store it: the domain is
+  // inside the angle brackets, and the closing ">" must not reach the group.
+  seed({
+    ...base,
+    status: "sent",
+    sentAt: new Date("2026-08-27T02:30:00Z"),
+    from: "Wraps Team <c@Two.example>",
+  });
   seed({
     ...base,
     status: "sent",
@@ -601,6 +609,32 @@ describe("Repository: message metrics", () => {
     expect(domains).toContain("two.example");
     expect(domains).toContain(null);
     expect(rows).toHaveLength(3);
+  });
+
+  it("domain dimension — a display-name sender groups with its bare address", async () => {
+    const rows = await queryMessageMetricBuckets({
+      organizationId: ORG_A,
+      startTime: DAY27_START,
+      endTime: DAY27_END,
+      dimensions: ["domain"],
+    });
+
+    const two = rows.find((r) => r.domain === "two.example");
+    expect(two?.sent).toBe(2);
+    expect(rows.some((r) => r.domain?.endsWith(">"))).toBe(false);
+  });
+
+  it("domain filter matches a display-name sender", async () => {
+    const rows = await queryMessageMetricBuckets({
+      organizationId: ORG_A,
+      startTime: DAY27_START,
+      endTime: DAY27_END,
+      dimensions: ["domain"],
+      domain: ["two.example"],
+    });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.sent).toBe(2);
   });
 
   it("broadcast dimension + broadcastId filter", async () => {
