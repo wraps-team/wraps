@@ -355,7 +355,11 @@ function parseSocialLinks(raw: string): Parsed<SocialLink[]> {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
-  } catch {
+  } catch (error) {
+    // Only a parse failure is the user's input to fix; anything else is a bug.
+    if (!(error instanceof SyntaxError)) {
+      throw error;
+    }
     return {
       ok: false,
       error: invalidValue(
