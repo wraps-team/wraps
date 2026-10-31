@@ -7,7 +7,8 @@
 
 import "@testing-library/jest-dom/vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MetricReasonsCard } from "../metric-reasons-card";
@@ -70,11 +71,17 @@ function response(overrides: Partial<ReasonsResponse> = {}): ReasonsResponse {
   };
 }
 
-function renderCard(metric: "bounce" | "complaint") {
+function renderCard(
+  metric: "bounce" | "complaint",
+  onUrlUpdate: (event: { searchParams: URLSearchParams }) => void = () => {}
+) {
   const client = new QueryClient();
   return render(
     <QueryClientProvider client={client}>
-      <NuqsTestingAdapter searchParams={{ days: "30" }}>
+      <NuqsTestingAdapter
+        onUrlUpdate={onUrlUpdate}
+        searchParams={{ days: "30" }}
+      >
         <MetricReasonsCard metric={metric} orgSlug="acme" />
       </NuqsTestingAdapter>
     </QueryClientProvider>
@@ -252,5 +259,68 @@ describe("MetricReasonsCard for complaints", () => {
     expect(
       screen.getByText("No complaints in this window.")
     ).toBeInTheDocument();
+  });
+});
+
+describe("MetricReasonsCard reason links", () => {
+  it("opens the hard list narrowed to a hard reason, and scrolls to it", async () => {
+    const user = userEvent.setup();
+    const onUrlUpdate = vi.fn();
+    const target = document.createElement("section");
+    target.id = "addresses-to-review";
+    target.scrollIntoView = vi.fn();
+    document.body.append(target);
+
+    renderCard("bounce", onUrlUpdate);
+    await user.click(
+      screen.getByRole("button", {
+        name: "Show addresses that bounced for Address does not exist",
+      })
+    );
+
+    await waitFor(() => expect(onUrlUpdate).toHaveBeenCalled());
+    const params = onUrlUpdate.mock.calls.at(-1)?.[0].searchParams;
+    expect(params.get("list")).toBe("hard");
+    expect(params.get("reason")).toBe("Address does not exist");
+    expect(target.scrollIntoView).toHaveBeenCalled();
+    target.remove();
+  });
+
+  it("opens the soft list for a soft reason", async () => {
+    const user = userEvent.setup();
+    const onUrlUpdate = vi.fn();
+    renderCard("bounce", onUrlUpdate);
+    await user.click(
+      screen.getByRole("button", {
+        name: "Show addresses that bounced for Server unreachable",
+      })
+    );
+    await waitFor(() => expect(onUrlUpdate).toHaveBeenCalled());
+    const params = onUrlUpdate.mock.calls.at(-1)?.[0].searchParams;
+    expect(params.get("list")).toBe("soft");
+    expect(params.get("reason")).toBe("Server unreachable");
+  });
+
+  it("leaves Other and complaint reasons as plain text", () => {
+    renderCard("bounce");
+    expect(
+      screen.queryByRole("button", { name: /bounced for Other/ })
+    ).toBeNull();
+    cleanup();
+    state.reasons = response({
+      metric: "complaint",
+      totalCount: 3,
+      groups: [
+        reason({
+          title: "Abuse",
+          bounceType: null,
+          feedbackType: "abuse",
+          count: 3,
+        }),
+      ],
+    });
+    renderCard("complaint");
+    expect(screen.getByText("Abuse")).toBeInTheDocument();
+    expect(screen.queryByRole("button")).toBeNull();
   });
 });

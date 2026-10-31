@@ -9,13 +9,19 @@ import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "../index";
 import {
+  type BounceReasonMatch,
   isRecommended,
   queryReviewAddressCounts,
   queryReviewAddresses,
   type ReviewAddressRow,
   type ReviewClassification,
 } from "../repositories/address-review";
-import { awsAccount, messageSend, organization } from "../schema";
+import {
+  awsAccount,
+  messageSend,
+  messageSendDiagnostic,
+  organization,
+} from "../schema";
 
 const suffix = crypto.randomUUID().slice(0, 8);
 const ORG_A = `address-review-org-a-${suffix}`;
@@ -512,5 +518,167 @@ describe("paging, ordering and counts", () => {
     expect(counts.complaint).toBe(
       all.filter((row) => row.complaints > 0).length
     );
+  });
+});
+
+describe("bounce reason filter", () => {
+  const KEY = "gmail|5.1.1|Bad destination mailbox address";
+
+  async function seedDiagnostic(
+    messageSendId: string,
+    reasonKey: string | null,
+    organizationId = ORG_A
+  ) {
+    await db.insert(messageSendDiagnostic).values({
+      messageSendId,
+      organizationId,
+      eventType: "bounce",
+      reasonKey,
+    });
+  }
+
+  function addressesFor(reasons: BounceReasonMatch[], kind?: "soft" | "hard") {
+    return queryA({ kind, bounceReasons: reasons }).then(({ rows }) =>
+      rows.map((row) => row.address)
+    );
+  }
+
+  it("keeps only addresses with a bounce in a matching reason group", async () => {
+    const matched = "reason-match-review@example.com";
+    const other = "reason-other-review@example.com";
+    const matchedId = await seedSend({
+      recipient: matched,
+      bouncedAt: INSIDE,
+      bounceType: "Permanent",
+      bounceSubType: "General",
+    });
+    await seedDiagnostic(matchedId, KEY);
+    const otherId = await seedSend({
+      recipient: other,
+      bouncedAt: INSIDE,
+      bounceType: "Permanent",
+      bounceSubType: "General",
+    });
+    await seedDiagnostic(otherId, "|5.2.2|Mailbox full");
+
+    const addresses = await addressesFor(
+      [
+        {
+          reasonKey: KEY,
+          hasDetail: true,
+          bounceType: "Permanent",
+          bounceSubType: "General",
+        },
+      ],
+      "hard"
+    );
+    expect(addresses).toContain(matched);
+    expect(addresses).not.toContain(other);
+  });
+
+  it("matches a bounce with no diagnostic row by its null reason and sub-type", async () => {
+    const legacy = "reason-legacy-review@example.com";
+    const detailed = "reason-legacy-detailed-review@example.com";
+    await seedSend({
+      recipient: legacy,
+      bouncedAt: INSIDE,
+      bounceType: "Permanent",
+      bounceSubType: "NoEmail",
+    });
+    const detailedId = await seedSend({
+      recipient: detailed,
+      bouncedAt: INSIDE,
+      bounceType: "Permanent",
+      bounceSubType: "NoEmail",
+    });
+    await seedDiagnostic(detailedId, null);
+
+    const addresses = await addressesFor(
+      [
+        {
+          reasonKey: null,
+          hasDetail: false,
+          bounceType: "Permanent",
+          bounceSubType: "NoEmail",
+        },
+      ],
+      "hard"
+    );
+    expect(addresses).toContain(legacy);
+    // Same null reason, but a diagnostic row exists: a different group.
+    expect(addresses).not.toContain(detailed);
+  });
+
+  it("lists no one for a content soft bounce, which is about the message", async () => {
+    const address = "reason-too-large-review@example.com";
+    await seedSend({
+      recipient: address,
+      bouncedAt: INSIDE,
+      bounceType: "Transient",
+      bounceSubType: "MessageTooLarge",
+    });
+    expect(await rowFor(address, "soft")).toBeUndefined();
+    expect(
+      await addressesFor(
+        [
+          {
+            reasonKey: null,
+            hasDetail: false,
+            bounceType: "Transient",
+            bounceSubType: "MessageTooLarge",
+          },
+        ],
+        "soft"
+      )
+    ).not.toContain(address);
+  });
+
+  it("requires the bounce to be of the list's kind", async () => {
+    const address = "reason-kind-review@example.com";
+    await seedSend({
+      recipient: address,
+      bouncedAt: INSIDE,
+      bounceType: "Transient",
+      bounceSubType: "MailboxFull",
+    });
+    const reasons: BounceReasonMatch[] = [
+      {
+        reasonKey: null,
+        hasDetail: false,
+        bounceType: "Transient",
+        bounceSubType: "MailboxFull",
+      },
+    ];
+    expect(await addressesFor(reasons, "soft")).toContain(address);
+    expect(await addressesFor(reasons, "hard")).not.toContain(address);
+  });
+
+  it("matches nothing for an empty list", async () => {
+    expect(await addressesFor([], "hard")).toEqual([]);
+  });
+
+  it("never returns a matching bounce from another organization", async () => {
+    const address = "reason-isolation-review@example.com";
+    const id = await seedSend({
+      organizationId: ORG_B,
+      recipient: address,
+      bouncedAt: INSIDE,
+      bounceType: "Permanent",
+      bounceSubType: "General",
+    });
+    await seedDiagnostic(id, KEY, ORG_B);
+    expect(
+      await addressesFor(
+        [
+          {
+            reasonKey: KEY,
+            hasDetail: true,
+            bounceType: "Permanent",
+            bounceSubType: "General",
+          },
+        ],
+        "hard"
+      )
+    ).not.toContain(address);
   });
 });

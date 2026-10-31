@@ -8,10 +8,15 @@
  */
 
 import {
+  describeBounceSubtype,
+  translateDiagnosticCode,
+} from "@wraps/core/email-diagnostics";
+import {
   awsAccount,
   db,
   member,
   messageSend,
+  messageSendDiagnostic,
   organization,
   user,
 } from "@wraps/db";
@@ -564,6 +569,132 @@ describe("single-kind lists", () => {
         result.rows.find((row) => row.address === address)
       ).toBeUndefined();
     }
+  });
+});
+
+describe("reason filter", () => {
+  const STATUS = "5.1.1";
+  const CODE =
+    "smtp; 550 5.1.1 The email account that you tried to reach does not exist";
+
+  it("narrows the hard list to the addresses behind a translated reason title", async () => {
+    const translated = translateDiagnosticCode({
+      status: STATUS,
+      diagnosticCode: CODE,
+    });
+    if (!translated) {
+      throw new Error("expected the catalog to translate 5.1.1");
+    }
+    const matched = "reason-translated-review@example.com";
+    const other = "reason-untranslated-review@example.com";
+    await seedSends([
+      {
+        organizationId: ORG_A,
+        recipient: matched,
+        bouncedAt: ago(2),
+        bounceType: "Permanent",
+        bounceSubType: "General",
+      },
+    ]);
+    await db.insert(messageSendDiagnostic).values({
+      messageSendId: seededSendIds.at(-1) as string,
+      organizationId: ORG_A,
+      eventType: "bounce",
+      enhancedStatus: STATUS,
+      diagnosticCode: CODE,
+      reasonKey: `${translated.provider ?? ""}|${translated.code ?? ""}|${translated.title}`,
+    });
+    await seedSends([
+      {
+        organizationId: ORG_A,
+        recipient: other,
+        bouncedAt: ago(2),
+        bounceType: "Permanent",
+        bounceSubType: "General",
+      },
+    ]);
+
+    const result = await listAddressesToReview(ORG_A, {
+      list: "hard",
+      ...DAYS_30,
+      reason: translated.title,
+    });
+    if (!result.success) {
+      throw new Error(result.error);
+    }
+    const addresses = result.rows.map((row) => row.address);
+    expect(addresses).toContain(matched);
+    expect(addresses).not.toContain(other);
+  });
+
+  it("matches a bounce with no diagnostic by its sub-type title, on its own list only", async () => {
+    const address = "reason-subtype-review@example.com";
+    await seedSends([
+      {
+        organizationId: ORG_A,
+        recipient: address,
+        bouncedAt: ago(2),
+        bounceType: "Transient",
+        bounceSubType: "MailboxFull",
+      },
+    ]);
+    const reason = describeBounceSubtype({
+      bounceType: "Transient",
+      bounceSubType: "MailboxFull",
+    }).title;
+
+    const soft = await listAddressesToReview(ORG_A, {
+      list: "soft",
+      ...DAYS_30,
+      reason,
+    });
+    const hard = await listAddressesToReview(ORG_A, {
+      list: "hard",
+      ...DAYS_30,
+      reason,
+    });
+    if (!soft.success || !hard.success) {
+      throw new Error("expected both lists to load");
+    }
+    expect(soft.rows.map((row) => row.address)).toEqual([address]);
+    expect(hard.rows).toEqual([]);
+  });
+
+  it("returns no rows for a reason no bounce has", async () => {
+    const result = await listAddressesToReview(ORG_A, {
+      list: "hard",
+      ...DAYS_30,
+      reason: "No such reason",
+    });
+    expect(result).toMatchObject({ success: true, rows: [] });
+  });
+
+  it("ignores the reason on the complaint list", async () => {
+    const address = "reason-complaint-review@example.com";
+    await seedSends([
+      { organizationId: ORG_A, recipient: address, complainedAt: ago(2) },
+    ]);
+    const result = await listAddressesToReview(ORG_A, {
+      list: "complaint",
+      ...DAYS_30,
+      reason: "No such reason",
+    });
+    if (!result.success) {
+      throw new Error(result.error);
+    }
+    expect(result.rows.map((row) => row.address)).toContain(address);
+  });
+
+  it("rejects an over-long reason", async () => {
+    const result = await listAddressesToReview(ORG_A, {
+      list: "hard",
+      ...DAYS_30,
+      reason: "x".repeat(301),
+    });
+    expect(result).toEqual({
+      success: false,
+      error: "reason must be a reason title",
+    });
   });
 });
 

@@ -2,6 +2,7 @@
 
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
+import { X } from "lucide-react";
 import { useQueryState } from "nuqs";
 import { useEffect, useState } from "react";
 import {
@@ -16,9 +17,11 @@ import { browserTimeZone } from "@/lib/analytics-drilldown-window";
 import { AddressDetailSheet } from "../../components/address-detail-sheet";
 import { useDeliverabilityDays } from "../lib/params";
 import {
+  ADDRESSES_TO_REVIEW_ID,
   REVIEW_LISTS,
   type ReviewListParam,
   reviewListParser,
+  reviewReasonParser,
 } from "../lib/review-params";
 import { ReviewTable } from "./review-table";
 import {
@@ -35,6 +38,12 @@ const EMPTY_COPY: Record<Exclude<ReviewList, "recommended">, string> = {
   soft: "No soft bounces in this range.",
   hard: "No hard bounces in this range.",
   complaint: "No complaints in this range.",
+};
+
+/** The empty copy when a reason from the Bounces card narrows the list. */
+const REASON_EMPTY_COPY: Record<"soft" | "hard", string> = {
+  soft: "No addresses to review for this reason. Bounces about the message itself (its size, content or attachments) don't count against the address.",
+  hard: "No hard-bounced addresses for this reason in this range.",
 };
 
 const TAB_LABEL: Record<ReviewListParam, string> = {
@@ -79,6 +88,7 @@ export function AddressesToReview({
   accounts,
 }: AddressesToReviewProps) {
   const [list, setList] = useQueryState("list", reviewListParser);
+  const [reasonParam, setReason] = useQueryState("reason", reviewReasonParser);
   const days = useDeliverabilityDays();
   const tz = useTimeZone();
   const queryClient = useQueryClient();
@@ -92,15 +102,19 @@ export function AddressesToReview({
 
   // The Suppressed tab loads its own data, so no review query runs for it.
   const reviewList: ReviewList | null = list === "suppressed" ? null : list;
+  // A reason narrows only the bounce lists.
+  const reason =
+    reasonParam && (list === "soft" || list === "hard") ? reasonParam : null;
 
   const reviewQuery = useInfiniteQuery({
-    queryKey: ["address-review", organizationId, reviewList, days, tz],
+    queryKey: ["address-review", organizationId, reviewList, reason, days, tz],
     queryFn: ({ pageParam }) =>
       listAddressesToReview(organizationId, {
         list: reviewList ?? "recommended",
         days,
         tz: tz ?? "UTC",
         offset: pageParam,
+        reason,
       }),
     initialPageParam: 0,
     // Recommendations has no continuation offset on the server, so it shows
@@ -201,6 +215,23 @@ export function AddressesToReview({
 
     return (
       <div className="space-y-4">
+        {reason !== null ? (
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Bounced for</span>
+            <span className="inline-flex items-center gap-1 rounded-md border bg-muted/50 py-0.5 pr-1 pl-2">
+              {reason}
+              <button
+                aria-label={`Clear the ${reason} filter`}
+                className="inline-flex size-5 items-center justify-center text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => setReason(null)}
+                type="button"
+              >
+                <X aria-hidden="true" className="size-3.5" />
+              </button>
+            </span>
+          </div>
+        ) : null}
+
         {list === "recommended" ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm">
@@ -235,7 +266,7 @@ export function AddressesToReview({
 
         {rows.length === 0 && !failure ? (
           <p className="text-muted-foreground text-sm">
-            {list === "recommended" ? recommendedEmptyCopy : EMPTY_COPY[list]}
+            {emptyCopy(list, reason, recommendedEmptyCopy)}
           </p>
         ) : null}
 
@@ -287,7 +318,7 @@ export function AddressesToReview({
   };
 
   return (
-    <section className="space-y-4">
+    <section className="scroll-mt-6 space-y-4" id={ADDRESSES_TO_REVIEW_ID}>
       <div className="space-y-1">
         <h2 className="font-semibold text-lg">Addresses to review</h2>
         <p className="text-muted-foreground text-sm">
@@ -300,6 +331,7 @@ export function AddressesToReview({
         onValueChange={(value) => {
           if (isReviewListParam(value)) {
             setList(value);
+            setReason(null);
           }
         }}
         tabs={REVIEW_LISTS.map((option) => ({
@@ -350,6 +382,20 @@ export function AddressesToReview({
       ) : null}
     </section>
   );
+}
+
+function emptyCopy(
+  list: ReviewList,
+  reason: string | null,
+  recommendedEmptyCopy: string
+): string {
+  if (list === "recommended") {
+    return recommendedEmptyCopy;
+  }
+  if (reason !== null && (list === "soft" || list === "hard")) {
+    return REASON_EMPTY_COPY[list];
+  }
+  return EMPTY_COPY[list];
 }
 
 /** The message for a failed load, or null when the lists loaded. */

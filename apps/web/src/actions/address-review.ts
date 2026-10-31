@@ -6,9 +6,11 @@ import {
 } from "@wraps/core/bounce-classification";
 import {
   awsAccount,
+  type BounceReasonMatch,
   db,
   eq,
   isRecommended,
+  queryBounceReasonRows,
   queryReviewAddressCounts,
   queryReviewAddresses,
   type ReviewAddressRow,
@@ -24,6 +26,7 @@ import {
   checkSuppressedAddresses,
   type ListedStatus,
 } from "@/lib/aws/ses-suppression";
+import { bounceReasonCopy } from "@/lib/bounce-reason-copy";
 import { type OrgActionCtx, orgAction } from "./shared/org-action";
 
 const REVIEW_ERROR = "Could not load addresses. Try again.";
@@ -31,6 +34,8 @@ const REVIEW_ERROR = "Could not load addresses. Try again.";
 const REVIEW_PAGE_SIZE = 25;
 /** The most recommendation candidates checked against SES in one request. */
 const RECOMMENDED_CANDIDATE_LIMIT = 100;
+/** Longer than any reason title the catalog writes. */
+const REASON_MAX = 300;
 
 const REVIEW_LISTS = ["recommended", "soft", "hard", "complaint"] as const;
 export type ReviewList = (typeof REVIEW_LISTS)[number];
@@ -159,6 +164,51 @@ function toReviewRow(
 
 type AccountRow = typeof awsAccount.$inferSelect;
 
+/** The SES bounce types behind each bounce list, as the Bounces card tags them. */
+const LIST_BOUNCE_TYPES: Record<"soft" | "hard", readonly string[]> = {
+  soft: ["Transient", "Undetermined"],
+  hard: ["Permanent"],
+};
+
+/**
+ * The reason groups behind one reason title on the Bounces card, for one
+ * list. The title is computed the way the reasons route computes it, from the
+ * same grouped rows, so a reason the card shows resolves to the groups it
+ * merged. Receiver domains collapse: the card merges across them too.
+ */
+async function bounceReasonsFor(
+  base: ReviewQuery,
+  list: "soft" | "hard",
+  reason: string
+): Promise<BounceReasonMatch[]> {
+  const rows = await queryBounceReasonRows({
+    organizationId: base.organizationId,
+    startTime: base.startTime,
+    endTime: base.endTime,
+    timezone: base.timezone,
+    day: null,
+  });
+  const types = LIST_BOUNCE_TYPES[list];
+  const matches = new Map<string, BounceReasonMatch>();
+  for (const row of rows) {
+    if (
+      row.bounceType === null ||
+      !types.includes(row.bounceType) ||
+      bounceReasonCopy(row).title !== reason
+    ) {
+      continue;
+    }
+    const match: BounceReasonMatch = {
+      reasonKey: row.reasonKey,
+      hasDetail: row.hasDetail,
+      bounceType: row.bounceType,
+      bounceSubType: row.bounceSubType,
+    };
+    matches.set(JSON.stringify(match), match);
+  }
+  return [...matches.values()];
+}
+
 /**
  * The first recommended addresses that SES does not list. Only the first
  * page is read: the candidates are checked in pages of REVIEW_PAGE_SIZE,
@@ -217,6 +267,18 @@ async function recommendedRows(
   return { rows: rows.slice(0, REVIEW_PAGE_SIZE), hasMore };
 }
 
+type ReviewInput = {
+  list: ReviewList;
+  days: number;
+  tz: string;
+  offset?: number;
+  /**
+   * A reason title from the Bounces card. On the soft and hard lists it keeps
+   * only addresses that bounced for that reason; the other lists ignore it.
+   */
+  reason?: string | null;
+};
+
 /**
  * One review list for one window. The window is rebuilt from `days` and
  * `tz` here, with the same validator as the drill-down, so a client cannot
@@ -227,19 +289,25 @@ export const listAddressesToReview = orgAction(
     name: "listAddressesToReview",
     resource: "awsAccounts",
     permission: ["read"],
-    orgId: (
-      organizationId: string,
-      _input: { list: ReviewList; days: number; tz: string; offset?: number }
-    ) => organizationId,
+    orgId: (organizationId: string, _input: ReviewInput) => organizationId,
     onError: REVIEW_ERROR,
   },
   async (
     ctx,
     organizationId: string,
-    input: { list: ReviewList; days: number; tz: string; offset?: number }
+    input: ReviewInput
   ): Promise<ListAddressesToReviewResult> => {
     if (!(REVIEW_LISTS as readonly string[]).includes(input.list)) {
       return { success: false, error: "list must be a review list" };
+    }
+    const reason = input.reason ?? null;
+    if (
+      reason !== null &&
+      (typeof reason !== "string" ||
+        reason.length === 0 ||
+        reason.length > REASON_MAX)
+    ) {
+      return { success: false, error: "reason must be a reason title" };
     }
     const parsed = validateDrilldownParams(
       { days: String(input.days), tz: input.tz },
@@ -266,6 +334,10 @@ export const listAddressesToReview = orgAction(
         where: eq(awsAccount.organizationId, organizationId),
       });
       const threshold = base.classification.softThreshold;
+      const bounceReasons =
+        reason !== null && (input.list === "soft" || input.list === "hard")
+          ? await bounceReasonsFor(base, input.list, reason)
+          : undefined;
 
       const [listed, counts] = await Promise.all([
         input.list === "recommended"
@@ -273,6 +345,7 @@ export const listAddressesToReview = orgAction(
           : queryReviewAddresses({
               ...base,
               kind: input.list,
+              bounceReasons,
               limit: REVIEW_PAGE_SIZE,
               offset,
             }).then(async (page) => {

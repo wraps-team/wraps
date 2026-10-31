@@ -2,7 +2,6 @@ import { auth } from "@wraps/auth";
 import {
   describeBounceSubtype,
   describeComplaintFeedbackType,
-  translateDiagnosticCode,
 } from "@wraps/core/email-diagnostics";
 import {
   type BounceReasonRow,
@@ -24,6 +23,7 @@ import type {
   ReasonsResponse,
 } from "@/app/(dashboard)/[orgSlug]/emails/deliverability/components/reason-groups";
 import { validateDrilldownParams } from "@/lib/analytics-drilldown-window";
+import { bounceReasonCopy } from "@/lib/bounce-reason-copy";
 import { createRequestLogger } from "@/lib/logger";
 import { getOrganizationWithMembership } from "@/lib/organization";
 
@@ -73,23 +73,12 @@ function isoOrNull(value: Date | null): string | null {
 }
 
 function bounceGroup(row: BounceReasonRow, totalCount: number): ReasonGroup {
-  // The copy comes from the same catalog the webhook used. The sample is one
-  // row's status and code, so the copy matches the reason key of the group.
-  const translation = row.hasDetail
-    ? translateDiagnosticCode({
-        status: row.sampleStatus ?? undefined,
-        diagnosticCode: row.sampleCode ?? undefined,
-      })
-    : null;
-  const subtype = describeBounceSubtype({
-    bounceType: row.bounceType,
-    bounceSubType: row.bounceSubType,
-  });
+  const { translation, subtype, title } = bounceReasonCopy(row);
 
   return {
     receiverDomain: row.receiverDomain,
     bounceType: row.bounceType,
-    title: translation?.title ?? subtype.title,
+    title,
     explanation: translation?.explanation ?? null,
     suggestedAction: translation
       ? (translation.suggestedAction ?? null)

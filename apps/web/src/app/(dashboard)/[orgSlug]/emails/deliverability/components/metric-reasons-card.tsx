@@ -3,6 +3,7 @@
 import { Badge } from "@wraps/ui/components/ui/badge";
 import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
 import { Skeleton } from "@wraps/ui/components/ui/skeleton";
+import { useQueryStates } from "nuqs";
 import * as React from "react";
 import {
   browserTimeZone,
@@ -15,6 +16,11 @@ import {
   useDrilldownReasons,
 } from "../hooks/use-drilldown-reasons";
 import { useDeliverabilityDays } from "../lib/params";
+import {
+  ADDRESSES_TO_REVIEW_ID,
+  reviewListParser,
+  reviewReasonParser,
+} from "../lib/review-params";
 import { Meter } from "./rate-bar-table";
 import type { ReasonGroup } from "./reason-groups";
 
@@ -156,6 +162,21 @@ export function MetricReasonsCard({
   );
 
   const query = useDrilldownReasons(orgSlug, metric, window);
+  const [, setReview] = useQueryStates({
+    list: reviewListParser,
+    reason: reviewReasonParser,
+  });
+
+  /** Opens Addresses to review on the row's list, narrowed to its reason. */
+  const showAddresses = (row: Row) => {
+    if (row.kind === null) {
+      return;
+    }
+    setReview({ list: row.kind, reason: row.label });
+    document
+      .getElementById(ADDRESSES_TO_REVIEW_ID)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
   const sends = useAnalyticsOverview(orgSlug, days).data?.totalSent ?? null;
   const copy = COPY[metric];
 
@@ -204,10 +225,26 @@ export function MetricReasonsCard({
 
         <ul className="flex flex-col gap-3">
           {rows.map((row) => (
-            <li className="flex flex-col gap-1.5" key={row.key}>
+            <li
+              className="relative isolate flex flex-col gap-1.5"
+              key={row.key}
+            >
               <div className="flex items-center justify-between gap-3 text-sm">
                 <span className="flex min-w-0 items-center gap-2">
-                  <span className="truncate">{row.label}</span>
+                  {row.kind !== null && !row.other ? (
+                    // The button's ::after covers the whole row, so the bar
+                    // and count are part of the target too.
+                    <button
+                      aria-label={`Show addresses that bounced for ${row.label}`}
+                      className="truncate text-left underline decoration-muted-foreground/40 underline-offset-4 after:absolute after:inset-0 after:z-10 hover:decoration-foreground focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-ring"
+                      onClick={() => showAddresses(row)}
+                      type="button"
+                    >
+                      {row.label}
+                    </button>
+                  ) : (
+                    <span className="truncate">{row.label}</span>
+                  )}
                   {row.kind === "hard" ? (
                     <Badge variant="destructive">hard</Badge>
                   ) : null}

@@ -20,7 +20,7 @@
 import type { SQL } from "drizzle-orm";
 import { and, eq, gte, isNotNull, lte, sql } from "drizzle-orm";
 import { db } from "../index";
-import { messageSend } from "../schema/batch";
+import { messageSend, messageSendDiagnostic } from "../schema/batch";
 import type { AddressWindowQuery } from "./address-sends";
 import type { DbClient } from "./api-keys";
 
@@ -59,8 +59,28 @@ type ReviewAggregates = {
   awsAccountId: SQL<string | null>;
 };
 
+/**
+ * One bounce reason group, as the reasons query keys it (minus the receiver
+ * domain): the stored reason, whether a diagnostic row exists, and the SES
+ * bounce type and sub-type. Null matches a null column.
+ */
+export type BounceReasonMatch = {
+  reasonKey: string | null;
+  hasDetail: boolean;
+  bounceType: string | null;
+  bounceSubType: string | null;
+};
+
 export type ReviewListQuery = ReviewQuery & {
   kind?: ReviewKind | "recommended";
+  /**
+   * With kind soft or hard: keep only addresses with a bounce of that kind in
+   * one of these reason groups. The bounce must pass the kind's own
+   * classifier too, so a content reason (a too-large message) lists no one:
+   * it is about the message, not the address. An empty list matches nothing.
+   * Ignored for the other kinds.
+   */
+  bounceReasons?: BounceReasonMatch[];
   limit: number;
   offset: number;
 };
@@ -108,11 +128,13 @@ function softPredicate(contentSubTypes: readonly string[]): SQL {
  * bounce with `lastOk`, the address's latest delivery in the window, taken
  * from the same CTE join.
  */
+const HARD_PREDICATE = sql`(${messageSend.bouncedAt} IS NOT NULL AND ${messageSend.bounceType} = 'Permanent')`;
+
 function reviewAggregates(
   contentSubTypes: readonly string[],
   lastOk: SQL
 ): ReviewAggregates {
-  const hardPredicate = sql`(${messageSend.bouncedAt} IS NOT NULL AND ${messageSend.bounceType} = 'Permanent')`;
+  const hardPredicate = HARD_PREDICATE;
   const softPred = softPredicate(contentSubTypes);
   const afterDelivery = sql`(${lastOk} IS NULL OR ${messageSend.bouncedAt} > ${lastOk})`;
   const lastEvent = sql`greatest(${messageSend.complainedAt}, ${messageSend.bouncedAt})`;
@@ -133,11 +155,33 @@ function reviewAggregates(
 }
 
 /**
+ * True for a bounce in one of the reason groups. `IS NOT DISTINCT FROM`
+ * matches a null column to a null in the group.
+ */
+function bounceReasonPredicate(reasons: BounceReasonMatch[]): SQL {
+  if (reasons.length === 0) {
+    return sql`false`;
+  }
+  const hasDetail = sql`(${messageSendDiagnostic.messageSendId} IS NOT NULL)`;
+  const matches = reasons.map(
+    (reason) =>
+      sql`(${messageSendDiagnostic.reasonKey} IS NOT DISTINCT FROM ${reason.reasonKey} AND ${hasDetail} = ${reason.hasDetail} AND ${messageSend.bounceType} IS NOT DISTINCT FROM ${reason.bounceType} AND ${messageSend.bounceSubType} IS NOT DISTINCT FROM ${reason.bounceSubType})`
+  );
+  return sql`(${messageSend.bouncedAt} IS NOT NULL AND (${sql.join(matches, sql` OR `)}))`;
+}
+
+/**
  * One row per lower-cased address with at least one complaint or bounce in
  * the window, with the aggregates. Not yet filtered by kind, ordered or
  * limited. The `ok` CTE is the latest delivery per address in the window.
+ * With `withDiagnostic`, each send's bounce diagnostic is LEFT JOINed on its
+ * primary key (message_send_id, event_type), so the join cannot fan out.
  */
-function groupedAddresses(query: ReviewQuery, dbClient: DbClient) {
+function groupedAddresses(
+  query: ReviewQuery,
+  dbClient: DbClient,
+  withDiagnostic = false
+) {
   const orgId = query.organizationId;
   const ok = dbClient.$with("ok").as(
     dbClient
@@ -163,7 +207,7 @@ function groupedAddresses(query: ReviewQuery, dbClient: DbClient) {
     sql`${ok.lastOk}`
   );
 
-  const builder = dbClient
+  const selected = dbClient
     .with(ok)
     .select({
       address: ADDRESS_KEY.as("address"),
@@ -176,7 +220,18 @@ function groupedAddresses(query: ReviewQuery, dbClient: DbClient) {
       awsAccountId: aggregates.awsAccountId.as("aws_account_id"),
     })
     .from(messageSend)
-    .leftJoin(ok, sql`${ok.addr} = ${ADDRESS_KEY}`)
+    .leftJoin(ok, sql`${ok.addr} = ${ADDRESS_KEY}`);
+  const joined = withDiagnostic
+    ? selected.leftJoin(
+        messageSendDiagnostic,
+        and(
+          eq(messageSendDiagnostic.messageSendId, messageSend.id),
+          eq(messageSendDiagnostic.eventType, "bounce"),
+          eq(messageSendDiagnostic.organizationId, messageSend.organizationId)
+        )
+      )
+    : selected;
+  const builder = joined
     .where(
       and(
         eq(messageSend.organizationId, orgId),
@@ -235,11 +290,29 @@ export async function queryReviewAddresses(
   query: ReviewListQuery,
   dbClient: DbClient = db
 ): Promise<{ rows: ReviewAddressRow[]; hasMore: boolean }> {
-  const { builder, aggregates } = groupedAddresses(query, dbClient);
+  const reasons =
+    query.kind === "soft" || query.kind === "hard"
+      ? query.bounceReasons
+      : undefined;
+  const { builder, aggregates } = groupedAddresses(
+    query,
+    dbClient,
+    reasons !== undefined
+  );
+  let having = kindPredicate(
+    query.kind,
+    aggregates,
+    query.classification.softThreshold
+  );
+  if (reasons !== undefined) {
+    const kindBounce =
+      query.kind === "soft"
+        ? softPredicate(query.classification.contentSubTypes)
+        : HARD_PREDICATE;
+    having = sql`count(*) filter (where ${kindBounce} AND ${bounceReasonPredicate(reasons)}) > 0`;
+  }
   const rows = (await builder
-    .having(
-      kindPredicate(query.kind, aggregates, query.classification.softThreshold)
-    )
+    .having(having)
     .orderBy(
       sql`${aggregates.lastEventAt} DESC NULLS LAST`,
       sql`${ADDRESS_KEY} ASC`

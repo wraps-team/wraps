@@ -375,4 +375,65 @@ describe("AddressesToReview", () => {
       "one@example.com"
     );
   });
+
+  it("sends a reason from the URL with the bounce list and shows it as a filter", async () => {
+    renderPanel({ list: "soft", reason: "Mailbox full" });
+    expect(await screen.findByText("soft@example.com")).toBeInTheDocument();
+    expect(mockList).toHaveBeenCalledWith(
+      ORG_ID,
+      expect.objectContaining({ list: "soft", reason: "Mailbox full" })
+    );
+    expect(screen.getByText("Mailbox full")).toBeInTheDocument();
+  });
+
+  it("uses the reason empty copy when the narrowed list is empty", async () => {
+    renderPanel({ list: "hard", reason: "Address does not exist" });
+    expect(
+      await screen.findByText(
+        "No hard-bounced addresses for this reason in this range."
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("clears the reason from the URL and reloads the whole list", async () => {
+    const user = userEvent.setup();
+    const { onUrlUpdate } = renderPanel({
+      list: "soft",
+      reason: "Mailbox full",
+    });
+    await screen.findByText("soft@example.com");
+    await user.click(
+      screen.getByRole("button", { name: "Clear the Mailbox full filter" })
+    );
+    await waitFor(() =>
+      expect(
+        onUrlUpdate.mock.calls.at(-1)?.[0].searchParams.has("reason")
+      ).toBe(false)
+    );
+    await waitFor(() =>
+      expect(mockList).toHaveBeenLastCalledWith(
+        ORG_ID,
+        expect.objectContaining({ list: "soft", reason: null })
+      )
+    );
+  });
+
+  it("drops the reason when another tab opens, and never sends it off a bounce list", async () => {
+    const user = userEvent.setup();
+    const { onUrlUpdate } = renderPanel({
+      list: "soft",
+      reason: "Mailbox full",
+    });
+    await screen.findByText("soft@example.com");
+    await user.click(await screen.findByRole("tab", { name: /Complaints/ }));
+    await waitFor(() => {
+      const params = onUrlUpdate.mock.calls.at(-1)?.[0].searchParams;
+      expect(params.get("list")).toBe("complaint");
+      expect(params.has("reason")).toBe(false);
+    });
+    expect(mockList).toHaveBeenLastCalledWith(
+      ORG_ID,
+      expect.objectContaining({ list: "complaint", reason: null })
+    );
+  });
 });
