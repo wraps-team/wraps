@@ -79,7 +79,7 @@ export function OverviewDashboard({
   return (
     <>
       <EventUsageBanner orgSlug={orgSlug} />
-      <div className="space-y-6 px-4 lg:px-6 pt-4 pb-6">
+      <div className="space-y-6 px-4 lg:px-6">
         {/* Health on the left, range controls on the right: on their own
             rows they spent a full band of the first screen on one short
             sentence. Below sm the controls stack above the health line. */}
