@@ -179,7 +179,7 @@ function apiErrorSpec(status: number, text: string): ErrorSpec {
       code: "FORBIDDEN",
       message: text,
       suggestion:
-        "Your role cannot change brand kits (writes need the templates write permission). Ask an organization admin to grant it, then retry.",
+        "Your role or this API key's scopes do not allow this. A signed-in session (wraps auth login) is checked against your role; an API key is checked against its own scopes. Brand kit writes need the templates write permission (key scope campaigns:write). Ask an owner or admin, then retry.",
     };
   }
   if (status === 404) {

@@ -211,7 +211,7 @@ function apiErrorSpec(status: number, text: string): ErrorSpec {
       code: "FORBIDDEN",
       message: text,
       suggestion:
-        "This API key is not allowed to do this. Use a key from an organization with access to segments.",
+        "Your role or this API key's scopes do not allow this. A signed-in session (wraps auth login) is checked against your role; an API key is checked against its own scopes. Ask an owner or admin for segments access, or use a key with the segments:read or segments:write scope it needs, then retry.",
     };
   }
   if (status === 404) {

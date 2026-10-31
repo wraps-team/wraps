@@ -254,7 +254,7 @@ function mapHttpError(
       code: "FORBIDDEN",
       message,
       suggestion:
-        "Your role cannot change broadcasts in this organization. Ask an owner or admin for broadcasts write access, then retry.",
+        "Your role or this API key's scopes do not allow this. A signed-in session (wraps auth login) is checked against your role; an API key is checked against its own scopes. Changing a broadcast needs broadcasts write access (key scope campaigns:write); editing a scheduled one or sending also needs send access (key scope send:email). Ask an owner or admin, then retry.",
     };
   }
   if (status === 404) {

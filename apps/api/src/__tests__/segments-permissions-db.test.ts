@@ -342,4 +342,15 @@ describe("POST /v1/segments/preview (read)", () => {
     expect(res.status).toBe(403);
     expect(res.body).toEqual({ error: PERMISSION_DENIED });
   });
+
+  it("answers a malformed condition with 400, not 500", async () => {
+    const res = await call(asReadOnlyKey(), "POST", "/v1/segments/preview", {
+      condition: { operator: "and", conditions: [] },
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({
+      error: "At least one filter group is required",
+    });
+  });
 });

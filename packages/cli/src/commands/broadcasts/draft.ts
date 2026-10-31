@@ -242,7 +242,7 @@ function mapHttpError(status: number, body: Json | null): CliError {
       code: "FORBIDDEN",
       message,
       suggestion:
-        "This key's role cannot save broadcasts. Ask an owner or admin of the organization for the broadcasts write permission, or use a key that has it (--token or WRAPS_API_KEY), then retry.",
+        "Your role or this API key's scopes do not allow this. A signed-in session (wraps auth login) is checked against your role; an API key is checked against its own scopes. Saving a draft needs broadcasts write access (key scope campaigns:write). Ask an owner or admin, or use a key with that scope (--token or WRAPS_API_KEY), then retry.",
     };
   }
   if (status === 404) {

@@ -383,7 +383,7 @@ describe("broadcasts draft", () => {
       expect(env.error?.message).toBe(
         "You don't have permission to perform this action"
       );
-      expect(env.error?.suggestion).toContain("broadcasts write permission");
+      expect(env.error?.suggestion).toContain("broadcasts write access (key scope campaigns:write)");
     });
 
     it("maps a plan-gate 403 to PLAN_REQUIRED with the upgrade hint", async () => {

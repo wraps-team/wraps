@@ -244,7 +244,7 @@ async function apiFailure(resp: Response): Promise<Failure> {
       code: "FORBIDDEN",
       message,
       suggestion:
-        "This API key may not do that in this organization. Use a key created by an owner or admin of the organization.",
+        "Your role or this API key's scopes do not allow this. A signed-in session (wraps auth login) is checked against your role; an API key is checked against its own scopes. Template writes need the templates write permission (key scope campaigns:write). Ask an owner or admin, then retry.",
     };
   }
   if (resp.status === 404) {
