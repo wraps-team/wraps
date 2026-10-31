@@ -16,6 +16,8 @@
  * - The cursor is decoded strictly. `decodeSuppressionCursor` returns null for
  *   anything that is not a base64url JSON object of strings, so the route can
  *   answer 400. The web copy silently starts over instead.
+ * - `putSuppressedAddress` (add) is copied from the web copy's put, with the
+ *   same credentials change.
  *
  * The access-denied / not-found classifiers, `toSuppressedAddress`, and the
  * cursor encoding are copied unchanged.
@@ -25,6 +27,7 @@ import {
   DeleteSuppressedDestinationCommand,
   GetSuppressedDestinationCommand,
   ListSuppressedDestinationsCommand,
+  PutSuppressedDestinationCommand,
   SESv2Client,
   type SuppressedDestinationSummary,
   type SuppressionListReason,
@@ -285,6 +288,47 @@ export async function getSuppressedAddress(params: {
       return { status: "denied" };
     }
     log.warn("Failed to get SES suppressed destination", {
+      awsAccountId: account.id,
+      err: error,
+    });
+    throw error;
+  }
+}
+
+export type PutSuppressedAddressResult =
+  | { status: "added" }
+  | { status: "denied" };
+
+/**
+ * Add an address to the account-level suppression list. Callers decide
+ * beforehand whether a write is needed (see the add route); this only
+ * performs the write and reports whether the role was allowed to make it.
+ * Copied from apps/web/src/lib/aws/ses-suppression.ts (putSuppressedAddress),
+ * with credentials from getCredentials.
+ */
+export async function putSuppressedAddress(params: {
+  account: AwsAccountRow;
+  email: string;
+  reason: "BOUNCE" | "COMPLAINT";
+}): Promise<PutSuppressedAddressResult> {
+  const { account, email, reason } = params;
+
+  const credentials = await getCredentials(account.id, account.organizationId);
+  const client = sesClientFor(account, credentials);
+
+  try {
+    await client.send(
+      new PutSuppressedDestinationCommand({
+        EmailAddress: email,
+        Reason: reason,
+      })
+    );
+    return { status: "added" };
+  } catch (error) {
+    if (isAccessDeniedError(error)) {
+      return { status: "denied" };
+    }
+    log.warn("Failed to put SES suppressed destination", {
       awsAccountId: account.id,
       err: error,
     });
