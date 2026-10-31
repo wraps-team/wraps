@@ -242,8 +242,8 @@ These commands read and change data in your Wraps organization (contacts, topics
 Commands that send email, make a live change or delete data refuse to run without `--yes`. They return `CONFIRMATION_REQUIRED` before making any request:
 
 - `contacts delete`, `contacts import --validate`, `contacts validate`, `segments delete`
-- `topics delete`, `email suppressions remove`, `api-keys revoke`
-- `email templates publish`
+- `topics delete`, `email suppressions add`, `email suppressions remove`, `api-keys revoke`
+- `email templates publish`, `email templates delete`
 - `broadcasts create`, `broadcasts send`, `broadcasts resume`, `broadcasts cancel`
 - `workflows trigger`, `workflows enable`, `workflows retry`, `workflows cancel`
 - `email agent approvals approve`, `email agent approvals reject`
@@ -251,7 +251,7 @@ Commands that send email, make a live change or delete data refuse to run withou
 
 Exceptions. `email templates pull` fetches without `--yes`, but refuses to overwrite existing local files unless `--yes` is given. `contacts export --output` and `audit-logs export --output` also refuse to overwrite an existing file unless `--yes` is given. `workflows disable` needs no `--yes` because it only stops future runs. `broadcasts duplicate` and `broadcasts update` are not destructive and need no `--yes`.
 
-`--dry-run` is supported on `contacts delete`, `contacts import`, `contacts validate`, `segments delete`, `topics delete`, `email suppressions remove`, `broadcasts create`, `broadcasts cancel`, `api-keys revoke`, `workflows trigger`, `email templates pull` and `brand-kits delete`. A dry run makes no changes. `broadcasts create --dry-run` validates the payload locally and makes no request.
+`--dry-run` is supported on `contacts delete`, `contacts import`, `contacts validate`, `segments delete`, `topics delete`, `email suppressions add`, `email suppressions remove`, `broadcasts create`, `broadcasts cancel`, `api-keys revoke`, `workflows trigger`, `email templates delete`, `email templates pull` and `brand-kits delete`. A dry run makes no changes. `broadcasts create --dry-run` validates the payload locally and makes no request.
 
 ### Pagination
 
@@ -294,6 +294,7 @@ Contact fields: `id`, `externalId`, `email`, `phone`, `firstName`, `lastName`, `
 - `wraps email templates pull [--out-dir <dir>] [--dry-run] [--yes]`. Writes `<slug>.tsx` for each template. `--out-dir` defaults to `wraps/templates` under the current directory. If any target file already exists, nothing is written unless `--yes` is given. Data: `outDir`, `dryRun`, `files` (each with `id`, `slug`, `path`, `exists`, `written`) and `skipped`.
 - `wraps email templates publish <id> --yes [--aws-account-id <id>]`. Publishes to SES and is LIVE. If the organization has exactly one AWS account it is used automatically. If it has several, pass `--aws-account-id`. Data: `id`, `publishedAt`, `sesTemplateName`, `awsAccountId`.
 - `wraps email templates duplicate <id>`. Creates a copy that is always a `DRAFT`. Data: the same keys as `get`.
+- `wraps email templates delete <id...> --yes [--dry-run]`. Deletes up to 100 templates in one command, with their versions. One id uses the single-template route and more than one uses the bulk route. A published SES copy is removed too, unless another template still uses the same SES name. Ids that are not templates of this organization are listed in `notFound` and skipped. If any template is still used by a scheduled, queued or processing broadcast, or by an enabled workflow, the whole delete is refused with `CONFLICT` and nothing is deleted. The error names the blocking template ids. Disable or cancel those first, then re-run. `--dry-run` previews the delete and makes no request. Data: `dryRun`, `route` (`single` or `bulk`), `deleted`, `notFound`, `count`, and `wouldDelete` in a dry run.
 
 ### Brand kits
 
@@ -367,6 +368,7 @@ Approval fields: `id`, `agentId`, `organizationId`, `status`, `payload`, `reason
 ### Email suppressions
 
 - `wraps email suppressions list [--account <awsAccountId>] [--reason bounce|complaint] [--limit <n>] [--cursor <c>]`. Lists the SES suppression list. Without `--account` it covers every connected AWS account. `--account` takes the `id` that `wraps email health` lists, not the 12-digit AWS account number. The cursor is opaque, and a page can be empty while `hasMore` is true. Data: `entries` (each with `email`, `reason`, `awsAccountId`, `lastUpdated`), `nextCursor`, `hasMore`, `deniedAccountIds`, `unreachableAccountIds`.
+- `wraps email suppressions add <email...> --account <awsAccountId> --reason bounce|complaint --yes [--file <path>] [--dry-run]`. Adds up to 100 addresses to that AWS account's SES suppression list, so Wraps stops sending to them. `--account` takes the id that `wraps email health` lists. `--file` reads one address per line and is combined with the addresses given as arguments. Duplicate addresses are removed. Adds are idempotent: an address that is already suppressed is reported with `alreadyPresent`, and a `BOUNCE` can be upgraded to `COMPLAINT`. The command has no 409 for adds. `--dry-run` previews the list and makes no request. Each address gets its own result. If any address fails, the other addresses still run, the envelope still reports `success: true`, and the exit code is 1. Undo one address with `wraps email suppressions remove`. Data: `awsAccountId`, `reason` (`BOUNCE` or `COMPLAINT`), `dryRun`, `results` (each with `email`, `success`, `alreadyPresent` and `error` on a failure), `added`, `alreadyPresent`, `failed`. A dry run returns `emails` instead of `results`.
 - `wraps email suppressions remove <email> --account <awsAccountId> --yes [--dry-run] [--acknowledge-complaint]`. Removes one address from that account's suppression list. An address suppressed for a spam complaint also needs `--acknowledge-complaint`, which the CLI sends only when you pass it. Pass it only after you have confirmed that sending to the address is safe. Data: `email`, `awsAccountId`, `dryRun`, `wasPresent`.
 
 ### Topics (Pro plan)
@@ -404,7 +406,7 @@ An API key cannot manage API keys. Sign in with `wraps auth login` first. `--tok
 
 The CLI commands above call these routes on `https://api.wraps.dev` (`WRAPS_API_URL` overrides it). Send `Authorization: Bearer <api key>`. Where a route checks a permission, it is listed with the route. Ids that belong to another organization return 404.
 
-Destructive routes need `confirm=true` in the query string and return 400 without it. The CLI sends it only after `--yes`. `DELETE /v1/batch/{id}` takes no `confirm` parameter.
+Most destructive routes need `confirm=true` in the query string and return 400 without it. The CLI sends it only after `--yes`. Some destructive routes take no `confirm` parameter: `DELETE /v1/batch/{id}`, `DELETE /v1/contacts/{id}` and the contacts bulk delete.
 
 Permissions are shown as `resource:action`. Plan requirements are stated per route.
 
@@ -426,6 +428,8 @@ Who the permission applies to depends on how the request authenticates:
 ### Email suppressions
 
 - `GET /v1/suppressions`: the SES suppression list. Query `awsAccountId`, `reason` (`BOUNCE` or `COMPLAINT`), `limit` (1-100) and `cursor`. Pass `nextCursor` back unchanged. Needs `awsAccounts:read`.
+- `POST /v1/suppressions`: add one address to an AWS account's suppression list. Body: `awsAccountId`, `email` and `reason` (`BOUNCE` or `COMPLAINT`). The address is trimmed and lowercased. Repeat adds are idempotent: an address already suppressed returns `alreadyPresent: true` and writes nothing new. A `BOUNCE` can be upgraded to `COMPLAINT`, but a `COMPLAINT` is never downgraded. A matching contact is marked suppressed. Needs `awsAccounts:write`; an API key needs `contacts:write`.
+- `POST /v1/suppressions/bulk`: add up to 100 addresses in one request. Body: `entries`, each with its own `awsAccountId`, `email` and `reason`. The response has one result per entry, in request order. An entry that fails (an invalid address, an account outside the organization, or an SES error) fails only itself. An empty list or more than 100 entries returns 400. Same permissions as the single route.
 - `DELETE /v1/suppressions/{email}?awsAccountId=<id>&confirm=true`: remove one address from that AWS account's suppression list. Percent-encode the email. An address suppressed for a complaint also needs `acknowledgedComplaint=true`, or the route returns 409. Needs `awsAccounts:write`.
 
 ### Events
@@ -462,6 +466,13 @@ Who the permission applies to depends on how the request authenticates:
 - `DELETE /v1/brand-kits/{id}?confirm=true`: delete a brand kit. Deleting the default promotes another kit, and templates that used the kit lose the link. Needs `templates:write`.
 - `POST /v1/brand-kits/{id}/default`: make this kit the organization's only default. The previous default is cleared in the same transaction. Needs `templates:write`.
 
+### Templates
+
+Only the delete routes are listed here. The other template routes (list, get, create, update, publish and duplicate) are in the API reference at https://wraps.dev/docs/reference/api.
+
+- `DELETE /v1/templates/{id}?confirm=true`: delete one template and its versions. Returns 409, and deletes nothing, while a scheduled, queued or processing broadcast, or an enabled workflow, still uses it. The response's `blockingIds` lists the blocking template ids. Draft, paused, completed and other non-blocking broadcasts and workflows do not block. A published SES copy is removed best-effort from the organization's AWS accounts. Needs `campaigns:write` for API keys, or the templates delete permission for a session.
+- `DELETE /v1/templates?confirm=true`: bulk delete. Body `{ "ids": [...] }`, 1 to 100 template ids. All or nothing: if any template is blocked, the whole request returns 409 with `blockingIds` and deletes nothing. Ids that are not templates of this organization are listed in `notFound` and skipped. Same permissions as the single route.
+
 ### Workflows
 
 - `GET /v1/workflows`: workflows, newest first. Query `page`, `pageSize`, `search` (matches the name) and `status`. Needs `workflows:read`.
@@ -481,6 +492,25 @@ These routes refuse API keys: a request authenticated with a `wraps_` key gets 4
 
 - `GET /v1/audit-logs`: newest first, keyset-paginated (`limit` 1-100, default 50; pass `nextCursor` back as `cursor`). Filters `action`, `actorId`, `dateFrom` and `dateTo`. Needs `orgSettings:read`. Results are limited to the plan's history window, which the response reports as `retentionDays`.
 - `GET /v1/audit-logs/export`: the same filters, `format` `json` (default) or `csv`, up to 50,000 rows. Needs `orgSettings:read` and the Business plan. Each export writes one `audit_log.exported` row.
+
+### Agents
+
+Agents are leashed senders: each has its own address and a send policy (hourly and daily caps and recipient allowlists). Listing needs authentication only. Creating, killing and changing the policy of an agent need an organization owner or admin. An API key follows its creator's current role, so a 403 means the creator is not an owner or admin now.
+
+- `GET /v1/agents`: every agent in one response. Not paginated.
+- `POST /v1/agents`: create an agent. Body: `name`, `emailAddress`, `domain` and an optional `policy` (`maxPerHour`, `maxPerDay`, `allowedRecipients`, `allowedRecipientDomains`). Returns 201. The agent is recorded in Wraps only; its AWS resources are deployed with the CLI. Returns 409 when the name or the address already exists.
+- `POST /v1/agents/{id}/kill`: set the agent's status to `KILLED`. Irreversible: no route returns a killed agent to `ACTIVE`. For a deployed agent the kill is pushed to its enforcer. `syncStatus` is `synced`, `skipped` or `failed`, and `warning` is set when the push fails. A failed push means the agent may still send, so call the route again to retry.
+- `PATCH /v1/agents/{id}/policy`: replace the whole send policy. All four fields are required. A killed agent returns 409 and keeps its old policy. `syncStatus` and `warning` mean the same as for kill.
+
+### Account health
+
+- `GET /v1/account/health`: the SES health the hourly sweep last saved for every connected AWS account, plus the organization rollup. The worst status wins, and `unknown` outranks `healthy`. Makes no AWS calls. `checkedAt` says how fresh the reading is. Needs authentication only.
+- `GET /v1/account/health/{awsAccountId}`: the same verdict for one account. `awsAccountId` is the Wraps id, not the 12-digit AWS account number. Returns 404 when the account does not belong to the organization.
+
+### Deliverability check (public)
+
+- `POST /tools/email-check`: check a domain's SPF, DKIM, DMARC, MX, blacklist and related setup. Body: `domain` (required), and optionally `quick`, `skipBlacklists`, `dkimSelector` and `dkimSelectors`. For AWS SES, pass `dkimSelectors`, because SES uses random selectors. No API key is needed. Rate limited to 10 requests per minute and 100 per hour per IP. A bad domain or a failed check returns HTTP 200 with `success: false`.
+- `GET /tools/email-check/{domain}`: a quick check of one domain, with no body. No API key is needed.
 
 ## Email SDK Reference (@wraps.dev/email)
 
@@ -1115,7 +1145,7 @@ Detailed comparisons:
 
 ## MCP Server (@wraps.dev/mcp)
 
-MCP server for Wraps email infrastructure. Gives AI agents access to your AWS SES sending history, delivery events, domain status, and suppression list — and, optionally, the ability to send email. With a Wraps API credential it also reads and changes Wraps data through the Wraps API: contacts, segments, topics, templates, broadcasts, events, workflows, agent approvals, metrics, inbound email and brand kits. Runs locally via stdio; AWS credentials never leave the machine.
+MCP server for Wraps email infrastructure. Gives AI agents access to your AWS SES sending history, delivery events, domain status, and suppression list — and, optionally, the ability to send email. With a Wraps API credential it also reads and changes Wraps data through the Wraps API: contacts, segments, topics, templates, broadcasts, events, workflows, suppressions, agents, agent approvals, metrics, inbound email, brand kits, account health and deliverability checks. Runs locally via stdio; AWS credentials never leave the machine.
 
 Prerequisites: for the AWS tools, a deployed Wraps email stack (`wraps email init`) and AWS credentials in the environment (same profile the CLI uses). For the API-backed tools, a Wraps API key or a `wraps auth login` session (see Credentials for API-backed tools below).
 
@@ -1137,9 +1167,11 @@ Prerequisites: for the AWS tools, a deployed Wraps email stack (`wraps email ini
 These tools call the Wraps API for your organization. Each one is a read (R), a write (W) or a destructive call (X). Write and destructive tools need `WRAPS_WRITE_ENABLED=true`; destructive tools also need `confirm: true`. The tool descriptions say when to use each tool and how to page through results. Paginated tools return `hasMore`. Segment and topic tools need a Pro plan or higher.
 
 #### Contacts
-- Read: `list_contacts`, `get_contact`, `validate_contact_emails`
-- Write: `create_contact`, `update_contact`, `set_contact_topics`
+- Read: `list_contacts`, `get_contact`, `validate_contact_emails`, `export_contacts`
+- Write: `create_contact`, `update_contact`, `set_contact_topics`, `import_contacts`
 - Destructive: `delete_contact`
+
+`import_contacts` takes up to 10,000 rows per call and needs `confirm: true` only when `duplicateStrategy` is `"update"`, because that changes existing contacts. `export_contacts` returns at most 1,000 rows per call. When `truncated` is `true`, narrow the filters and call again, because there is no paging.
 
 #### Segments
 - Read: `list_segments`, `get_segment`, `preview_segment`
@@ -1154,7 +1186,9 @@ These tools call the Wraps API for your organization. Each one is a read (R), a 
 #### Templates
 - Read: `list_templates`, `get_template`
 - Write: `create_template`, `update_template`, `duplicate_template`
-- Destructive: `publish_template`
+- Destructive: `publish_template`, `delete_template`
+
+`delete_template` deletes up to 100 templates, with their versions, and is refused with 409 (nothing deleted) while a scheduled, queued or processing broadcast, or an enabled workflow, uses one. It needs `confirm: true`.
 
 #### Broadcasts
 - Read: `list_broadcasts`, `get_broadcast`, `list_broadcast_recipients`, `get_broadcast_clicks`
@@ -1166,12 +1200,21 @@ These tools call the Wraps API for your organization. Each one is a read (R), a 
 - Destructive: `track_event`
 
 #### Suppressions
-- Destructive: `remove_suppression`
+- Destructive: `add_suppression`, `remove_suppression`
+
+`add_suppression` adds up to 100 addresses to one AWS account's SES suppression list, and needs `confirm: true`. Undo one address at a time with `remove_suppression`.
 
 #### Workflows
 - Read: `list_workflows`, `get_workflow`, `list_workflow_executions`, `get_workflow_execution`
 - Write: `enable_workflow_schedule`, `disable_workflow_schedule`
 - Destructive: `trigger_workflow`, `retry_workflow_execution`, `cancel_workflow_execution`
+
+#### Agents
+- Read: `list_agents`
+- Write: `create_agent`
+- Destructive: `kill_agent`, `set_agent_policy`
+
+`set_agent_policy` replaces the whole send policy (all four fields) and needs `confirm: true`. `kill_agent` is irreversible and needs `confirm: true`. `create_agent`, `kill_agent` and `set_agent_policy` need an organization owner or admin.
 
 #### Agent approvals
 - Read: `list_agent_approvals`
@@ -1187,6 +1230,16 @@ These tools call the Wraps API for your organization. Each one is a read (R), a 
 - Read: `list_brand_kits`, `get_brand_kit`
 - Write: `create_brand_kit`, `update_brand_kit`, `set_default_brand_kit`
 - Destructive: `delete_brand_kit`
+
+#### Account health
+- Read: `get_account_health`
+
+`get_account_health` reads the SES health the hourly sweep last saved, with no AWS calls. Pass `awsAccountId` (the Wraps id) for one account, or omit it for every account and the organization status.
+
+#### Deliverability check
+- Read: `email_check`
+
+`email_check` checks a domain's SPF, DKIM, DMARC, MX, blacklist and related setup, and returns a grade with the issues that cost points. It sends no mail. The request goes to the public `POST /tools/email-check` route without your Wraps credential, but the tool is registered only when Wraps credentials are configured. It is rate limited to 10 requests per minute and 100 per hour per IP.
 
 ### Credentials for API-backed tools
 
@@ -1216,9 +1269,9 @@ With neither, only the AWS tools are registered. An expired or revoked credentia
 
 ### Write gate and confirm
 
-Every API-backed write (W) and destructive (X) tool is refused unless `WRAPS_WRITE_ENABLED=true`. Read (R) tools work without it. Destructive tools also require `confirm: true` in the call, and the server refuses the call without it. Set `confirm: true` only after the user has confirmed the change. Several destructive tools cannot be undone, including `delete_contact`, `publish_template`, `send_broadcast` and `trigger_workflow`.
+Every API-backed write (W) and destructive (X) tool is refused unless `WRAPS_WRITE_ENABLED=true`. Read (R) tools work without it. Destructive tools also require `confirm: true` in the call, and the server refuses the call without it. Set `confirm: true` only after the user has confirmed the change. Several destructive tools cannot be undone, including `delete_contact`, `delete_template`, `publish_template`, `kill_agent`, `send_broadcast` and `trigger_workflow`.
 
-When `WRAPS_AGENT_ID` is set (enforced mode), `approve_agent_approval` and `reject_agent_approval` are not registered, so an enforced agent cannot approve or reject its own sends.
+When `WRAPS_AGENT_ID` is set (enforced mode), `create_agent`, `kill_agent`, `set_agent_policy`, `approve_agent_approval` and `reject_agent_approval` are not registered, so an enforced agent cannot create agents, kill them, change their policies, or approve or reject sends. `list_agents` stays registered.
 
 ### Setup
 

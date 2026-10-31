@@ -18,8 +18,13 @@
  * Removing an address is destructive: --yes is required, and --dry-run previews
  * with no request. Complaint suppressions also need --acknowledge-complaint.
  * That flag is sent to the API only when the user passed it.
+ *
+ * Adding addresses is also gated by --yes (--dry-run previews). One address
+ * uses POST /v1/suppressions; two or more use POST /v1/suppressions/bulk, which
+ * reports each address on its own, so a bulk add can partly fail.
  */
 
+import { readFile } from "node:fs/promises";
 import { log, note } from "@clack/prompts";
 import {
   checkApiTarget,
@@ -52,11 +57,31 @@ export type SuppressionsRemoveOptions = {
   region?: string;
 };
 
+export type SuppressionsAddOptions = {
+  emails?: string[];
+  file?: string;
+  account?: string;
+  reason?: string;
+  yes?: boolean;
+  dryRun?: boolean;
+  json?: boolean;
+  token?: string;
+  region?: string;
+};
+
 type Failure = { code: string; message: string; suggestion: string };
 type Parsed<T> = { ok: true; value: T } | { ok: false; failure: Failure };
 type Target = { apiBase: string; token: string };
 type Body = Record<string, unknown>;
 type Outcome = { ok: true; body: Body } | { ok: false; failure: Failure };
+
+type AddReason = "BOUNCE" | "COMPLAINT";
+type AddResult = {
+  email: string;
+  success: boolean;
+  alreadyPresent?: boolean;
+  error?: string;
+};
 
 type SuppressedEntry = {
   email: string;
@@ -71,12 +96,17 @@ const REMOVE_COMMAND = "email.suppressions.remove";
 const LIST_USAGE = "wraps email suppressions list --json";
 const REMOVE_USAGE =
   "wraps email suppressions remove <email> --account <awsAccountId> --yes";
+const ADD_COMMAND = "email.suppressions.add";
+const ADD_USAGE =
+  "wraps email suppressions add <email...> --account <awsAccountId> --reason bounce|complaint --yes";
 
+const MAX_BATCH = 100;
 const MAX_LIMIT = 100;
 const MAX_CURSOR_LENGTH = 8192;
 const MAX_EMAIL_LENGTH = 320;
 const MAX_ACCOUNT_ID_LENGTH = 128;
 const DIGITS_ONLY = /^\d+$/;
+const LINE_BREAK = /\r?\n/;
 const PERMISSION_TEXT = /update-role|permission/i;
 
 const DENIED_SUGGESTION =
@@ -168,7 +198,7 @@ function accountSuggestion(
  * remove differ on 400, 403 and 404.
  */
 function httpFailure(
-  action: "list" | "remove",
+  action: "list" | "remove" | "add",
   status: number,
   text: string,
   remove?: { email: string; account: string; ack: boolean }
@@ -255,14 +285,17 @@ function httpFailure(
     };
   }
   if (status >= 500) {
-    return {
-      code: "API_ERROR",
-      message: text,
-      suggestion:
-        action === "list"
-          ? "The Wraps API failed. Retry shortly; to find a failing account, run `wraps email health`."
-          : `The Wraps API failed. Retry shortly; check the address is still listed with \`${LIST_USAGE}\` first.`,
-    };
+    let suggestion: string;
+    if (action === "list") {
+      suggestion =
+        "The Wraps API failed. Retry shortly; to find a failing account, run `wraps email health`.";
+    } else if (action === "add") {
+      suggestion =
+        "The Wraps API failed. Retry shortly; adding an address twice is safe, so re-running the same command is fine.";
+    } else {
+      suggestion = `The Wraps API failed. Retry shortly; check the address is still listed with \`${LIST_USAGE}\` first.`;
+    }
+    return { code: "API_ERROR", message: text, suggestion };
   }
   return {
     code: "API_ERROR",
@@ -273,20 +306,29 @@ function httpFailure(
 
 async function callApi(request: {
   target: Target;
-  method: "GET" | "DELETE";
+  method: "GET" | "DELETE" | "POST";
   path: string;
   query: URLSearchParams;
+  body?: unknown;
   onFailure: (status: number, text: string) => Failure;
 }): Promise<Outcome> {
-  const { target, method, path, query, onFailure } = request;
+  const { target, method, path, query, body: payload, onFailure } = request;
   const qs = query.toString();
   const url = `${target.apiBase}${path}${qs ? `?${qs}` : ""}`;
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${target.token}`,
+  };
+  if (payload !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
 
   let resp: Awaited<ReturnType<typeof fetch>>;
   try {
     resp = await fetch(url, {
       method,
-      headers: { Authorization: `Bearer ${target.token}` },
+      headers,
+      body: payload === undefined ? undefined : JSON.stringify(payload),
     });
   } catch (err) {
     return {
@@ -642,4 +684,379 @@ export async function suppressionsRemove(
       `${email} was no longer on the list of account ${accountId}; nothing changed.`
     );
   }
+}
+
+/** Add-specific hints for 400 and 404; every other status uses httpFailure("add"). */
+function addFailure(status: number, text: string): Failure {
+  if (status === 400) {
+    return {
+      code: "VALIDATION_FAILED",
+      message: text,
+      suggestion: `Check the arguments, then re-run: ${ADD_USAGE}`,
+    };
+  }
+  if (status === 404) {
+    return {
+      code: "NOT_FOUND",
+      message: text,
+      suggestion:
+        "Check that --account is the awsAccountId of a connected account. `wraps email health` lists each account's SES status.",
+    };
+  }
+  return httpFailure("add", status, text);
+}
+
+function undoHint(accountId: string, reason: AddReason): string {
+  const ack = reason === "COMPLAINT" ? " --acknowledge-complaint" : "";
+  return `wraps email suppressions remove <email> --account ${accountId} --yes${ack}`;
+}
+
+/** Trims, drops blanks, and keeps the first spelling of each address (case-insensitive). */
+function uniqueAddresses(raw: string[]): string[] {
+  const seen = new Map<string, string>();
+  for (const item of raw) {
+    const email = item.trim();
+    if (email !== "" && !seen.has(email.toLowerCase())) {
+      seen.set(email.toLowerCase(), email);
+    }
+  }
+  return [...seen.values()];
+}
+
+/** One address per line; blank lines and lines starting with # are skipped. */
+async function readAddressFile(path: string): Promise<Parsed<string[]>> {
+  try {
+    const text = await readFile(path, "utf8");
+    const lines = text
+      .split(LINE_BREAK)
+      .map((line) => line.trim())
+      .filter((line) => line !== "" && !line.startsWith("#"));
+    return { ok: true, value: lines };
+  } catch (err) {
+    return {
+      ok: false,
+      failure: {
+        code: "INVALID_FLAG_VALUE",
+        message: `Could not read --file ${path} (${errorText(err)})`,
+        suggestion:
+          "Check the path, then pass --file <path> to a text file with one address per line.",
+      },
+    };
+  }
+}
+
+/** Maps one bulk entry. The API answers in request order, one result per entry. */
+function bulkResult(email: string, item: unknown): AddResult {
+  if (item !== null && typeof item === "object") {
+    const row = item as Record<string, unknown>;
+    if (row.success === true) {
+      return {
+        email,
+        success: true,
+        alreadyPresent: row.alreadyPresent === true,
+      };
+    }
+    if (row.success === false) {
+      return {
+        email,
+        success: false,
+        error:
+          typeof row.error === "string"
+            ? row.error
+            : "Failed to add suppression",
+      };
+    }
+  }
+  return {
+    email,
+    success: false,
+    error: "The API returned no result for this address",
+  };
+}
+
+/** Positional addresses first, then --file lines; deduped and checked against MAX_BATCH. */
+async function collectAddresses(
+  options: SuppressionsAddOptions
+): Promise<Parsed<string[]>> {
+  const file = optionalText(
+    "--file",
+    options.file,
+    `Pass --file <path> to a text file with one address per line, or give the addresses as arguments: ${ADD_USAGE}`
+  );
+  if (!file.ok) {
+    return file;
+  }
+  let fromFile: string[] = [];
+  if (file.value !== undefined) {
+    const read = await readAddressFile(file.value);
+    if (!read.ok) {
+      return read;
+    }
+    fromFile = read.value;
+  }
+
+  const fromArgs = Array.isArray(options.emails)
+    ? options.emails.filter((item): item is string => typeof item === "string")
+    : [];
+  const emails = uniqueAddresses([...fromArgs, ...fromFile]);
+  if (emails.length === 0) {
+    return {
+      ok: false,
+      failure: {
+        code: "MISSING_REQUIRED_FLAG",
+        message: "No email addresses given",
+        suggestion: `Usage: ${ADD_USAGE}, or pass --file <path>`,
+      },
+    };
+  }
+  if (emails.length > MAX_BATCH) {
+    return {
+      ok: false,
+      failure: {
+        code: "VALIDATION_FAILED",
+        message: `${emails.length} addresses given; one command adds at most ${MAX_BATCH}`,
+        suggestion: `Split the list into files of ${MAX_BATCH} or fewer, then run the command once per file with --file <path>.`,
+      },
+    };
+  }
+  return { ok: true, value: emails };
+}
+
+function parseAccount(raw: unknown): Parsed<string> {
+  const account = optionalText(
+    "--account",
+    raw,
+    `Find the awsAccountId with \`${LIST_USAGE}\`, then re-run: ${ADD_USAGE}`
+  );
+  if (!account.ok) {
+    return account;
+  }
+  if (account.value === undefined) {
+    return {
+      ok: false,
+      failure: {
+        code: "VALIDATION_FAILED",
+        message: "Missing --account <awsAccountId>",
+        suggestion: `Find the awsAccountId with \`${LIST_USAGE}\`, then re-run: ${ADD_USAGE}`,
+      },
+    };
+  }
+  if (account.value.length > MAX_ACCOUNT_ID_LENGTH) {
+    return {
+      ok: false,
+      failure: {
+        code: "INVALID_FLAG_VALUE",
+        message: "--account is longer than 128 characters",
+        suggestion: `Copy the awsAccountId exactly from \`${LIST_USAGE}\`.`,
+      },
+    };
+  }
+  return { ok: true, value: account.value };
+}
+
+function parseAddReason(raw: unknown): Parsed<AddReason> {
+  const text = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  if (text === "bounce") {
+    return { ok: true, value: "BOUNCE" };
+  }
+  if (text === "complaint") {
+    return { ok: true, value: "COMPLAINT" };
+  }
+  return {
+    ok: false,
+    failure: {
+      code: raw === undefined ? "MISSING_REQUIRED_FLAG" : "INVALID_FLAG_VALUE",
+      message: "--reason must be bounce or complaint",
+      suggestion: `Re-run with --reason bounce or --reason complaint: ${ADD_USAGE}`,
+    },
+  };
+}
+
+/** One address uses the single route; two or more use the bulk route. */
+async function sendAdds(
+  target: Target,
+  accountId: string,
+  reason: AddReason,
+  emails: string[]
+): Promise<Parsed<AddResult[]>> {
+  const only = emails.length === 1 ? emails[0] : undefined;
+  if (only !== undefined) {
+    const outcome = await callApi({
+      target,
+      method: "POST",
+      path: "/v1/suppressions",
+      query: new URLSearchParams(),
+      body: { awsAccountId: accountId, email: only, reason },
+      onFailure: addFailure,
+    });
+    if (!outcome.ok) {
+      return outcome;
+    }
+    return {
+      ok: true,
+      value: [
+        {
+          email: only,
+          success: true,
+          alreadyPresent: outcome.body.alreadyPresent === true,
+        },
+      ],
+    };
+  }
+
+  const outcome = await callApi({
+    target,
+    method: "POST",
+    path: "/v1/suppressions/bulk",
+    query: new URLSearchParams(),
+    body: {
+      entries: emails.map((email) => ({
+        awsAccountId: accountId,
+        email,
+        reason,
+      })),
+    },
+    onFailure: addFailure,
+  });
+  if (!outcome.ok) {
+    return outcome;
+  }
+  const rows: unknown[] = Array.isArray(outcome.body.results)
+    ? outcome.body.results
+    : [];
+  return {
+    ok: true,
+    value: emails.map((email, index) => bulkResult(email, rows[index])),
+  };
+}
+
+function printAddHuman(
+  accountId: string,
+  reason: AddReason,
+  results: AddResult[],
+  counts: { added: number; alreadyPresent: number; failed: number }
+): void {
+  for (const r of results) {
+    if (!r.success) {
+      log.error(`${r.email}: ${r.error ?? "Failed to add suppression"}`);
+    } else if (r.alreadyPresent === true) {
+      log.info(
+        `${r.email} was already suppressed on account ${accountId}; nothing changed.`
+      );
+    } else {
+      log.success(
+        `Suppressed ${r.email} on account ${accountId} as ${reason}.`
+      );
+    }
+  }
+  log.info(
+    `${counts.added} added, ${counts.alreadyPresent} already suppressed, ${counts.failed} failed.`
+  );
+  if (counts.added > 0) {
+    log.info(`Undo with: ${undoHint(accountId, reason)}`);
+  }
+}
+
+/**
+ * wraps email suppressions add <email...> --account <awsAccountId> --reason bounce|complaint --yes
+ *
+ * --json data: { awsAccountId, reason: "BOUNCE"|"COMPLAINT", dryRun, results,
+ * added, alreadyPresent, failed }. Each result is { email, success } plus
+ * alreadyPresent on success or error on failure. Exit code is 1 when any
+ * address failed, and the envelope still reports success: true with the counts.
+ */
+export async function suppressionsAdd(
+  options: SuppressionsAddOptions
+): Promise<void> {
+  const command = ADD_COMMAND;
+
+  const addresses = await collectAddresses(options);
+  if (!addresses.ok) {
+    emitError(command, addresses.failure);
+    return;
+  }
+  const account = parseAccount(options.account);
+  if (!account.ok) {
+    emitError(command, account.failure);
+    return;
+  }
+  const parsedReason = parseAddReason(options.reason);
+  if (!parsedReason.ok) {
+    emitError(command, parsedReason.failure);
+    return;
+  }
+  const emails = addresses.value;
+  const accountId = account.value;
+  const reason = parsedReason.value;
+
+  // --dry-run makes no request, so it needs no credentials and no --yes.
+  if (options.dryRun) {
+    const data = {
+      awsAccountId: accountId,
+      reason,
+      dryRun: true,
+      emails,
+      results: [],
+      added: 0,
+      alreadyPresent: 0,
+      failed: 0,
+    };
+    if (isJsonMode()) {
+      jsonSuccess(command, data);
+      return;
+    }
+    note(
+      emails.join("\n"),
+      `Dry run: ${emails.length} address(es) on account ${accountId} as ${reason}`
+    );
+    log.info("No request was sent.");
+    return;
+  }
+
+  if (!options.yes) {
+    const shown = emails.length === 1 ? emails[0] : "<email...>";
+    emitError(command, {
+      code: "CONFIRMATION_REQUIRED",
+      message:
+        "Suppressing an address stops Wraps from sending to it. Nothing was added because --yes was not passed.",
+      suggestion: `Re-run with --yes to confirm: wraps email suppressions add ${shown} --account ${accountId} --reason ${reason.toLowerCase()} --yes. Undo later with: ${undoHint(accountId, reason)}`,
+    });
+    return;
+  }
+
+  const target = await connect(command, options.token);
+  if (!target) {
+    return;
+  }
+
+  const sent = await sendAdds(target, accountId, reason, emails);
+  if (!sent.ok) {
+    emitError(command, sent.failure);
+    return;
+  }
+  const results = sent.value;
+  const added = results.filter(
+    (r) => r.success && r.alreadyPresent !== true
+  ).length;
+  const alreadyPresent = results.filter(
+    (r) => r.success && r.alreadyPresent === true
+  ).length;
+  const failed = results.filter((r) => !r.success).length;
+
+  if (failed > 0) {
+    process.exitCode = 1;
+  }
+  if (isJsonMode()) {
+    jsonSuccess(command, {
+      awsAccountId: accountId,
+      reason,
+      dryRun: false,
+      results,
+      added,
+      alreadyPresent,
+      failed,
+    });
+    return;
+  }
+  printAddHuman(accountId, reason, results, { added, alreadyPresent, failed });
 }
