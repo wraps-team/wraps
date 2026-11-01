@@ -59,12 +59,16 @@ async function requireRow(name: string) {
   return row;
 }
 
+// Scoped to orgA: the isolation test writes an orgB row with the same account
+// and record name, and an unscoped lookup returns whichever row Postgres
+// hands back first.
 async function rowFor(name: string) {
   const [row] = await db
     .select()
     .from(domainAuthCheck)
     .where(
       and(
+        eq(domainAuthCheck.organizationId, orgA),
         eq(domainAuthCheck.awsAccountId, acctA),
         eq(domainAuthCheck.recordName, name)
       )
@@ -235,6 +239,7 @@ describe("Repository: domain-auth", () => {
       .from(domainAuthCheck)
       .where(
         and(
+          eq(domainAuthCheck.organizationId, orgA),
           eq(domainAuthCheck.awsAccountId, acctA),
           eq(domainAuthCheck.recordName, name)
         )
