@@ -9,10 +9,14 @@
  * PATCH  /v1/templates/:id          - Partial update
  * POST   /v1/templates/:id/publish  - Publish to SES
  * POST   /v1/templates/:id/duplicate - Duplicate a template
+ * DELETE /v1/templates/:id          - Delete one template (needs confirm=true)
+ * DELETE /v1/templates              - Delete up to 100 templates (confirm=true, body { ids })
  *
- * No DELETE — templates are referenced by messageSend.emailTemplateId and
- * batchSend.emailTemplateId (onDelete: "set null"), so a delete silently
- * detaches send history. Deliberately not in this plan.
+ * A delete is refused with 409 while a scheduled, queued or processing
+ * broadcast, or an enabled workflow, still uses the template. The FKs on
+ * messageSend/batchSend.emailTemplateId are onDelete "set null", so without
+ * that check a delete would silently detach live sends. The bulk delete is
+ * all-or-nothing. See services/template-delete.ts.
  *
  * The API does not compile TSX. `compiledHtml`/`compiledText` must be
  * supplied by the caller (the CLI renders locally; the dashboard compiles in
@@ -49,8 +53,16 @@ import { requirePermission } from "../lib/require-permission";
 import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
 import { rateLimitMiddleware } from "../middleware/rate-limit";
 import { getCredentials } from "../services/credentials";
+import {
+  deleteTemplates,
+  describeBlocker,
+  type TemplateBlocker,
+} from "../services/template-delete";
 
 const errorResponse = t.Object({ error: t.String() });
+
+const DELETE_CONFIRM_REQUIRED =
+  "Confirmation required: pass confirm=true to delete this template. Deleting it cannot be undone, and its published SES copy is removed too.";
 
 function sha256hex(source: string): string {
   return createHash("sha256").update(source).digest("hex");
@@ -333,6 +345,43 @@ function toListItem(row: {
     publishedAt: row.publishedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+// ── Delete helpers ───────────────────────────────────────────────────────
+
+const DELETE_CONFLICT_RESPONSE = t.Object({
+  error: t.String(),
+  blockingIds: t.Array(t.String(), {
+    description: "Template ids that a live broadcast or enabled workflow uses",
+  }),
+});
+
+const DELETE_SINGLE_RESPONSE = t.Object({
+  success: t.Literal(true),
+  id: t.String(),
+});
+
+const DELETE_BULK_RESPONSE = t.Object({
+  deleted: t.Number({ description: "Number of templates deleted" }),
+  notFound: t.Array(t.String(), {
+    description:
+      "Ids that are not templates of this organization (skipped, nothing deleted for them)",
+  }),
+});
+
+function clientIp(request: Request): string | null {
+  const forwarded = request.headers.get("x-forwarded-for");
+  return forwarded ? forwarded.split(",")[0].trim() : null;
+}
+
+function deleteConflictBody(blockers: TemplateBlocker[]) {
+  const blockingIds = [...new Set(blockers.map((b) => b.templateId))];
+  const shown = blockers.slice(0, 5).map(describeBlocker).join(", ");
+  const more = blockers.length > 5 ? ` and ${blockers.length - 5} more` : "";
+  return {
+    error: `Cannot delete: still in use by ${shown}${more}. Nothing was deleted. Wait for or cancel the broadcasts, or disable the workflows and remove the template from their steps, then retry.`,
+    blockingIds,
   };
 }
 
@@ -867,6 +916,131 @@ export const templatesRoutes = createAuthenticatedRoutes("/v1/templates")
         summary: "Duplicate a template",
         description:
           'Copies name (with " (Copy)" appended), content, and channel/previewText (the dashboard\'s duplicate route omits these two — fixed here). slug, sesTemplateName, and publishedAt are never copied; the duplicate is always a DRAFT.',
+      },
+    }
+  )
+  .delete(
+    "/:id",
+    async (ctx) => {
+      const gate = await requirePermission(ctx, "templates", ["delete"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
+      const authContext = getAuth(ctx);
+      const { params, query, set, request } = ctx;
+
+      if (query.confirm !== "true") {
+        set.status = 400;
+        return { error: DELETE_CONFIRM_REQUIRED };
+      }
+
+      const result = await deleteTemplates({
+        organizationId: authContext.organizationId,
+        userId: gate.userId,
+        ids: [params.id],
+        resourceId: params.id,
+        ipAddress: clientIp(request),
+        userAgent: request.headers.get("user-agent"),
+      });
+
+      if (result.kind === "blocked") {
+        set.status = 409;
+        return deleteConflictBody(result.blockers);
+      }
+      if (result.deleted.length === 0) {
+        set.status = 404;
+        return { error: "Template not found" };
+      }
+      return { success: true as const, id: params.id };
+    },
+    {
+      params: t.Object({ id: t.String({ maxLength: 36 }) }),
+      query: t.Object({
+        confirm: t.Optional(
+          t.String({ description: "Must be the string true" })
+        ),
+      }),
+      response: {
+        200: DELETE_SINGLE_RESPONSE,
+        400: errorResponse,
+        403: errorResponse,
+        404: errorResponse,
+        409: DELETE_CONFLICT_RESPONSE,
+      },
+      detail: {
+        tags: ["templates"],
+        summary: "Delete a template",
+        description:
+          "Deletes one template, org-scoped, along with its versions. Destructive: pass confirm=true, or the request is refused with 400 before anything changes. Refused with 409 (and nothing deleted) while a scheduled, queued or processing broadcast, or an enabled workflow (a send_email or send_sms step, or a cascade channel), still uses the template; blockingIds lists the template ids that are blocked. Draft, paused, completed and other non-blocking broadcasts or workflows do not block. A published SES copy is removed best-effort from the org's AWS accounts. Requires templates delete permission (campaigns:write for API keys).",
+      },
+    }
+  )
+  .delete(
+    "/",
+    async (ctx) => {
+      const gate = await requirePermission(ctx, "templates", ["delete"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
+      const authContext = getAuth(ctx);
+      const { body, query, set, request } = ctx;
+
+      if (query.confirm !== "true") {
+        set.status = 400;
+        return { error: DELETE_CONFIRM_REQUIRED };
+      }
+      if (body.ids.length === 0) {
+        set.status = 400;
+        return { error: "No template IDs provided" };
+      }
+      if (body.ids.length > 100) {
+        set.status = 400;
+        return { error: "Maximum 100 templates can be deleted at once" };
+      }
+
+      const ids = [...new Set(body.ids)];
+      const result = await deleteTemplates({
+        organizationId: authContext.organizationId,
+        userId: gate.userId,
+        ids,
+        resourceId: null,
+        ipAddress: clientIp(request),
+        userAgent: request.headers.get("user-agent"),
+      });
+
+      if (result.kind === "blocked") {
+        set.status = 409;
+        return deleteConflictBody(result.blockers);
+      }
+
+      const deletedIds = new Set(result.deleted.map((row) => row.id));
+      return {
+        deleted: deletedIds.size,
+        notFound: ids.filter((id) => !deletedIds.has(id)),
+      };
+    },
+    {
+      query: t.Object({
+        confirm: t.Optional(
+          t.String({ description: "Must be the string true" })
+        ),
+      }),
+      body: t.Object({
+        ids: t.Array(t.String({ maxLength: 36 }), {
+          description: "Template IDs to delete (1-100)",
+        }),
+      }),
+      response: {
+        200: DELETE_BULK_RESPONSE,
+        400: errorResponse,
+        403: errorResponse,
+        409: DELETE_CONFLICT_RESPONSE,
+      },
+      detail: {
+        tags: ["templates"],
+        summary: "Bulk delete templates",
+        description:
+          "Deletes up to 100 templates in one request (body { ids }), org-scoped. Destructive: pass confirm=true, or the request is refused with 400. All-or-nothing: if any template is still used by a scheduled, queued or processing broadcast, or an enabled workflow, the whole request returns 409 with blockingIds and deletes nothing. Ids that are not templates of this organization are listed in notFound and skipped. Requires templates delete permission (campaigns:write for API keys).",
       },
     }
   );

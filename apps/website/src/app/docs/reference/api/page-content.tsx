@@ -351,6 +351,7 @@ API keys are created in the Wraps dashboard under Settings > API Keys.`,
 | Connections | AWS account connection management | Yes |
 | Domains | Sending identity (domain) verification state, read live from SES | Yes |
 | Templates | Email/SMS template CRUD, publish to SES, and CLI sync | Yes |
+| Suppressions | SES suppression list per AWS account: list, add (single and bulk), and remove | Yes |
 | Segments | Audience segment CRUD and condition preview (Pro plan required) | Yes |
 | Agents | Leashed agent (addressable sender) management: create, kill switch, and approval queue | Yes |
 | Webhooks | Receive SES delivery events | Secret-based |
@@ -529,7 +530,7 @@ Sending identity (domain and email address) verification state, read live from S
 
 CRUD, publish, and duplicate for email/SMS templates. Same table the dashboard's React Email editor and the CLI's \`wraps push\`/\`wraps pull\` protocol read and write -- an API-created template shows up in the editor, and an editor-saved template is readable here.
 
-The API does **not** compile TSX -- \`compiledHtml\`/\`compiledText\` must be supplied by the caller (the CLI renders locally with React Email; the dashboard compiles in the editor). \`POST /v1/templates/:id/publish\` refuses a template with no \`compiledHtml\`. AI generation is dashboard-only; there is no generation endpoint here. There is intentionally no \`DELETE\` -- templates are referenced by \`messageSend.emailTemplateId\` and \`batchSend.emailTemplateId\`, so deleting one would silently detach send history.
+The API does **not** compile TSX -- \`compiledHtml\`/\`compiledText\` must be supplied by the caller (the CLI renders locally with React Email; the dashboard compiles in the editor). \`POST /v1/templates/:id/publish\` refuses a template with no \`compiledHtml\`. AI generation is dashboard-only; there is no generation endpoint here. Templates can be deleted, one at a time or in bulk (see Delete Templates below). A delete is refused with 409 while a scheduled, queued, or processing broadcast, or an enabled workflow, still uses the template.
 
 ### List Templates
 
@@ -556,6 +557,12 @@ The API does **not** compile TSX -- \`compiledHtml\`/\`compiledText\` must be su
 ### Duplicate a Template
 
 \`POST /v1/templates/:id/duplicate\` -- Copies content, channel, and previewText into a new \`DRAFT\` named \`"<name> (Copy)"\`. \`slug\`, \`sesTemplateName\`, and \`publishedAt\` are never copied.
+
+### Delete Templates
+
+\`DELETE /v1/templates/:id?confirm=true\` -- Deletes one template with its versions, org-scoped. \`DELETE /v1/templates?confirm=true\` with body \`{ "ids": [...] }\` deletes 1 to 100 templates in one request. Both need \`confirm=true\`, or they return 400 before anything changes. A published SES copy is removed best-effort from the organization's AWS accounts. Needs \`campaigns:write\` for API keys.
+
+**Returns 409 instead of deleting** while a template is still used by a \`scheduled\`, \`queued\`, or \`processing\` broadcast, or by an enabled workflow (a \`send_email\` or \`send_sms\` step, or a cascade channel). The single route deletes nothing, and \`blockingIds\` lists the blocking template ids. The bulk route is all-or-nothing: one blocked template fails the whole request. Draft, paused, completed, and other non-blocking broadcasts and workflows do not block. On the bulk route, ids that are not templates of this organization are listed in \`notFound\` and skipped.
 
 ### CLI Sync: \`/pull\` Pagination
 
@@ -592,6 +599,22 @@ A segment is a saved audience filter used for broadcast targeting and workflow e
 ### Preview a Condition
 
 \`POST /v1/segments/preview\` -- \`{ condition, limit? }\` (limit capped at 100) -- returns \`{ count, sample }\` for an unsaved condition, without creating a segment. Use this to validate a condition and see roughly who it would reach before committing to \`POST /v1/segments\`.`,
+
+  suppressions: `## Email Suppressions
+
+The SES account-level suppression list, kept per AWS account. Wraps stops sending to a suppressed address. Each route takes the Wraps account id (the \`id\` from the account list), not the 12-digit AWS account number.
+
+### Add a Suppressed Address
+
+\`POST /v1/suppressions\` -- Body \`{ awsAccountId, email, reason }\`, where \`reason\` is \`BOUNCE\` or \`COMPLAINT\`. The address is trimmed and lowercased. Repeat adds are idempotent: an address already suppressed returns \`alreadyPresent: true\` and writes nothing new. A \`BOUNCE\` can be upgraded to \`COMPLAINT\`; a \`COMPLAINT\` is never downgraded. A matching contact is set to suppressed so broadcasts skip it. Needs \`awsAccounts:write\`; API keys need \`contacts:write\`.
+
+### Add Many at Once
+
+\`POST /v1/suppressions/bulk\` -- Body \`{ entries: [{ awsAccountId, email, reason }] }\`, 1 to 100 entries, each with its own account. The response has one result per entry, in request order. An entry that fails (an invalid address, an account outside the organization, an SES denial, or an SES error) fails only itself. An empty list or more than 100 entries returns 400. Same permissions as the single route.
+
+### Remove a Suppressed Address
+
+\`DELETE /v1/suppressions/:email?awsAccountId=<id>&confirm=true\` -- Removes one address. Percent-encode the email in the path. An address suppressed for a complaint also needs \`acknowledgedComplaint=true\`, or the route returns 409. Needs \`awsAccounts:write\`.`,
 
   contactTopics: `## Contact Topics: PATCH vs PUT
 
@@ -638,6 +661,8 @@ ${SECTION_MD.domains}
 ${SECTION_MD.templates}
 
 ${SECTION_MD.segments}
+
+${SECTION_MD.suppressions}
 
 ${SECTION_MD.contactTopics}
 
@@ -715,7 +740,14 @@ const endpointGroups = [
     name: "Templates",
     description: "Email/SMS template CRUD, publish to SES, and CLI sync",
     auth: true,
-    methods: ["GET", "POST", "PATCH"],
+    methods: ["GET", "POST", "PATCH", "DELETE"],
+  },
+  {
+    name: "Suppressions",
+    description:
+      "SES suppression list per AWS account: list, add (single and bulk), and remove",
+    auth: true,
+    methods: ["GET", "POST", "DELETE"],
   },
   {
     name: "Segments",
@@ -2047,10 +2079,9 @@ export default function PageContent() {
             refuses a template with no{" "}
             <code className="rounded bg-muted px-1 py-0.5">compiledHtml</code>.
             AI generation is dashboard-only — there is no generation endpoint
-            here, and there is no{" "}
-            <code className="rounded bg-muted px-1 py-0.5">DELETE</code>{" "}
-            (templates are referenced by send history, so deleting one would
-            silently detach it).
+            here. Templates can be deleted, but a delete is refused with 409
+            while a scheduled, queued, or processing broadcast or an enabled
+            workflow still uses the template.
           </p>
         </div>
 
@@ -2256,6 +2287,56 @@ export default function PageContent() {
           </code>{" "}
           to omit the TSX source from every row.
         </p>
+
+        <h3 className="mb-3 font-medium text-lg">Delete Templates</h3>
+        <p className="mb-4 text-muted-foreground">
+          <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
+            DELETE /v1/templates/:id?confirm=true
+          </code>{" "}
+          deletes one template with its versions. Its bulk form,{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            DELETE /v1/templates?confirm=true
+          </code>
+          , takes a body of{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            {"{ ids }"}
+          </code>{" "}
+          with 1 to 100 template ids. Both need{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            confirm=true
+          </code>
+          , or they return 400 before anything changes. A published SES copy is
+          removed best-effort from the organization's AWS accounts.
+        </p>
+        <div className="mb-4 rounded-lg border-primary border-l-4 bg-primary/10 p-4">
+          <p className="font-medium text-sm">A delete can return 409</p>
+          <p className="mt-2 text-muted-foreground text-sm">
+            A template still used by a{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">
+              scheduled
+            </code>
+            ,{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">queued</code>
+            , or{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">
+              processing
+            </code>{" "}
+            broadcast, or by an enabled workflow, blocks the delete. The single
+            route returns 409 and deletes nothing, and{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">
+              blockingIds
+            </code>{" "}
+            lists the blocking template ids. The bulk route is all-or-nothing:
+            one blocked template fails the whole request. Draft, paused,
+            completed, and other non-blocking broadcasts and workflows do not
+            block. On the bulk route, ids that are not templates of this
+            organization are listed in{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">
+              notFound
+            </code>{" "}
+            and skipped.
+          </p>
+        </div>
       </section>
 
       {/* Segments */}
@@ -2352,6 +2433,91 @@ export default function PageContent() {
             broadcast can be deleted.
           </p>
         </div>
+      </section>
+
+      {/* Email Suppressions */}
+      <section className="mb-12">
+        <SectionHeading
+          className="mb-6"
+          id="suppressions"
+          markdown={SECTION_MD.suppressions}
+          title="Email Suppressions"
+        />
+        <p className="mb-4 text-muted-foreground">
+          The SES account-level suppression list, kept per AWS account. Wraps
+          stops sending to a suppressed address. Each route takes the Wraps
+          account id, not the 12-digit AWS account number.
+        </p>
+
+        <h3 className="mb-3 font-medium text-lg">Add a Suppressed Address</h3>
+        <p className="mb-4 text-muted-foreground">
+          <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
+            POST /v1/suppressions
+          </code>{" "}
+          takes{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            awsAccountId
+          </code>
+          , <code className="rounded bg-muted px-1 py-0.5 text-xs">email</code>,
+          and{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">reason</code> (
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">BOUNCE</code>{" "}
+          or{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            COMPLAINT
+          </code>
+          ). Repeat adds are idempotent: an address that is already suppressed
+          returns{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            alreadyPresent: true
+          </code>{" "}
+          and nothing new is written. A bounce can be upgraded to a complaint,
+          but a complaint is never downgraded. A matching contact is marked
+          suppressed so broadcasts skip it. Needs{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            awsAccounts:write
+          </code>
+          ; API keys need{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            contacts:write
+          </code>
+          .
+        </p>
+
+        <h3 className="mb-3 font-medium text-lg">Add Many at Once</h3>
+        <p className="mb-4 text-muted-foreground">
+          <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
+            POST /v1/suppressions/bulk
+          </code>{" "}
+          adds 1 to 100 entries in one request, each with its own{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            awsAccountId
+          </code>
+          . The response has one result per entry, in request order. An entry
+          that fails (an invalid address, an account outside the organization,
+          an SES denial, or an SES error) fails only itself. An empty list or
+          more than 100 entries returns 400.
+        </p>
+
+        <h3 className="mb-3 font-medium text-lg">
+          Remove a Suppressed Address
+        </h3>
+        <p className="mb-4 text-muted-foreground">
+          <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
+            DELETE
+            /v1/suppressions/:email?awsAccountId=&lt;id&gt;&amp;confirm=true
+          </code>{" "}
+          removes one address. Percent-encode the email in the path. An address
+          suppressed for a complaint also needs{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            acknowledgedComplaint=true
+          </code>
+          , or the route returns 409. Needs{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            awsAccounts:write
+          </code>
+          .
+        </p>
       </section>
 
       {/* Contact Topics */}

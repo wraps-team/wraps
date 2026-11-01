@@ -57,6 +57,26 @@ const EMAIL_DATA_COMMANDS: EmailDataCommand[] = [
     notes: "The copy is always a DRAFT.",
   },
   {
+    command: "email templates delete <id...>",
+    summary:
+      "Delete up to 100 templates, with their versions. A published SES copy is removed too, unless another template uses the same SES name.",
+    flags:
+      "--yes (required), --dry-run (previews the delete and makes no request)",
+    data: "dryRun, route (single or bulk), deleted, notFound, count, and wouldDelete in a dry run",
+    notes:
+      "If any template is still used by a scheduled, queued or processing broadcast, or by an enabled workflow, the whole delete is refused with CONFLICT and nothing is deleted. The error names the blocking template ids.",
+  },
+  {
+    command: "email suppressions add <email...>",
+    summary:
+      "Add up to 100 addresses to an AWS account's SES suppression list, so Wraps stops sending to them.",
+    flags:
+      "--account <awsAccountId> (required), --reason bounce|complaint (required), --file <path> (one address per line), --yes (required), --dry-run",
+    data: "awsAccountId, reason, dryRun, results (email, success, alreadyPresent, error on a failure), added, alreadyPresent, failed",
+    notes:
+      "Adds are idempotent: an address that is already suppressed is reported as alreadyPresent. If any address fails, the command exits with code 1. Undo one address with email suppressions remove.",
+  },
+  {
     command: "email metrics",
     summary:
       "Aggregate sends, opens, clicks, bounces and cost for the organization.",
@@ -1320,6 +1340,129 @@ export default function CLIReferenceEmailPageContent() {
                 <li>
                   After removal, manually delete the MX and SPF DNS records for
                   the removed domain
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* inbound list */}
+        <div className="mb-8 ml-4">
+          <h3 className="mb-3 font-semibold text-xl">
+            wraps email inbound list
+          </h3>
+          <p className="mb-4 text-muted-foreground text-sm">
+            List one page of parsed inbound emails from each connected AWS
+            account&apos;s SES inbound bucket. Wraps stores nothing; the emails
+            are read live from your account. Results come in S3 key order, not
+            received time, so the newest email is not necessarily first.
+          </p>
+          <Card className="mb-4">
+            <CardHeader>
+              <CardTitle className="text-lg">Usage</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CLICommand command="npx @wraps.dev/cli email inbound list [options]" />
+            </CardContent>
+          </Card>
+          <Card className="mb-4">
+            <CardHeader>
+              <CardTitle className="text-lg">Options</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">
+                    --account &lt;id&gt;
+                  </code>{" "}
+                  <span className="text-muted-foreground">
+                    Read one account only. Use the id that{" "}
+                    <code>wraps email health</code> lists, not the 12-digit AWS
+                    account number
+                  </span>
+                </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">
+                    --limit &lt;n&gt;
+                  </code>{" "}
+                  <span className="text-muted-foreground">
+                    Page size, 1-100 (default 20)
+                  </span>
+                </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">
+                    --cursor &lt;c&gt;
+                  </code>{" "}
+                  <span className="text-muted-foreground">
+                    The nextCursor from the previous page, passed unchanged
+                  </span>
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Important Notes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="list-disc space-y-2 pl-5 text-muted-foreground text-sm">
+                <li>
+                  A page can be empty, or hold fewer than --limit entries, while
+                  nextCursor is still set. Keep following nextCursor until it is
+                  null
+                </li>
+                <li>
+                  The response also lists deniedAccountIds and
+                  unreachableAccountIds. When either is not empty, the listing
+                  is incomplete
+                </li>
+                <li>
+                  Attachments appear as metadata only (hasAttachments and
+                  attachmentCount); their contents cannot be downloaded
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* inbound get */}
+        <div className="mb-8 ml-4">
+          <h3 className="mb-3 font-semibold text-xl">
+            wraps email inbound get
+          </h3>
+          <p className="mb-4 text-muted-foreground text-sm">
+            Show one inbound email: headers, text body, HTML body and attachment
+            metadata. Pass the emailId from{" "}
+            <code>wraps email inbound list</code>.
+          </p>
+          <Card className="mb-4">
+            <CardHeader>
+              <CardTitle className="text-lg">Usage</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CLICommand command="npx @wraps.dev/cli email inbound get <emailId> [options]" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Options</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">
+                    --account &lt;id&gt;
+                  </code>{" "}
+                  <span className="text-muted-foreground">
+                    Read only this account. Without it, every account is tried
+                    in order and the first match is returned
+                  </span>
+                </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">--json</code>{" "}
+                  <span className="text-muted-foreground">
+                    Print the JSON envelope. Use it to read the html field
+                  </span>
                 </li>
               </ul>
             </CardContent>

@@ -612,9 +612,16 @@ describe("openapi", () => {
     // as segments' is. The bare path still answers (see the list tests).
     expect(Object.keys(spec.paths).sort()).toEqual([
       "/v1/suppressions/",
+      "/v1/suppressions/bulk",
       "/v1/suppressions/{email}",
     ]);
-    expect(Object.keys(spec.paths["/v1/suppressions/"] ?? {})).toEqual(["get"]);
+    expect(Object.keys(spec.paths["/v1/suppressions/"] ?? {}).sort()).toEqual([
+      "get",
+      "post",
+    ]);
+    expect(Object.keys(spec.paths["/v1/suppressions/bulk"] ?? {})).toEqual([
+      "post",
+    ]);
     expect(Object.keys(spec.paths["/v1/suppressions/{email}"] ?? {})).toEqual([
       "delete",
     ]);

@@ -6,6 +6,9 @@
  * assertion parses the single console.log envelope.
  */
 
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setJsonMode } from "../../../utils/shared/json-output.js";
 
@@ -20,7 +23,11 @@ import {
   checkApiTarget,
   resolveApiTarget,
 } from "../../../utils/shared/api-target.js";
-import { suppressionsList, suppressionsRemove } from "../suppressions.js";
+import {
+  suppressionsAdd,
+  suppressionsList,
+  suppressionsRemove,
+} from "../suppressions.js";
 
 const API_BASE = "http://api.test";
 const TOKEN = "wraps_test";
@@ -726,6 +733,276 @@ describe("wraps email suppressions", () => {
 
       expect(log.warn).toHaveBeenCalledWith(
         "a@x.co was no longer on the list of account acc_1; nothing changed."
+      );
+    });
+  });
+
+  describe("add", () => {
+    const ADD_ENDPOINT_BODY = (entries: string[], reason: string) =>
+      entries.map((email) => ({ awsAccountId: ACCOUNT, email, reason }));
+
+    it("one address posts to /v1/suppressions with the body, the bearer token and a JSON content type", async () => {
+      fetchMock.mockResolvedValue(
+        res(200, {
+          success: true,
+          email: EMAIL,
+          awsAccountId: ACCOUNT,
+          alreadyPresent: false,
+        })
+      );
+
+      await suppressionsAdd({
+        emails: [EMAIL],
+        account: ACCOUNT,
+        reason: "bounce",
+        yes: true,
+        json: true,
+        token: TOKEN,
+      });
+
+      const env = envelope(logSpy);
+      expect(env.success).toBe(true);
+      expect(env.command).toBe("email.suppressions.add");
+      expect(env.data).toEqual({
+        awsAccountId: ACCOUNT,
+        reason: "BOUNCE",
+        dryRun: false,
+        results: [{ email: EMAIL, success: true, alreadyPresent: false }],
+        added: 1,
+        alreadyPresent: 0,
+        failed: 0,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(requestedUrl(fetchMock).pathname).toBe("/v1/suppressions");
+      expect(fetchMock.mock.calls[0][1]).toMatchObject({
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      });
+      expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+        awsAccountId: ACCOUNT,
+        email: EMAIL,
+        reason: "BOUNCE",
+      });
+      expect(process.exitCode).toBeUndefined();
+    });
+
+    it("two or more addresses post to /v1/suppressions/bulk, keep each result, and exit 1 when one failed", async () => {
+      fetchMock.mockResolvedValue(
+        res(200, {
+          results: [
+            { email: "a@x.co", success: true, alreadyPresent: false },
+            { email: "b@x.co", success: true, alreadyPresent: true },
+            { email: "c@x.co", success: false, error: "SES denied" },
+          ],
+        })
+      );
+
+      await suppressionsAdd({
+        emails: ["a@x.co", "b@x.co", "c@x.co"],
+        account: ACCOUNT,
+        reason: "complaint",
+        yes: true,
+        json: true,
+      });
+
+      expect(requestedUrl(fetchMock).pathname).toBe("/v1/suppressions/bulk");
+      expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: "POST" });
+      expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+        entries: ADD_ENDPOINT_BODY(["a@x.co", "b@x.co", "c@x.co"], "COMPLAINT"),
+      });
+      const env = envelope(logSpy);
+      expect(env.success).toBe(true);
+      expect(env.data).toEqual({
+        awsAccountId: ACCOUNT,
+        reason: "COMPLAINT",
+        dryRun: false,
+        results: [
+          { email: "a@x.co", success: true, alreadyPresent: false },
+          { email: "b@x.co", success: true, alreadyPresent: true },
+          { email: "c@x.co", success: false, error: "SES denied" },
+        ],
+        added: 1,
+        alreadyPresent: 1,
+        failed: 1,
+      });
+      expect(process.exitCode).toBe(1);
+    });
+
+    it("--file reads one address per line, skips blanks and # comments, and dedupes case-insensitively after the arguments", async () => {
+      const dir = await mkdtemp(join(tmpdir(), "suppr-add-"));
+      const file = join(dir, "list.txt");
+      try {
+        await writeFile(
+          file,
+          [
+            "# header",
+            "",
+            "  a@x.co  ",
+            "B@x.co",
+            "# skipped",
+            "a@X.co",
+            "",
+            "c@x.co",
+          ].join("\n")
+        );
+        fetchMock.mockResolvedValue(
+          res(200, {
+            results: [
+              { email: "b@x.co", success: true, alreadyPresent: false },
+              { email: "a@x.co", success: true, alreadyPresent: false },
+              { email: "c@x.co", success: true, alreadyPresent: false },
+            ],
+          })
+        );
+
+        await suppressionsAdd({
+          emails: ["b@x.co"],
+          file,
+          account: ACCOUNT,
+          reason: "bounce",
+          yes: true,
+          json: true,
+        });
+
+        const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+        expect(body.entries.map((e: { email: string }) => e.email)).toEqual([
+          "b@x.co",
+          "a@x.co",
+          "c@x.co",
+        ]);
+        expect(envelope(logSpy).data).toMatchObject({ added: 3, failed: 0 });
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
+    });
+
+    it("without --yes it refuses with CONFIRMATION_REQUIRED, names the undo command, and sends nothing", async () => {
+      await suppressionsAdd({
+        emails: [EMAIL],
+        account: ACCOUNT,
+        reason: "bounce",
+        json: true,
+      });
+
+      const err = failure();
+      expect(err.code).toBe("CONFIRMATION_REQUIRED");
+      expect(err.suggestion).toBe(
+        "Re-run with --yes to confirm: wraps email suppressions add a@x.co --account acc_1 --reason bounce --yes. Undo later with: wraps email suppressions remove <email> --account acc_1 --yes"
+      );
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("--dry-run lists the addresses, account and reason with no --yes and no request", async () => {
+      await suppressionsAdd({
+        emails: [EMAIL, "b@x.co"],
+        account: ACCOUNT,
+        reason: "bounce",
+        dryRun: true,
+        json: true,
+      });
+
+      const env = envelope(logSpy);
+      expect(env.success).toBe(true);
+      expect(env.data).toEqual({
+        awsAccountId: ACCOUNT,
+        reason: "BOUNCE",
+        dryRun: true,
+        emails: [EMAIL, "b@x.co"],
+        results: [],
+        added: 0,
+        alreadyPresent: 0,
+        failed: 0,
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(process.exitCode).toBeUndefined();
+    });
+
+    it("rejects --reason other than bounce or complaint before any request, naming the flag", async () => {
+      await suppressionsAdd({
+        emails: [EMAIL],
+        account: ACCOUNT,
+        reason: "spam",
+        yes: true,
+        json: true,
+      });
+
+      expect(failure().message).toBe("--reason must be bounce or complaint");
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("refuses more than 100 addresses locally, before any request", async () => {
+      const emails = Array.from({ length: 101 }, (_, i) => `user${i}@x.co`);
+
+      await suppressionsAdd({
+        emails,
+        account: ACCOUNT,
+        reason: "bounce",
+        yes: true,
+        json: true,
+      });
+
+      const err = failure();
+      expect(err.code).toBe("VALIDATION_FAILED");
+      expect(err.message).toBe(
+        "101 addresses given; one command adds at most 100"
+      );
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("--token is passed to the target resolver and the request uses the resolved token", async () => {
+      vi.mocked(checkApiTarget).mockReturnValue({
+        ok: true,
+        target: { apiBase: API_BASE, token: "wraps_explicit" },
+      } as never);
+      fetchMock.mockResolvedValue(
+        res(200, {
+          success: true,
+          email: EMAIL,
+          awsAccountId: ACCOUNT,
+          alreadyPresent: false,
+        })
+      );
+
+      await suppressionsAdd({
+        emails: [EMAIL],
+        account: ACCOUNT,
+        reason: "bounce",
+        yes: true,
+        json: true,
+        token: "wraps_explicit",
+      });
+
+      expect(resolveApiTarget).toHaveBeenCalledWith({
+        token: "wraps_explicit",
+      });
+      expect(fetchMock.mock.calls[0][1]).toMatchObject({
+        headers: { Authorization: "Bearer wraps_explicit" },
+      });
+    });
+
+    it("403 with the SES permission text is FORBIDDEN and names wraps platform update-role", async () => {
+      fetchMock.mockResolvedValue(
+        res(403, {
+          error:
+            "Wraps doesn't have permission to manage the suppression list on this account. Run `wraps platform update-role` to refresh permissions.",
+        })
+      );
+
+      await suppressionsAdd({
+        emails: [EMAIL],
+        account: ACCOUNT,
+        reason: "bounce",
+        yes: true,
+        json: true,
+      });
+
+      const err = failure();
+      expect(err.code).toBe("FORBIDDEN");
+      expect(err.suggestion).toBe(
+        "Refresh the Wraps role's permissions with `wraps platform update-role`, then retry."
       );
     });
   });

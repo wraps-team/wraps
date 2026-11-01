@@ -19,6 +19,7 @@ import {
 } from "../../../utils/shared/api-target.js";
 import { setJsonMode } from "../../../utils/shared/json-output.js";
 import {
+  templatesDelete,
   templatesDuplicate,
   templatesGet,
   templatesList,
@@ -797,5 +798,185 @@ describe("templatesPull", () => {
 
     expectFailure("email.templates.pull", "NOT_AUTHENTICATED");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("templatesDelete", () => {
+  const DELETE_KEYS = ["count", "deleted", "dryRun", "notFound", "route"];
+
+  function headersAt(n: number): Record<string, string> {
+    return (fetchMock.mock.calls[n][1] as { headers: Record<string, string> })
+      .headers;
+  }
+
+  it("deletes one id on the single route with confirm=true and auth", async () => {
+    fetchMock.mockResolvedValueOnce(res(200, { success: true, id: "tpl_1" }));
+
+    await templatesDelete({
+      ids: ["tpl_1"],
+      yes: true,
+      json: true,
+      token: TOKEN,
+    });
+
+    const env = expectSuccess("email.templates.delete");
+    expect(requestAt(0)[0]).toBe(`${API}/v1/templates/tpl_1?confirm=true`);
+    expect(requestAt(0)[1]).toMatchObject({ method: "DELETE" });
+    expect(requestAt(0)[1].body).toBeUndefined();
+    expect(headersAt(0).Authorization).toBe(`Bearer ${TOKEN}`);
+    expect(env.data).toEqual({
+      dryRun: false,
+      route: "single",
+      deleted: ["tpl_1"],
+      notFound: [],
+      count: 1,
+    });
+  });
+
+  it("sends repeated ids as one bulk body with confirm=true", async () => {
+    fetchMock.mockResolvedValueOnce(
+      res(200, { deleted: 2, notFound: ["tpl_gone"] })
+    );
+
+    await templatesDelete({
+      ids: ["tpl_1", "tpl_2", "tpl_gone"],
+      yes: true,
+      json: true,
+      token: TOKEN,
+    });
+
+    const env = expectSuccess("email.templates.delete");
+    expect(requestAt(0)[0]).toBe(`${API}/v1/templates?confirm=true`);
+    expect(requestAt(0)[1]).toMatchObject({ method: "DELETE" });
+    expect(JSON.parse(requestAt(0)[1].body ?? "")).toEqual({
+      ids: ["tpl_1", "tpl_2", "tpl_gone"],
+    });
+    expect(headersAt(0)["Content-Type"]).toBe("application/json");
+    expect(env.data).toEqual({
+      dryRun: false,
+      route: "bulk",
+      deleted: ["tpl_1", "tpl_2"],
+      notFound: ["tpl_gone"],
+      count: 2,
+    });
+  });
+
+  it("refuses without --yes before any request", async () => {
+    await templatesDelete({ ids: ["tpl_1"], json: true, token: TOKEN });
+
+    const env = expectFailure(
+      "email.templates.delete",
+      "CONFIRMATION_REQUIRED"
+    );
+    expect(env.error?.suggestion).toContain("--yes");
+    expect(env.error?.message).toContain("Nothing was deleted");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("dry run previews the ids and route and makes no request", async () => {
+    await templatesDelete({
+      ids: ["tpl_1", "tpl_2"],
+      dryRun: true,
+      json: true,
+      token: TOKEN,
+    });
+
+    const env = expectSuccess("email.templates.delete");
+    expect(env.data).toMatchObject({
+      dryRun: true,
+      route: "bulk",
+      wouldDelete: ["tpl_1", "tpl_2"],
+      count: 0,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("shows blocking ids on 409 and exits non-zero", async () => {
+    fetchMock.mockResolvedValueOnce(
+      res(409, {
+        error:
+          "Cannot delete: still in use by a scheduled broadcast. Nothing was deleted.",
+        blockingIds: ["tpl_busy"],
+      })
+    );
+
+    await templatesDelete({
+      ids: ["tpl_1", "tpl_busy"],
+      yes: true,
+      json: true,
+      token: TOKEN,
+    });
+
+    const env = expectFailure("email.templates.delete", "CONFLICT");
+    expect(env.error?.message).toContain("tpl_busy");
+    expect(env.error?.suggestion).toContain("broadcasts cancel");
+    expect(env.error?.suggestion).toContain("workflows disable");
+  });
+
+  it("reports a missing single id as NOT_FOUND", async () => {
+    fetchMock.mockResolvedValueOnce(res(404, { error: "Template not found" }));
+
+    await templatesDelete({
+      ids: ["tpl_nope"],
+      yes: true,
+      json: true,
+      token: TOKEN,
+    });
+
+    const env = expectFailure("email.templates.delete", "NOT_FOUND");
+    expect(env.error?.message).toContain("tpl_nope");
+  });
+
+  it("keeps the same data keys for single and bulk output", async () => {
+    fetchMock
+      .mockResolvedValueOnce(res(200, { success: true, id: "tpl_1" }))
+      .mockResolvedValueOnce(res(200, { deleted: 1, notFound: [] }));
+
+    await templatesDelete({
+      ids: ["tpl_1"],
+      yes: true,
+      json: true,
+      token: TOKEN,
+    });
+    const single = JSON.parse(String(logSpy.mock.calls[0][0])) as Envelope;
+    logSpy.mockClear();
+
+    await templatesDelete({
+      ids: ["tpl_1", "tpl_2"],
+      yes: true,
+      json: true,
+      token: TOKEN,
+    });
+    const bulk = JSON.parse(String(logSpy.mock.calls[0][0])) as Envelope;
+
+    expect(Object.keys(single.data ?? {}).sort()).toEqual(DELETE_KEYS);
+    expect(Object.keys(bulk.data ?? {}).sort()).toEqual(DELETE_KEYS);
+  });
+
+  it("rejects more than 100 ids locally, before any request", async () => {
+    const ids = Array.from({ length: 101 }, (_, i) => `tpl_${i}`);
+
+    await templatesDelete({ ids, yes: true, json: true, token: TOKEN });
+
+    const env = expectFailure("email.templates.delete", "VALIDATION_FAILED");
+    expect(env.error?.message).toContain("at most 100");
+    expect(env.error?.suggestion).toContain("batches");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("uses the --token value for the target", async () => {
+    fetchMock.mockResolvedValueOnce(res(200, { success: true, id: "tpl_1" }));
+
+    await templatesDelete({
+      ids: ["tpl_1"],
+      yes: true,
+      json: true,
+      token: "wraps_flag_token",
+    });
+
+    expect(resolveApiTarget).toHaveBeenCalledWith({
+      token: "wraps_flag_token",
+    });
+    expectSuccess("email.templates.delete");
   });
 });

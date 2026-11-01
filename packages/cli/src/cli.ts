@@ -115,6 +115,7 @@ import {
 import { restore } from "./commands/email/restore.js";
 import { emailStatus } from "./commands/email/status.js";
 import {
+  suppressionsAdd,
   suppressionsList,
   suppressionsRemove,
 } from "./commands/email/suppressions.js";
@@ -123,6 +124,7 @@ import { templatesInit } from "./commands/email/templates/init.js";
 import { templatesPreview } from "./commands/email/templates/preview.js";
 import { templatesPush } from "./commands/email/templates/push.js";
 import {
+  templatesDelete,
   templatesDuplicate,
   templatesGet,
   templatesList,
@@ -375,6 +377,9 @@ function showHelp() {
     `  ${pc.cyan("email suppressions list")}  List the SES suppression list (--account <awsAccountId>, --reason bounce|complaint, --limit, --cursor). A page can be empty while hasMore is true.`
   );
   console.log(
+    `  ${pc.cyan("email suppressions add <email...>")}  Suppress addresses (needs --account, --reason bounce|complaint and --yes; --file for a list; --dry-run previews)`
+  );
+  console.log(
     `  ${pc.cyan("email suppressions remove")}  Remove one address (needs --account and --yes; --dry-run previews; --acknowledge-complaint for complaint suppressions)\n`
   );
   console.log(
@@ -419,6 +424,9 @@ function showHelp() {
   );
   console.log(
     `  ${pc.cyan("email templates duplicate")} <id>  Copy a template as a new draft`
+  );
+  console.log(
+    `  ${pc.cyan("email templates delete")} <id...>  Delete templates (--yes; --dry-run previews; refuses in-use templates)`
   );
   console.log(
     `  ${pc.cyan("email templates init")}  Initialize templates-as-code`
@@ -790,6 +798,12 @@ const flags: Record<string, any> = parsedCli.flags;
 const { sub, extraPositionals } = parsedCli;
 const [primaryCommand, subCommand] = sub;
 
+/** Commands whose trailing positionals are a list (`<id...>`, `<email...>`). */
+const VARIADIC_COMMANDS = new Set([
+  "email templates delete",
+  "email suppressions add",
+]);
+
 // Enable JSON output mode globally when --json flag is passed
 setJsonMode(flags.json === true);
 
@@ -1001,9 +1015,13 @@ async function run() {
   }
 
   try {
-    // Nothing reads positionals past index 3, so any here means the invocation
-    // was misunderstood (usually a value given to a valueless boolean flag).
-    if (extraPositionals.length > 0) {
+    // Only the variadic commands below read positionals past index 3 (they take
+    // sub.slice(3)). For every other command, extras mean the invocation was
+    // misunderstood (usually a value given to a valueless boolean flag).
+    if (
+      extraPositionals.length > 0 &&
+      !VARIADIC_COMMANDS.has(sub.slice(0, 3).join(" "))
+    ) {
       throw errors.invalidFlagUsage(
         `Unrecognized argument${extraPositionals.length > 1 ? "s" : ""}: ${extraPositionals.join(" ")}`,
         "A boolean flag (such as --root or --json) takes no value, so a value after it is discarded. Check the flags before these arguments, or run the command with --help."
@@ -1588,6 +1606,17 @@ async function run() {
                 region: flags.region,
               });
               break;
+            case "delete":
+              await templatesDelete({
+                ids: sub.slice(3),
+                yes: flags.yes,
+                dryRun: flags.dryRun,
+                json: flags.json,
+                token: flags.token,
+                region: flags.region,
+              });
+              break;
+
             case "preview":
               await templatesPreview({
                 port: flags.port,
@@ -1600,7 +1629,7 @@ async function run() {
               throw errors.unknownCommand(
                 "templates command",
                 templatesSubCommand,
-                "Available commands: init, push, preview, list, get, pull, publish, duplicate"
+                "Available commands: init, push, preview, list, get, pull, publish, duplicate, delete"
               );
           }
           break;
@@ -1695,6 +1724,20 @@ async function run() {
               });
               break;
 
+            case "add":
+              await suppressionsAdd({
+                emails: sub.slice(3),
+                file: flags.file,
+                account: flags.account,
+                reason: flags.reason,
+                yes: flags.yes,
+                dryRun: flags.dryRun,
+                json: flags.json,
+                token: flags.token,
+                region: flags.region,
+              });
+              break;
+
             case "remove":
               await suppressionsRemove({
                 email: sub[3],
@@ -1712,7 +1755,7 @@ async function run() {
               throw errors.unknownCommand(
                 "suppressions command",
                 suppressionsSubCommand,
-                "Available commands: list, remove <email>"
+                "Available commands: list, add <email...>, remove <email>"
               );
           }
           break;

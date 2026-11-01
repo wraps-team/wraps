@@ -1,5 +1,5 @@
 /**
- * Remote management of templates: `wraps email templates list|get|pull|publish|duplicate`.
+ * Remote management of templates: `wraps email templates list|get|pull|publish|duplicate|delete`.
  *
  * These talk to the organization's templates API. Local authoring (init, push,
  * preview) stays in its own files. `pull` writes one `<slug>.tsx` per template
@@ -14,6 +14,8 @@
  * - A 409 body carries its text in `message`, not `error`. `apiFailure()` reads `message` first.
  * - `awsAccountId` is an awsAccount row id, which `GET /v1/account/health` lists as `accounts[].id`.
  * - `publish` writes to SES, so it requires `--yes`. Nothing is sent before the flag check.
+ * - `delete` removes templates, so it requires `--yes`. One id uses `DELETE /v1/templates/:id`;
+ *   two or more use `DELETE /v1/templates` with body `{ ids }` (max 100, all-or-nothing).
  */
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -75,6 +77,15 @@ type TemplatesDuplicateOptions = {
   region?: string;
 };
 
+type TemplatesDeleteOptions = {
+  ids?: string[];
+  yes?: boolean;
+  dryRun?: boolean;
+  json?: boolean;
+  token?: string;
+  region?: string;
+};
+
 /** Raw template row as the templates routes return it. Optional fields are absent on some routes. */
 type ApiTemplate = {
   id: string;
@@ -114,10 +125,14 @@ const CMD = {
   pull: "email.templates.pull",
   publish: "email.templates.publish",
   duplicate: "email.templates.duplicate",
+  delete: "email.templates.delete",
 } as const;
 
 const TEMPLATE_STATUSES: string[] = ["DRAFT", "PUBLISHED", "ARCHIVED"];
 const TEMPLATE_CHANNELS: string[] = ["email", "sms"];
+
+/** The bulk delete route takes at most this many ids per request. */
+const DELETE_BULK_MAX = 100;
 
 /** pull reads the route in pages of this size. The route caps `limit` at 200. */
 const PULL_PAGE_SIZE = 200;
@@ -195,7 +210,7 @@ async function call(
   command: string,
   target: UsableApiTarget,
   path: string,
-  init: { method?: "GET" | "POST"; body?: unknown } = {}
+  init: { method?: "GET" | "POST" | "DELETE"; body?: unknown } = {}
 ): Promise<Response | null> {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${target.token}`,
@@ -718,6 +733,220 @@ export async function templatesDuplicate(
     return;
   }
   log.success(`Created draft copy ${copy.id} (${copy.name}).`);
+}
+
+/**
+ * Reads a failed delete response. A 409 names the templates still in use and a
+ * 404 on the single route names the missing id; both get delete-specific next
+ * steps. Every other status uses the shared mapping.
+ */
+async function deleteFailure(
+  resp: Response,
+  singleId: string | undefined
+): Promise<Failure> {
+  if (resp.status === 409) {
+    const body = (await resp.json().catch(() => null)) as {
+      error?: unknown;
+      blockingIds?: unknown;
+    } | null;
+    const blockingIds = Array.isArray(body?.blockingIds)
+      ? body.blockingIds.filter((id): id is string => typeof id === "string")
+      : [];
+    return {
+      code: "CONFLICT",
+      message: `${firstText(body?.error) ?? "A broadcast or workflow still uses one of these templates."} Blocking template ids: ${blockingIds.join(", ") || "none reported"}.`,
+      suggestion:
+        "Finish or cancel each scheduled, queued or processing broadcast that uses a blocking template (`wraps broadcasts cancel <id> --yes`), or disable each enabled workflow that sends it (`wraps workflows disable <workflow-id>`). Find the workflows with `wraps workflows list` and the broadcasts in the dashboard. Then re-run the delete. Nothing was deleted.",
+    };
+  }
+  if (resp.status === 404 && singleId !== undefined) {
+    return {
+      code: "NOT_FOUND",
+      message: `Template ${singleId} was not found in this organization. Nothing was deleted.`,
+      suggestion:
+        "Check the id with `wraps email templates list`, then re-run the delete.",
+    };
+  }
+  return apiFailure(resp);
+}
+
+/** The ids to delete: trimmed, non-empty, and de-duplicated in input order. */
+function deleteIds(options: TemplatesDeleteOptions): string[] {
+  return [
+    ...new Set(
+      (options.ids ?? []).map((id) => id.trim()).filter((id) => id !== "")
+    ),
+  ];
+}
+
+/** Dry run: prints what would be deleted and which route it would use. No request. */
+function printDeleteDryRun(
+  command: string,
+  ids: string[],
+  route: "single" | "bulk"
+): void {
+  if (isJsonMode()) {
+    jsonSuccess(command, {
+      dryRun: true,
+      route,
+      wouldDelete: ids,
+      deleted: [],
+      notFound: [],
+      count: 0,
+    });
+    return;
+  }
+  log.info(
+    `Dry run: would delete ${ids.length} template(s) via the ${route} route: ${ids.join(", ")}. Nothing was deleted.`
+  );
+}
+
+/**
+ * Sends the delete. One id goes to the single route; more go to the bulk route
+ * with the ids in the body. Both carry `confirm=true`.
+ */
+function sendDelete(
+  command: string,
+  target: UsableApiTarget,
+  ids: string[],
+  singleId: string | undefined
+): Promise<Response | null> {
+  const confirm = new URLSearchParams({ confirm: "true" });
+  if (singleId === undefined) {
+    return call(command, target, withQuery("/v1/templates", confirm), {
+      method: "DELETE",
+      body: { ids },
+    });
+  }
+  return call(
+    command,
+    target,
+    withQuery(`/v1/templates/${encodeURIComponent(singleId)}`, confirm),
+    { method: "DELETE" }
+  );
+}
+
+/**
+ * Reads a successful delete response into `{ deleted, notFound }`. Returns null
+ * after reporting an unreadable response.
+ */
+async function readDeleteResult(
+  command: string,
+  resp: Response,
+  ids: string[],
+  singleId: string | undefined
+): Promise<{ deleted: string[]; notFound: string[] } | null> {
+  if (singleId !== undefined) {
+    const body = await readBody<{ success?: boolean }>(resp);
+    if (!body || body.success !== true) {
+      failUnexpected(command);
+      return null;
+    }
+    return { deleted: [singleId], notFound: [] };
+  }
+  const body = await readBody<{ deleted?: number; notFound?: unknown }>(resp);
+  if (!(body && Array.isArray(body.notFound))) {
+    failUnexpected(command);
+    return null;
+  }
+  const notFound = body.notFound.filter(
+    (id): id is string => typeof id === "string"
+  );
+  return {
+    deleted: ids.filter((id) => !notFound.includes(id)),
+    notFound,
+  };
+}
+
+function printDeleteResult(
+  route: "single" | "bulk",
+  result: { deleted: string[]; notFound: string[] }
+): void {
+  const { deleted, notFound } = result;
+  log.success(
+    route === "single"
+      ? `Deleted template ${deleted[0]}.`
+      : `Deleted ${deleted.length} template(s).`
+  );
+  if (notFound.length > 0) {
+    log.warn(
+      `Not found in this organization, so skipped: ${notFound.join(", ")}.`
+    );
+  }
+}
+
+/**
+ * `wraps email templates delete <id...> --yes`. One id uses the single route;
+ * two or more use the bulk route. Both report the same shape:
+ * `{ dryRun, route, deleted, notFound, count }`.
+ *
+ * Refuses without `--yes` before any request. `--dry-run` previews the ids and
+ * the route, with no request and no auth check. A bulk delete is all-or-nothing:
+ * a template still in use fails the whole call with 409 and nothing is deleted.
+ */
+export async function templatesDelete(
+  options: TemplatesDeleteOptions
+): Promise<void> {
+  const command = CMD.delete;
+  const ids = deleteIds(options);
+  if (ids.length === 0) {
+    failMissingId(command, "wraps email templates delete <id...> --yes");
+    return;
+  }
+  if (ids.length > DELETE_BULK_MAX) {
+    failValidation(
+      command,
+      `${ids.length} template ids were given, but one delete accepts at most ${DELETE_BULK_MAX}. Nothing was deleted.`,
+      `Split the ids into batches of ${DELETE_BULK_MAX} or fewer, and run one delete per batch with --yes.`
+    );
+    return;
+  }
+
+  const [first] = ids;
+  const singleId = ids.length === 1 ? first : undefined;
+  const route = singleId === undefined ? "bulk" : "single";
+
+  if (options.dryRun) {
+    printDeleteDryRun(command, ids, route);
+    return;
+  }
+  if (!options.yes) {
+    fail(command, {
+      code: "CONFIRMATION_REQUIRED",
+      message: `Deleting ${ids.length} template(s) removes them and their versions. A published SES copy is removed too, unless another template still uses that name. If any template is still used by a scheduled, queued or processing broadcast, or an enabled workflow, the whole delete is refused. Nothing was deleted.`,
+      suggestion: `Preview with \`wraps email templates delete ${ids.join(" ")} --dry-run\`, then re-run with --yes.`,
+    });
+    return;
+  }
+
+  const target = await connect(command, options.token);
+  if (!target) {
+    return;
+  }
+  const resp = await sendDelete(command, target, ids, singleId);
+  if (!resp) {
+    return;
+  }
+  if (!resp.ok) {
+    fail(command, await deleteFailure(resp, singleId));
+    return;
+  }
+  const result = await readDeleteResult(command, resp, ids, singleId);
+  if (!result) {
+    return;
+  }
+
+  if (isJsonMode()) {
+    jsonSuccess(command, {
+      dryRun: false,
+      route,
+      deleted: result.deleted,
+      notFound: result.notFound,
+      count: result.deleted.length,
+    });
+    return;
+  }
+  printDeleteResult(route, result);
 }
 
 /**
