@@ -117,7 +117,12 @@ function renderSheet(
   return { onClose, onSave };
 }
 
-afterEach(cleanup);
+// Radix FocusScope dispatches its unmount event from a setTimeout(0). Let it
+// fire before vitest tears down jsdom, or it lands as an unhandled error.
+afterEach(async () => {
+  cleanup();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+});
 
 describe("copy button has an accessible name (H3)", () => {
   it("names the button after the address it copies", () => {
