@@ -1,5 +1,6 @@
 import { renderAllAlternativesMarkdown } from "./alternatives-markdown";
 import { renderPricingMarkdown } from "./pricing-markdown";
+import { renderSesCalculatorMarkdown } from "./ses-calculator-markdown";
 
 /** Generated from config/pricing.ts + lib/ses-cost.ts — mirrors public/pricing.md */
 const PRICING_MARKDOWN = renderPricingMarkdown();
@@ -7,13 +8,17 @@ const PRICING_MARKDOWN = renderPricingMarkdown();
 /** Generated from config/alternatives.ts — the same source the HTML renders from. */
 const ALTERNATIVES_MARKDOWN = renderAllAlternativesMarkdown();
 
+/** Generated from lib/ses-cost.ts — the module the calculator page renders its rates from. */
+const SES_CALCULATOR_MARKDOWN = renderSesCalculatorMarkdown();
+
 export const AGENT_CONTENT: Record<string, string> = {
   ...ALTERNATIVES_MARKDOWN,
   // Pricing is the single most-requested page for agents; serve it on both the
   // page path (via Accept: text/markdown) and the literal .md path.
   "/pricing": PRICING_MARKDOWN,
   "/pricing.md": PRICING_MARKDOWN,
-  "/tools/ses-calculator": PRICING_MARKDOWN,
+  // The calculator page is about Amazon SES pricing; Wraps' own plans stay at /pricing.
+  "/tools/ses-calculator": SES_CALCULATOR_MARKDOWN,
   "/": `# Wraps
 
 > Deploy email, SMS, and CDN infrastructure to your AWS account with one command.
