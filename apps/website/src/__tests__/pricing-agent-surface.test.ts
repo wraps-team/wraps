@@ -5,7 +5,12 @@ import { describe, expect, it } from "vitest";
 import { AGENT_CONTENT } from "@/lib/agent-content";
 import { renderPricingMarkdown } from "@/lib/pricing-markdown";
 import { renderSesCalculatorMarkdown } from "@/lib/ses-calculator-markdown";
-import { estimateCost, SES_PLAN_IDS, SES_PLANS } from "@/lib/ses-cost";
+import {
+  estimateCost,
+  SES_PLAN_IDS,
+  SES_PLAN_INCLUDES,
+  SES_PLANS,
+} from "@/lib/ses-cost";
 
 const webRoot = resolve(__dirname, "..", "..");
 const read = (relativePath: string) =>
@@ -90,6 +95,10 @@ describe("markdown content negotiation", () => {
       }
     }
     expect(md).toContain(`$${SES_PLANS.pro.monthlyFee}/mo`);
+    // What each plan includes is the text the page renders, not a second copy.
+    for (const id of SES_PLAN_IDS) {
+      expect(md).toContain(SES_PLAN_INCLUDES[id]);
+    }
     expect(md).toMatch(/no free sending allowance/i);
     // Wraps' own plans are one link away, not inlined.
     expect(md).toContain("https://wraps.dev/pricing.md");

@@ -138,6 +138,31 @@ export const SES_PLAN_IDS = [
   "enterprise",
 ] as const;
 
+/**
+ * What each plan's price covers beyond sending, per the AWS SES pricing page.
+ * Rendered by /tools/ses-calculator and its markdown twin.
+ */
+export const SES_PLAN_INCLUDES: Record<SesPlanId, string> = {
+  alacarte: "Sending only. Every other feature is billed on its own line.",
+  essentials:
+    "Virtual Deliverability Manager (SES deliverability) and Mail Manager email processing.",
+  pro: "Essentials, plus inbox placement testing, managed dedicated IPs and 2,500 email validations a month.",
+  enterprise:
+    "Pro, plus Global Endpoints, 1,000 tenants and 5,000 email validations a month.",
+};
+
+/** The three marginal volume bands every 2026 plan is priced in. */
+export const SES_VOLUME_BANDS = [
+  "First 10M",
+  "10M to 100M",
+  "Over 100M",
+] as const;
+
+/** Volumes for the worked-cost table. 20M crosses the first band boundary. */
+export const SES_EXAMPLE_VOLUMES = [
+  10_000, 100_000, 1_000_000, 20_000_000,
+] as const;
+
 export const DEFAULT_SES_PLAN: SesPlanId = "alacarte";
 
 // =============================================================================

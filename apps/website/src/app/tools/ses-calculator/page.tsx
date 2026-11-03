@@ -24,8 +24,11 @@ import { JsonLd } from "@/components/json-ld";
 import type { SesPlanId } from "@/lib/ses-cost";
 import {
   AWS_INFRA_PRICING,
+  SES_EXAMPLE_VOLUMES,
   SES_PLAN_IDS,
+  SES_PLAN_INCLUDES,
   SES_PLANS,
+  SES_VOLUME_BANDS,
   sesSendingCost,
 } from "@/lib/ses-cost";
 import SESCalculatorPageContent from "./page-content";
@@ -54,22 +57,6 @@ export const metadata: Metadata = {
     canonical: "https://wraps.dev/tools/ses-calculator",
   },
 };
-
-/** What each plan's price covers beyond sending, per the AWS SES pricing page. */
-const PLAN_INCLUDES: Record<SesPlanId, string> = {
-  alacarte: "Sending only. Every other feature is billed on its own line.",
-  essentials:
-    "Virtual Deliverability Manager (SES deliverability) and Mail Manager email processing.",
-  pro: "Essentials, plus inbox placement testing, managed dedicated IPs and 2,500 email validations a month.",
-  enterprise:
-    "Pro, plus Global Endpoints, 1,000 tenants and 5,000 email validations a month.",
-};
-
-/** The three marginal volume bands every 2026 plan is priced in. */
-const VOLUME_BANDS = ["First 10M", "10M to 100M", "Over 100M"] as const;
-
-/** Volumes for the worked-cost table. 20M crosses the first band boundary. */
-const EXAMPLE_VOLUMES = [10_000, 100_000, 1_000_000, 20_000_000] as const;
 
 /** À la carte line items beyond sending, from the AWS SES pricing page. */
 const OTHER_CHARGES = [
@@ -251,7 +238,7 @@ export default function SESCalculatorPage() {
                   <TableRow>
                     <TableHead>Plan</TableHead>
                     <TableHead>Monthly fee</TableHead>
-                    {VOLUME_BANDS.map((band) => (
+                    {SES_VOLUME_BANDS.map((band) => (
                       <TableHead key={band}>{band}</TableHead>
                     ))}
                     <TableHead>Included beyond sending</TableHead>
@@ -275,13 +262,13 @@ export default function SESCalculatorPage() {
                             ? "None"
                             : formatUsd(plan.monthlyFee)}
                         </TableCell>
-                        {VOLUME_BANDS.map((band, index) => (
+                        {SES_VOLUME_BANDS.map((band, index) => (
                           <TableCell className="font-mono" key={band}>
                             {formatRate(bandRate(id, index))}
                           </TableCell>
                         ))}
                         <TableCell className="min-w-64 whitespace-normal text-muted-foreground">
-                          {PLAN_INCLUDES[id]}
+                          {SES_PLAN_INCLUDES[id]}
                         </TableCell>
                       </TableRow>
                     );
@@ -384,7 +371,7 @@ export default function SESCalculatorPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {EXAMPLE_VOLUMES.map((emails) => (
+                  {SES_EXAMPLE_VOLUMES.map((emails) => (
                     <TableRow key={emails}>
                       <TableCell className="font-medium">
                         {emails.toLocaleString("en-US")}

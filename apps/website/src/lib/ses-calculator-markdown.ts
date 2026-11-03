@@ -10,17 +10,17 @@
 
 import {
   AWS_INFRA_PRICING,
+  SES_EXAMPLE_VOLUMES,
   SES_PLAN_IDS,
+  SES_PLAN_INCLUDES,
   SES_PLANS,
   SES_PRICING_COPY,
+  SES_VOLUME_BANDS,
   type SesPlan,
   sesSendingCost,
 } from "./ses-cost";
 
 const SITE = "https://wraps.dev";
-
-/** Volumes for the worked-cost table. 20M crosses the first band boundary. */
-const EXAMPLE_VOLUMES = [10_000, 100_000, 1_000_000, 20_000_000] as const;
 
 function rate(perThousand: number): string {
   return `$${perThousand.toFixed(2)}`;
@@ -35,32 +35,10 @@ function usd(amount: number): string {
   });
 }
 
-function volume(value: number): string {
-  return value >= 1_000_000
-    ? `${value / 1_000_000}M`
-    : value.toLocaleString("en-US");
-}
-
 function table(headers: string[], rows: string[][]): string {
   return [headers, headers.map(() => "---"), ...rows]
     .map((cells) => `| ${cells.join(" | ")} |`)
     .join("\n");
-}
-
-/** One label per marginal band, read off the plan's own tier boundaries. */
-function bandLabels(plan: SesPlan): string[] {
-  let previous = 0;
-  return plan.tiers.map((tier) => {
-    let label = `Over ${volume(previous)}`;
-    if (Number.isFinite(tier.upTo)) {
-      label =
-        previous === 0
-          ? `First ${volume(tier.upTo)}`
-          : `${volume(previous)} to ${volume(tier.upTo)}`;
-    }
-    previous = tier.upTo;
-    return label;
-  });
 }
 
 /** The plan's rate in a band; flat plans (à la carte) charge one rate in every band. */
@@ -70,7 +48,6 @@ function bandRate(plan: SesPlan, band: number): number {
 }
 
 function plansSection(): string {
-  const labels = bandLabels(SES_PLANS.essentials);
   const rows = SES_PLAN_IDS.map((id) => {
     const plan = SES_PLANS[id];
     return [
@@ -78,9 +55,9 @@ function plansSection(): string {
       plan.monthlyFee === 0
         ? "$0"
         : `$${plan.monthlyFee.toLocaleString("en-US")}/mo`,
-      ...labels.map((_, band) => rate(bandRate(plan, band))),
+      ...SES_VOLUME_BANDS.map((_, band) => rate(bandRate(plan, band))),
       plan.defaultForNewAccounts ? "Yes" : "No",
-      plan.summary,
+      SES_PLAN_INCLUDES[id],
     ];
   });
 
@@ -92,7 +69,7 @@ ${table(
   [
     "SES plan",
     "Monthly fee",
-    ...labels.map((label) => `Per 1,000: ${label}`),
+    ...SES_VOLUME_BANDS.map((band) => `Per 1,000: ${band}`),
     "Default for new accounts",
     "What it adds",
   ],
@@ -101,7 +78,7 @@ ${table(
 }
 
 function costsSection(): string {
-  const rows = EXAMPLE_VOLUMES.map((emails) => [
+  const rows = SES_EXAMPLE_VOLUMES.map((emails) => [
     `${emails.toLocaleString("en-US")} emails`,
     ...SES_PLAN_IDS.map((id) => {
       const plan = SES_PLANS[id];
