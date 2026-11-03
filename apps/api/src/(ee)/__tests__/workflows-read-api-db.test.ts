@@ -81,6 +81,18 @@ function appFor(organizationId: string, userId: string | null) {
     .use(workflowsReadRoutes);
 }
 
+// The route groups in index.ts order (workflowsRoutes, workflowsSyncRoutes,
+// then workflowsReadRoutes), so /pull reaches the sync handler rather than
+// /:workflowId. The caller supplies the auth context.
+function indexOrderAppAs(auth: Record<string, unknown>) {
+  const { app } = createErrorHarness();
+  return app
+    .derive(() => ({ auth }))
+    .use(workflowsRoutes)
+    .use(workflowsSyncRoutes)
+    .use(workflowsReadRoutes);
+}
+
 function unauthedApp() {
   const { app } = createErrorHarness();
   return app.use(workflowsReadRoutes);
@@ -472,19 +484,12 @@ describe("route precedence — static paths beat /:workflowId", () => {
   // Same order as index.ts after C1: workflowsRoutes, workflowsSyncRoutes,
   // then workflowsReadRoutes. Auth is injected, the real groups are mounted.
   function indexOrderApp() {
-    const { app } = createErrorHarness();
-    return app
-      .derive(() => ({
-        auth: {
-          apiKeyId: null,
-          organizationId: ids.org,
-          userId: ids.user,
-          planId: "free",
-        },
-      }))
-      .use(workflowsRoutes)
-      .use(workflowsSyncRoutes)
-      .use(workflowsReadRoutes);
+    return indexOrderAppAs({
+      apiKeyId: null,
+      organizationId: ids.org,
+      userId: ids.user,
+      planId: "free",
+    });
   }
 
   it("GET /v1/workflows/pull still reaches the sync handler", async () => {
@@ -507,6 +512,45 @@ describe("route precedence — static paths beat /:workflowId", () => {
     );
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ id: EXEC_A_OLD });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// /pull returns steps, trigger config and TypeScript source, so it needs the
+// same workflows read the summary routes do. Every role in access.ts holds
+// workflows read, so only API key scopes can be refused here.
+describe("GET /v1/workflows/pull — permissions", () => {
+  function keyAuth(apiKeyScopes: string[]) {
+    return {
+      apiKeyId: `${PREFIX}-key`,
+      organizationId: ids.org,
+      userId: ids.user,
+      planId: "free",
+      apiKeyScopes,
+    };
+  }
+
+  it("an API key with workflows:read gets the pushed workflows", async () => {
+    const res = await indexOrderAppAs(keyAuth(["workflows:read"])).handle(
+      new Request("http://localhost/v1/workflows/pull")
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.workflows.map((w: { id: string }) => w.id)).toEqual([
+      WF_PUSHED,
+    ]);
+    expect(body.workflows[0].sourceTs).toContain("defineWorkflow");
+  });
+
+  it("an API key without workflows:read gets 403 and no workflow data", async () => {
+    const res = await indexOrderAppAs(keyAuth(["contacts:read"])).handle(
+      new Request("http://localhost/v1/workflows/pull")
+    );
+    expect(res.status).toBe(403);
+    const text = await res.text();
+    expect(JSON.parse(text)).toEqual({ error: DENIED });
+    expect(text).not.toContain(WF_PUSHED);
+    expect(text).not.toContain("defineWorkflow");
   });
 });
 
