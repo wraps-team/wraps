@@ -425,6 +425,17 @@ Who the permission applies to depends on how the request authenticates:
 - `DELETE /v1/topics/{id}?confirm=true`: delete the topic and every subscription to it. Needs `topics:delete`.
 - `GET /v1/topics/{id}/subscribers`: subscribers, filterable by `status` (`subscribed`, `pending`, `unsubscribed`). Query `page` and `pageSize`. Needs `topics:read`.
 
+### Segments (Pro plan)
+
+Every segments route needs the Pro plan, reads included. A Free organization gets 403 on every verb. A `condition` is the filter tree the dashboard segment builder produces: AND/OR groups of `{ field, operator, value }` filters, with optional nesting under `group.nested`. It is validated before it is saved, and an invalid or unevaluable condition returns 400 with the reason. `memberCount` in every response is counted live against current contacts, not read from a stored value.
+
+- `GET /v1/segments`: list segments with `memberCount`, `trackMembership` and `lastComputedAt`. Query `limit` (1-100, default 20), `offset` and `search` (matches the name). Returns `segments`, `total`, `limit` and `offset`. Any authenticated caller on a Pro plan can read.
+- `POST /v1/segments`: create a segment. Body: `name` (required, up to 200 characters), `condition` (required), `description` and `trackMembership`. Returns 201 with the segment, `condition` included. Needs `segments:write`.
+- `GET /v1/segments/{id}`: one segment with its `condition`. Returns 404 when it is not in the organization.
+- `PATCH /v1/segments/{id}`: change only the fields sent: `name`, `description`, `condition`, `trackMembership`. Sending `condition` re-validates it. Needs `segments:write`.
+- `DELETE /v1/segments/{id}`: delete a segment. Takes no `confirm` parameter. Returns 409 and deletes nothing while a scheduled, queued or processing broadcast targets the segment. Draft, completed, failed and cancelled broadcasts do not block it. Needs `segments:delete`.
+- `POST /v1/segments/preview`: count and sample the audience an unsaved condition would reach, without saving a segment. Body: `condition` (required) and `limit` (1-100, default 5). Returns `count` and `sample` (email addresses). It is the quickest way to check a condition before `POST /v1/segments`. Needs `segments:read`.
+
 ### Email suppressions
 
 - `GET /v1/suppressions`: the SES suppression list. Query `awsAccountId`, `reason` (`BOUNCE` or `COMPLAINT`), `limit` (1-100) and `cursor`. Pass `nextCursor` back unchanged. Needs `awsAccounts:read`.
