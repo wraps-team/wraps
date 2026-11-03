@@ -21,12 +21,26 @@ skipped — a production deploy that silently did not happen, on a run whose con
 read `cancelled` rather than `failure`. `baseline/deploy-api-workflow.test.ts` fails if
 `deploy-api.yml` calls `test.yml` again.
 
-Two consequences before editing either file:
+Consequences to know before editing either file:
 
-- **`workflow_run` has no `paths:` filter**, so the deploy's path list lives in the `gate`
-  job, which diffs against *the last commit this workflow actually deployed* — not `HEAD^`.
-  A `HEAD^` comparison strands changes whenever a deploy is cancelled, fails, or a push
-  carries several commits. Keep the list in sync with `pnpm --filter "@wraps/api^..." list`.
+- **`workflow_run` has no `paths:` filter**, so the deploy's path list lives in
+  `scripts/ci/deploy-gate.sh` (run by the `gate` job; tests in
+  `scripts/__tests__/deploy-gate.test.ts`). It diffs against *the last commit this
+  workflow actually deployed* — not `HEAD^`. A `HEAD^` comparison strands changes whenever
+  a deploy is cancelled, fails, or a push carries several commits. Keep the list in sync
+  with `pnpm --filter "@wraps/api^..." list`; it also carries `pnpm-lock.yaml` and
+  `pnpm-workspace.yaml`, because the API takes its dependency versions from the pnpm
+  catalog.
+- **"Last deployed" is a GitHub Deployment, not a past run.** After `sst deploy` succeeds,
+  the `deploy` job records the tested SHA as a `success` Deployment in the
+  `api-<stage>` environment (`api-production`), and the gate reads the newest one. Past
+  runs can't stand in: a run whose gate skipped still concludes `success`, and a
+  `workflow_run` run's own `head_sha` is main's HEAD at trigger time, not the commit it
+  tested — on 2026-11-03 that hid API commit #247 behind the docs-only #248 until a manual
+  dispatch. **Never use `api-<stage>` as a job `environment:`**: GitHub's automatic job
+  records carry `github.sha`, the same wrong commit, and would corrupt the lookup. Every
+  failure to read the record (none yet, API error, timeout, SHA not in history) deploys;
+  the gate never deploys backwards onto a commit older than the recorded one.
 - **The deploy checks out the tested SHA** (`needs.gate.outputs.sha`), not the branch tip.
   Under `workflow_run` the default checkout is main's head at trigger time, which may
   already be a newer, untested commit.

@@ -28,10 +28,11 @@ on:
           - production
           - staging
 
+# Least privilege: `gate` and `deploy` set their own permissions below. A
+# job-level `permissions:` replaces this set rather than adding to it, so each
+# restates everything it needs. `migrate` (migrate.yml) inherits this.
 permissions:
   contents: read
-  id-token: write # Required for AWS OIDC
-  deployments: write # `gate` reads, and `deploy` writes, the `api-<stage>` deployment record
 
 env:
   AWS_REGION: us-east-1
@@ -84,6 +85,10 @@ jobs:
       github.event.workflow_run.event == 'push'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Reads the `api-<stage>` deployment record; never writes it.
+    permissions:
+      contents: read
+      deployments: read
     outputs:
       deploy: ${{ steps.decide.outputs.deploy }}
       sha: ${{ steps.decide.outputs.sha }}
@@ -104,7 +109,18 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           # A `workflow_run` trigger always deploys production, as `deploy` assumes.
           STAGE: ${{ github.event.inputs.stage || 'production' }}
-        run: bash scripts/ci/deploy-gate.sh
+        run: |
+          # `workflow_run` uses this file as it is on main but checks out the
+          # tested commit, so a commit older than scripts/ci/deploy-gate.sh can
+          # land here. Fail loudly and do not deploy: deploying on a missing
+          # script would also fire for any later re-run of Test on a pre-gate
+          # commit, shipping that old code unconditionally. The commit that adds
+          # the script runs its own gate, finds no record, and deploys.
+          if [ ! -f scripts/ci/deploy-gate.sh ]; then
+            echo "::error::scripts/ci/deploy-gate.sh does not exist at $HEAD_SHA (a commit from before the gate script landed); not deploying"
+            exit 1
+          fi
+          bash scripts/ci/deploy-gate.sh
 
   # Migrate BEFORE deploying, not after. `sst deploy` publishes each Lambda's
   # new code the moment that function updates — well before the command returns
@@ -147,6 +163,10 @@ jobs:
     # Bound a hung `sst deploy`; a normal run is ~5-14 minutes. This does not
     # cover queue time — GitHub caps self-hosted queue time at 24h instead.
     timeout-minutes: 120
+    permissions:
+      contents: read
+      id-token: write # Required for AWS OIDC
+      deployments: write # Writes the `api-<stage>` deployment record
     environment: ${{ github.event.inputs.stage || 'production' }}
 
     # Two `sst deploy` runs against one Pulumi stack fight over the state lock.

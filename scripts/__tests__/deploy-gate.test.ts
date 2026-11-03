@@ -29,6 +29,8 @@ const SCRIPT = join(
 const FAKE_GH = `#!/usr/bin/env bash
 echo "$*" >> "$FAKE_GH_DIR/calls.log"
 if [ -f "$FAKE_GH_DIR/fail" ]; then echo "gh: boom" >&2; exit 1; fi
+# exec so the timeout's SIGTERM reaches sleep itself, not just this shell.
+if [ -f "$FAKE_GH_DIR/slow" ]; then exec sleep 30; fi
 path="$2"
 case "$path" in
   */deployments\\?*) cat "$FAKE_GH_DIR/deployments.json" ;;
@@ -98,7 +100,11 @@ function serve(deployments: Fixture[]) {
 
 function runGate(
   headSha: string,
-  opts: { event?: string; stage?: string } = {}
+  opts: {
+    event?: string;
+    stage?: string;
+    env?: Record<string, string>;
+  } = {}
 ) {
   const output = join(root, "github-output");
   writeFileSync(output, "");
@@ -114,6 +120,7 @@ function runGate(
       HEAD_SHA: headSha,
       EVENT_NAME: opts.event ?? "workflow_run",
       STAGE: opts.stage ?? "production",
+      ...opts.env,
     },
   });
   const outputs = Object.fromEntries(
@@ -125,6 +132,7 @@ function runGate(
   return {
     status: result.status,
     stdout: result.stdout,
+    stderr: result.stderr,
     deploy: outputs.deploy,
     sha: outputs.sha,
     calls: readFileSync(join(ghDir, "calls.log"), "utf-8"),
@@ -171,9 +179,12 @@ describe("deploy-gate.sh", () => {
       expect(result.status).toBe(0);
       expect(result.deploy).toBe("true");
       expect(result.sha).toBe(head);
+      expect(result.stderr).toContain(
+        "::notice::no api-production deployment record"
+      );
     });
 
-    it("deploys when the GitHub API errors", () => {
+    it("deploys when the GitHub API errors, and keeps gh's error in the log", () => {
       const head = commit("apps/website/page.tsx", "docs only");
       writeFileSync(join(ghDir, "fail"), "");
 
@@ -181,6 +192,23 @@ describe("deploy-gate.sh", () => {
 
       expect(result.status).toBe(0);
       expect(result.deploy).toBe("true");
+      expect(result.stderr).toContain("gh: boom");
+      expect(result.stderr).toContain(
+        "::warning::could not list api-production"
+      );
+    });
+
+    it("deploys when gh hangs, instead of running the job into its timeout", () => {
+      const head = commit("apps/website/page.tsx", "docs only");
+      writeFileSync(join(ghDir, "slow"), "");
+
+      const started = Date.now();
+      const result = runGate(head, { env: { DEPLOY_GATE_GH_TIMEOUT: "1" } });
+
+      expect(result.status).toBe(0);
+      expect(result.deploy).toBe("true");
+      expect(result.stderr).toContain("::warning::could not list");
+      expect(Date.now() - started).toBeLessThan(15_000);
     });
 
     it("deploys when the API returns something that is not JSON", () => {
@@ -191,6 +219,7 @@ describe("deploy-gate.sh", () => {
 
       expect(result.status).toBe(0);
       expect(result.deploy).toBe("true");
+      expect(result.stderr).toContain("::warning::api-production deployments");
     });
 
     it("deploys when every status lookup fails", () => {
@@ -202,6 +231,7 @@ describe("deploy-gate.sh", () => {
 
       expect(result.status).toBe(0);
       expect(result.deploy).toBe("true");
+      expect(result.stderr).toContain("::warning::could not read the status");
     });
 
     it("deploys when the recorded sha is not in this history", () => {
@@ -213,7 +243,8 @@ describe("deploy-gate.sh", () => {
 
       expect(result.status).toBe(0);
       expect(result.deploy).toBe("true");
-      expect(result.stdout).toContain("no usable previous deploy");
+      expect(result.stdout).toContain("recorded deploy is not in history");
+      expect(result.stderr).toContain("::warning::recorded deploy");
     });
   });
 
@@ -264,7 +295,7 @@ describe("deploy-gate.sh", () => {
       expect(runGate(head).calls).toContain("environment=api-production");
     });
 
-    it("keeps the path list in step with the API's workspace dependencies", () => {
+    it("deploys for the paths in the list and skips for unrelated ones", () => {
       const deployed = commit("README.md", "deployed");
       serve([{ id: 1, sha: deployed, statuses: ["success"] }]);
 
@@ -275,6 +306,9 @@ describe("deploy-gate.sh", () => {
         "infra/api.ts",
         "sst.config.ts",
         ".github/workflows/deploy-api.yml",
+        // The API's dependency versions come from the pnpm catalog.
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
       ]) {
         const head = commit(file, `touch ${file}`);
         expect(runGate(head).deploy, file).toBe("true");
@@ -333,6 +367,53 @@ describe("deploy-gate.sh", () => {
       expect(result.stdout).toContain(`comparing ${newer}..${head}`);
       expect(result.deploy).toBe("false");
     });
+  });
+
+  describe("never deploys backwards", () => {
+    it("skips a tested commit that is older than the recorded deploy", () => {
+      const parent = commit("apps/website/page.tsx", "older, docs only");
+      const deployed = commit("apps/api/src/route.ts", "newer, api change");
+      serve([{ id: 1, sha: deployed, statuses: ["success"] }]);
+
+      // A tree diff parent..deployed-direction would list apps/api/ and deploy.
+      const result = runGate(parent);
+
+      expect(result.status).toBe(0);
+      expect(result.deploy).toBe("false");
+      expect(result.stdout).toContain("is older than deployed");
+    });
+
+    it("still deploys an older commit when dispatched by hand", () => {
+      const parent = commit("apps/website/page.tsx", "older");
+      const deployed = commit("apps/api/src/route.ts", "newer");
+      serve([{ id: 1, sha: deployed, statuses: ["success"] }]);
+
+      const result = runGate(parent, { event: "workflow_dispatch" });
+
+      expect(result.deploy).toBe("true");
+    });
+
+    it("does not treat a sibling branch as older", () => {
+      const base = commit("README.md", "base");
+      const deployed = commit("apps/website/page.tsx", "deployed");
+      git("checkout", "-q", "-b", "other", base);
+      const head = commit("apps/api/src/route.ts", "api change off a sibling");
+      serve([{ id: 1, sha: deployed, statuses: ["success"] }]);
+
+      expect(runGate(head).deploy).toBe("true");
+    });
+  });
+
+  it("deploys when a file was moved out of an API path", () => {
+    const deployed = commit("apps/api/src/route.ts", "deployed");
+    mkdirSync(join(repo, "docs"), { recursive: true });
+    git("mv", "apps/api/src/route.ts", "docs/route.md");
+    git("commit", "-m", "move the route out of the API");
+    const head = git("rev-parse", "HEAD");
+    serve([{ id: 1, sha: deployed, statuses: ["success"] }]);
+
+    // Rename detection would report only docs/route.md and skip.
+    expect(runGate(head).deploy).toBe("true");
   });
 
   // 2026-11-03: #248 (docs-only) and #247 (API) merged back to back. The old
