@@ -154,13 +154,15 @@ export const releases: Release[] = [
         until you set <Code>WRAPS_WRITE_ENABLED=true</Code>
       </>,
       <>
-        Check the role or key behind anything that writes. Read-only and billing
-        members can read but not write, and marketing members can read but not
-        change segments, workflows or topics.{" "}
+        Check the role or key behind your API calls. Read-only and billing
+        members can read but not change data, and marketing members can read but
+        not change segments, workflows or topics.{" "}
         <Code>wraps platform connect</Code> and <Code>disconnect</Code> from a
-        session need an owner or admin. An API key needs the matching scope for
-        reads as well as writes on topics, events, suppressions, workflow runs
-        and contact export. A refused request returns 403 and changes nothing
+        session need an owner or admin. An API key now needs a scope to read
+        too: <Code>topics:read</Code> for topics, <Code>workflows:read</Code>{" "}
+        for workflows and their runs, and <Code>contacts:read</Code> for events,
+        suppressions and contact export. Event tracking still accepts any key. A
+        refused request returns 403 and changes nothing
       </>,
     ],
     docs: "/docs/cli-reference",
