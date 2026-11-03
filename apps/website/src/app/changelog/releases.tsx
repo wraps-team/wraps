@@ -142,8 +142,9 @@ export const releases: Release[] = [
         delete up to 100 templates, and{" "}
         <Code>wraps email suppressions add</Code> to add up to 100 addresses to
         an account&apos;s suppression list. The last two need <Code>--yes</Code>{" "}
-        and take <Code>--dry-run</Code>. A template that a scheduled broadcast
-        or an enabled workflow uses is refused, and nothing is deleted
+        and take <Code>--dry-run</Code>. A template still used by a scheduled,
+        queued or processing broadcast, or by an enabled workflow, is refused,
+        and nothing is deleted
       </>,
       <>
         Connect an MCP client to <Code>@wraps.dev/mcp</Code> v0.10.0 for tools
