@@ -234,7 +234,8 @@ jobs:
       # given its `success` status is skipped by the gate in favour of the
       # previous record, so the next run diffs against a stale baseline and a
       # revert of this deploy would look like "nothing changed". The red job is
-      # the only signal, so re-run this job's record step (or dispatch a deploy).
+      # the only signal, so re-run the `deploy` job (it repeats `sst deploy` for the same
+      # commit, then records it) or dispatch a deploy.
       - name: Record the deployed commit
         env:
           GH_TOKEN: ${{ github.token }}

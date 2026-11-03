@@ -66,7 +66,7 @@ fi
 # exit code is in each warning so the two can be told apart.
 last_deployed_sha() {
   local timeout_s="${DEPLOY_GATE_GH_TIMEOUT:-20}"
-  local deployments rows id sha state rc count=0
+  local deployments rows id sha statuses state rc count=0
 
   deployments=$(timeout "$timeout_s" gh api \
     "repos/$GITHUB_REPOSITORY/deployments?environment=api-$STAGE&per_page=30") || {
@@ -80,7 +80,7 @@ last_deployed_sha() {
     return 0
   fi
 
-  rows=$(jq -r '.[] | select(.id != null and .sha != null) | [.id, .sha] | @tsv' <<<"$deployments") || {
+  rows=$(jq -r '.[] | if .id == null or .sha == null then error("deployment without id or sha") else [.id, .sha] | @tsv end' <<<"$deployments") || {
     echo "::warning::could not parse the api-$STAGE deployments response: deploying without a baseline" >&2
     return 0
   }
@@ -89,11 +89,14 @@ last_deployed_sha() {
     [ -n "$id" ] || continue
     count=$((count + 1))
     # Statuses come newest first, so the first one is the deployment's state.
-    state=$(timeout "$timeout_s" gh api \
-      "repos/$GITHUB_REPOSITORY/deployments/$id/statuses?per_page=1" |
-      jq -r '.[0].state // ""') || {
+    statuses=$(timeout "$timeout_s" gh api \
+      "repos/$GITHUB_REPOSITORY/deployments/$id/statuses?per_page=1") || {
       rc=$?
       echo "::warning::could not read the status of api-$STAGE deployment $id (exit $rc): deploying without a baseline" >&2
+      return 0
+    }
+    state=$(jq -er 'if type == "array" then (.[0].state // "") else error("not an array") end' <<<"$statuses") || {
+      echo "::warning::the status response for api-$STAGE deployment $id is empty or not a JSON array: deploying without a baseline" >&2
       return 0
     }
     if [ "$state" = "success" ]; then
@@ -102,9 +105,7 @@ last_deployed_sha() {
     fi
   done <<<"$rows"
 
-  if [ "$count" -eq 0 ] && jq -e 'length > 0' <<<"$deployments" >/dev/null 2>&1; then
-    echo "::warning::api-$STAGE deployments came back without ids: deploying without a baseline" >&2
-  elif [ "$count" -eq 0 ]; then
+  if [ "$count" -eq 0 ]; then
     echo "::notice::no api-$STAGE deployment record yet (expected on the first run after this gate shipped)" >&2
   else
     echo "::warning::none of the $count newest api-$STAGE deployments has a success status" >&2
@@ -132,10 +133,13 @@ fi
 # would list the newer commit's files as changes and roll production back. Only
 # exit 0 skips; exit 1 (not an ancestor) and 128 (error) fall through to the
 # diff, so an error here never blocks a deploy.
+#
+# A manual dispatch always deploys, which is how to roll back on purpose. The
+# rollback lasts until the next push to main deploys (that push descends from the
+# bad commit, so it ships it again), so revert on main to keep it.
 if [ "$last" != "$HEAD_SHA" ] && git merge-base --is-ancestor "$HEAD_SHA" "$last"; then
   echo "deploy=false" >> "$OUT"
   echo "::notice::$HEAD_SHA is older than deployed $last: skipping (dispatch Deploy API by hand to roll back on purpose)"
-  echo "$HEAD_SHA is older than deployed $last: skipping"
   exit 0
 fi
 

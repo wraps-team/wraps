@@ -25,7 +25,8 @@ const SCRIPT = join(
 );
 
 // Answers the two endpoints the script calls from files in $FAKE_GH_DIR and
-// logs every call. A `fail` file makes every call exit non-zero.
+// logs every call. A `fail` file makes every call exit non-zero; `slow` makes
+// every call hang, and `slow-statuses-<id>` hangs only that deployment's statuses.
 const FAKE_GH = `#!/usr/bin/env bash
 echo "$*" >> "$FAKE_GH_DIR/calls.log"
 if [ -f "$FAKE_GH_DIR/fail" ]; then echo "gh: boom" >&2; exit 1; fi
@@ -238,7 +239,27 @@ describe("deploy-gate.sh", () => {
       const result = runGate(head);
 
       expect(result.deploy).toBe("true");
-      expect(result.stderr).toContain("deploying without a baseline");
+      expect(result.stderr).toContain(
+        "could not read the status of api-production deployment 2 (exit 1)"
+      );
+    });
+
+    it("deploys a revert when the newest record's status body is empty", () => {
+      const d1 = commit("README.md", "older deploy");
+      const d2 = commit("apps/api/src/route.ts", "api change, deployed");
+      git("revert", "--no-edit", d2);
+      const head = git("rev-parse", "HEAD");
+      serve([
+        { id: 2, sha: d2 },
+        { id: 1, sha: d1, statuses: ["success"] },
+      ]);
+      // A 204 reads as success with no output; it must not fall back to D1.
+      writeFileSync(join(ghDir, "statuses-2.json"), "");
+
+      const result = runGate(head);
+
+      expect(result.deploy).toBe("true");
+      expect(result.stderr).toContain("is empty or not a JSON array");
     });
 
     it("deploys a revert when only the status call hangs", () => {
@@ -259,18 +280,27 @@ describe("deploy-gate.sh", () => {
       expect(result.stderr).toContain("(exit 124)");
     });
 
-    it("deploys when the deployments come back without ids", () => {
-      const head = commit("apps/website/page.tsx", "docs only");
+    it("deploys when the newest deployment is malformed, not falling back to an older one", () => {
+      const older = commit("apps/website/page.tsx", "older deploy");
+      const head = commit("apps/website/other.tsx", "docs only");
       writeFileSync(
         join(ghDir, "deployments.json"),
-        JSON.stringify([{ sha: head }])
+        JSON.stringify([
+          { id: 2, sha: null },
+          { id: 1, sha: older },
+        ])
+      );
+      writeFileSync(
+        join(ghDir, "statuses-1.json"),
+        JSON.stringify([{ state: "success" }])
       );
 
       const result = runGate(head);
 
+      // Falling back to `older` would diff website-only changes and skip.
       expect(result.deploy).toBe("true");
       expect(result.stderr).toContain(
-        "::warning::api-production deployments came back without ids"
+        "::warning::could not parse the api-production deployments response"
       );
     });
 

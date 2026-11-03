@@ -41,7 +41,8 @@ Consequences to know before editing either file:
   records carry `github.sha`, the same wrong commit, and would corrupt the lookup. Every
   failure to read the record (none yet, API error, timeout, an unreadable status, SHA not
   in history) deploys. When it can read the record, the gate skips a commit older than the
-  recorded one; a manual dispatch always deploys, which is how to roll back on purpose.
+  recorded one; a manual dispatch always deploys, which is how to roll back on purpose; it lasts until
+  the next push to main deploys, so revert on main to keep it.
   A failed record step leaves the job red on purpose: a deployment without its `success`
   status is skipped in favour of the previous record, which is a stale baseline.
 - **The deploy checks out the tested SHA** (`needs.gate.outputs.sha`), not the branch tip.
