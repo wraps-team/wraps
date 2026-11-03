@@ -221,3 +221,10 @@ opaque connection/query errors, not a helpful message.
   `node scripts/test-db/reap-branches.mjs`.
 - Default test environment is `node`; `src/components/**/*.test.{ts,tsx}` run in
   jsdom via `environmentMatchGlobs`.
+
+## Security findings
+
+Vercel Security Review (wraps team, Agent settings) reviews each push to this project. Findings
+live in the team's Vulnerabilities dashboard, never in public PRs; read them with
+`vercel security vulnerabilities`. Verify each one against the code, then fix it through a normal
+plan and review. Don't use "Fix with Vercel Agent".
