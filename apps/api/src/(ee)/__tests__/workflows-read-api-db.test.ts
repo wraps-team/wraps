@@ -31,6 +31,7 @@ import {
   vi,
 } from "vitest";
 import { createErrorHarness } from "../../__tests__/error-handler-harness";
+import type { AuthContext } from "../../middleware/auth";
 import {
   cleanupBaseOrg,
   clearWorkflowState,
@@ -84,7 +85,7 @@ function appFor(organizationId: string, userId: string | null) {
 // The route groups in index.ts order (workflowsRoutes, workflowsSyncRoutes,
 // then workflowsReadRoutes), so /pull reaches the sync handler rather than
 // /:workflowId. The caller supplies the auth context.
-function indexOrderAppAs(auth: Record<string, unknown>) {
+function indexOrderAppAs(auth: AuthContext) {
   const { app } = createErrorHarness();
   return app
     .derive(() => ({ auth }))
