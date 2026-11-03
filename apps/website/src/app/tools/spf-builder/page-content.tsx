@@ -23,12 +23,14 @@ import {
 import { parseAsString, useQueryState } from "nuqs";
 import type * as React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ToolSignupBox } from "@/components/tool-signup-box";
 import {
   buildSpfRecord,
   SPF_PROVIDERS as PROVIDERS,
   SPF_QUALIFIERS as QUALIFIERS,
   type SpfQualifier,
 } from "@/lib/spf-record";
+import { builderCta } from "@/lib/tool-cta";
 
 // Custom include with resolved lookup count
 type CustomInclude = {
@@ -914,6 +916,8 @@ export default function SPFBuilderWidget() {
             </p>
           </CardContent>
         </Card>
+
+        <ToolSignupBox cta={builderCta("spf")} tool="spf-builder" />
       </div>
     </>
   );

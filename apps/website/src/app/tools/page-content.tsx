@@ -34,11 +34,12 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import Link from "next/link";
 import Script from "next/script";
 import { parseAsString, useQueryStates } from "nuqs";
 import type * as React from "react";
 import { Fragment, useEffect, useRef, useState } from "react";
+import { ToolSignupBox } from "@/components/tool-signup-box";
+import { checkerCta, DEMO_DOMAINS, detectSes } from "@/lib/tool-cta";
 
 // Turnstile types for Cloudflare bot protection
 declare global {
@@ -541,6 +542,22 @@ export default function ToolsPageContent({
     }
     return "pass";
   };
+
+  // What the signup box offers: which fix fits what this check found.
+  const buildSignupCta = (r: EmailCheckResult) =>
+    checkerCta({
+      domain: r.domain,
+      spf: getSpfStatus(),
+      dkim: getDkimStatus(),
+      dmarc: getDmarcStatus(),
+      dkimUnverifiable: Boolean(isAwsSesWithoutDkim),
+      onSes: detectSes({
+        spfRecord: r.spf?.record ?? null,
+        spfIncludes: r.spf?.includes ?? [],
+        dkimWarnings: r.dkim?.warnings ?? [],
+        mxExchanges: (r.mx?.records ?? []).map((record) => record.exchange),
+      }),
+    });
 
   const getStatusLabel = (
     exists: boolean,
@@ -1468,25 +1485,7 @@ export default function ToolsPageContent({
             </Card>
           )}
 
-          {/* CTA */}
-          <Card className="border-border bg-card">
-            <CardContent>
-              <div className="flex flex-col gap-4 md:flex-row md:items-center">
-                <div className="flex-1">
-                  <h3 className="mb-2 font-heading font-semibold text-xl tracking-tight">
-                    Need to set up email infrastructure?
-                  </h3>
-                  <p className="text-muted-foreground">
-                    Wraps deploys production-ready email infrastructure to your
-                    AWS account in under 2 minutes.
-                  </p>
-                </div>
-                <Button asChild size="lg" variant="brand">
-                  <Link href="/docs/quickstart">Get Started</Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <ToolSignupBox cta={buildSignupCta(result)} tool="checker" />
         </div>
       )}
 
@@ -1507,7 +1506,7 @@ export default function ToolsPageContent({
                 configuration. We'll check SPF, DKIM, DMARC, and MX records.
               </p>
               <div className="flex flex-wrap justify-center gap-2">
-                {["gmail.com", "microsoft.com", "stripe.com"].map((d) => (
+                {DEMO_DOMAINS.map((d) => (
                   <Button
                     key={d}
                     onClick={() => setParams({ domain: d })}

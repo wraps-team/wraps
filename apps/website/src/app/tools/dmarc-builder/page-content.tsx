@@ -20,6 +20,7 @@ import {
 import { Textarea } from "@wraps/ui/components/ui/textarea";
 import { AlertTriangle, Check, Copy, Info } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { ToolSignupBox } from "@/components/tool-signup-box";
 import {
   buildDmarcRecord,
   DEFAULT_DMARC_INPUT,
@@ -28,6 +29,7 @@ import {
   type DmarcInput,
   type DmarcPolicy,
 } from "@/lib/dmarc-builder";
+import { builderCta } from "@/lib/tool-cta";
 
 const POLICIES: { value: DmarcPolicy; label: string }[] = [
   { value: "none", label: "none (monitor only)" },
@@ -363,6 +365,8 @@ export default function DmarcBuilderPageContent() {
           </Notice>
         ))}
       </div>
+
+      <ToolSignupBox cta={builderCta("dmarc")} tool="dmarc-builder" />
     </div>
   );
 }
