@@ -6,10 +6,12 @@
  */
 
 import {
+  type ContactRecord,
   contactEvent,
   contactMatchesCondition,
   db,
   eq,
+  findContactsByIdsInOrg,
   getSegmentsByIds,
   workflow,
   workflowExecution,
@@ -165,11 +167,13 @@ export async function emitContactUpdated(params: {
   organizationId: string;
   updatedFields?: string[];
   contactData?: Record<string, unknown>;
+  changeSource?: ContactChangeSource;
 }): Promise<{ workflowsTriggered: number }> {
   const eventData = {
     ...params.contactData,
     updatedFields: params.updatedFields,
     updatedAt: new Date().toISOString(),
+    ...(params.changeSource ? { changeSource: params.changeSource } : {}),
   };
 
   // Match workflows with triggerType: "event" + eventName: "contact_updated"
@@ -211,6 +215,178 @@ export async function emitContactUpdated(params: {
     workflowsTriggered:
       matchingByEvent.workflowsTriggered + matchingByTrigger.length,
   };
+}
+
+/**
+ * What changed a contact, carried as `changeSource` in contact_updated event
+ * data. Named so it cannot shadow a contact property called `source`.
+ * - `api`: an API key. `user`: a signed-in session (dashboard or CLI).
+ * - `bounce`: a hard bounce, or soft bounces escalating to `bounced`.
+ * - `complaint`: an SES complaint.
+ * - `ses_suppression`: an SES Suppressed event, or a bounce with a
+ *   suppression sub-type.
+ * - `unsubscribe`: the unsubscribe link.
+ */
+export type ContactChangeSource =
+  | "api"
+  | "user"
+  | "bounce"
+  | "complaint"
+  | "ses_suppression"
+  | "unsubscribe";
+
+export type ContactUpdatedItem = {
+  contactId: string;
+  updatedFields: string[];
+  changeSource: ContactChangeSource;
+};
+
+/** The contact fields every contact_updated event carries, as PATCH sends them. */
+function contactUpdatedData(row: ContactRecord): Record<string, unknown> {
+  return {
+    email: row.email,
+    phone: row.phone,
+    firstName: row.firstName,
+    lastName: row.lastName,
+    company: row.company,
+    jobTitle: row.jobTitle,
+    preferredChannel: row.preferredChannel,
+    emailStatus: row.emailStatus,
+  };
+}
+
+/**
+ * Emit contact_updated for many contacts of one org at once. Call it after the
+ * change is persisted: the event data is read from the stored rows, so callers
+ * pass ids only. Ids not found in the org are dropped.
+ *
+ * However many contacts there are, this runs one contact lookup and one
+ * workflow query per match form (`event` + eventName `contact_updated`, and
+ * triggerType `contact_updated`), then one batched enqueue. The contact_event
+ * rows are written even when no workflow matches, since segments and the
+ * timeline read them.
+ */
+export async function emitContactsUpdated(
+  organizationId: string,
+  items: ContactUpdatedItem[]
+): Promise<{ workflowsTriggered: number }> {
+  if (items.length === 0) {
+    return { workflowsTriggered: 0 };
+  }
+
+  const contactIds = [...new Set(items.map((item) => item.contactId))];
+  const rows = await findContactsByIdsInOrg(organizationId, contactIds, db);
+  const rowsById = new Map(rows.map((row) => [row.id, row]));
+
+  const updatedAt = new Date().toISOString();
+  const events: { contactId: string; eventData: Record<string, unknown> }[] =
+    [];
+  for (const item of items) {
+    const row = rowsById.get(item.contactId);
+    if (!row) {
+      continue;
+    }
+    events.push({
+      contactId: row.id,
+      eventData: {
+        ...contactUpdatedData(row),
+        updatedFields: item.updatedFields,
+        updatedAt,
+        changeSource: item.changeSource,
+      },
+    });
+  }
+  if (events.length === 0) {
+    return { workflowsTriggered: 0 };
+  }
+
+  await recordContactUpdatedEvents(organizationId, events);
+
+  const [matchingByEvent, matchingByTrigger] = await Promise.all([
+    db
+      .select({ id: workflow.id })
+      .from(workflow)
+      .where(
+        and(
+          eq(workflow.organizationId, organizationId),
+          eq(workflow.status, "enabled"),
+          eq(workflow.triggerType, "event"),
+          sql`${workflow.triggerConfig}->>'eventName' = 'contact_updated'`
+        )
+      ),
+    db
+      .select({ id: workflow.id })
+      .from(workflow)
+      .where(
+        and(
+          eq(workflow.organizationId, organizationId),
+          eq(workflow.status, "enabled"),
+          eq(workflow.triggerType, "contact_updated")
+        )
+      ),
+  ]);
+
+  // A workflow has one trigger type, so the two sets never overlap.
+  const workflowIds = [...matchingByEvent, ...matchingByTrigger].map(
+    (wf) => wf.id
+  );
+  const jobs: WorkflowJob[] = events.flatMap((event) =>
+    workflowIds.map((workflowId) => ({
+      type: "trigger" as const,
+      workflowId,
+      contactId: event.contactId,
+      organizationId,
+      eventData: event.eventData,
+    }))
+  );
+
+  if (jobs.length > 0) {
+    await enqueueWorkflowStepBatch(jobs);
+    log.info("contact_updated matched workflows", {
+      organizationId,
+      contactCount: events.length,
+      workflowCount: workflowIds.length,
+    });
+  }
+
+  return { workflowsTriggered: jobs.length };
+}
+
+/**
+ * One multi-row insert; if it fails (a contact deleted since the lookup trips
+ * the FK), each row is retried alone so one missing contact does not drop the
+ * others' rows. Never throws: a lost event row must not stop the triggers.
+ */
+async function recordContactUpdatedEvents(
+  organizationId: string,
+  events: { contactId: string; eventData: Record<string, unknown> }[]
+): Promise<void> {
+  const values = events.map((event) => ({
+    contactId: event.contactId,
+    organizationId,
+    eventName: "contact_updated",
+    eventData: event.eventData,
+  }));
+  try {
+    await db.insert(contactEvent).values(values);
+    return;
+  } catch (error) {
+    log.warn("Batch contact_updated event insert failed; retrying per row", {
+      organizationId,
+      count: values.length,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+  for (const value of values) {
+    try {
+      await db.insert(contactEvent).values(value);
+    } catch (error) {
+      log.error("Failed to record contact_updated event", error, {
+        organizationId,
+        contactId: value.contactId,
+      });
+    }
+  }
 }
 
 /**
