@@ -723,7 +723,7 @@ describe("wraps email suppressions", () => {
       );
     });
 
-    it("human mode reports wasPresent=false as nothing changed", async () => {
+    it("human mode reports wasPresent=false as already gone", async () => {
       setJsonMode(false);
       fetchMock.mockResolvedValue(
         res(200, { success: true, email: EMAIL, wasPresent: false })
@@ -732,7 +732,7 @@ describe("wraps email suppressions", () => {
       await suppressionsRemove({ email: EMAIL, account: ACCOUNT, yes: true });
 
       expect(log.warn).toHaveBeenCalledWith(
-        "a@x.co was no longer on the list of account acc_1; nothing changed."
+        "a@x.co was no longer on the list of account acc_1."
       );
     });
   });
