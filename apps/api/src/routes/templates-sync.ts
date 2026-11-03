@@ -19,6 +19,97 @@ import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
 
 const errorResponse = t.Object({ error: t.String() });
 
+const pushedTemplateStatus = t.Literal("PUBLISHED", {
+  description: "Every template a push writes is published",
+});
+
+/** 200 body of `POST /push`, also declared as the 201 a first push answers. */
+const pushResponse = t.Object(
+  {
+    id: t.String({ description: "Template id" }),
+    slug: t.String({ description: "Template slug" }),
+    status: pushedTemplateStatus,
+    updatedAt: t.String({
+      description: "ISO 8601 time the template was written",
+    }),
+    remoteHash: t.String({
+      description: "The sourceHash that was pushed, echoed back",
+    }),
+  },
+  { description: "Template written" }
+);
+
+/** 200 body of `POST /push/batch`: one result per pushed template, in request order. */
+const pushBatchResponse = t.Object(
+  {
+    results: t.Array(
+      t.Object({
+        slug: t.String({ description: "Template slug" }),
+        id: t.String({ description: "Template id" }),
+        status: pushedTemplateStatus,
+      }),
+      {
+        description: "One entry per pushed template (empty for an empty batch)",
+      }
+    ),
+  },
+  { description: "Every template in the batch written" }
+);
+
+/** One code-pushed template as `GET /pull` returns it. */
+const pullTemplateRow = t.Object({
+  id: t.String({ description: "Template id" }),
+  slug: t.Union([t.String(), t.Null()], {
+    description: "Template slug (filename without extension)",
+  }),
+  subject: t.Union([t.String(), t.Null()], {
+    description: "Email subject line",
+  }),
+  emailType: t.Union([t.Literal("marketing"), t.Literal("transactional")], {
+    description: "Email type for compliance",
+  }),
+  channel: t.String({ description: "Template channel: email or sms" }),
+  variables: t.Union([t.Array(t.Unknown()), t.Null()], {
+    description:
+      "Template variables, each { name: string, fallback?: string }. Items are not validated: the column is unconstrained jsonb.",
+  }),
+  sourceHash: t.Union([t.String(), t.Null()], {
+    description: "SHA256 hash of the pushed source file",
+  }),
+  status: t.Union(
+    [t.Literal("DRAFT"), t.Literal("PUBLISHED"), t.Literal("ARCHIVED")],
+    { description: "Template status" }
+  ),
+  updatedAt: t.String({ description: "ISO 8601 time of the last write" }),
+  lastEditedFrom: t.Union([t.String(), t.Null()], {
+    description: "Where the template was last edited: cli, dashboard or api",
+  }),
+  // Last on purpose: mapRow emits `source` after the other columns, and the
+  // response is rebuilt in schema key order.
+  source: t.Optional(
+    t.Union([t.String(), t.Null()], {
+      description:
+        "React Email TSX source. Absent when `source=false`. Rows with no source are filtered out, so it is never null in practice.",
+    })
+  ),
+});
+
+/** 200 body of `GET /pull`. */
+const pullResponse = t.Object(
+  {
+    templates: t.Array(pullTemplateRow, {
+      description: "Code-pushed templates that have source",
+    }),
+    nextCursor: t.Optional(
+      t.Union([t.String(), t.Null()], {
+        description:
+          "Cursor for the next page, null on the last page. Present only when `limit` is set.",
+      })
+    ),
+  },
+  { description: "Code-pushed templates" }
+);
+
 type DbOrTx =
   | typeof db
   | Parameters<Parameters<(typeof db)["transaction"]>[0]>[0];
@@ -115,7 +206,7 @@ export const templatesSyncRoutes = createAuthenticatedRoutes("/v1/templates")
         description:
           "Upserts a template compiled from React Email source. Used by `wraps push`.",
       },
-      response: { 403: errorResponse },
+      response: { 200: pushResponse, 201: pushResponse, 403: errorResponse },
     }
   )
 
@@ -228,7 +319,7 @@ export const templatesSyncRoutes = createAuthenticatedRoutes("/v1/templates")
         summary: "Push multiple templates from CLI",
         description: "Batch upsert templates compiled from React Email source.",
       },
-      response: { 403: errorResponse },
+      response: { 200: pushBatchResponse, 403: errorResponse },
     }
   )
 
@@ -247,11 +338,11 @@ export const templatesSyncRoutes = createAuthenticatedRoutes("/v1/templates")
         slug: string | null;
         source: string | null;
         subject: string | null;
-        emailType: string;
+        emailType: "marketing" | "transactional";
         channel: string;
         variables: Record<string, unknown>[] | null;
         sourceHash: string | null;
-        status: string;
+        status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
         updatedAt: Date;
         lastEditedFrom: string | null;
       };
@@ -380,6 +471,7 @@ export const templatesSyncRoutes = createAuthenticatedRoutes("/v1/templates")
         description:
           "Returns code-pushed templates with their React Email source. With no `limit`, returns every template in one response (the CLI's push/pull protocol depends on this). Pass `limit` to opt into cursor pagination — the response then includes `nextCursor` (null on the last page). `source=false` omits the `source` field from every row.",
       },
+      response: { 200: pullResponse },
     }
   );
 
