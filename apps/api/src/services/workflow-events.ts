@@ -225,7 +225,8 @@ export async function emitContactUpdated(params: {
  * - `complaint`: an SES complaint.
  * - `ses_suppression`: an SES Suppressed event, or a bounce with a
  *   suppression sub-type.
- * - `unsubscribe`: the unsubscribe link.
+ * - `unsubscribe`: the unsubscribe link, or the preference centre's
+ *   "unsubscribe from all".
  */
 export type ContactChangeSource =
   | "api"
@@ -265,13 +266,15 @@ function contactUpdatedData(row: ContactRecord): Record<string, unknown> {
  * triggerType `contact_updated`), then one batched enqueue. The contact_event
  * rows are written even when no workflow matches, since segments and the
  * timeline read them.
+ *
+ * `contactsFound` is how many of the distinct ids were found in the org.
  */
 export async function emitContactsUpdated(
   organizationId: string,
   items: ContactUpdatedItem[]
-): Promise<{ workflowsTriggered: number }> {
+): Promise<{ workflowsTriggered: number; contactsFound: number }> {
   if (items.length === 0) {
-    return { workflowsTriggered: 0 };
+    return { workflowsTriggered: 0, contactsFound: 0 };
   }
 
   const contactIds = [...new Set(items.map((item) => item.contactId))];
@@ -297,7 +300,7 @@ export async function emitContactsUpdated(
     });
   }
   if (events.length === 0) {
-    return { workflowsTriggered: 0 };
+    return { workflowsTriggered: 0, contactsFound: 0 };
   }
 
   await recordContactUpdatedEvents(organizationId, events);
@@ -349,7 +352,7 @@ export async function emitContactsUpdated(
     });
   }
 
-  return { workflowsTriggered: jobs.length };
+  return { workflowsTriggered: jobs.length, contactsFound: rows.length };
 }
 
 /**

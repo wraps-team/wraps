@@ -9,6 +9,8 @@
  * PATCH /v1/contacts/:id - Update a contact (adds topics, doesn't replace)
  * DELETE /v1/contacts/:id - Delete a contact
  * DELETE /v1/contacts - Bulk delete contacts
+ * POST /v1/contacts/events/updated - contact_updated for a dashboard write
+ *   (session only, hidden from the spec)
  */
 
 import {
@@ -46,6 +48,7 @@ import {
   checkSegmentEntry,
   checkSegmentExit,
   emitContactCreated,
+  emitContactsUpdated,
   emitContactUpdated,
   emitTopicSubscribed,
   getSegmentMembership,
@@ -251,6 +254,38 @@ const listContactsQuerySchema = t.Object({
     })
   ),
 });
+
+/**
+ * The contact fields a dashboard write may report in `updatedFields`: the
+ * dashboard's editable fields, the names PATCH already emits.
+ */
+const CONTACT_UPDATED_FIELDS = [
+  "email",
+  "phone",
+  "firstName",
+  "lastName",
+  "company",
+  "jobTitle",
+  "preferredChannel",
+  "properties",
+  "emailStatus",
+  "smsStatus",
+] as const;
+
+const DASHBOARD_ONLY =
+  "Only the Wraps dashboard can report contact updates. API keys cannot call this route.";
+
+/**
+ * Session-only gate, as in api-keys.ts: returns the 403 body when the request
+ * was authenticated with an API key, otherwise null.
+ */
+function rejectApiKeyCaller(ctx: unknown): { error: string } | null {
+  if (getAuth(ctx).apiKeyId === null) {
+    return null;
+  }
+  (ctx as { set: { status: number } }).set.status = 403;
+  return { error: DASHBOARD_ONLY };
+}
 
 export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
   // List contacts
@@ -1208,6 +1243,72 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
         tags: ["contacts"],
         summary: "Bulk delete contacts",
         description: "Deletes multiple contacts at once (max 100)",
+      },
+    }
+  )
+  // contact_updated for a write the dashboard already committed. The web app
+  // cannot enqueue workflow jobs, so its server actions call this after their
+  // write. Session only: the dashboard is the only caller.
+  .post(
+    "/events/updated",
+    async (ctx) => {
+      const rejected = rejectApiKeyCaller(ctx);
+      if (rejected) {
+        return rejected;
+      }
+      const gate = await requirePermission(ctx, "contacts", ["write"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
+      const authContext = getAuth(ctx);
+
+      // One event per contact: a repeated id merges its fields.
+      const fieldsById = new Map<string, Set<string>>();
+      for (const item of ctx.body.contacts) {
+        const fields = fieldsById.get(item.contactId) ?? new Set<string>();
+        for (const field of item.updatedFields) {
+          fields.add(field);
+        }
+        fieldsById.set(item.contactId, fields);
+      }
+
+      // Ids outside the caller's org are dropped by the emitter.
+      const { contactsFound } = await emitContactsUpdated(
+        authContext.organizationId,
+        [...fieldsById].map(([contactId, fields]) => ({
+          contactId,
+          updatedFields: [...fields],
+          changeSource: "user" as const,
+        }))
+      );
+
+      return { accepted: contactsFound };
+    },
+    {
+      body: t.Object({
+        contacts: t.Array(
+          t.Object({
+            contactId: t.String({ minLength: 1, maxLength: 255 }),
+            updatedFields: t.Array(
+              t.Union(CONTACT_UPDATED_FIELDS.map((field) => t.Literal(field))),
+              { minItems: 1, maxItems: 10 }
+            ),
+          }),
+          { minItems: 1, maxItems: 100 }
+        ),
+      }),
+      response: {
+        200: t.Object({
+          accepted: t.Number({
+            description: "Contacts found in the organization and emitted for",
+          }),
+        }),
+        403: errorResponse,
+      },
+      detail: {
+        hide: true,
+        tags: ["contacts"],
+        summary: "Emit contact_updated for a dashboard write",
       },
     }
   );
