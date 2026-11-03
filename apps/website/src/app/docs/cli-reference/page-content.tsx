@@ -385,6 +385,16 @@ const DATA_COMMAND_GROUPS: DataCommandGroup[] = [
           "Without --account it covers every connected AWS account. The cursor is opaque: repeat the same --account and --reason with it. A page can be empty while hasMore is true.",
       },
       {
+        command: "email suppressions add <email...>",
+        summary:
+          "Add up to 100 addresses to an AWS account's SES suppression list, so Wraps stops sending to them.",
+        flags:
+          "--account <awsAccountId> (required), --reason bounce|complaint (required), --file <path> (one address per line), --yes (required), --dry-run",
+        data: "awsAccountId, reason, dryRun, results (email, success, alreadyPresent, error on a failure), added, alreadyPresent, failed",
+        notes:
+          "Adds are idempotent: an address that is already suppressed is reported as alreadyPresent. If any address fails, the command exits with code 1. Undo one address with email suppressions remove.",
+      },
+      {
         command: "email suppressions remove <email>",
         summary: "Remove one address from an AWS account's suppression list.",
         flags:
@@ -818,7 +828,8 @@ export default function CLIReferencePageContent() {
               Without --yes they return CONFIRMATION_REQUIRED before making any
               request: contacts delete, contacts import with --validate,
               contacts validate, segments delete, topics delete, email
-              suppressions remove, email templates publish, broadcasts create,
+              suppressions add, email suppressions remove, email templates
+              publish, broadcasts create,
               broadcasts send, broadcasts resume, broadcasts cancel, workflows
               trigger, workflows enable, workflows retry, workflows cancel,
               email agent approvals approve, email agent approvals reject,

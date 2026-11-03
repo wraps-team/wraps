@@ -67,6 +67,24 @@ const EMAIL_DATA_COMMANDS: EmailDataCommand[] = [
       "If any template is still used by a scheduled, queued or processing broadcast, or by an enabled workflow, the whole delete is refused with CONFLICT and nothing is deleted. The error names the blocking template ids.",
   },
   {
+    command: "email suppressions list",
+    summary: "List the SES suppression list.",
+    flags:
+      "--account <awsAccountId>, --reason (bounce or complaint), --limit (1-100), --cursor",
+    data: "entries (email, reason, awsAccountId, lastUpdated), nextCursor, hasMore, deniedAccountIds, unreachableAccountIds",
+    notes:
+      "Without --account it covers every connected AWS account. --account takes the id that email health lists, not the 12-digit AWS account number. The cursor is opaque: repeat the same --account and --reason with it. A page can be empty while hasMore is true.",
+  },
+  {
+    command: "email suppressions remove <email>",
+    summary: "Remove one address from an AWS account's suppression list.",
+    flags:
+      "--account <awsAccountId> (required), --yes (required), --dry-run, --acknowledge-complaint",
+    data: "email, awsAccountId, dryRun, wasPresent",
+    notes:
+      "An address suppressed for a spam complaint also needs --acknowledge-complaint. The CLI sends that flag only when you pass it. Pass it only after you have confirmed that sending to the address is safe. --dry-run previews the removal and makes no request.",
+  },
+  {
     command: "email suppressions add <email...>",
     summary:
       "Add up to 100 addresses to an AWS account's SES suppression list, so Wraps stops sending to them.",
