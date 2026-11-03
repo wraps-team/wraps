@@ -213,6 +213,64 @@ describe("updateContact reports contact_updated", () => {
     expect(reportedFields()).toEqual([["phone", "smsStatus"]]);
   });
 
+  it("adding an email to a phone-only contact stores it active and reports email and emailStatus", async () => {
+    await db
+      .update(contact)
+      .set({
+        email: null,
+        emailHash: null,
+        emailStatus: null,
+        emailVerifiedAt: null,
+        phone: "+15550003333",
+        smsStatus: "opted_in",
+      })
+      .where(eq(contact.id, CONTACT_ID));
+
+    // No emailStatus sent: the sheet leaves an untouched status out.
+    const result = await updateContact(CONTACT_ID, testOrg.id, {
+      email: `${PREFIX}-added@example.com`,
+    });
+
+    expect(result.success).toBe(true);
+    const [row] = await db
+      .select({
+        email: contact.email,
+        emailStatus: contact.emailStatus,
+        emailVerifiedAt: contact.emailVerifiedAt,
+      })
+      .from(contact)
+      .where(eq(contact.id, CONTACT_ID));
+    expect(row.email).toBe(`${PREFIX}-added@example.com`);
+    expect(row.emailStatus).toBe("active");
+    expect(row.emailVerifiedAt).toBeInstanceOf(Date);
+    expect(reportedFields()).toEqual([["email", "emailStatus"]]);
+  });
+
+  it("adding an email with a chosen status keeps that status", async () => {
+    await db
+      .update(contact)
+      .set({
+        email: null,
+        emailHash: null,
+        emailStatus: null,
+        phone: "+15550004444",
+      })
+      .where(eq(contact.id, CONTACT_ID));
+
+    const result = await updateContact(CONTACT_ID, testOrg.id, {
+      email: `${PREFIX}-chosen@example.com`,
+      emailStatus: "unsubscribed",
+    });
+
+    expect(result.success).toBe(true);
+    const [row] = await db
+      .select({ emailStatus: contact.emailStatus })
+      .from(contact)
+      .where(eq(contact.id, CONTACT_ID));
+    expect(row.emailStatus).toBe("unsubscribed");
+    expect(reportedFields()).toEqual([["email", "emailStatus"]]);
+  });
+
   it("a nested properties change reports properties", async () => {
     const result = await updateContact(CONTACT_ID, testOrg.id, {
       properties: { plan: "pro", tags: ["a", "c"] },

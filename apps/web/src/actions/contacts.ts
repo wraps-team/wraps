@@ -503,6 +503,10 @@ export const updateContact = orgAction(
     const updateData: Partial<InsertContactData> = {
       updatedAt: new Date(),
     };
+    // Set when an email is added to a contact that had none and the caller
+    // sent no status: it starts "active", as createContact does (and as the
+    // phone branch below defaults smsStatus).
+    let defaultEmailStatus: EmailStatus | undefined;
 
     // Handle email update
     if (data.email !== undefined) {
@@ -528,6 +532,9 @@ export const updateContact = orgAction(
 
         updateData.email = email;
         updateData.emailHash = emailHashValue;
+        if (!existing.email && data.emailStatus === undefined) {
+          defaultEmailStatus = "active";
+        }
       } else {
         // Clearing email
         updateData.email = null;
@@ -578,26 +585,28 @@ export const updateContact = orgAction(
       }
     }
 
-    // Handle email status update
-    if (data.emailStatus !== undefined) {
-      updateData.emailStatus = data.emailStatus;
+    // Handle email status update. A defaulted status goes through the same
+    // path as a chosen one, so it is stamped the same way (emailVerifiedAt).
+    const emailStatus = data.emailStatus ?? defaultEmailStatus;
+    if (emailStatus !== undefined) {
+      updateData.emailStatus = emailStatus;
 
       // Update timestamps based on status
-      if (data.emailStatus === "active" && existing.emailStatus !== "active") {
+      if (emailStatus === "active" && existing.emailStatus !== "active") {
         updateData.emailVerifiedAt = new Date();
-      } else if (data.emailStatus === "unsubscribed") {
+      } else if (emailStatus === "unsubscribed") {
         updateData.emailUnsubscribedAt = new Date();
-      } else if (data.emailStatus === "bounced") {
+      } else if (emailStatus === "bounced") {
         updateData.emailBouncedAt = new Date();
-      } else if (data.emailStatus === "complained") {
+      } else if (emailStatus === "complained") {
         updateData.emailComplainedAt = new Date();
-      } else if (data.emailStatus === "suppressed") {
+      } else if (emailStatus === "suppressed") {
         updateData.emailSuppressedAt = new Date();
       }
       // A manual reactivation clears the soft-bounce count AND its timestamp,
       // like a successful delivery does. A stale timestamp would make the
       // 24-hour rule skip the next soft bounce and leave count 0.
-      if (data.emailStatus === "active") {
+      if (emailStatus === "active") {
         updateData.emailSoftBounceCount = 0;
         updateData.emailLastSoftBouncedAt = null;
       }

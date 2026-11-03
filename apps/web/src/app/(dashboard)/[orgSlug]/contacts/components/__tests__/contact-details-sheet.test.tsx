@@ -389,6 +389,32 @@ describe("Save sends only the fields the user changed", () => {
     expect(sent.emailStatus).toBeUndefined();
   });
 
+  it("a status the user picks is still sent", async () => {
+    // Radix Select needs these in jsdom.
+    Element.prototype.hasPointerCapture = () => false;
+    Element.prototype.setPointerCapture = () => undefined;
+    Element.prototype.releasePointerCapture = () => undefined;
+    Element.prototype.scrollIntoView = () => undefined;
+    const user = userEvent.setup();
+    const { onSave } = renderSheet({
+      contact: makeContact({ phone: "+15550001111", smsStatus: null }),
+    });
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    const smsStatus = screen
+      .getAllByRole("combobox")
+      .find((box) => box.textContent?.includes("Pending Consent"));
+    expect(smsStatus).toBeDefined();
+    await user.click(smsStatus as HTMLElement);
+    await user.click(await screen.findByRole("option", { name: "Opted In" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    const sent = onSave.mock.calls[0][0];
+    expect(sent.smsStatus).toBe("opted_in");
+    expect(sent.emailStatus).toBeUndefined();
+  });
+
   it("a phone-only contact's missing email status is not sent", async () => {
     const user = userEvent.setup();
     const { onSave } = renderSheet({
