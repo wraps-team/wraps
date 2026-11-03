@@ -106,24 +106,30 @@ const pushBatchResponse = t.Object(
   { description: "Every workflow in the batch written" }
 );
 
-// Steps, transitions and trigger config are jsonb the dashboard also writes, so
-// the pull schemas name the known fields and let anything else through: a
-// response schema that stripped a field would change what pull returns.
+// Steps, transitions and trigger config are jsonb with no database-level shape,
+// and the dashboard and older CLIs also write them. Elysia strips an unlisted
+// field from a declared response and answers 422 for a mistyped one, so these
+// schemas stay loose on purpose: only id, type, name and the transition ids are
+// required, every other known field may be missing or null, and unknown keys
+// pass through. A stricter schema could turn a pull that works today into a 422.
 const pullStep = t.Object(
   {
     id: t.String(),
     type: t.String({ description: "Step type, e.g. send_email or delay" }),
     name: t.String(),
-    position: t.Object(
-      { x: t.Number(), y: t.Number() },
-      { additionalProperties: true }
+    position: t.Optional(
+      t.Object({ x: t.Number(), y: t.Number() }, { additionalProperties: true })
     ),
-    config: t.Any({ description: "Step configuration, shape depends on type" }),
+    config: t.Optional(
+      t.Any({ description: "Step configuration, shape depends on type" })
+    ),
     cascadeGroupId: t.Optional(
-      t.String({ description: "Cascade group this step belongs to" })
+      t.Union([t.String(), t.Null()], {
+        description: "Cascade group this step belongs to",
+      })
     ),
     cascadeChannels: t.Optional(
-      t.Array(t.Record(t.String(), t.Unknown()), {
+      t.Union([t.Array(t.Record(t.String(), t.Unknown())), t.Null()], {
         description: "Cascade reconstruction metadata, first step of a group",
       })
     ),
@@ -137,19 +143,25 @@ const pullTransition = t.Object(
     fromStepId: t.String(),
     toStepId: t.String(),
     condition: t.Optional(
-      t.Object({ branch: t.String() }, { additionalProperties: true })
+      t.Union([
+        t.Object({ branch: t.String() }, { additionalProperties: true }),
+        t.Null(),
+      ])
     ),
   },
   { additionalProperties: true }
 );
 
+const nullableString = (description?: string) =>
+  t.Optional(t.Union([t.String(), t.Null()], { description }));
+
 const pullTriggerConfig = t.Object(
   {
-    eventName: t.Optional(t.String()),
-    segmentId: t.Optional(t.String()),
-    schedule: t.Optional(t.String({ description: "Cron expression" })),
-    timezone: t.Optional(t.String()),
-    topicId: t.Optional(t.String()),
+    eventName: nullableString(),
+    segmentId: nullableString(),
+    schedule: nullableString("Cron expression"),
+    timezone: nullableString(),
+    topicId: nullableString(),
   },
   { additionalProperties: true }
 );

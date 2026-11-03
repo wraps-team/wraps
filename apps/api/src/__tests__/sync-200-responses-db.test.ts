@@ -525,6 +525,53 @@ describe("GET /v1/workflows/pull 200", () => {
     expect(row.triggerConfig).toEqual(triggerConfig);
   });
 
+  it("serves jsonb the dashboard may have written with nulls and omissions", async () => {
+    // Nothing in the database constrains these columns, so pull must not turn a
+    // row it serves today into a 422 over a null or a missing optional key.
+    const steps = [
+      { id: "s1", type: "trigger", name: "Start" },
+      {
+        id: "s2",
+        type: "delay",
+        name: "Wait",
+        position: { x: 1, y: 2 },
+        config: { type: "delay", amount: 1, unit: "days" },
+        cascadeGroupId: null,
+        cascadeChannels: null,
+      },
+    ];
+    const transitions = [
+      { id: "t1", fromStepId: "s1", toStepId: "s2", condition: null },
+      { id: "t2", fromStepId: "s2", toStepId: "s3" },
+    ];
+    const triggerConfig = {
+      eventName: null,
+      segmentId: null,
+      schedule: null,
+      timezone: null,
+      topicId: null,
+    };
+    await db.insert(workflow).values({
+      id: `${PREFIX}-loose`,
+      organizationId: ids.org,
+      name: "Loose",
+      slug: "loose",
+      status: "draft",
+      triggerType: "event",
+      triggerConfig,
+      steps,
+      transitions,
+      pushedFromCli: true,
+    } as unknown as typeof workflow.$inferInsert);
+
+    const res = await call("GET", "/v1/workflows/pull");
+    expect(res.status).toBe(200);
+    const [row] = (await res.json()).workflows;
+    expect(row.steps).toEqual(steps);
+    expect(row.transitions).toEqual(transitions);
+    expect(row.triggerConfig).toEqual(triggerConfig);
+  });
+
   it("passes nulls through for columns a row leaves empty", async () => {
     await db.insert(workflow).values({
       id: `${PREFIX}-bare`,
