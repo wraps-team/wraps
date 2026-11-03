@@ -76,15 +76,6 @@ const EMAIL_DATA_COMMANDS: EmailDataCommand[] = [
       "Without --account it covers every connected AWS account. --account takes the id that email health lists, not the 12-digit AWS account number. The cursor is opaque: repeat the same --account and --reason with it. A page can be empty while hasMore is true.",
   },
   {
-    command: "email suppressions remove <email>",
-    summary: "Remove one address from an AWS account's suppression list.",
-    flags:
-      "--account <awsAccountId> (required), --yes (required), --dry-run, --acknowledge-complaint",
-    data: "email, awsAccountId, dryRun, wasPresent",
-    notes:
-      "An address suppressed for a spam complaint also needs --acknowledge-complaint. The CLI sends that flag only when you pass it. Pass it only after you have confirmed that sending to the address is safe. --dry-run previews the removal and makes no request.",
-  },
-  {
     command: "email suppressions add <email...>",
     summary:
       "Add up to 100 addresses to an AWS account's SES suppression list, so Wraps stops sending to them.",
@@ -93,6 +84,15 @@ const EMAIL_DATA_COMMANDS: EmailDataCommand[] = [
     data: "awsAccountId, reason, dryRun, results (email, success, alreadyPresent, error on a failure), added, alreadyPresent, failed",
     notes:
       "Adds are idempotent: an address that is already suppressed is reported as alreadyPresent. If any address fails, the command exits with code 1. Undo one address with email suppressions remove.",
+  },
+  {
+    command: "email suppressions remove <email>",
+    summary: "Remove one address from an AWS account's suppression list.",
+    flags:
+      "--account <awsAccountId> (required), --yes (required), --dry-run, --acknowledge-complaint",
+    data: "email, awsAccountId, dryRun, wasPresent",
+    notes:
+      "An address suppressed for a spam complaint also needs --acknowledge-complaint. The CLI sends that flag only when you pass it. Pass it only after you have confirmed that sending to the address is safe. --dry-run previews the removal and makes no request.",
   },
   {
     command: "email metrics",

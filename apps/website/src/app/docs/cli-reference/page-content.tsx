@@ -249,7 +249,7 @@ const DATA_COMMAND_GROUPS: DataCommandGroup[] = [
         flags:
           "--name, --subject, --template-id, --audience-type (all, topic or segment), --topic-id or --segment-id, --aws-account-id, --html-content, --scheduled-for (ISO time)",
         notes:
-          "The output prints the broadcasts send command to run next. Draft content is fixed when the draft is created, because the API does not edit drafts on current main.",
+          "The output prints the broadcasts send command to run next. Change a saved draft later with broadcasts update.",
       },
       {
         command: "broadcasts create",
@@ -351,6 +351,16 @@ const DATA_COMMAND_GROUPS: DataCommandGroup[] = [
         summary: "Copy a template as a new draft.",
         data: TEMPLATE_FIELDS,
         notes: "The copy is always a DRAFT.",
+      },
+      {
+        command: "email templates delete <id...>",
+        summary:
+          "Delete up to 100 templates, with their versions. A published SES copy is removed too, unless another template uses the same SES name.",
+        flags:
+          "--yes (required), --dry-run (previews the delete and makes no request)",
+        data: "dryRun, route (single or bulk), deleted, notFound, count, and wouldDelete in a dry run",
+        notes:
+          "If any template is still used by a scheduled, queued or processing broadcast, or by an enabled workflow, the whole delete is refused with CONFLICT and nothing is deleted. The error names the blocking template ids.",
       },
       {
         command: "email metrics",
@@ -829,10 +839,11 @@ export default function CLIReferencePageContent() {
               request: contacts delete, contacts import with --validate,
               contacts validate, segments delete, topics delete, email
               suppressions add, email suppressions remove, email templates
-              publish, broadcasts create, broadcasts send, broadcasts resume,
-              broadcasts cancel, workflows trigger, workflows enable, workflows
-              retry, workflows cancel, email agent approvals approve, email
-              agent approvals reject, api-keys revoke, and brand-kits delete.
+              publish, email templates delete, broadcasts create, broadcasts
+              send, broadcasts resume, broadcasts cancel, workflows trigger,
+              workflows enable, workflows retry, workflows cancel, email agent
+              approvals approve, email agent approvals reject, api-keys revoke,
+              and brand-kits delete.
             </p>
             <p className="text-muted-foreground text-sm">
               email templates pull fetches without --yes, but it refuses to

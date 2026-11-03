@@ -406,14 +406,14 @@ An API key cannot manage API keys. Sign in with `wraps auth login` first. `--tok
 
 The CLI commands above call these routes on `https://api.wraps.dev` (`WRAPS_API_URL` overrides it). Send `Authorization: Bearer <api key>`. Where a route checks a permission, it is listed with the route. Ids that belong to another organization return 404.
 
-Most destructive routes need `confirm=true` in the query string and return 400 without it. The CLI sends it only after `--yes`. Some destructive routes take no `confirm` parameter: `DELETE /v1/batch/{id}`, `DELETE /v1/contacts/{id}` and the contacts bulk delete.
+Most destructive routes need `confirm=true` in the query string and return 400 without it. The CLI sends it only after `--yes`. Some destructive routes take no `confirm` parameter: `DELETE /v1/batch/{id}`, `DELETE /v1/contacts/{id}`, `DELETE /v1/segments/{id}` and the contacts bulk delete.
 
 Permissions are shown as `resource:action`. Plan requirements are stated per route.
 
 Who the permission applies to depends on how the request authenticates:
 
 - A session (dashboard, or the CLI after `wraps auth login`) is a person. Their role in the organization must allow the action. A `read-only` or `billing` member can read but not change data, and a `marketing` member cannot change segments, topics or workflows.
-- An API key belongs to the organization, not to the person who created it. The key's own scopes, chosen when it was created, must cover the action: `contacts:read` or `contacts:write` for contacts (import counts as write, export as read) and suppressions; `topics:*`, `segments:*` and `workflows:*` for those resources; `campaigns:read` or `campaigns:write` for templates, brand kits and broadcasts; `campaigns:write` plus `send:email` to send or resume a broadcast; `analytics:read` for events. A key created with `--permissions readonly` can read but every write returns 403. A key keeps working after its creator leaves the organization. Keys cannot manage API keys or read the audit log. Any key can still connect or disconnect an AWS account (`wraps platform connect` and `disconnect` in CI), whatever its scopes.
+- An API key belongs to the organization, not to the person who created it. The key's own scopes, chosen when it was created, must cover the action: `contacts:read` or `contacts:write` for contacts (import counts as write, export as read) and suppressions; `topics:*`, `segments:*` and `workflows:*` for those resources; `campaigns:read` or `campaigns:write` for templates, brand kits and broadcasts; `campaigns:write` plus `send:email` to send or resume a broadcast; `contacts:read` for events. A key created with `--permissions readonly` can read but every write returns 403. A key keeps working after its creator leaves the organization. Keys cannot manage API keys or read the audit log. Any key can still connect or disconnect an AWS account (`wraps platform connect` and `disconnect` in CI), whatever its scopes.
 - A refused request returns 403 with `{"error":"You don't have permission to perform this action"}` and changes nothing.
 
 ### Topics (Pro plan)
@@ -422,18 +422,18 @@ Who the permission applies to depends on how the request authenticates:
 - `POST /v1/topics`: create a topic. Needs `topics:write`. A slug that already exists returns 409.
 - `GET /v1/topics/{id}`: one topic with its audience counts. Needs `topics:read`.
 - `PATCH /v1/topics/{id}`: change only the fields sent. Needs `topics:write`.
-- `DELETE /v1/topics/{id}?confirm=true`: delete the topic and every subscription to it. Needs `topics:delete`.
+- `DELETE /v1/topics/{id}?confirm=true`: delete the topic and every subscription to it. Needs `topics:delete`; an API key needs `topics:write`.
 - `GET /v1/topics/{id}/subscribers`: subscribers, filterable by `status` (`subscribed`, `pending`, `unsubscribed`). Query `page` and `pageSize`. Needs `topics:read`.
 
 ### Segments (Pro plan)
 
-Every segments route needs the Pro plan, reads included. A Free organization gets 403 on every verb. A `condition` is the filter tree the dashboard segment builder produces: AND/OR groups of `{ field, operator, value }` filters, with optional nesting under `group.nested`. It is validated before it is saved, and an invalid or unevaluable condition returns 400 with the reason. `memberCount` in every response is counted live against current contacts, not read from a stored value.
+Every segments route needs the Pro plan, reads included. A Free organization gets 403 on every verb. A `condition` is the filter tree the dashboard segment builder produces: `{ logic, groups }`, where `logic` is `AND` or `OR` and each group holds `filters` (each `{ field, operator, value }`) and an optional `nested` condition of the same shape. It is validated before it is saved, and an invalid or unevaluable condition returns 400 with the reason. `memberCount` in every response is the number of contacts a broadcast to the segment would reach now, counted at request time and not read from a stored value.
 
-- `GET /v1/segments`: list segments with `memberCount`, `trackMembership` and `lastComputedAt`. Query `limit` (1-100, default 20), `offset` and `search` (matches the name). Returns `segments`, `total`, `limit` and `offset`. Any authenticated caller on a Pro plan can read.
+- `GET /v1/segments`: list segments with `memberCount`, `trackMembership` and `lastComputedAt`. Query `limit` (1-100, default 20), `offset` and `search` (matches the name). Returns `segments`, `total`, `limit` and `offset`. Requires authentication only.
 - `POST /v1/segments`: create a segment. Body: `name` (required, up to 200 characters), `condition` (required), `description` and `trackMembership`. Returns 201 with the segment, `condition` included. Needs `segments:write`.
-- `GET /v1/segments/{id}`: one segment with its `condition`. Returns 404 when it is not in the organization.
+- `GET /v1/segments/{id}`: one segment with its `condition`. Returns 404 when it is not in the organization. Requires authentication only.
 - `PATCH /v1/segments/{id}`: change only the fields sent: `name`, `description`, `condition`, `trackMembership`. Sending `condition` re-validates it. Needs `segments:write`.
-- `DELETE /v1/segments/{id}`: delete a segment. Takes no `confirm` parameter. Returns 409 and deletes nothing while a scheduled, queued or processing broadcast targets the segment. Draft, completed, failed and cancelled broadcasts do not block it. Needs `segments:delete`.
+- `DELETE /v1/segments/{id}`: delete a segment. Takes no `confirm` parameter. Returns 409 and deletes nothing while a scheduled, queued or processing broadcast targets the segment. Draft, completed, failed and cancelled broadcasts do not block it. Needs `segments:delete`; an API key needs `segments:write`.
 - `POST /v1/segments/preview`: count and sample the audience an unsaved condition would reach, without saving a segment. Body: `condition` (required) and `limit` (1-100, default 5). Returns `count` and `sample` (email addresses). It is the quickest way to check a condition before `POST /v1/segments`. Needs `segments:read`.
 
 ### Email suppressions
