@@ -7,8 +7,9 @@
  * File suffix `-db.test.ts` = real Neon test branch (no `@wraps/db` mock).
  */
 
+import { createHash } from "node:crypto";
 import { swagger } from "@elysiajs/swagger";
-import { auditLog, db, eq, member, user } from "@wraps/db";
+import { and, auditLog, contact, db, eq, member, user } from "@wraps/db";
 import { inArray } from "drizzle-orm";
 import { Elysia } from "elysia";
 import {
@@ -198,6 +199,73 @@ function suppressedOn(accountId: string): string[] {
 
 function removePath(email: string, query: string) {
   return `/v1/suppressions/${encodeURIComponent(email)}?${query}`;
+}
+
+function hashEmail(email: string): string {
+  return createHash("sha256").update(email.toLowerCase().trim()).digest("hex");
+}
+
+/** A unique address per call, so tests never share a contact or SES entry. */
+function uniqueEmail(label: string): string {
+  return `${label}-${crypto.randomUUID().slice(0, 8)}@example.com`;
+}
+
+/** Puts an address on the fake SES list for the org's AWS account. */
+function suppressOnSes(accountId: string, email: string) {
+  sesState.store.get(accountId)?.push({
+    EmailAddress: email,
+    Reason: "BOUNCE",
+    LastUpdateTime: new Date("2026-10-01T00:00:00.000Z"),
+  });
+}
+
+async function seedContact(
+  organizationId: string,
+  email: string,
+  emailStatus: string
+) {
+  const now = new Date();
+  await db.insert(contact).values({
+    id: `${PREFIX}-c-${crypto.randomUUID().slice(0, 8)}`,
+    organizationId,
+    email,
+    emailHash: hashEmail(email),
+    firstName: "Test",
+    lastName: "Contact",
+    emailStatus,
+    status: "active",
+    createdAt: now,
+    updatedAt: now,
+  } as typeof contact.$inferInsert);
+}
+
+async function contactStatus(organizationId: string, email: string) {
+  const rows = await db
+    .select({ emailStatus: contact.emailStatus })
+    .from(contact)
+    .where(
+      and(
+        eq(contact.organizationId, organizationId),
+        eq(contact.emailHash, hashEmail(email))
+      )
+    );
+  return rows[0]?.emailStatus;
+}
+
+/** The `contactRestored` flag on the org's audit row for a removed address. */
+async function contactRestoredFor(organizationId: string, email: string) {
+  const rows = await db
+    .select({ metadata: auditLog.metadata })
+    .from(auditLog)
+    .where(
+      and(
+        eq(auditLog.organizationId, organizationId),
+        eq(auditLog.action, "suppression.removed"),
+        eq(auditLog.resourceId, email)
+      )
+    );
+  expect(rows).toHaveLength(1);
+  return (rows[0]?.metadata as Record<string, unknown>).contactRestored;
 }
 
 async function clearAudit() {
@@ -412,6 +480,84 @@ describe("remove", () => {
       actorEmail: `${PREFIX}@example.com`,
       metadata: { email, reason: "BOUNCE", awsAccountId: ids.awsAccount },
     });
+    await clearAudit();
+  });
+
+  it("puts a suppressed contact back to active and records contactRestored", async () => {
+    const app = appFor(ids.org, ids.user);
+    const email = uniqueEmail("restore");
+    suppressOnSes(ids.awsAccount, email);
+    await seedContact(ids.org, email, "suppressed");
+
+    const { status, body } = await call(
+      app,
+      "DELETE",
+      removePath(email, `awsAccountId=${ids.awsAccount}&confirm=true`)
+    );
+
+    expect(status).toBe(200);
+    expect(body).toEqual({ success: true, email, wasPresent: true });
+    expect(await contactStatus(ids.org, email)).toBe("active");
+    expect(await contactRestoredFor(ids.org, email)).toBe(true);
+    await clearAudit();
+  });
+
+  it.each(["bounced", "complained"])(
+    "leaves a %s contact alone and records contactRestored false",
+    async (emailStatus) => {
+      const app = appFor(ids.org, ids.user);
+      const email = uniqueEmail(emailStatus);
+      suppressOnSes(ids.awsAccount, email);
+      await seedContact(ids.org, email, emailStatus);
+
+      const { status } = await call(
+        app,
+        "DELETE",
+        removePath(email, `awsAccountId=${ids.awsAccount}&confirm=true`)
+      );
+
+      expect(status).toBe(200);
+      expect(suppressedOn(ids.awsAccount)).not.toContain(email);
+      expect(await contactStatus(ids.org, email)).toBe(emailStatus);
+      expect(await contactRestoredFor(ids.org, email)).toBe(false);
+      await clearAudit();
+    }
+  );
+
+  it("does not restore another org's suppressed contact with the same email", async () => {
+    const app = appFor(ids.org, ids.user);
+    const email = uniqueEmail("shared");
+    suppressOnSes(ids.awsAccount, email);
+    await seedContact(ids.org, email, "suppressed");
+    await seedContact(ids.otherOrg, email, "suppressed");
+
+    const { status } = await call(
+      app,
+      "DELETE",
+      removePath(email, `awsAccountId=${ids.awsAccount}&confirm=true`)
+    );
+
+    expect(status).toBe(200);
+    expect(await contactStatus(ids.org, email)).toBe("active");
+    expect(await contactStatus(ids.otherOrg, email)).toBe("suppressed");
+    await clearAudit();
+  });
+
+  it("still removes the address when no contact exists, with contactRestored false", async () => {
+    const app = appFor(ids.org, ids.user);
+    const email = uniqueEmail("nocontact");
+    suppressOnSes(ids.awsAccount, email);
+
+    const { status, body } = await call(
+      app,
+      "DELETE",
+      removePath(email, `awsAccountId=${ids.awsAccount}&confirm=true`)
+    );
+
+    expect(status).toBe(200);
+    expect(body).toEqual({ success: true, email, wasPresent: true });
+    expect(await contactStatus(ids.org, email)).toBeUndefined();
+    expect(await contactRestoredFor(ids.org, email)).toBe(false);
     await clearAudit();
   });
 

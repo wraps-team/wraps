@@ -24,6 +24,7 @@ import {
   db,
   eq,
   suppressContactByEmail,
+  unsuppressContactByEmail,
   user,
 } from "@wraps/db";
 import { t } from "elysia";
@@ -600,6 +601,26 @@ export const suppressionsRoutes = createAuthenticatedRoutes("/v1/suppressions")
         return { error: PERMISSION_DENIED_ERROR };
       }
 
+      // Broadcasts read the contact's status, not the SES list: put a contact
+      // this address's suppression had parked back in the audience, as the
+      // dashboard does. Only a `suppressed` contact changes. The helper is
+      // idempotent, so a failed write is safe to surface as a failure.
+      let contactRestored: boolean;
+      try {
+        contactRestored = await unsuppressContactByEmail(organizationId, email);
+      } catch (error) {
+        log.error(
+          "Failed to restore contact after suppression removal",
+          error,
+          {
+            organizationId,
+            awsAccountId: account.id,
+          }
+        );
+        set.status = 502;
+        return { error: "Failed to remove suppression" };
+      }
+
       try {
         const [actor] = gate.userId
           ? await db
@@ -619,6 +640,7 @@ export const suppressionsRoutes = createAuthenticatedRoutes("/v1/suppressions")
             email,
             reason: current.address.reason,
             awsAccountId: account.id,
+            contactRestored,
           },
           ipAddress: clientIp(request),
           userAgent: request.headers.get("user-agent"),
@@ -663,7 +685,7 @@ export const suppressionsRoutes = createAuthenticatedRoutes("/v1/suppressions")
         tags: ["suppressions"],
         summary: "Remove a suppressed address",
         description:
-          "Removes one address from the SES suppression list of the given AWS account. Destructive: pass confirm=true, or the request is refused with 400 before anything changes. Addresses suppressed for a spam complaint also need acknowledgedComplaint=true (409 otherwise). Percent-encode the email in the path. Requires awsAccounts:write.",
+          "Removes one address from the SES suppression list of the given AWS account. Destructive: pass confirm=true, or the request is refused with 400 before anything changes. Addresses suppressed for a spam complaint also need acknowledgedComplaint=true (409 otherwise). Percent-encode the email in the path. A contact for this address whose status is suppressed becomes active again; other statuses are unchanged. Requires awsAccounts:write.",
       },
     }
   );
