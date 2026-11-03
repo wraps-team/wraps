@@ -249,7 +249,7 @@ const DATA_COMMAND_GROUPS: DataCommandGroup[] = [
         flags:
           "--name, --subject, --template-id, --audience-type (all, topic or segment), --topic-id or --segment-id, --aws-account-id, --html-content, --scheduled-for (ISO time)",
         notes:
-          "The output prints the broadcasts send command to run next. Draft content is fixed when the draft is created, because the API does not edit drafts on current main.",
+          "The output prints the broadcasts send command to run next. Change a saved draft later with broadcasts update.",
       },
       {
         command: "broadcasts create",
@@ -353,6 +353,16 @@ const DATA_COMMAND_GROUPS: DataCommandGroup[] = [
         notes: "The copy is always a DRAFT.",
       },
       {
+        command: "email templates delete <id...>",
+        summary:
+          "Delete up to 100 templates, with their versions. A published SES copy is removed too, unless another template uses the same SES name.",
+        flags:
+          "--yes (required), --dry-run (previews the delete and makes no request)",
+        data: "dryRun, route (single or bulk), deleted, notFound, count, and wouldDelete in a dry run",
+        notes:
+          "If any template is still used by a scheduled, queued or processing broadcast, or by an enabled workflow, the whole delete is refused with CONFLICT and nothing is deleted. The error names the blocking template ids.",
+      },
+      {
         command: "email metrics",
         summary:
           "Aggregate sends, opens, clicks, bounces and cost for the organization.",
@@ -383,6 +393,16 @@ const DATA_COMMAND_GROUPS: DataCommandGroup[] = [
         data: "entries (email, reason, awsAccountId, lastUpdated), nextCursor, hasMore, deniedAccountIds, unreachableAccountIds",
         notes:
           "Without --account it covers every connected AWS account. The cursor is opaque: repeat the same --account and --reason with it. A page can be empty while hasMore is true.",
+      },
+      {
+        command: "email suppressions add <email...>",
+        summary:
+          "Add up to 100 addresses to an AWS account's SES suppression list, so Wraps stops sending to them.",
+        flags:
+          "--account <awsAccountId> (required), --reason bounce|complaint (required), --file <path> (one address per line), --yes (required), --dry-run",
+        data: "awsAccountId, reason, dryRun, results (email, success, alreadyPresent, error on a failure), added, alreadyPresent, failed",
+        notes:
+          "Adds are idempotent: an address that is already suppressed is reported as alreadyPresent. If any address fails, the command exits with code 1. Undo one address with email suppressions remove.",
       },
       {
         command: "email suppressions remove <email>",
@@ -818,11 +838,12 @@ export default function CLIReferencePageContent() {
               Without --yes they return CONFIRMATION_REQUIRED before making any
               request: contacts delete, contacts import with --validate,
               contacts validate, segments delete, topics delete, email
-              suppressions remove, email templates publish, broadcasts create,
-              broadcasts send, broadcasts resume, broadcasts cancel, workflows
-              trigger, workflows enable, workflows retry, workflows cancel,
-              email agent approvals approve, email agent approvals reject,
-              api-keys revoke, and brand-kits delete.
+              suppressions add, email suppressions remove, email templates
+              publish, email templates delete, broadcasts create, broadcasts
+              send, broadcasts resume, broadcasts cancel, workflows trigger,
+              workflows enable, workflows retry, workflows cancel, email agent
+              approvals approve, email agent approvals reject, api-keys revoke,
+              and brand-kits delete.
             </p>
             <p className="text-muted-foreground text-sm">
               email templates pull fetches without --yes, but it refuses to
