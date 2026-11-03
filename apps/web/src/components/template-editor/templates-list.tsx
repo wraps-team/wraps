@@ -988,6 +988,11 @@ function TemplateRowWithPublish({
   const handleDeleteConfirm = useCallback(() => {
     deleteTemplate.mutate(template.id, {
       onSuccess: () => setDeleteDialogOpen(false),
+      onError: (error) => {
+        toast.error("Failed to delete template", {
+          description: error.message,
+        });
+      },
     });
   }, [deleteTemplate, template.id]);
 

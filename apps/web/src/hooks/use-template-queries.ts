@@ -183,7 +183,9 @@ export function useDeleteTemplate(orgSlug: string) {
         }
       );
       if (!response.ok) {
-        throw new Error("Failed to delete template");
+        // A 409 names the broadcasts and workflows that still use it.
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body?.error ?? "Failed to delete template");
       }
       return response.json();
     },
