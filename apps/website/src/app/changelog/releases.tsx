@@ -119,6 +119,7 @@ export const releases: Release[] = [
       "CLI v3.20.0",
       "MCP v0.10.0",
       "MCP v0.11.0",
+      "@wraps.dev/client v0.14.0",
       "@wraps.dev/client v0.15.0",
     ],
     date: "2026-11-02",
@@ -137,22 +138,29 @@ export const releases: Release[] = [
       </>,
       <>
         Run <Code>wraps broadcasts draft</Code> to save a broadcast without
-        sending it, so someone can review it before{" "}
-        <Code>wraps broadcasts send</Code>
+        sending it, <Code>wraps email templates delete &lt;id...&gt;</Code> to
+        delete up to 100 templates, and{" "}
+        <Code>wraps email suppressions add</Code> to add up to 100 addresses to
+        an account&apos;s suppression list. The last two need <Code>--yes</Code>{" "}
+        and take <Code>--dry-run</Code>. A template that a scheduled broadcast
+        or an enabled workflow uses is refused, and nothing is deleted
       </>,
       <>
-        Run <Code>wraps email templates delete &lt;id...&gt;</Code> to delete up
-        to 100 templates, or <Code>wraps email suppressions add</Code> to add up
-        to 100 addresses to an account&apos;s suppression list. Both need{" "}
-        <Code>--yes</Code> and take <Code>--dry-run</Code>. A template that a
-        scheduled broadcast or an enabled workflow uses is refused, and nothing
-        is deleted
+        Connect an MCP client to <Code>@wraps.dev/mcp</Code> v0.10.0 for tools
+        across contacts, segments, topics, templates, broadcasts, events,
+        workflows, suppressions, inbound email and brand kits. v0.11.0 adds{" "}
+        <Code>delete_template</Code>, <Code>add_suppression</Code>, contact
+        import and export, account health and agent tools. Write tools stay off
+        until you set <Code>WRAPS_WRITE_ENABLED=true</Code>
       </>,
       <>
-        Check the scopes on any API key that writes data: a key without the
-        matching scope, and a read-only member&apos;s session, now get 403 from
-        batch, contact, segment, template and workflow write routes. The MCP
-        server adds tools for these routes in v0.10.0 and v0.11.0
+        Check the role or key behind anything that writes. Read-only and billing
+        members can read but not write, and marketing members can read but not
+        change segments, workflows or topics.{" "}
+        <Code>wraps platform connect</Code> and <Code>disconnect</Code> from a
+        session need an owner or admin. An API key needs the matching scope for
+        reads as well as writes on topics, events, suppressions, workflow runs
+        and contact export. A refused request returns 403 and changes nothing
       </>,
     ],
     docs: "/docs/cli-reference",
