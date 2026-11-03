@@ -329,12 +329,18 @@ export function ContactDetailsSheet({
         values.jobTitle !== (contact.jobTitle || "")
           ? values.jobTitle || null
           : undefined,
+      // Compared against the defaults the form fills in for a missing
+      // status, like the text fields compare against "": an untouched
+      // status is never sent (it would write, and report, a status the user
+      // never chose).
       emailStatus:
-        values.emailStatus !== contact.emailStatus
+        values.emailStatus !== (contact.emailStatus || "active")
           ? values.emailStatus
           : undefined,
       smsStatus:
-        values.smsStatus !== contact.smsStatus ? values.smsStatus : undefined,
+        values.smsStatus !== (contact.smsStatus || "pending_consent")
+          ? values.smsStatus
+          : undefined,
       properties: propertiesChanged ? propertiesObj : undefined,
       topicIds: topicsChanged ? selectedTopicIds : undefined,
     });
