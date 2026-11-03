@@ -1251,7 +1251,7 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
     ],
     audience: "stranger-with-problem",
     rationale:
-      "Almost every result for this comparison is published by one of the two parties, and neither leads with the fact that decides it: they share a delivery substrate, so the real trade is ownership and tooling rather than inbox placement.",
+      "Almost every result for this comparison is published by one of the two parties, and neither leads with the fact that decides it: the real trade is ownership and tooling rather than inbox placement, and that holds whether a Resend domain sends through SES or through its newer Forge MTA.",
   },
   {
     route: "/versus/amazon-ses-vs-self-hosted",
