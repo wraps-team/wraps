@@ -75,10 +75,39 @@ const toConnect = (): Pick<ToolCta, "command" | "secondary"> => ({
 
 // ── SES detection ───────────────────────────────────────────────────
 
+const SES_DOMAIN = "amazonses.com";
+const AWS_SPF_HOST = "_spf.aws";
+const SPF_QUALIFIER = /^[+\-~?]/;
+const SPF_TARGET = /^(?:include:|redirect=)(.+)$/;
+const TRAILING_DOT = /\.$/;
+const WHITESPACE = /\s+/;
+
+/** A host that is `amazonses.com` or a subdomain of it, never a look-alike such as
+ * `notamazonses.com` or `amazonses.com.example.org`. */
+function isSesHost(host: string): boolean {
+  const bare = host.trim().toLowerCase().replace(TRAILING_DOT, "");
+  return bare === SES_DOMAIN || bare.endsWith(`.${SES_DOMAIN}`);
+}
+
+/** The hosts an SPF record delegates to through `include:` or `redirect=`. */
+function spfDelegatedHosts(spf: string): string[] {
+  const hosts: string[] = [];
+  for (const token of spf.toLowerCase().split(WHITESPACE)) {
+    const target = SPF_TARGET.exec(token.replace(SPF_QUALIFIER, ""));
+    if (target?.[1]) {
+      hosts.push(target[1]);
+    }
+  }
+  return hosts;
+}
+
 /**
  * Whether a domain sends through Amazon SES, from signals the checker already has.
  * SES picks DKIM selectors at random, so DKIM records cannot identify it; SPF, the
  * checker's own "AWS SES" DKIM warning and an SES MX host can.
+ *
+ * Hosts are compared whole, not by substring, so a look-alike domain is not taken for
+ * SES.
  */
 export function detectSes(input: {
   spfRecord: string | null;
@@ -86,18 +115,22 @@ export function detectSes(input: {
   dkimWarnings: string[];
   mxExchanges: string[];
 }): boolean {
-  const spf = [input.spfRecord ?? "", ...input.spfIncludes]
-    .join(" ")
-    .toLowerCase();
-  if (spf.includes("amazonses.com") || spf.includes("_spf.aws")) {
+  const delegated = spfDelegatedHosts(
+    [input.spfRecord ?? "", ...input.spfIncludes].join(" ")
+  );
+  if (
+    delegated.some(
+      (host) =>
+        isSesHost(host) ||
+        host.trim().replace(TRAILING_DOT, "") === AWS_SPF_HOST
+    )
+  ) {
     return true;
   }
   if (input.dkimWarnings.some((w) => w.toLowerCase().includes("aws ses"))) {
     return true;
   }
-  return input.mxExchanges.some((mx) =>
-    mx.toLowerCase().includes("amazonses.com")
-  );
+  return input.mxExchanges.some(isSesHost);
 }
 
 // ── Checker ─────────────────────────────────────────────────────────

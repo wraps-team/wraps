@@ -76,6 +76,55 @@ describe("detectSes", () => {
     ).toBe(true);
   });
 
+  it("finds SES behind a qualifier, a redirect, or a regional subdomain", () => {
+    expect(
+      detectSes({ ...none, spfRecord: "v=spf1 -include:amazonses.com -all" })
+    ).toBe(true);
+    expect(
+      detectSes({ ...none, spfRecord: "v=spf1 redirect=amazonses.com" })
+    ).toBe(true);
+    expect(
+      detectSes({ ...none, spfRecord: "v=spf1 include:eu.amazonses.com ~all" })
+    ).toBe(true);
+  });
+
+  it("does not take a look-alike host for SES", () => {
+    for (const spfRecord of [
+      "v=spf1 include:amazonses.com.evil.example ~all",
+      "v=spf1 include:notamazonses.com ~all",
+      "v=spf1 include:amazonses.community ~all",
+      "v=spf1 ip4:203.0.113.7 a:amazonses.com.example.org ~all",
+    ]) {
+      expect(detectSes({ ...none, spfRecord })).toBe(false);
+    }
+    expect(
+      detectSes({
+        ...none,
+        mxExchanges: [
+          "feedback-smtp.us-east-1.amazonses.com.evil.io",
+          "mail.notamazonses.com",
+        ],
+      })
+    ).toBe(false);
+    // The text of the record is not a host: a comment-like string mentioning SES
+    // in a TXT value that is not an include or redirect does not count.
+    expect(
+      detectSes({
+        ...none,
+        spfRecord: "v=spf1 ip4:203.0.113.7 ~all amazonses.com",
+      })
+    ).toBe(false);
+  });
+
+  it("accepts an SES MX host with a trailing dot", () => {
+    expect(
+      detectSes({
+        ...none,
+        mxExchanges: ["feedback-smtp.us-west-2.amazonses.com."],
+      })
+    ).toBe(true);
+  });
+
   it("does not flag other providers", () => {
     expect(
       detectSes({
