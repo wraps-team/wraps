@@ -88,15 +88,21 @@ export async function unsubscribeContactGlobally(
     )
     .returning({ id: contact.id });
 
-  // Also unsubscribe from all topics. The contact lookup above is the org
-  // gate for this write.
+  // Also unsubscribe from all of the org's topics. contact_topic has no org
+  // column, so the write carries the org through the topic it points at, on
+  // top of the contact lookup above.
   await db
     .update(contactTopic)
     .set({
       status: "unsubscribed",
       unsubscribedAt: now,
     })
-    .where(eq(contactTopic.contactId, contactId));
+    .where(
+      and(
+        eq(contactTopic.contactId, contactId),
+        sql`${contactTopic.topicId} IN (SELECT ${topic.id} FROM ${topic} WHERE ${topic.organizationId} = ${organizationId})`
+      )
+    );
 
   // Emit topic_unsubscribed events for all previously subscribed topics
   await Promise.all(

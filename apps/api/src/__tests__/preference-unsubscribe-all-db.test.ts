@@ -13,7 +13,7 @@
  * the token library are real.
  */
 
-import { and, contact, contactTopic, db, eq, topic, workflow } from "@wraps/db";
+import { contact, contactTopic, db, eq, topic, workflow } from "@wraps/db";
 import { Elysia } from "elysia";
 import * as jose from "jose";
 import {
@@ -198,12 +198,7 @@ describe("POST /v1/preference-events/unsubscribe-all (real DB)", () => {
     await db.delete(workflow).where(eq(workflow.id, workflowId));
     await db
       .delete(contactTopic)
-      .where(
-        and(
-          eq(contactTopic.contactId, fixture.ids.otherContact),
-          eq(contactTopic.topicId, OTHER_ORG_TOPIC)
-        )
-      );
+      .where(eq(contactTopic.topicId, OTHER_ORG_TOPIC));
     await db.delete(contactTopic).where(eq(contactTopic.topicId, TOPIC_A));
     await db.delete(contactTopic).where(eq(contactTopic.topicId, TOPIC_B));
     await db.delete(topic).where(eq(topic.id, TOPIC_A));
@@ -308,6 +303,31 @@ describe("POST /v1/preference-events/unsubscribe-all (real DB)", () => {
     });
     expect(mockedEmit).not.toHaveBeenCalled();
     expect(mockedTopicEmit).not.toHaveBeenCalled();
+  });
+
+  it("a subscription that points at another org's topic is neither unsubscribed nor reported", async () => {
+    const { ids } = fixture;
+    // Bad data on purpose: contact_topic has no org column, so nothing stops
+    // a row for org A's contact pointing at org B's topic.
+    await db.insert(contactTopic).values({
+      contactId: ids.contact,
+      topicId: OTHER_ORG_TOPIC,
+      status: "subscribed",
+    });
+    const token = await generateUnsubscribeToken(ids.contact, ids.org);
+
+    const res = await unsubscribeAll({ token });
+
+    expect(res.status).toBe(200);
+    expect(await topicStatusesOf(ids.contact)).toEqual({
+      [TOPIC_A]: "unsubscribed",
+      [TOPIC_B]: "unsubscribed",
+      [OTHER_ORG_TOPIC]: "subscribed",
+    });
+    expect(
+      mockedTopicEmit.mock.calls.map(([params]) => params.topicId).sort()
+    ).toEqual([TOPIC_A, TOPIC_B].sort());
+    expect(contactUpdatedJobs()).toHaveLength(1);
   });
 
   it("a token carrying a topic id still unsubscribes from everything", async () => {

@@ -1050,6 +1050,27 @@ describe("Workflow event emission from preference center", () => {
 // confirm. Each test installs its own fetch stub over the file-level one.
 describe("unsubscribeGlobally — API first, local fallback", () => {
   const API_URL = "http://api.test";
+  // Another org's topic, for a contact_topic row that points across orgs.
+  const foreignOrg = {
+    id: "test-pref-org-foreign",
+    name: "Preferences Foreign Org",
+    slug: "pref-foreign-org",
+    createdAt: new Date(),
+    logo: null,
+    metadata: null,
+  };
+  const foreignTopic = {
+    id: "test-pref-topic-foreign",
+    organizationId: foreignOrg.id,
+    name: "Foreign Topic",
+    slug: "foreign-topic",
+    description: "Belongs to another organization",
+    public: true,
+    doubleOptIn: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    createdBy: testUser.id,
+  };
   const originalFetch = globalThis.fetch;
   type Call = { url: string; options: RequestInit };
   const unsubscribeAllCalls: Call[] = [];
@@ -1152,6 +1173,23 @@ describe("unsubscribeGlobally — API first, local fallback", () => {
       .filter((failure) => failure !== undefined);
   }
 
+  beforeAll(async () => {
+    await db
+      .insert(organization)
+      .values(foreignOrg)
+      .onConflictDoUpdate({
+        target: organization.id,
+        set: { name: foreignOrg.name },
+      });
+    await db
+      .insert(topic)
+      .values(foreignTopic)
+      .onConflictDoUpdate({
+        target: topic.id,
+        set: { updatedAt: new Date() },
+      });
+  });
+
   beforeEach(async () => {
     unsubscribeAllCalls.length = 0;
     eventCalls.length = 0;
@@ -1179,6 +1217,11 @@ describe("unsubscribeGlobally — API first, local fallback", () => {
       .update(contact)
       .set({ emailStatus: "active", emailUnsubscribedAt: null })
       .where(eq(contact.id, testContact.id));
+    await db
+      .delete(contactTopic)
+      .where(eq(contactTopic.topicId, foreignTopic.id));
+    await db.delete(topic).where(eq(topic.id, foreignTopic.id));
+    await db.delete(organization).where(eq(organization.id, foreignOrg.id));
   });
 
   it("API success: one unsubscribe-all call with the token, and no local write", async () => {
@@ -1374,6 +1417,43 @@ describe("unsubscribeGlobally — API first, local fallback", () => {
     expect(contactRow.emailUnsubscribedAt?.toISOString()).toBe(
       firstUnsubscribedAt.toISOString()
     );
+  });
+
+  it("a fallback leaves a subscription to another org's topic alone and does not report it", async () => {
+    // Bad data on purpose: contact_topic has no org column, so nothing stops
+    // a row for this org's contact pointing at another org's topic.
+    await db.insert(contactTopic).values({
+      contactId: testContact.id,
+      topicId: foreignTopic.id,
+      status: "subscribed",
+      subscribedAt: new Date(),
+    });
+    stubApi(() => Promise.resolve(new Response("boom", { status: 500 })));
+    const token = await generateUnsubscribeToken(
+      testContact.id,
+      testOrganization.id
+    );
+
+    const result = await unsubscribeGlobally(
+      token,
+      testContact.id,
+      testOrganization.id
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(await topicStatuses()).toEqual({
+      [testRegularTopic.id]: "unsubscribed",
+      [testDoubleOptInTopic.id]: "unsubscribed",
+      [foreignTopic.id]: "subscribed",
+    });
+    expect(eventCalls).toHaveLength(1);
+    expect(JSON.parse(eventCalls[0].options.body as string).changes).toEqual([
+      {
+        topicId: testRegularTopic.id,
+        topicName: testRegularTopic.name,
+        action: "unsubscribed",
+      },
+    ]);
   });
 
   it("a fallback for a token pairing this contact with another org touches none of its rows", async () => {

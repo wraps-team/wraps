@@ -521,14 +521,21 @@ export async function unsubscribeGlobally(
         )
         .returning({ topicId: contactTopic.topicId, topicName: topic.name });
 
-      // Then every remaining subscription (pending ones too)
+      // Then every remaining subscription to the org's topics (pending ones
+      // too). contact_topic has no org column, so the org comes through the
+      // topic, on top of the contact lookup above.
       await db
         .update(contactTopic)
         .set({
           status: "unsubscribed",
           unsubscribedAt: now,
         })
-        .where(eq(contactTopic.contactId, contactId));
+        .where(
+          and(
+            eq(contactTopic.contactId, contactId),
+            sql`${contactTopic.topicId} IN (SELECT ${topic.id} FROM ${topic} WHERE ${topic.organizationId} = ${organizationId})`
+          )
+        );
 
       const changes: TopicChange[] = unsubscribedTopics.map((t) => ({
         topicId: t.topicId,
