@@ -459,7 +459,7 @@ describe("bulkDeleteTemplates refuses templates still in use", () => {
     );
   });
 
-  it("another org's template id deletes nothing: count 0, row intact, SES untouched, no audit row names it", async () => {
+  it("another org's template id deletes nothing: count 0, row intact, SES untouched, no audit row", async () => {
     const foreign = await newTemplate({}, otherOrg.id);
 
     const result = await bulkDeleteTemplates(testOrg.id, [foreign]);
@@ -468,6 +468,8 @@ describe("bulkDeleteTemplates refuses templates still in use", () => {
     expect(await templateExists(foreign, otherOrg.id)).toBe(true);
     expect(mockDeleteSESTemplate).not.toHaveBeenCalled();
     expect(await auditRowsNaming(foreign)).toHaveLength(0);
+    // Nothing was deleted, so no template.deleted row at all (as in the API).
+    expect(await deletedAuditRows()).toHaveLength(0);
   });
 
   it("another org's draft broadcast pointing at this org's template does not block", async () => {

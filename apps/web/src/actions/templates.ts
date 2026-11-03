@@ -330,6 +330,18 @@ class TemplatesInUseError extends Error {
 }
 
 /**
+ * Thrown inside `ctx.audited` when none of the ids is a template of the org,
+ * so no `template.deleted` audit row is written for a delete that removed
+ * nothing (the API writes none either). Caught in `bulkDeleteTemplates`.
+ */
+class NothingToDeleteError extends Error {
+  constructor() {
+    super("No templates of this organization to delete");
+    this.name = "NothingToDeleteError";
+  }
+}
+
+/**
  * Bulk delete templates. All-or-nothing, like DELETE /v1/templates.
  *
  * In one transaction: lock the org's target rows FOR UPDATE, run the shared
@@ -368,7 +380,7 @@ export const bulkDeleteTemplates = orgAction(
             requestedIds
           );
           if (targets.length === 0) {
-            return targets;
+            throw new NothingToDeleteError();
           }
 
           const blockers = await findTemplateDeleteBlockers(
@@ -403,6 +415,9 @@ export const bulkDeleteTemplates = orgAction(
         }
       );
     } catch (error) {
+      if (error instanceof NothingToDeleteError) {
+        return { success: true, count: 0 };
+      }
       if (error instanceof TemplatesInUseError) {
         return {
           success: false,
