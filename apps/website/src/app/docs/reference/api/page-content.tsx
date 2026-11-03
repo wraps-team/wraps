@@ -614,7 +614,7 @@ The SES account-level suppression list, kept per AWS account. Wraps stops sendin
 
 ### Remove a Suppressed Address
 
-\`DELETE /v1/suppressions/:email?awsAccountId=<id>&confirm=true\` -- Removes one address. Percent-encode the email in the path. An address suppressed for a complaint also needs \`acknowledgedComplaint=true\`, or the route returns 409. Needs \`awsAccounts:write\`.`,
+\`DELETE /v1/suppressions/:email?awsAccountId=<id>&confirm=true\` -- Removes one address. Percent-encode the email in the path. An address suppressed for a complaint also needs \`acknowledgedComplaint=true\`, or the route returns 409. A contact for this address whose status is \`suppressed\` becomes \`active\` again; other statuses are unchanged. Needs \`awsAccounts:write\`.`,
 
   contactTopics: `## Contact Topics: PATCH vs PUT
 
@@ -2512,7 +2512,13 @@ export default function PageContent() {
           <code className="rounded bg-muted px-1 py-0.5 text-xs">
             acknowledgedComplaint=true
           </code>
-          , or the route returns 409. Needs{" "}
+          , or the route returns 409. A contact for this address whose status is{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">
+            suppressed
+          </code>{" "}
+          becomes{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">active</code>{" "}
+          again; other statuses are unchanged. Needs{" "}
           <code className="rounded bg-muted px-1 py-0.5 text-xs">
             awsAccounts:write
           </code>
