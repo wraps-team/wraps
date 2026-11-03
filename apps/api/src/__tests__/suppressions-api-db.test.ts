@@ -611,6 +611,7 @@ describe("remove", () => {
   it("refuses a complaint suppression without acknowledgedComplaint, with the spam text", async () => {
     const app = appFor(ids.org, ids.user);
     const email = "complaint-a@example.com";
+    await seedContact(ids.org, email, "suppressed");
     const refused = await call(
       app,
       "DELETE",
@@ -623,6 +624,8 @@ describe("remove", () => {
     );
     expect(sesState.calls.some((c) => c.kind === "delete")).toBe(false);
     expect(suppressedOn(ids.awsAccount)).toContain(email);
+    // The contact is only restored once SES has really dropped the address.
+    expect(await contactStatus(ids.org, email)).toBe("suppressed");
 
     const allowed = await call(
       app,
@@ -634,6 +637,7 @@ describe("remove", () => {
     );
     expect(allowed.status).toBe(200);
     expect(allowed.body).toEqual({ success: true, email, wasPresent: true });
+    expect(await contactStatus(ids.org, email)).toBe("active");
     await clearAudit();
   });
 

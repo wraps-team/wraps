@@ -23,6 +23,7 @@ import {
   awsAccount,
   db,
   eq,
+  hashContactValue,
   suppressContactByEmail,
   unsuppressContactByEmail,
   user,
@@ -603,8 +604,10 @@ export const suppressionsRoutes = createAuthenticatedRoutes("/v1/suppressions")
 
       // Broadcasts read the contact's status, not the SES list: put a contact
       // this address's suppression had parked back in the audience, as the
-      // dashboard does. Only a `suppressed` contact changes. The helper is
-      // idempotent, so a failed write is safe to surface as a failure.
+      // dashboard does. Only a `suppressed` contact changes. If this write
+      // fails, SES has already dropped the address; we report failure as the
+      // dashboard does, but a retry answers 404 at the SES re-read and never
+      // reaches this call, so the contact stays suppressed until fixed by hand.
       let contactRestored: boolean;
       try {
         contactRestored = await unsuppressContactByEmail(organizationId, email);
@@ -614,6 +617,7 @@ export const suppressionsRoutes = createAuthenticatedRoutes("/v1/suppressions")
           error,
           {
             organizationId,
+            emailHash: hashContactValue(email),
             awsAccountId: account.id,
           }
         );
