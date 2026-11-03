@@ -1,25 +1,7 @@
 import { auth } from "@wraps/auth";
+import type { ContactUpdatedField } from "@wraps/db";
 import { headers } from "next/headers";
 import type { Logger } from "@/lib/logger";
-
-/**
- * The contact fields a dashboard write may report, as the API's
- * POST /v1/contacts/events/updated accepts them.
- */
-export const CONTACT_UPDATED_FIELDS = [
-  "email",
-  "phone",
-  "firstName",
-  "lastName",
-  "company",
-  "jobTitle",
-  "preferredChannel",
-  "properties",
-  "emailStatus",
-  "smsStatus",
-] as const;
-
-export type ContactUpdatedField = (typeof CONTACT_UPDATED_FIELDS)[number];
 
 export type ContactUpdatedViaApiItem = {
   contactId: string;

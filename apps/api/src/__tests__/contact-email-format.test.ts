@@ -17,6 +17,10 @@ vi.mock("@wraps/db", async () => ({
   EMAIL_STATUSES: (
     await vi.importActual<typeof import("@wraps/db")>("@wraps/db")
   ).EMAIL_STATUSES,
+  // Real constant too: the dashboard's contact_updated route allowlists it.
+  CONTACT_UPDATED_FIELDS: (
+    await vi.importActual<typeof import("@wraps/db")>("@wraps/db")
+  ).CONTACT_UPDATED_FIELDS,
   contact: {
     id: "id",
     organizationId: "organization_id",

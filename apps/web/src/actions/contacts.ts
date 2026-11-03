@@ -3,8 +3,10 @@
 import { isDeepStrictEqual } from "node:util";
 import {
   CONTACT_SORT_FIELDS,
+  CONTACT_UPDATED_FIELDS,
   type ContactSort,
   type ContactSortField,
+  type ContactUpdatedField,
   deleteContact as dbDeleteContact,
   fetchTopicsForSubscription,
   findContactByEmailHash,
@@ -19,11 +21,7 @@ import {
 } from "@wraps/db";
 import { revalidatePath } from "next/cache";
 import { trackContactCreated } from "@/lib/activation-tracking";
-import {
-  CONTACT_UPDATED_FIELDS,
-  type ContactUpdatedField,
-  emitContactsUpdatedViaApi,
-} from "@/lib/contact-updated-api";
+import { emitContactsUpdatedViaApi } from "@/lib/contact-updated-api";
 import type {
   ContactStatus,
   CreateContactResult,

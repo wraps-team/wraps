@@ -15,6 +15,7 @@
 
 import {
   bulkDeleteContacts,
+  CONTACT_UPDATED_FIELDS,
   type ContactRecord,
   contact,
   contactUniqueViolationField,
@@ -42,6 +43,7 @@ import { sql } from "drizzle-orm";
 import { t } from "elysia";
 
 import { log } from "../lib/logger";
+import { rejectApiKeyCaller } from "../lib/reject-api-key-caller";
 import { requirePermission } from "../lib/require-permission";
 import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
 import {
@@ -255,37 +257,8 @@ const listContactsQuerySchema = t.Object({
   ),
 });
 
-/**
- * The contact fields a dashboard write may report in `updatedFields`: the
- * dashboard's editable fields, the names PATCH already emits.
- */
-const CONTACT_UPDATED_FIELDS = [
-  "email",
-  "phone",
-  "firstName",
-  "lastName",
-  "company",
-  "jobTitle",
-  "preferredChannel",
-  "properties",
-  "emailStatus",
-  "smsStatus",
-] as const;
-
 const DASHBOARD_ONLY =
   "Only the Wraps dashboard can report contact updates. API keys cannot call this route.";
-
-/**
- * Session-only gate, as in api-keys.ts: returns the 403 body when the request
- * was authenticated with an API key, otherwise null.
- */
-function rejectApiKeyCaller(ctx: unknown): { error: string } | null {
-  if (getAuth(ctx).apiKeyId === null) {
-    return null;
-  }
-  (ctx as { set: { status: number } }).set.status = 403;
-  return { error: DASHBOARD_ONLY };
-}
 
 export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
   // List contacts
@@ -1252,7 +1225,7 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
   .post(
     "/events/updated",
     async (ctx) => {
-      const rejected = rejectApiKeyCaller(ctx);
+      const rejected = rejectApiKeyCaller(ctx, DASHBOARD_ONLY);
       if (rejected) {
         return rejected;
       }

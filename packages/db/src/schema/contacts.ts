@@ -30,6 +30,28 @@ export const EMAIL_STATUSES = [
 export type EmailStatus = (typeof EMAIL_STATUSES)[number];
 
 /**
+ * The contact fields a dashboard write may report in a `contact_updated`
+ * event's `updatedFields` (POST /v1/contacts/events/updated): the dashboard's
+ * editable fields, under the names PATCH /v1/contacts/:id already emits. The
+ * API route's allowlist and the web helper both read this list, so they
+ * cannot drift into a 422 the helper would only log.
+ */
+export const CONTACT_UPDATED_FIELDS = [
+  "email",
+  "phone",
+  "firstName",
+  "lastName",
+  "company",
+  "jobTitle",
+  "preferredChannel",
+  "properties",
+  "emailStatus",
+  "smsStatus",
+] as const;
+
+export type ContactUpdatedField = (typeof CONTACT_UPDATED_FIELDS)[number];
+
+/**
  * Whether a status may be sent to. Total by construction: adding a sixth
  * `EmailStatus` fails the build here until someone answers the question for it.
  *
