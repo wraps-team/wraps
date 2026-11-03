@@ -12,11 +12,13 @@ import { Label } from "@wraps/ui/components/ui/label";
 import { AlertTriangle, Info } from "lucide-react";
 import Link from "next/link";
 import { parseAsInteger, useQueryStates } from "nuqs";
+import { ToolSignupBox } from "@/components/tool-signup-box";
 import {
   estimateSesRates,
   type MetricResult,
   type RateStatus,
 } from "@/lib/ses-bounce-rate";
+import { ratesCta } from "@/lib/tool-cta";
 
 const parsers = {
   sends: parseAsInteger.withDefault(0),
@@ -264,6 +266,11 @@ export default function BounceRateCalculatorPageContent() {
               left out above.
             </p>
           )}
+
+          <ToolSignupBox
+            cta={ratesCta([estimate.bounce.status, estimate.complaint.status])}
+            tool="bounce-rate"
+          />
         </>
       ) : (
         <p className="text-muted-foreground text-sm">

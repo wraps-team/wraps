@@ -12,7 +12,9 @@ import { Label } from "@wraps/ui/components/ui/label";
 import { Textarea } from "@wraps/ui/components/ui/textarea";
 import { Lock } from "lucide-react";
 import { useMemo, useState } from "react";
+import { ToolSignupBox } from "@/components/tool-signup-box";
 import { type AuthMethodResult, parseEmailHeaders } from "@/lib/email-headers";
+import { headersCta } from "@/lib/tool-cta";
 
 type BadgeVariant = "success" | "warning" | "destructive" | "outline";
 
@@ -268,6 +270,16 @@ export default function EmailHeaderAnalyzerPageContent() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {recognized && (
+        <ToolSignupBox
+          cta={headersCta({
+            results: parsed.auth.map((entry) => entry.result),
+            aligned: parsed.alignment.aligned,
+          })}
+          tool="header-analyzer"
+        />
       )}
     </div>
   );

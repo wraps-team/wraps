@@ -20,6 +20,7 @@ import Link from "next/link";
 import { AgentQuickstartPrompt } from "@/components/docs/agent-quickstart-prompt";
 import { AwsCredentialsPrereqs } from "@/components/docs/aws-credentials-prereqs";
 import { DocsLayout } from "@/components/docs-layout";
+import { ToolSignupBox } from "@/components/tool-signup-box";
 import {
   CodeBlock,
   CodeBlockBody,
@@ -38,6 +39,7 @@ import {
   SnippetTabsList,
   SnippetTabsTrigger,
 } from "@/components/ui/shadcn-io/snippet";
+import { guideCta } from "@/lib/tool-cta";
 
 // ── Install ─────────────────────────────────────────────────────────
 
@@ -791,6 +793,14 @@ npx @wraps.dev/cli email domains verify -d acme.com`}
           </Card>
         </div>
       </section>
+
+      <div className="mb-8">
+        <ToolSignupBox
+          cta={guideCta()}
+          layout="stacked"
+          tool="better-auth-guide"
+        />
+      </div>
 
       <Card className="bg-muted/50">
         <CardContent className="p-8 text-center">
