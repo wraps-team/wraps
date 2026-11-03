@@ -31,10 +31,12 @@ import {
   awsAccount,
   db,
   desc,
+  describeBlocker,
   encodeCursor,
   eq,
   escapeIlike,
   or,
+  type TemplateBlocker,
   template,
   templateVersion,
 } from "@wraps/db";
@@ -53,11 +55,7 @@ import { requirePermission } from "../lib/require-permission";
 import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
 import { rateLimitMiddleware } from "../middleware/rate-limit";
 import { getCredentials } from "../services/credentials";
-import {
-  deleteTemplates,
-  describeBlocker,
-  type TemplateBlocker,
-} from "../services/template-delete";
+import { deleteTemplates } from "../services/template-delete";
 
 const errorResponse = t.Object({ error: t.String() });
 

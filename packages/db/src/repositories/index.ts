@@ -15,3 +15,4 @@ export * from "./message-sends";
 export * from "./notifications";
 export * from "./segments";
 export * from "./subscriptions";
+export * from "./template-delete-blockers";
