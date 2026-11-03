@@ -169,7 +169,7 @@ const faqs = [
   },
   {
     q: "What are the non-price reasons to move?",
-    a: "Three come up repeatedly: logs purged at 30 days on every non-Enterprise plan, an API capped at 2 requests per second on all tiers, and the risk of a vendor suspending an account during a traffic spike. Sending from your own AWS account replaces all three with limits you can raise by asking AWS.",
+    a: "Three come up repeatedly: logs purged at 30 days on every non-Enterprise plan, an API limited to 10 requests per second per team on all tiers, and the risk of a vendor suspending an account during a traffic spike. Sending from your own AWS account replaces all three with limits you can raise by asking AWS.",
   },
   {
     q: "How long does this take?",
@@ -217,9 +217,9 @@ const reasons: { trigger: string; verdict: string }[] = [
       "Worth moving. Logs are purged at 30 days on every non-Enterprise plan.",
   },
   {
-    trigger: "You hit the 2 requests per second cap",
+    trigger: "You hit the 10 requests per second limit",
     verdict:
-      "Worth moving. That cap applies on every tier; SES throughput rises with your own reputation.",
+      "Worth moving if you need more headroom than Resend will grant. The default applies on every tier and is raised only on request; SES throughput rises through a quota request backed by your own reputation.",
   },
   {
     trigger: "A suspension during a traffic spike would be fatal",

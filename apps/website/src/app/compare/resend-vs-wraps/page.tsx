@@ -97,7 +97,7 @@ const tldrComparison = [
   },
   {
     dimension: "Rate limits",
-    resend: "2 req/sec (all plans)",
+    resend: "10 req/sec (all plans)",
     wraps: "AWS SES limits (scales with reputation)",
   },
   {

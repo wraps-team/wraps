@@ -156,7 +156,7 @@ export const VENDORS: Record<VendorId, Vendor> = {
     bestFor:
       "The fastest path from an empty project to a sent email, especially with React Email.",
     watchOut:
-      "Logs are purged at 30 days on every non-Enterprise plan, the API is capped at 2 requests per second on all tiers, and suspension during traffic spikes is the complaint that recurs in its public reviews.",
+      "Logs are purged at 30 days on every non-Enterprise plan, the API is limited to 10 requests per second per team on all tiers, and suspension during traffic spikes is the complaint that recurs in its public reviews.",
     url: "https://resend.com/pricing",
   },
   loops: {
@@ -272,7 +272,7 @@ export const VENDORS: Record<VendorId, Vendor> = {
     name: "Brevo",
     category: "EU marketing platform with a transactional API attached",
     pricing:
-      "Priced on send volume rather than contacts. Starter runs from roughly $9/mo at 5,000 emails to roughly $69/mo at 100,000; the Business tier is roughly double at each volume and is where automation and A/B testing live.",
+      "Priced on send volume rather than contacts. Starter runs from $9/mo at 5,000 emails to roughly $82/mo at 100,000; the Standard tier is roughly $18/mo at 5,000 and roughly $139/mo at 100,000, and is where automation and A/B testing live.",
     bestFor:
       "Small EU teams wanting email, SMS, and a light CRM on one invoice.",
     watchOut:
@@ -439,10 +439,10 @@ const RESEND_PAGE: AlternativesPage = {
   description:
     "Twelve real alternatives to Resend, ranked, with published prices and the catch on each one. Postmark, Amazon SES, Loops, AhaSend, and where Wraps actually fits.",
   intro:
-    "Resend is a good product, and most people reading this are not leaving because it is bad. They are leaving because of a specific thing: logs vanishing at 30 days, a 2 request/second ceiling, an overage line on an invoice, or a suspension at the worst possible hour. Which of those it is decides where you should go, so this list is ordered by how close each option is to being a straight replacement, not by which one we would prefer you pick.",
+    "Resend is a good product, and most people reading this are not leaving because it is bad. They are leaving because of a specific thing: logs vanishing at 30 days, a 10 request/second API limit, an overage line on an invoice, or a suspension at the worst possible hour. Which of those it is decides where you should go, so this list is ordered by how close each option is to being a straight replacement, not by which one we would prefer you pick.",
   whyPeopleLeave: [
     "Log retention is 30 days on every non-Enterprise plan. The bounce you need to explain three months later is not there any more.",
-    "The API is rate limited to 2 requests per second on every plan, Scale included.",
+    "The API is rate limited to 10 requests per second per team on every plan, Scale included; a higher limit is granted to trusted senders on request.",
     "Overage bills automatically at $0.65 to $0.90 per 1,000 once you pass your tier, and the hard caps that used to stop it were removed in December 2025.",
     "Account suspension during a traffic spike. It is the complaint that repeats across their public reviews, and it lands on signup and password-reset email first.",
   ],
@@ -603,7 +603,7 @@ const SENDGRID_PAGE: AlternativesPage = {
     {
       vendor: "resend",
       verdict:
-        "The biggest single jump in quality of life if SendGrid's console and SDKs are what you resent, and cheaper too, at $35 for 100K against Pro's $89.95. Read its own terms before committing: logs purge at 30 days on every non-Enterprise plan, the API is capped at 2 requests per second on every plan, and suspension complaints exist there too, just fewer of them.",
+        "The biggest single jump in quality of life if SendGrid's console and SDKs are what you resent, and cheaper too, at $35 for 100K against Pro's $89.95. Read its own terms before committing: logs purge at 30 days on every non-Enterprise plan, the API is limited to 10 requests per second per team on every plan, and suspension complaints exist there too, just fewer of them.",
     },
     {
       vendor: "wraps",
@@ -715,7 +715,7 @@ const POSTMARK_PAGE: AlternativesPage = {
     {
       vendor: "resend",
       verdict:
-        "The nearest thing to Postmark's developer experience at a materially lower bill: $35 at 100K against roughly $133, and $350 at 500K against roughly $630. Both are transactional-first with good SDKs, so the migration is genuinely small. The costs are 30-day log retention on every non-Enterprise plan, a 2 request/second API ceiling, and a support culture that is not Postmark's.",
+        "The nearest thing to Postmark's developer experience at a materially lower bill: $35 at 100K against roughly $133, and $350 at 500K against roughly $630. Both are transactional-first with good SDKs, so the migration is genuinely small. The costs are 30-day log retention on every non-Enterprise plan, a 10 request/second API limit, and a support culture that is not Postmark's.",
     },
     {
       vendor: "wraps",
@@ -827,7 +827,7 @@ const MAILGUN_PAGE: AlternativesPage = {
     {
       vendor: "resend",
       verdict:
-        "The developer-experience upgrade, and cheaper than Mailgun Scale at the same volume: $35 at 100K against $90. React Email support and a clean SDK are the draw. Check the 30-day log retention and the 2 request/second rate limit against how you actually send, particularly if you were using Mailgun's log search to debug delivery months after the fact.",
+        "The developer-experience upgrade, and cheaper than Mailgun Scale at the same volume: $35 at 100K against $90. React Email support and a clean SDK are the draw. Check the 30-day log retention and the 10 request/second rate limit against how you actually send, particularly if you were using Mailgun's log search to debug delivery months after the fact.",
     },
     {
       vendor: "wraps",
@@ -965,7 +965,7 @@ const CUSTOMER_IO_PAGE: AlternativesPage = {
     {
       vendor: "resend",
       verdict:
-        "For teams willing to admit the automation was never really used, which is more of them than the category would like. A clean API and a low bill, at $35 for 100K emails against a Customer.io invoice driven by profiles you may not message. The trade is that you are giving up journeys entirely, plus 30-day log retention and a 2 request/second cap.",
+        "For teams willing to admit the automation was never really used, which is more of them than the category would like. A clean API and a low bill, at $35 for 100K emails against a Customer.io invoice driven by profiles you may not message. The trade is that you are giving up journeys entirely, plus 30-day log retention and a 10 request/second API limit.",
     },
     {
       vendor: "postmark",

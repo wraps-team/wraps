@@ -715,7 +715,7 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
     primaryQuery: "migrate from resend to amazon ses",
     secondaryQueries: [
       "resend log retention 30 days",
-      "resend rate limit 2 requests per second",
+      "resend api rate limit per second",
       "resend to own aws account",
     ],
     audience: "stranger-with-problem",
@@ -1115,7 +1115,7 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
     secondaryQueries: [
       "is resend or postmark better for deliverability",
       "resend 30 day log retention limit",
-      "resend two requests per second rate limit",
+      "resend api rate limit per second",
       "react email with postmark",
       "which transactional provider stores the message body",
       "moving postmark layouts into react email components",
@@ -1123,7 +1123,7 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
     ],
     audience: "stranger-with-problem",
     rationale:
-      "The two facts that decide this in practice — Resend purging logs at thirty days on every non-Enterprise plan, and a two-per-second API ceiling that does not lift on any tier — appear in neither vendor's own comparison, because neither vendor is going to write them down.",
+      "The two facts that decide this in practice — Resend purging logs at thirty days on every non-Enterprise plan, and an API rate limit of ten requests per second that is the same on every plan — appear in neither vendor's own comparison, because neither vendor is going to write them down.",
   },
   {
     route: "/versus/loops-vs-resend",
@@ -1517,7 +1517,7 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
     primaryQuery: "resend or sendgrid for a new product",
     secondaryQueries: [
       "sendgrid replacement for a small dev team",
-      "resend rate limit two requests per second",
+      "resend api rate limit per second",
       "sendgrid trial after free tier ended",
       "does resend have marketing campaigns",
       "converting sendgrid dynamic templates to react email",
@@ -1526,7 +1526,7 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
     ],
     audience: "stranger-with-problem",
     rationale:
-      "Almost every result is a migration guide published by one of the two. The facts that decide it — a fixed request-rate ceiling on one side that no plan lifts, a retired free tier on the other — are in neither guide, because neither company benefits from raising them.",
+      "Almost every result is a migration guide published by one of the two. The facts that decide it — a request-rate default of ten per second on one side that is the same on every plan, a retired free tier on the other — are in neither guide, because neither company benefits from raising them.",
   },
   {
     route: "/versus/mailgun-vs-resend",
@@ -1632,7 +1632,7 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
       "resend broadcasts versus a real marketing tool",
       "eu based email platform for gdpr",
       "does resend charge for marketing contacts",
-      "sending a large campaign under a two per second rate limit",
+      "sending a large campaign under an api rate limit",
       "using react email with a marketing suite",
       "what happens to email logs after thirty days",
     ],
