@@ -42,6 +42,11 @@ const pushDeniedResponse = t.Object({
   message: t.Optional(t.String()),
 });
 
+/** 403 from the permission gate alone (`requirePermission` sends `{ error }`). */
+const permissionDeniedResponse = t.Object({
+  error: t.String(),
+});
+
 type DbOrTx =
   | typeof db
   | Parameters<Parameters<(typeof db)["transaction"]>[0]>[0];
@@ -391,6 +396,10 @@ export const workflowsSyncRoutes = createAuthenticatedRoutes("/v1/workflows")
   .get(
     "/pull",
     async (ctx) => {
+      const gate = await requirePermission(ctx, "workflows", ["read"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
       const authContext = getAuth(ctx);
 
       const workflows = await db
@@ -431,7 +440,10 @@ export const workflowsSyncRoutes = createAuthenticatedRoutes("/v1/workflows")
         tags: ["workflows"],
         summary: "Pull workflows for CLI sync",
         description:
-          "Returns all workflows pushed from CLI with their TypeScript source.",
+          "Returns all workflows pushed from CLI with their TypeScript source. Requires the `workflows` read permission (`workflows:read` for API keys).",
+      },
+      response: {
+        403: permissionDeniedResponse,
       },
     }
   );
