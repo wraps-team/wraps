@@ -47,6 +47,158 @@ const permissionDeniedResponse = t.Object({
   error: t.String(),
 });
 
+const workflowStatus = t.Union(
+  [
+    t.Literal("draft"),
+    t.Literal("enabled"),
+    t.Literal("paused"),
+    t.Literal("archived"),
+  ],
+  { description: "Workflow status after the push" }
+);
+
+/**
+ * 200 body of `POST /push`. A first push answers 201 with the same body.
+ * `scheduleError` appears only when a schedule could not be registered; the
+ * workflow was then saved as draft.
+ */
+const pushResponse = t.Object(
+  {
+    id: t.String({ description: "Workflow id" }),
+    slug: t.String({ description: "Workflow slug" }),
+    status: workflowStatus,
+    updatedAt: t.String({
+      description: "ISO 8601 time the workflow was written",
+    }),
+    remoteHash: t.String({
+      description: "The sourceHash that was pushed, echoed back",
+    }),
+    scheduleError: t.Optional(
+      t.String({
+        description:
+          "Why the schedule could not be registered; set only then, and the workflow was saved as draft",
+      })
+    ),
+  },
+  { description: "Workflow written" }
+);
+
+/** 200 body of `POST /push/batch`: one result per pushed workflow. */
+const pushBatchResponse = t.Object(
+  {
+    results: t.Array(
+      t.Object({
+        slug: t.String({ description: "Workflow slug" }),
+        id: t.String({ description: "Workflow id" }),
+        status: workflowStatus,
+        scheduleError: t.Optional(
+          t.String({
+            description:
+              "Why the schedule could not be registered; set only then, and the workflow was saved as draft",
+          })
+        ),
+      }),
+      {
+        description: "One entry per pushed workflow (empty for an empty batch)",
+      }
+    ),
+  },
+  { description: "Every workflow in the batch written" }
+);
+
+// Steps, transitions and trigger config are jsonb the dashboard also writes, so
+// the pull schemas name the known fields and let anything else through: a
+// response schema that stripped a field would change what pull returns.
+const pullStep = t.Object(
+  {
+    id: t.String(),
+    type: t.String({ description: "Step type, e.g. send_email or delay" }),
+    name: t.String(),
+    position: t.Object(
+      { x: t.Number(), y: t.Number() },
+      { additionalProperties: true }
+    ),
+    config: t.Any({ description: "Step configuration, shape depends on type" }),
+    cascadeGroupId: t.Optional(
+      t.String({ description: "Cascade group this step belongs to" })
+    ),
+    cascadeChannels: t.Optional(
+      t.Array(t.Record(t.String(), t.Unknown()), {
+        description: "Cascade reconstruction metadata, first step of a group",
+      })
+    ),
+  },
+  { additionalProperties: true }
+);
+
+const pullTransition = t.Object(
+  {
+    id: t.String(),
+    fromStepId: t.String(),
+    toStepId: t.String(),
+    condition: t.Optional(
+      t.Object({ branch: t.String() }, { additionalProperties: true })
+    ),
+  },
+  { additionalProperties: true }
+);
+
+const pullTriggerConfig = t.Object(
+  {
+    eventName: t.Optional(t.String()),
+    segmentId: t.Optional(t.String()),
+    schedule: t.Optional(t.String({ description: "Cron expression" })),
+    timezone: t.Optional(t.String()),
+    topicId: t.Optional(t.String()),
+  },
+  { additionalProperties: true }
+);
+
+/** One code-pushed workflow as `GET /pull` returns it. */
+const pullWorkflowRow = t.Object({
+  id: t.String({ description: "Workflow id" }),
+  slug: t.String({
+    description: "Workflow slug (rows without a slug are never returned)",
+  }),
+  name: t.String({ description: "Workflow display name" }),
+  description: t.Union([t.String(), t.Null()], {
+    description: "Workflow description",
+  }),
+  sourceTs: t.Union([t.String(), t.Null()], {
+    description: "Original TypeScript source code",
+  }),
+  sourceHash: t.Union([t.String(), t.Null()], {
+    description: "SHA256 hash of the pushed source file",
+  }),
+  status: workflowStatus,
+  triggerType: t.Union([t.String(), t.Null()], {
+    description: "Trigger type",
+  }),
+  triggerConfig: t.Union([pullTriggerConfig, t.Null()], {
+    description: "Trigger configuration",
+  }),
+  steps: t.Union([t.Array(pullStep), t.Null()], {
+    description: "Flat array of workflow steps",
+  }),
+  transitions: t.Union([t.Array(pullTransition), t.Null()], {
+    description: "Flat array of step transitions",
+  }),
+  updatedAt: t.String({ description: "ISO 8601 time of the last write" }),
+  lastEditedFrom: t.Union([t.String(), t.Null()], {
+    description: "Where the workflow was last edited: cli or dashboard",
+  }),
+});
+
+/** 200 body of `GET /pull`. */
+const pullResponse = t.Object(
+  {
+    workflows: t.Array(pullWorkflowRow, {
+      description: "Workflows pushed from the CLI",
+    }),
+  },
+  { description: "Code-pushed workflows" }
+);
+
 type DbOrTx =
   | typeof db
   | Parameters<Parameters<(typeof db)["transaction"]>[0]>[0];
@@ -211,6 +363,7 @@ export const workflowsSyncRoutes = createAuthenticatedRoutes("/v1/workflows")
           "Upserts a workflow parsed from TypeScript source. Used by `wraps email workflows push`.",
       },
       response: {
+        200: pushResponse,
         403: pushDeniedResponse,
       },
     }
@@ -387,6 +540,7 @@ export const workflowsSyncRoutes = createAuthenticatedRoutes("/v1/workflows")
         description: "Batch upsert workflows parsed from TypeScript source.",
       },
       response: {
+        200: pushBatchResponse,
         403: pushDeniedResponse,
       },
     }
@@ -428,7 +582,7 @@ export const workflowsSyncRoutes = createAuthenticatedRoutes("/v1/workflows")
 
       return {
         workflows: workflows
-          .filter((w) => w.slug != null)
+          .filter((w): w is typeof w & { slug: string } => w.slug != null)
           .map((w) => ({
             ...w,
             updatedAt: w.updatedAt.toISOString(),
@@ -443,6 +597,7 @@ export const workflowsSyncRoutes = createAuthenticatedRoutes("/v1/workflows")
           "Returns all workflows pushed from CLI with their TypeScript source. Requires the `workflows` read permission (`workflows:read` for API keys).",
       },
       response: {
+        200: pullResponse,
         403: permissionDeniedResponse,
       },
     }
