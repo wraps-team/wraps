@@ -1260,6 +1260,7 @@ describe("unsubscribeGlobally — API first, local fallback", () => {
       [testDoubleOptInTopic.id]: "pending",
     });
     expect(loggedFailures()).toEqual([]);
+    expect(loggedFailures("emit-workflow-events")).toEqual([]);
   });
 
   const timeoutError = () =>
@@ -1364,6 +1365,7 @@ describe("unsubscribeGlobally — API first, local fallback", () => {
       });
       expect(otherApiCalls).toHaveLength(0);
       expect(loggedFailures()).toEqual([failure]);
+      expect(loggedFailures("emit-workflow-events")).toEqual([]);
     }
   );
 
@@ -1382,7 +1384,9 @@ describe("unsubscribeGlobally — API first, local fallback", () => {
     );
 
     expect(result).toEqual({ success: true });
-    expect((await readContact()).emailStatus).toBe("unsubscribed");
+    const contactRow = await readContact();
+    expect(contactRow.emailStatus).toBe("unsubscribed");
+    expect(contactRow.emailUnsubscribedAt).toBeInstanceOf(Date);
     expect(await topicStatuses()).toEqual({
       [testRegularTopic.id]: "unsubscribed",
       [testDoubleOptInTopic.id]: "unsubscribed",
