@@ -290,6 +290,21 @@ export async function findContactByEmailHash(
 }
 
 /**
+ * Which contact a by-email status write changed. At most one can: a contact is
+ * unique per (organization, email hash).
+ */
+export type ContactEmailStatusWrite =
+  | { changed: true; contactId: string }
+  | { changed: false; contactId: null };
+
+function emailStatusWrite(rows: { id: string }[]): ContactEmailStatusWrite {
+  const [row] = rows;
+  return row
+    ? { changed: true, contactId: row.id }
+    : { changed: false, contactId: null };
+}
+
+/**
  * Marks the org's contact for `email` as `suppressed`, for a suppression added
  * by hand to the SES suppression list. Broadcasts choose recipients from
  * `email_status` and never read the SES list, so without this the next
@@ -304,6 +319,20 @@ export async function suppressContactByEmail(
   email: string,
   dbClient: DbClient = db
 ): Promise<boolean> {
+  return (
+    await suppressContactByEmailWithChange(organizationId, email, dbClient)
+  ).changed;
+}
+
+/**
+ * `suppressContactByEmail`, also returning the id of the contact it changed,
+ * for callers that emit `contact_updated`.
+ */
+export async function suppressContactByEmailWithChange(
+  organizationId: string,
+  email: string,
+  dbClient: DbClient = db
+): Promise<ContactEmailStatusWrite> {
   const rows = await dbClient
     .update(contact)
     .set({ emailStatus: "suppressed", emailSuppressedAt: new Date() })
@@ -318,7 +347,7 @@ export async function suppressContactByEmail(
       )
     )
     .returning({ id: contact.id });
-  return rows.length > 0;
+  return emailStatusWrite(rows);
 }
 
 /**
@@ -332,6 +361,20 @@ export async function unsuppressContactByEmail(
   email: string,
   dbClient: DbClient = db
 ): Promise<boolean> {
+  return (
+    await unsuppressContactByEmailWithChange(organizationId, email, dbClient)
+  ).changed;
+}
+
+/**
+ * `unsuppressContactByEmail`, also returning the id of the contact it changed,
+ * for callers that emit `contact_updated`.
+ */
+export async function unsuppressContactByEmailWithChange(
+  organizationId: string,
+  email: string,
+  dbClient: DbClient = db
+): Promise<ContactEmailStatusWrite> {
   const rows = await dbClient
     .update(contact)
     .set({ emailStatus: "active" })
@@ -343,7 +386,7 @@ export async function unsuppressContactByEmail(
       )
     )
     .returning({ id: contact.id });
-  return rows.length > 0;
+  return emailStatusWrite(rows);
 }
 
 export async function findContactByPhoneHash(
