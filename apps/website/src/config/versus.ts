@@ -1455,8 +1455,7 @@ const LOOPS_VS_RESEND: VersusPage = {
         "Not as the native authoring path. Loops expects its own editor, which is the point of the product: a non-engineer can change an email without a deploy. If having templates as components in your repository is a requirement rather than a preference, that requirement is pointing you at Resend, and it is a reasonable thing to let decide the question.",
     },
     {
-      question:
-        "Is Resend's API rate limit really the same on every plan?",
+      question: "Is Resend's API rate limit really the same on every plan?",
       answer:
         "Yes, including Scale: ten requests per second per team by default, with an increase available to trusted senders on request. For request-response mail it never comes up. For anything batched you queue and drip, which is fine and is also an architectural constraint you should know about before you build. The relevant question is whether anything in your system ever wants to send thousands of messages in a short window, because if so the design has to account for it from the start.",
     },
@@ -4756,7 +4755,8 @@ const MAILGUN_VS_RESEND: VersusPage = {
         "Within whatever retention your current plan gives you, yes, and outside it there is nothing to export. That window is the thing to check first, because it shortens if you downgrade and it disappears entirely when the account closes. Treat the export as a dated task with a named owner rather than a cleanup item, and while you are at it consider whether any of that history should have been landing in your own store all along — because the same question arrives again at the next vendor, with a shorter window.",
     },
     {
-      question: "Does Resend offer a European region, and does my data stay there?",
+      question:
+        "Does Resend offer a European region, and does my data stay there?",
       answer:
         "For sending, yes: a domain can be created in Ireland (eu-west-1), alongside North Virginia, São Paulo and Tokyo. What the region does not do is keep your data there. Resend's docs say region selection controls where emails are routed and sent from, and that account data, including email metadata, logs and API records, is stored in the United States regardless. Resend also publishes its subprocessors, which satisfies a great many buyers. If your requirement is written down as a jurisdiction for stored data rather than expressed as a preference about sending location, check it against those docs before anybody builds a prototype. Mailgun has offered a European region for years, chosen per domain with its own API hostname; check what it keeps there against the same clause.",
     },
