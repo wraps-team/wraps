@@ -1,22 +1,27 @@
 import { auth } from "@wraps/auth";
 import {
   auditLog,
-  awsAccount,
   db,
   editsPushOwnedTemplateField,
+  findTemplateDeleteBlockers,
+  type TemplateBlocker,
   template,
   templateVersion,
 } from "@wraps/db";
-import { deleteSESTemplate } from "@wraps/email";
 import { and, desc, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireRoutePermission } from "@/app/api/shared/route-permission";
 import { auditLogEntry, getAuditContext } from "@/lib/audit";
-import { getOrAssumeRole } from "@/lib/aws/credential-cache";
 import { createRequestLogger } from "@/lib/logger";
 import { getOrganizationWithMembership } from "@/lib/organization";
+import {
+  lockTemplatesForDelete,
+  removePublishedSesTemplates,
+  type TemplateDeleteTarget,
+  templateInUseMessage,
+} from "@/lib/template-delete";
 
 const updateTemplateSchema = z
   .object({
@@ -341,79 +346,86 @@ export async function DELETE(_request: Request, context: RouteContext) {
     );
     if (denied) return denied;
 
-    // Fetch the template to check for SES template name
-    const existingTemplate = await db.query.template.findFirst({
-      where: and(
-        eq(template.id, id),
-        eq(template.organizationId, orgWithMembership.id)
-      ),
-      columns: { id: true, sesTemplateName: true },
-    });
+    const auditCtx = await getAuditContext();
+    const organizationId = orgWithMembership.id;
 
-    if (!existingTemplate) {
+    // In one transaction: lock the row, run the shared in-use check (a
+    // draft, scheduled, queued or processing broadcast, or an enabled
+    // workflow), then delete the row (versions cascade) and write the audit
+    // row. A blocked delete changes nothing and writes no audit row.
+    const outcome = await db.transaction(
+      async (
+        tx
+      ): Promise<
+        | { kind: "not_found" }
+        | {
+            kind: "blocked";
+            blockers: TemplateBlocker[];
+            target: TemplateDeleteTarget;
+          }
+        | { kind: "deleted"; target: TemplateDeleteTarget }
+      > => {
+        const [target] = await lockTemplatesForDelete(tx, organizationId, [id]);
+        if (!target) {
+          return { kind: "not_found" };
+        }
+
+        const blockers = await findTemplateDeleteBlockers(tx, organizationId, [
+          target.id,
+        ]);
+        if (blockers.length > 0) {
+          return { kind: "blocked", blockers, target };
+        }
+
+        await tx
+          .delete(template)
+          .where(
+            and(
+              eq(template.id, target.id),
+              eq(template.organizationId, organizationId)
+            )
+          );
+        await tx.insert(auditLog).values(
+          auditLogEntry(auditCtx, {
+            organizationId,
+            actorId: session.user.id,
+            actorEmail: session.user.email,
+            action: "template.deleted",
+            resource: "template",
+            resourceId: id,
+            metadata: { templateId: id },
+          })
+        );
+        return { kind: "deleted", target };
+      }
+    );
+
+    if (outcome.kind === "not_found") {
       return NextResponse.json(
         { error: "Template not found" },
         { status: 404 }
       );
     }
-
-    // Delete from SES if published
-    if (existingTemplate.sesTemplateName) {
-      const customerAwsAccount = await db.query.awsAccount.findFirst({
-        where: eq(awsAccount.organizationId, orgWithMembership.id),
-      });
-
-      if (customerAwsAccount) {
-        const credentials = await getOrAssumeRole({
-          roleArn: customerAwsAccount.roleArn,
-          externalId: customerAwsAccount.externalId,
-          region: customerAwsAccount.region,
-        });
-
-        try {
-          await deleteSESTemplate(
-            credentials,
-            customerAwsAccount.region,
-            existingTemplate.sesTemplateName
-          );
-        } catch (err) {
-          const log = createRequestLogger({
-            path: "/api/[orgSlug]/emails/templates/[id]",
-            method: "DELETE",
-            orgSlug,
-          });
-          log.warn(
-            { err, templateId: id },
-            "Failed to delete template from SES"
-          );
-        }
-      }
+    if (outcome.kind === "blocked") {
+      return NextResponse.json(
+        {
+          error: templateInUseMessage(outcome.blockers, [outcome.target]),
+          blockingIds: [id],
+        },
+        { status: 409 }
+      );
     }
 
-    const auditCtx = await getAuditContext();
-
-    // Delete template from database (versions will cascade)
-    await db.transaction(async (tx) => {
-      await tx
-        .delete(template)
-        .where(
-          and(
-            eq(template.id, id),
-            eq(template.organizationId, orgWithMembership.id)
-          )
-        );
-      await tx.insert(auditLog).values(
-        auditLogEntry(auditCtx, {
-          organizationId: orgWithMembership.id,
-          actorId: session.user.id,
-          actorEmail: session.user.email,
-          action: "template.deleted",
-          resource: "template",
-          resourceId: id,
-          metadata: { templateId: id },
-        })
-      );
-    });
+    // SES only after the commit, best-effort.
+    await removePublishedSesTemplates(
+      organizationId,
+      [outcome.target],
+      createRequestLogger({
+        path: "/api/[orgSlug]/emails/templates/[id]",
+        method: "DELETE",
+        orgSlug,
+      })
+    );
 
     return NextResponse.json({ success: true });
   } catch (error) {

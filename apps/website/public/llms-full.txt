@@ -294,7 +294,7 @@ Contact fields: `id`, `externalId`, `email`, `phone`, `firstName`, `lastName`, `
 - `wraps email templates pull [--out-dir <dir>] [--dry-run] [--yes]`. Writes `<slug>.tsx` for each template. `--out-dir` defaults to `wraps/templates` under the current directory. If any target file already exists, nothing is written unless `--yes` is given. Data: `outDir`, `dryRun`, `files` (each with `id`, `slug`, `path`, `exists`, `written`) and `skipped`.
 - `wraps email templates publish <id> --yes [--aws-account-id <id>]`. Publishes to SES and is LIVE. If the organization has exactly one AWS account it is used automatically. If it has several, pass `--aws-account-id`. Data: `id`, `publishedAt`, `sesTemplateName`, `awsAccountId`.
 - `wraps email templates duplicate <id>`. Creates a copy that is always a `DRAFT`. Data: the same keys as `get`.
-- `wraps email templates delete <id...> --yes [--dry-run]`. Deletes up to 100 templates in one command, with their versions. One id uses the single-template route and more than one uses the bulk route. A published SES copy is removed too, unless another template still uses the same SES name. Ids that are not templates of this organization are listed in `notFound` and skipped. If any template is still used by a scheduled, queued or processing broadcast, or by an enabled workflow, the whole delete is refused with `CONFLICT` and nothing is deleted. The error names the blocking template ids. Disable or cancel those first, then re-run. `--dry-run` previews the delete and makes no request. Data: `dryRun`, `route` (`single` or `bulk`), `deleted`, `notFound`, `count`, and `wouldDelete` in a dry run.
+- `wraps email templates delete <id...> --yes [--dry-run]`. Deletes up to 100 templates in one command, with their versions. One id uses the single-template route and more than one uses the bulk route. A published SES copy is removed too, unless another template still uses the same SES name. Ids that are not templates of this organization are listed in `notFound` and skipped. If any template is still used by a draft, scheduled, queued or processing broadcast, or by an enabled workflow, the whole delete is refused with `CONFLICT` and nothing is deleted. The error names the blocking template ids. Point each draft broadcast at another template (`wraps broadcasts update <id> --template-id <other-id>`, or `--clear-template-id`). Finish or cancel each scheduled, queued or processing broadcast (`wraps broadcasts cancel <id> --yes`), and pause each enabled workflow in the dashboard, or, for a workflow defined in code, remove the template from its steps and run `wraps email workflows push` again (if the push reports a dashboard edit, ask the user before using `--force`, which overwrites those edits). Then re-run. `--dry-run` previews the delete and makes no request. Data: `dryRun`, `route` (`single` or `bulk`), `deleted`, `notFound`, `count`, and `wouldDelete` in a dry run.
 
 ### Brand kits
 
@@ -406,14 +406,14 @@ An API key cannot manage API keys. Sign in with `wraps auth login` first. `--tok
 
 The CLI commands above call these routes on `https://api.wraps.dev` (`WRAPS_API_URL` overrides it). Send `Authorization: Bearer <api key>`. Where a route checks a permission, it is listed with the route. Ids that belong to another organization return 404.
 
-Most destructive routes need `confirm=true` in the query string and return 400 without it. The CLI sends it only after `--yes`. Some destructive routes take no `confirm` parameter: `DELETE /v1/batch/{id}`, `DELETE /v1/contacts/{id}` and the contacts bulk delete.
+Most destructive routes need `confirm=true` in the query string and return 400 without it. The CLI sends it only after `--yes`. Some destructive routes take no `confirm` parameter: `DELETE /v1/batch/{id}`, `DELETE /v1/contacts/{id}`, `DELETE /v1/segments/{id}` and the contacts bulk delete.
 
 Permissions are shown as `resource:action`. Plan requirements are stated per route.
 
 Who the permission applies to depends on how the request authenticates:
 
 - A session (dashboard, or the CLI after `wraps auth login`) is a person. Their role in the organization must allow the action. A `read-only` or `billing` member can read but not change data, and a `marketing` member cannot change segments, topics or workflows.
-- An API key belongs to the organization, not to the person who created it. The key's own scopes, chosen when it was created, must cover the action: `contacts:read` or `contacts:write` for contacts (import counts as write, export as read) and suppressions; `topics:*`, `segments:*` and `workflows:*` for those resources; `campaigns:read` or `campaigns:write` for templates, brand kits and broadcasts; `campaigns:write` plus `send:email` to send or resume a broadcast; `analytics:read` for events. A key created with `--permissions readonly` can read but every write returns 403. A key keeps working after its creator leaves the organization. Keys cannot manage API keys or read the audit log. Any key can still connect or disconnect an AWS account (`wraps platform connect` and `disconnect` in CI), whatever its scopes.
+- An API key belongs to the organization, not to the person who created it. The key's own scopes, chosen when it was created, must cover the action: `contacts:read` or `contacts:write` for contacts (import counts as write, export as read) and suppressions; `topics:*`, `segments:*` and `workflows:*` for those resources; `campaigns:read` or `campaigns:write` for templates, brand kits and broadcasts; `campaigns:write` plus `send:email` to send or resume a broadcast; `contacts:read` for events. A key created with `--permissions readonly` can read but gets 403 on scoped write routes. Event tracking accepts any key, so a read-only key can still record events, which can create contacts and start workflows. Agent routes that change something ignore the key's scopes and need the key's creator to still be an owner or admin, so they stop working for that key once its creator leaves; every other route keeps working after the creator leaves the organization. Keys cannot manage API keys or read the audit log. Any key can still connect or disconnect an AWS account (`wraps platform connect` and `disconnect` in CI), whatever its scopes.
 - A refused request returns 403 with `{"error":"You don't have permission to perform this action"}` and changes nothing.
 
 ### Topics (Pro plan)
@@ -422,15 +422,26 @@ Who the permission applies to depends on how the request authenticates:
 - `POST /v1/topics`: create a topic. Needs `topics:write`. A slug that already exists returns 409.
 - `GET /v1/topics/{id}`: one topic with its audience counts. Needs `topics:read`.
 - `PATCH /v1/topics/{id}`: change only the fields sent. Needs `topics:write`.
-- `DELETE /v1/topics/{id}?confirm=true`: delete the topic and every subscription to it. Needs `topics:delete`.
+- `DELETE /v1/topics/{id}?confirm=true`: delete the topic and every subscription to it. Needs `topics:delete`; an API key needs `topics:write`.
 - `GET /v1/topics/{id}/subscribers`: subscribers, filterable by `status` (`subscribed`, `pending`, `unsubscribed`). Query `page` and `pageSize`. Needs `topics:read`.
+
+### Segments (Pro plan)
+
+Every segments route needs the Pro plan, reads included. A Free organization gets 403 on every verb. A `condition` is the filter tree the dashboard segment builder produces: `{ logic, groups }`, where `logic` is `AND` or `OR` and each group holds `filters` (each `{ field, operator, value }`, plus `unit` (`days`, `hours` or `minutes`, default `days`) for time-based operators) and an optional `nested` condition of the same shape. It is validated before it is saved, and an invalid or unevaluable condition returns 400 with the reason. `memberCount` in every response is the number of contacts a broadcast to the segment would reach now, counted at request time and not read from a stored value.
+
+- `GET /v1/segments`: list segments with `memberCount`, `trackMembership` and `lastComputedAt`. Query `limit` (1-100, default 20), `offset` and `search` (matches the name). Returns `segments`, `total`, `limit` and `offset`. Requires authentication only.
+- `POST /v1/segments`: create a segment. Body: `name` (required, up to 200 characters), `condition` (required), `description` and `trackMembership`. Returns 201 with the segment, `condition` included. Needs `segments:write`.
+- `GET /v1/segments/{id}`: one segment with its `condition`. Returns 404 when it is not in the organization. Requires authentication only.
+- `PATCH /v1/segments/{id}`: change only the fields sent: `name`, `description`, `condition`, `trackMembership`. Sending `condition` re-validates it. Needs `segments:write`.
+- `DELETE /v1/segments/{id}`: delete a segment. Takes no `confirm` parameter. Returns 409 and deletes nothing while a scheduled, queued or processing broadcast targets the segment. Draft, completed, failed and cancelled broadcasts do not block it. Needs `segments:delete`; an API key needs `segments:write`.
+- `POST /v1/segments/preview`: count and sample the audience an unsaved condition would reach, without saving a segment. Body: `condition` (required) and `limit` (1-100, default 5). Returns `count` and `sample` (email addresses). It is the quickest way to check a condition before `POST /v1/segments`. Needs `segments:read`.
 
 ### Email suppressions
 
 - `GET /v1/suppressions`: the SES suppression list. Query `awsAccountId`, `reason` (`BOUNCE` or `COMPLAINT`), `limit` (1-100) and `cursor`. Pass `nextCursor` back unchanged. Needs `awsAccounts:read`.
 - `POST /v1/suppressions`: add one address to an AWS account's suppression list. Body: `awsAccountId`, `email` and `reason` (`BOUNCE` or `COMPLAINT`). The address is trimmed and lowercased. Repeat adds are idempotent: an address already suppressed returns `alreadyPresent: true` and writes nothing new. A `BOUNCE` can be upgraded to `COMPLAINT`, but a `COMPLAINT` is never downgraded. A matching contact is marked suppressed. Needs `awsAccounts:write`; an API key needs `contacts:write`.
 - `POST /v1/suppressions/bulk`: add up to 100 addresses in one request. Body: `entries`, each with its own `awsAccountId`, `email` and `reason`. The response has one result per entry, in request order. An entry that fails (an invalid address, an account outside the organization, or an SES error) fails only itself. An empty list or more than 100 entries returns 400. Same permissions as the single route.
-- `DELETE /v1/suppressions/{email}?awsAccountId=<id>&confirm=true`: remove one address from that AWS account's suppression list. Percent-encode the email. An address suppressed for a complaint also needs `acknowledgedComplaint=true`, or the route returns 409. Needs `awsAccounts:write`.
+- `DELETE /v1/suppressions/{email}?awsAccountId=<id>&confirm=true`: remove one address from that AWS account's suppression list. Percent-encode the email. An address suppressed for a complaint also needs `acknowledgedComplaint=true`, or the route returns 409. A contact for this address whose status is `suppressed` becomes `active` again; other statuses are unchanged. Needs `awsAccounts:write`.
 
 ### Events
 
@@ -470,7 +481,7 @@ Who the permission applies to depends on how the request authenticates:
 
 Only the delete routes are listed here. The other template routes (list, get, create, update, publish and duplicate) are in the API reference at https://wraps.dev/docs/reference/api.
 
-- `DELETE /v1/templates/{id}?confirm=true`: delete one template and its versions. Returns 409, and deletes nothing, while a scheduled, queued or processing broadcast, or an enabled workflow, still uses it. The response's `blockingIds` lists the blocking template ids. Draft, paused, completed and other non-blocking broadcasts and workflows do not block. A published SES copy is removed best-effort from the organization's AWS accounts. Needs `campaigns:write` for API keys, or the templates delete permission for a session.
+- `DELETE /v1/templates/{id}?confirm=true`: delete one template and its versions. Returns 409, and deletes nothing, while a draft, scheduled, queued or processing broadcast (a paused broadcast is `processing`), or an enabled workflow, still uses it. The response's `blockingIds` lists the blocking template ids. Completed, failed and cancelled broadcasts, and draft, paused and archived workflows, do not block. A published SES copy is removed best-effort from the organization's AWS accounts. Needs `campaigns:write` for API keys, or the templates delete permission for a session.
 - `DELETE /v1/templates?confirm=true`: bulk delete. Body `{ "ids": [...] }`, 1 to 100 template ids. All or nothing: if any template is blocked, the whole request returns 409 with `blockingIds` and deletes nothing. Ids that are not templates of this organization are listed in `notFound` and skipped. Same permissions as the single route.
 
 ### Workflows
@@ -1188,7 +1199,7 @@ These tools call the Wraps API for your organization. Each one is a read (R), a 
 - Write: `create_template`, `update_template`, `duplicate_template`
 - Destructive: `publish_template`, `delete_template`
 
-`delete_template` deletes up to 100 templates, with their versions, and is refused with 409 (nothing deleted) while a scheduled, queued or processing broadcast, or an enabled workflow, uses one. It needs `confirm: true`.
+`delete_template` deletes up to 100 templates, with their versions, and is refused with 409 (nothing deleted) while a draft, scheduled, queued or processing broadcast, or an enabled workflow, uses one. It needs `confirm: true`.
 
 #### Broadcasts
 - Read: `list_broadcasts`, `get_broadcast`, `list_broadcast_recipients`, `get_broadcast_clicks`

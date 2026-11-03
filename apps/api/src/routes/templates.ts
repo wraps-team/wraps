@@ -12,11 +12,12 @@
  * DELETE /v1/templates/:id          - Delete one template (needs confirm=true)
  * DELETE /v1/templates              - Delete up to 100 templates (confirm=true, body { ids })
  *
- * A delete is refused with 409 while a scheduled, queued or processing
+ * A delete is refused with 409 while a draft, scheduled, queued or processing
  * broadcast, or an enabled workflow, still uses the template. The FKs on
  * messageSend/batchSend.emailTemplateId are onDelete "set null", so without
- * that check a delete would silently detach live sends. The bulk delete is
- * all-or-nothing. See services/template-delete.ts.
+ * that check a delete would silently detach drafts and live sends. The bulk
+ * delete is all-or-nothing. See services/template-delete.ts and the shared
+ * rule in @wraps/db `template-delete-blockers`.
  *
  * The API does not compile TSX. `compiledHtml`/`compiledText` must be
  * supplied by the caller (the CLI renders locally; the dashboard compiles in
@@ -31,10 +32,12 @@ import {
   awsAccount,
   db,
   desc,
+  describeBlocker,
   encodeCursor,
   eq,
   escapeIlike,
   or,
+  type TemplateBlocker,
   template,
   templateVersion,
 } from "@wraps/db";
@@ -53,11 +56,7 @@ import { requirePermission } from "../lib/require-permission";
 import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
 import { rateLimitMiddleware } from "../middleware/rate-limit";
 import { getCredentials } from "../services/credentials";
-import {
-  deleteTemplates,
-  describeBlocker,
-  type TemplateBlocker,
-} from "../services/template-delete";
+import { deleteTemplates } from "../services/template-delete";
 
 const errorResponse = t.Object({ error: t.String() });
 
@@ -353,7 +352,8 @@ function toListItem(row: {
 const DELETE_CONFLICT_RESPONSE = t.Object({
   error: t.String(),
   blockingIds: t.Array(t.String(), {
-    description: "Template ids that a live broadcast or enabled workflow uses",
+    description:
+      "Template ids that a draft, scheduled, queued or processing broadcast, or an enabled workflow, uses",
   }),
 });
 
@@ -380,7 +380,7 @@ function deleteConflictBody(blockers: TemplateBlocker[]) {
   const shown = blockers.slice(0, 5).map(describeBlocker).join(", ");
   const more = blockers.length > 5 ? ` and ${blockers.length - 5} more` : "";
   return {
-    error: `Cannot delete: still in use by ${shown}${more}. Nothing was deleted. Wait for or cancel the broadcasts, or disable the workflows and remove the template from their steps, then retry.`,
+    error: `Cannot delete: still in use by ${shown}${more}. Nothing was deleted. Point each draft broadcast that uses it at another template, or clear its template. Wait for or cancel each scheduled, queued or processing broadcast that uses it. Pause each enabled workflow in the dashboard, or, for a workflow defined in code, remove the template from its steps and run \`wraps email workflows push\` again (if the push reports a dashboard edit, ask the user before using \`--force\`, which overwrites those edits). Then retry.`,
     blockingIds,
   };
 }
@@ -971,7 +971,7 @@ export const templatesRoutes = createAuthenticatedRoutes("/v1/templates")
         tags: ["templates"],
         summary: "Delete a template",
         description:
-          "Deletes one template, org-scoped, along with its versions. Destructive: pass confirm=true, or the request is refused with 400 before anything changes. Refused with 409 (and nothing deleted) while a scheduled, queued or processing broadcast, or an enabled workflow (a send_email or send_sms step, or a cascade channel), still uses the template; blockingIds lists the template ids that are blocked. Draft, paused, completed and other non-blocking broadcasts or workflows do not block. A published SES copy is removed best-effort from the org's AWS accounts. Requires templates delete permission (campaigns:write for API keys).",
+          "Deletes one template, org-scoped, along with its versions. Destructive: pass confirm=true, or the request is refused with 400 before anything changes. Refused with 409 (and nothing deleted) while a draft, scheduled, queued or processing broadcast (a paused broadcast counts as processing), or an enabled workflow (a send_email or send_sms step, or a cascade channel), still uses the template; blockingIds lists the template ids that are blocked. Completed, failed and cancelled broadcasts, and draft, paused and archived workflows, do not block. A published SES copy is removed best-effort from the org's AWS accounts. Requires templates delete permission (campaigns:write for API keys).",
       },
     }
   )
@@ -1040,7 +1040,7 @@ export const templatesRoutes = createAuthenticatedRoutes("/v1/templates")
         tags: ["templates"],
         summary: "Bulk delete templates",
         description:
-          "Deletes up to 100 templates in one request (body { ids }), org-scoped. Destructive: pass confirm=true, or the request is refused with 400. All-or-nothing: if any template is still used by a scheduled, queued or processing broadcast, or an enabled workflow, the whole request returns 409 with blockingIds and deletes nothing. Ids that are not templates of this organization are listed in notFound and skipped. Requires templates delete permission (campaigns:write for API keys).",
+          "Deletes up to 100 templates in one request (body { ids }), org-scoped. Destructive: pass confirm=true, or the request is refused with 400. All-or-nothing: if any template is still used by a draft, scheduled, queued or processing broadcast, or an enabled workflow, the whole request returns 409 with blockingIds and deletes nothing. Ids that are not templates of this organization are listed in notFound and skipped. Requires templates delete permission (campaigns:write for API keys).",
       },
     }
   );

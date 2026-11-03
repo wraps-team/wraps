@@ -113,6 +113,62 @@ export const Code = ({ children }: { children: ReactNode }) => (
 
 export const releases: Release[] = [
   {
+    slug: "inbound-brand-kits-drafts-and-deletes-for-agents",
+    versions: [
+      "CLI v3.19.0",
+      "CLI v3.20.0",
+      "MCP v0.10.0",
+      "MCP v0.11.0",
+      "@wraps.dev/client v0.14.0",
+      "@wraps.dev/client v0.15.0",
+    ],
+    date: "2026-11-02",
+    icon: Bot,
+    title: "Inbound email, brand kits, drafts and deletes for agents",
+    tags: ["cli", "api", "agents", "sdk"],
+    summary:
+      "Read inbound email, manage brand kits, stage broadcast drafts, delete templates and add suppressions from the CLI, the API or an MCP client.",
+    items: [
+      <>
+        Run <Code>wraps email inbound list</Code> and{" "}
+        <Code>wraps email inbound get</Code> to read parsed inbound emails, and{" "}
+        <Code>wraps brand-kits</Code> to list, create, update, delete and set
+        the default brand kit. The API routes are <Code>/v1/email/inbound</Code>{" "}
+        and <Code>/v1/brand-kits</Code>
+      </>,
+      <>
+        Run <Code>wraps broadcasts draft</Code> to save a broadcast without
+        sending it, <Code>wraps email templates delete &lt;id...&gt;</Code> to
+        delete up to 100 templates, and{" "}
+        <Code>wraps email suppressions add</Code> to add up to 100 addresses to
+        an account&apos;s suppression list. The last two need <Code>--yes</Code>{" "}
+        and take <Code>--dry-run</Code>. A template still used by a scheduled,
+        queued or processing broadcast, or by an enabled workflow, is refused,
+        and nothing is deleted
+      </>,
+      <>
+        Connect an MCP client to <Code>@wraps.dev/mcp</Code> v0.10.0 for tools
+        across contacts, segments, topics, templates, broadcasts, events,
+        workflows, suppressions, inbound email and brand kits. v0.11.0 adds{" "}
+        <Code>delete_template</Code>, <Code>add_suppression</Code>, contact
+        import and export, account health and agent tools. Write tools stay off
+        until you set <Code>WRAPS_WRITE_ENABLED=true</Code>
+      </>,
+      <>
+        Check the role or key behind your API calls. Read-only and billing
+        members can read but not change data, and marketing members can read but
+        not change segments, workflows or topics.{" "}
+        <Code>wraps platform connect</Code> and <Code>disconnect</Code> from a
+        session need an owner or admin. An API key now needs a scope to read
+        too: <Code>topics:read</Code> for topics, <Code>workflows:read</Code>{" "}
+        for workflows and their runs, and <Code>contacts:read</Code> for events,
+        suppressions and contact export. Event tracking still accepts any key. A
+        refused request returns 403 and changes nothing
+      </>,
+    ],
+    docs: "/docs/cli-reference",
+  },
+  {
     slug: "wcag-aaa-contrast-across-the-dashboard",
     date: "2026-10-30",
     icon: LayoutDashboard,

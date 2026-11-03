@@ -910,7 +910,10 @@ describe("templatesDelete", () => {
     const env = expectFailure("email.templates.delete", "CONFLICT");
     expect(env.error?.message).toContain("tpl_busy");
     expect(env.error?.suggestion).toContain("broadcasts cancel");
-    expect(env.error?.suggestion).toContain("workflows disable");
+    expect(env.error?.suggestion).toContain(
+      "pause each enabled workflow in the dashboard, or, for a workflow defined in code, remove the template from its steps and run `wraps email workflows push` again (if the push reports a dashboard edit, ask the user before using `--force`, which overwrites those edits)"
+    );
+    expect(env.error?.suggestion).not.toContain("workflows disable");
   });
 
   it("reports a missing single id as NOT_FOUND", async () => {
