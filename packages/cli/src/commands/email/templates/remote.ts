@@ -756,7 +756,7 @@ async function deleteFailure(
       code: "CONFLICT",
       message: `${firstText(body?.error) ?? "A broadcast or workflow still uses one of these templates."} Blocking template ids: ${blockingIds.join(", ") || "none reported"}.`,
       suggestion:
-        "Point each draft broadcast that uses a blocking template at another one (`wraps broadcasts update <id> --template-id <other-id>`, or `--clear-template-id`). Finish or cancel each scheduled, queued or processing broadcast that uses one (`wraps broadcasts cancel <id> --yes`), and disable each enabled workflow that sends one (`wraps workflows disable <workflow-id>`). Find the workflows with `wraps workflows list` and the broadcasts in the dashboard. Then re-run the delete. Nothing was deleted.",
+        "Point each draft broadcast that uses a blocking template at another one (`wraps broadcasts update <id> --template-id <other-id>`, or `--clear-template-id`). Finish or cancel each scheduled, queued or processing broadcast that uses one (`wraps broadcasts cancel <id> --yes`), and disable each enabled workflow in the dashboard, or remove the template from its steps and push it again. Find the workflows with `wraps workflows list` and the broadcasts in the dashboard. Then re-run the delete. Nothing was deleted.",
     };
   }
   if (resp.status === 404 && singleId !== undefined) {

@@ -55,8 +55,8 @@ export type DeleteTemplatesInput = {
  * foreign key) waits on the lock. Workflows reference templates inside their
  * JSON steps, with no foreign key, so they do not wait: a workflow enabled
  * between the check and the commit is not blocked, and is left pointing at a
- * deleted template. If any target is blocked, nothing is deleted. The audit row is written in
- * the same transaction as the delete.
+ * deleted template. If any target is blocked, nothing is deleted. The audit
+ * row is written in the same transaction as the delete.
  *
  * SES is cleaned up only after the commit. If the DB delete failed first, the
  * SES template could be removed while the row still says PUBLISHED.

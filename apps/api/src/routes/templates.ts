@@ -379,7 +379,7 @@ function deleteConflictBody(blockers: TemplateBlocker[]) {
   const shown = blockers.slice(0, 5).map(describeBlocker).join(", ");
   const more = blockers.length > 5 ? ` and ${blockers.length - 5} more` : "";
   return {
-    error: `Cannot delete: still in use by ${shown}${more}. Nothing was deleted. Point each draft broadcast that uses it at another template, or clear its template. Wait for or cancel each scheduled, queued or processing broadcast that uses it. Disable each enabled workflow that sends it and remove the template from its steps. Then retry.`,
+    error: `Cannot delete: still in use by ${shown}${more}. Nothing was deleted. Point each draft broadcast that uses it at another template, or clear its template. Wait for or cancel each scheduled, queued or processing broadcast that uses it. Disable each enabled workflow in the dashboard, or remove the template from its steps and push it again. Then retry.`,
     blockingIds,
   };
 }
