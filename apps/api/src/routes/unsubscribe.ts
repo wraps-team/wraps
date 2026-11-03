@@ -8,14 +8,12 @@
  */
 
 import { contact, contactTopic, db, eq, topic } from "@wraps/db";
-import { and, sql } from "drizzle-orm";
+import { and } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { log } from "../lib/logger";
 import { verifyUnsubscribeToken } from "../lib/unsubscribe-token";
-import {
-  emitContactsUpdated,
-  emitTopicUnsubscribed,
-} from "../services/workflow-events";
+import { unsubscribeContactGlobally } from "../services/unsubscribe";
+import { emitTopicUnsubscribed } from "../services/workflow-events";
 
 export const unsubscribeRoutes = new Elysia({ prefix: "/unsubscribe" })
   /**
@@ -119,86 +117,9 @@ export const unsubscribeRoutes = new Elysia({ prefix: "/unsubscribe" })
 
         log.info("Unsubscribe: topic unsubscribed", { contactId, topicId });
       } else {
-        // Global unsubscribe - unsubscribe from all email communications
-        // Get all subscribed topics before unsubscribing (for event emission)
-        const subscribedTopics = await db
-          .select({
-            topicId: contactTopic.topicId,
-            topicName: topic.name,
-          })
-          .from(contactTopic)
-          .innerJoin(topic, eq(topic.id, contactTopic.topicId))
-          .where(
-            and(
-              eq(contactTopic.contactId, contactId),
-              eq(contactTopic.status, "subscribed")
-            )
-          );
-
-        // Guarded so only a real change writes and emits: two concurrent
-        // one-click POSTs emit once, and a repeat keeps the first
-        // emailUnsubscribedAt. The topic writes below stay unconditional.
-        const changed = await db
-          .update(contact)
-          .set({
-            emailStatus: "unsubscribed",
-            emailUnsubscribedAt: now,
-          })
-          .where(
-            and(
-              eq(contact.id, contactId),
-              eq(contact.organizationId, organizationId),
-              sql`${contact.emailStatus} IS DISTINCT FROM 'unsubscribed'`
-            )
-          )
-          .returning({ id: contact.id });
-
-        // Also unsubscribe from all topics
-        await db
-          .update(contactTopic)
-          .set({
-            status: "unsubscribed",
-            unsubscribedAt: now,
-          })
-          .where(eq(contactTopic.contactId, contactId));
-
-        // Emit topic_unsubscribed events for all previously subscribed topics
-        await Promise.all(
-          subscribedTopics.map((t) =>
-            emitTopicUnsubscribed({
-              contactId,
-              organizationId,
-              topicId: t.topicId,
-              topicName: t.topicName,
-            }).catch((err) => {
-              log.error("Failed to emit topic_unsubscribed event", err, {
-                contactId,
-                topicId: t.topicId,
-              });
-            })
-          )
-        );
-
-        // After the contact write. A failed emit is logged: a committed
-        // unsubscribe never becomes a 500.
-        if (changed.length > 0) {
-          await emitContactsUpdated(organizationId, [
-            {
-              contactId,
-              updatedFields: ["emailStatus"],
-              changeSource: "unsubscribe",
-            },
-          ]).catch((err) => {
-            log.error("Failed to emit contact_updated event", err, {
-              contactId,
-            });
-          });
-        }
-
-        log.info("Unsubscribe: global unsubscribe", {
-          contactId,
-          topicCount: subscribedTopics.length,
-        });
+        // Global unsubscribe - unsubscribe from all email communications.
+        // The contact lookup above already 404s a contact outside the org.
+        await unsubscribeContactGlobally(organizationId, contactId);
       }
 
       // 5. Return success (no redirect per RFC 8058)
