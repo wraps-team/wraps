@@ -4499,14 +4499,14 @@ const RESEND_VS_SENDGRID: VersusPage = {
   pickA: [
     "You are a small team shipping application email from your own codebase, and time-to-first-send is the metric that actually matters this month.",
     "Templates as reviewable React components in the repository is how you want them, and a developer changing copy is acceptable.",
-    "Traffic is request-response and comfortably under two API calls a second, with nothing batch-shaped anywhere in the system.",
+    "Traffic is request-response and comfortably under ten API calls a second, with nothing batch-shaped anywhere in the system.",
     "A permanent free allowance matters, because a side project or a staging environment should not generate an invoice.",
   ],
   pickB: [
     "Mail has to leave systems you do not control, and a documented relay integration for each of them is worth more than a pleasant SDK.",
     "A marketing team needs segmentation and a visual designer, and you would rather they shared a suppression list with the transactional side than ran a second vendor.",
     "Procurement needs a certification pack, a data processing agreement and a named support escalation before anything ships.",
-    "A campaign going out fast is a billing question rather than an architecture question, because the request rate is the same on every plan and a plan upgrade does not change it.",
+    "A campaign going out fast is a billing question rather than an architecture question, because the constraint is the plan's included volume rather than a request rate.",
   ],
   prosA: [
     "A permanent free allowance still exists here, with a daily cap sitting alongside the monthly one, which is the reason an enormous number of side projects and staging environments now live on this side of the comparison.",
@@ -4675,7 +4675,7 @@ const MAILGUN_VS_RESEND: VersusPage = {
     "A written data residency requirement needs a named region rather than a documented policy.",
   ],
   pickB: [
-    "Mail is triggered by user actions from your own codebase, comfortably under two API calls a second, and nothing in the system is batch-shaped.",
+    "Mail is triggered by user actions from your own codebase, comfortably under ten API calls a second, and nothing in the system is batch-shaped.",
     "Templates as reviewable components in the repository is worth more to the team than any capability on the other side of this page.",
     "Volume is small enough that the cheaper plan and the permanent free allowance genuinely change the monthly number.",
     "You want the integration finished this afternoon and are willing to add a second service later if inbound ever becomes a requirement.",
@@ -4702,7 +4702,7 @@ const MAILGUN_VS_RESEND: VersusPage = {
     "There is no inbound, so replies mean a second service in front and a seam where a sent message and the answer to it are tracked in different systems.",
     "No validation product either, which on an open signup form leaves a third-party API, a check you write, or a bounce rate you are gambling with.",
     "Ten API requests per second per team on every tier, which is an architectural constraint rather than a commercial one and therefore not something a plan upgrade removes.",
-    "No named region to satisfy a residency clause, and thirty days of retention on everything short of Enterprise.",
+    "A sending region you can name, but account data stays in the United States whichever one you pick, so a residency clause about stored data is not met, and thirty days of retention on everything short of Enterprise.",
   ],
   migrationChecklist: [
     "Count what you actually use inbound for before anything else, because there is none on the other side. Reply handling, ticket ingestion, per-customer addresses and catch-all forwarding each need a named replacement — Cloudflare Email Routing, an SES receipt rule, or keeping a minimal account open purely for Routes — and every answer costs a second set of credentials.",
@@ -5871,7 +5871,7 @@ const CUSTOMER_IO_VS_RESEND: VersusPage = {
     "The messages are triggered by your own application and the logic is simple enough to belong in the codebase.",
     "A wide free funnel makes per-profile billing a charge for people you have already lost.",
     "Templates as reviewable React components matter more than any workflow editor would.",
-    "Traffic is request-response and comfortably under two API calls a second, with no large synchronised fan-out.",
+    "Traffic is request-response and comfortably under ten API calls a second, with no large synchronised fan-out.",
   ],
   prosA: [
     "The decision engine is the product: events in, segments evaluated continuously, workflows with branches, waits and exit conditions, and the sending is the last step of something the platform worked out.",
@@ -6477,7 +6477,7 @@ const MAILERSEND_VS_RESEND: VersusPage = {
     {
       question: "Can we choose where our email is processed?",
       answer:
-        "On the developer-first side a sending domain is created in a region you select, which makes the residency answer a decision you take at setup. That is genuinely useful when somebody asks the question, and it is a decision you make once and live with rather than a setting you toggle later. It does not change who holds the account — the boundary still belongs to the vendor, so a compliance questionnaire that wants to name the ultimate processor gets a longer answer than the region alone provides. On the other side the footprint is what it is, documented and not configurable. Which of those satisfies your reviewer is worth establishing before anything technical starts.",
+        "On the developer-first side a sending domain is created in a region you select, which makes the sending-location answer a decision you take at setup (Resend's docs add that account data, including logs and email metadata, stays in the United States whichever region you pick). That is genuinely useful when somebody asks the question, and it is a decision you make once and live with rather than a setting you toggle later. It does not change who holds the account — the boundary still belongs to the vendor, so a compliance questionnaire that wants to name the ultimate processor gets a longer answer than the region alone provides. On the other side the footprint is what it is, documented and not configurable. Which of those satisfies your reviewer is worth establishing before anything technical starts.",
     },
     {
       question: "Which one can we safely run our staging environment on?",
