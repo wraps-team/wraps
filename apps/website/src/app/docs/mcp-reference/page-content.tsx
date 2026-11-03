@@ -292,7 +292,7 @@ const tools = [
     name: "delete_template",
     write: true,
     description:
-      "Permanently delete up to 100 templates, with their versions, and their published SES copies where no other template uses the same SES name. Refused with 409 (nothing deleted) while a scheduled, queued or processing broadcast, or an enabled workflow, uses one. Needs confirm: true.",
+      "Permanently delete up to 100 templates, with their versions, and their published SES copies where no other template uses the same SES name. Refused with 409 (nothing deleted) while a draft, scheduled, queued or processing broadcast, or an enabled workflow, uses one. Needs confirm: true.",
   },
   {
     name: "list_broadcasts",

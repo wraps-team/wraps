@@ -756,7 +756,7 @@ async function deleteFailure(
       code: "CONFLICT",
       message: `${firstText(body?.error) ?? "A broadcast or workflow still uses one of these templates."} Blocking template ids: ${blockingIds.join(", ") || "none reported"}.`,
       suggestion:
-        "Finish or cancel each scheduled, queued or processing broadcast that uses a blocking template (`wraps broadcasts cancel <id> --yes`), or disable each enabled workflow that sends it (`wraps workflows disable <workflow-id>`). Find the workflows with `wraps workflows list` and the broadcasts in the dashboard. Then re-run the delete. Nothing was deleted.",
+        "Point each draft broadcast that uses a blocking template at another one (`wraps broadcasts update <id> --template-id <other-id>`, or `--clear-template-id`). Finish or cancel each scheduled, queued or processing broadcast that uses one (`wraps broadcasts cancel <id> --yes`), and disable each enabled workflow in the dashboard, or remove the template from its steps and push it again. Find the workflows with `wraps workflows list` and the broadcasts in the dashboard. Then re-run the delete. Nothing was deleted.",
     };
   }
   if (resp.status === 404 && singleId !== undefined) {
@@ -913,7 +913,7 @@ export async function templatesDelete(
   if (!options.yes) {
     fail(command, {
       code: "CONFIRMATION_REQUIRED",
-      message: `Deleting ${ids.length} template(s) removes them and their versions. A published SES copy is removed too, unless another template still uses that name. If any template is still used by a scheduled, queued or processing broadcast, or an enabled workflow, the whole delete is refused. Nothing was deleted.`,
+      message: `Deleting ${ids.length} template(s) removes them and their versions. A published SES copy is removed too, unless another template still uses that name. If any template is still used by a draft, scheduled, queued or processing broadcast, or an enabled workflow, the whole delete is refused. Nothing was deleted.`,
       suggestion: `Preview with \`wraps email templates delete ${ids.join(" ")} --dry-run\`, then re-run with --yes.`,
     });
     return;

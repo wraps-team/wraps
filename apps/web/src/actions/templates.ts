@@ -2,8 +2,14 @@
 
 import { toPlainText } from "@react-email/render";
 import { auth } from "@wraps/auth";
-import type { EmailType } from "@wraps/db";
-import { auditLog, awsAccount, db, template } from "@wraps/db";
+import type { EmailType, TemplateBlocker } from "@wraps/db";
+import {
+  auditLog,
+  awsAccount,
+  db,
+  findTemplateDeleteBlockers,
+  template,
+} from "@wraps/db";
 import {
   deleteSESTemplate,
   generateSESTemplateName,
@@ -22,6 +28,12 @@ import { headers } from "next/headers";
 import { trackTemplatePublished } from "@/lib/activation-tracking";
 import { auditLogEntry, getAuditContext } from "@/lib/audit";
 import { getOrAssumeRole } from "@/lib/aws/credential-cache";
+import {
+  lockTemplatesForDelete,
+  removePublishedSesTemplates,
+  type TemplateDeleteTarget,
+  templateInUseMessage,
+} from "@/lib/template-delete";
 import { orgAction } from "./shared/org-action";
 
 export type PublishTemplateResult =
@@ -300,9 +312,45 @@ export const publishTemplateToSES = orgAction(
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Bulk delete templates
+ * Thrown inside `ctx.audited` when a target template is still in use, so the
+ * transaction rolls back and no `template.deleted` audit row is written.
+ * Caught in `bulkDeleteTemplates` itself, never by `orgAction`. Not exported:
+ * a "use server" file may export only async functions.
+ */
+class TemplatesInUseError extends Error {
+  readonly blockers: TemplateBlocker[];
+  readonly targets: TemplateDeleteTarget[];
+
+  constructor(blockers: TemplateBlocker[], targets: TemplateDeleteTarget[]) {
+    super("Templates in use");
+    this.name = "TemplatesInUseError";
+    this.blockers = blockers;
+    this.targets = targets;
+  }
+}
+
+/**
+ * Thrown inside `ctx.audited` when none of the ids is a template of the org,
+ * so no `template.deleted` audit row is written for a delete that removed
+ * nothing (the API writes none either). Caught in `bulkDeleteTemplates`.
+ */
+class NothingToDeleteError extends Error {
+  constructor() {
+    super("No templates of this organization to delete");
+    this.name = "NothingToDeleteError";
+  }
+}
+
+/**
+ * Bulk delete templates. All-or-nothing, like DELETE /v1/templates.
  *
- * Also deletes from AWS SES for any templates that were published.
+ * In one transaction: lock the org's target rows FOR UPDATE, run the shared
+ * in-use check (@wraps/db `findTemplateDeleteBlockers`: a draft, scheduled,
+ * queued or processing broadcast, or an enabled workflow), then delete the
+ * rows and write the audit row. If any target is in use, nothing is deleted,
+ * no audit row is written, and the error names the blockers.
+ *
+ * The published SES copies are removed only after the commit, best-effort.
  */
 export const bulkDeleteTemplates = orgAction(
   {
@@ -320,81 +368,70 @@ export const bulkDeleteTemplates = orgAction(
     if (templateIds.length === 0) {
       return { success: false, error: "No templates selected" };
     }
+    const requestedIds = [...new Set(templateIds)];
 
-    // Fetch templates to get their SES template names
-    const templates = await db.query.template.findMany({
-      where: and(
-        eq(template.organizationId, organizationId),
-        inArray(template.id, templateIds)
-      ),
-      columns: {
-        id: true,
-        sesTemplateName: true,
-      },
-    });
+    let deleted: TemplateDeleteTarget[];
+    try {
+      deleted = await ctx.audited(
+        async (tx) => {
+          const targets = await lockTemplatesForDelete(
+            tx,
+            organizationId,
+            requestedIds
+          );
+          if (targets.length === 0) {
+            throw new NothingToDeleteError();
+          }
 
-    // Delete from SES for templates that were published
-    const templatesWithSES = templates.filter((t) => t.sesTemplateName);
-    if (templatesWithSES.length > 0) {
-      // Get the organization's AWS account
-      const customerAwsAccount = await db.query.awsAccount.findFirst({
-        where: eq(awsAccount.organizationId, organizationId),
-      });
+          const blockers = await findTemplateDeleteBlockers(
+            tx,
+            organizationId,
+            targets.map((target) => target.id)
+          );
+          if (blockers.length > 0) {
+            throw new TemplatesInUseError(blockers, targets);
+          }
 
-      if (customerAwsAccount) {
-        const credentials = await getOrAssumeRole({
-          roleArn: customerAwsAccount.roleArn,
-          externalId: customerAwsAccount.externalId,
-          region: customerAwsAccount.region,
-        });
-
-        // Delete from SES (fire and settle - don't fail the whole operation if SES fails)
-        await Promise.allSettled(
-          templatesWithSES.map(async (t) => {
-            try {
-              await deleteSESTemplate(
-                credentials,
-                customerAwsAccount.region,
-                t.sesTemplateName!
-              );
-              ctx.log.info(
-                { templateId: t.id, sesTemplateName: t.sesTemplateName },
-                "Deleted template from SES"
-              );
-            } catch (err) {
-              ctx.log.warn(
-                { err, templateId: t.id },
-                "Failed to delete template from SES"
-              );
-            }
-          })
-        );
-      }
-    }
-
-    // Delete templates from database + audit log in one transaction
-    await ctx.audited(
-      async (tx) => {
-        await tx
-          .delete(template)
-          .where(
+          await tx.delete(template).where(
             and(
               eq(template.organizationId, organizationId),
-              inArray(template.id, templateIds)
+              inArray(
+                template.id,
+                targets.map((target) => target.id)
+              )
             )
           );
-      },
-      () => ({
-        action: "template.deleted" as const,
-        resource: "template",
-        metadata: { count: templateIds.length, templateIds },
-      })
-    );
+          return targets;
+        },
+        (targets) => {
+          // Keep the caller's order, not the locked select's.
+          const deletedIds = new Set(targets.map((target) => target.id));
+          const ids = requestedIds.filter((id) => deletedIds.has(id));
+          return {
+            action: "template.deleted" as const,
+            resource: "template",
+            metadata: { count: ids.length, templateIds: ids },
+          };
+        }
+      );
+    } catch (error) {
+      if (error instanceof NothingToDeleteError) {
+        return { success: true, count: 0 };
+      }
+      if (error instanceof TemplatesInUseError) {
+        return {
+          success: false,
+          error: templateInUseMessage(error.blockers, error.targets),
+        };
+      }
+      throw error;
+    }
 
-    // Revalidate
+    await removePublishedSesTemplates(organizationId, deleted, ctx.log);
+
     revalidateTemplates(ctx.access.orgSlug);
 
-    return { success: true, count: templateIds.length };
+    return { success: true, count: deleted.length };
   }
 );
 

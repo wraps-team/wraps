@@ -530,7 +530,7 @@ Sending identity (domain and email address) verification state, read live from S
 
 CRUD, publish, and duplicate for email/SMS templates. Same table the dashboard's React Email editor and the CLI's \`wraps push\`/\`wraps pull\` protocol read and write -- an API-created template shows up in the editor, and an editor-saved template is readable here.
 
-The API does **not** compile TSX -- \`compiledHtml\`/\`compiledText\` must be supplied by the caller (the CLI renders locally with React Email; the dashboard compiles in the editor). \`POST /v1/templates/:id/publish\` refuses a template with no \`compiledHtml\`. AI generation is dashboard-only; there is no generation endpoint here. Templates can be deleted, one at a time or in bulk (see Delete Templates below). A delete is refused with 409 while a scheduled, queued, or processing broadcast, or an enabled workflow, still uses the template.
+The API does **not** compile TSX -- \`compiledHtml\`/\`compiledText\` must be supplied by the caller (the CLI renders locally with React Email; the dashboard compiles in the editor). \`POST /v1/templates/:id/publish\` refuses a template with no \`compiledHtml\`. AI generation is dashboard-only; there is no generation endpoint here. Templates can be deleted, one at a time or in bulk (see Delete Templates below). A delete is refused with 409 while a draft, scheduled, queued, or processing broadcast, or an enabled workflow, still uses the template.
 
 ### List Templates
 
@@ -562,7 +562,7 @@ The API does **not** compile TSX -- \`compiledHtml\`/\`compiledText\` must be su
 
 \`DELETE /v1/templates/:id?confirm=true\` -- Deletes one template with its versions, org-scoped. \`DELETE /v1/templates?confirm=true\` with body \`{ "ids": [...] }\` deletes 1 to 100 templates in one request. Both need \`confirm=true\`, or they return 400 before anything changes. A published SES copy is removed best-effort from the organization's AWS accounts. Needs \`campaigns:write\` for API keys.
 
-**Returns 409 instead of deleting** while a template is still used by a \`scheduled\`, \`queued\`, or \`processing\` broadcast, or by an enabled workflow (a \`send_email\` or \`send_sms\` step, or a cascade channel). The single route deletes nothing, and \`blockingIds\` lists the blocking template ids. The bulk route is all-or-nothing: one blocked template fails the whole request. Draft, paused, completed, and other non-blocking broadcasts and workflows do not block. On the bulk route, ids that are not templates of this organization are listed in \`notFound\` and skipped.
+**Returns 409 instead of deleting** while a template is still used by a \`draft\`, \`scheduled\`, \`queued\`, or \`processing\` broadcast (a paused broadcast is \`processing\`), or by an enabled workflow (a \`send_email\` or \`send_sms\` step, or a cascade channel). The single route deletes nothing, and \`blockingIds\` lists the blocking template ids. The bulk route is all-or-nothing: one blocked template fails the whole request. Completed, failed, and cancelled broadcasts, and draft, paused, and archived workflows, do not block. On the bulk route, ids that are not templates of this organization are listed in \`notFound\` and skipped.
 
 ### CLI Sync: \`/pull\` Pagination
 
@@ -2080,8 +2080,8 @@ export default function PageContent() {
             <code className="rounded bg-muted px-1 py-0.5">compiledHtml</code>.
             AI generation is dashboard-only — there is no generation endpoint
             here. Templates can be deleted, but a delete is refused with 409
-            while a scheduled, queued, or processing broadcast or an enabled
-            workflow still uses the template.
+            while a draft, scheduled, queued, or processing broadcast or an
+            enabled workflow still uses the template.
           </p>
         </div>
 
@@ -2312,6 +2312,7 @@ export default function PageContent() {
           <p className="font-medium text-sm">A delete can return 409</p>
           <p className="mt-2 text-muted-foreground text-sm">
             A template still used by a{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">draft</code>,{" "}
             <code className="rounded bg-muted px-1 py-0.5 text-xs">
               scheduled
             </code>
@@ -2327,9 +2328,9 @@ export default function PageContent() {
               blockingIds
             </code>{" "}
             lists the blocking template ids. The bulk route is all-or-nothing:
-            one blocked template fails the whole request. Draft, paused,
-            completed, and other non-blocking broadcasts and workflows do not
-            block. On the bulk route, ids that are not templates of this
+            one blocked template fails the whole request. Completed, failed, and
+            cancelled broadcasts, and draft, paused, and archived workflows, do
+            not block. On the bulk route, ids that are not templates of this
             organization are listed in{" "}
             <code className="rounded bg-muted px-1 py-0.5 text-xs">
               notFound
