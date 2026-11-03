@@ -798,6 +798,9 @@ describe("Workflow event emission from preference center", () => {
 
   beforeEach(async () => {
     apiCalls.length = 0;
+    // Plan 023b: emitPreferenceEvents has no default API URL any more, so
+    // these tests set one instead of relying on the developer's env.
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "http://api.test");
 
     // Intercept only API calls to preference-events, pass everything else through
     vi.stubGlobal(
@@ -833,6 +836,7 @@ describe("Workflow event emission from preference center", () => {
 
   afterAll(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it("should call API to emit topic_unsubscribed when a topic is unsubscribed", async () => {
@@ -1164,13 +1168,15 @@ describe("unsubscribeGlobally — API first, local fallback", () => {
     return Object.fromEntries(rows.map((r) => [r.topicId, r.status]));
   }
 
-  function loggedFailures(): unknown[] {
+  /** The `failure` of each warn/error log for `op`, in order. */
+  function loggedFailures(op = "unsubscribe-all-api"): unknown[] {
     return [
       ...vi.mocked(logger.warn).mock.calls,
       ...vi.mocked(logger.error).mock.calls,
     ]
-      .map(([obj]) => (obj as { failure?: unknown } | undefined)?.failure)
-      .filter((failure) => failure !== undefined);
+      .map(([obj]) => obj as { op?: unknown; failure?: unknown } | undefined)
+      .filter((obj) => obj?.op === op && obj.failure !== undefined)
+      .map((obj) => obj?.failure);
   }
 
   beforeAll(async () => {
@@ -1314,15 +1320,6 @@ describe("unsubscribeGlobally — API first, local fallback", () => {
       attempts: 1,
       setup: () => stubApi(() => Promise.resolve(Response.json({ ok: true }))),
     },
-    {
-      name: "NEXT_PUBLIC_API_URL unset",
-      failure: "unconfigured",
-      attempts: 0,
-      setup: () => {
-        vi.stubEnv("NEXT_PUBLIC_API_URL", "");
-        stubApi(() => Promise.resolve(Response.json({ success: true })));
-      },
-    },
   ];
 
   it.each(failures)(
@@ -1369,6 +1366,35 @@ describe("unsubscribeGlobally — API first, local fallback", () => {
       expect(loggedFailures()).toEqual([failure]);
     }
   );
+
+  it("NEXT_PUBLIC_API_URL unset: writes locally and calls no API at all (no default URL)", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "");
+    stubApi(() => Promise.resolve(Response.json({ success: true })));
+    const token = await generateUnsubscribeToken(
+      testContact.id,
+      testOrganization.id
+    );
+
+    const result = await unsubscribeGlobally(
+      token,
+      testContact.id,
+      testOrganization.id
+    );
+
+    expect(result).toEqual({ success: true });
+    expect((await readContact()).emailStatus).toBe("unsubscribed");
+    expect(await topicStatuses()).toEqual({
+      [testRegularTopic.id]: "unsubscribed",
+      [testDoubleOptInTopic.id]: "unsubscribed",
+    });
+    // Neither the unsubscribe-all call nor the topic events go anywhere:
+    // a self-hosted deployment never sends the token to the Wraps platform.
+    expect(unsubscribeAllCalls).toHaveLength(0);
+    expect(eventCalls).toHaveLength(0);
+    expect(otherApiCalls).toHaveLength(0);
+    expect(loggedFailures()).toEqual(["unconfigured"]);
+    expect(loggedFailures("emit-workflow-events")).toEqual(["unconfigured"]);
+  });
 
   it("the timeout is 10 seconds", async () => {
     const timeoutSpy = vi

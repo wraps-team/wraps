@@ -33,6 +33,10 @@ type TopicChange = {
 /**
  * Emit workflow events for topic subscription changes via the API.
  * Fire-and-forget: failures are logged but never block the preference update.
+ *
+ * No default API URL: a self-hosted deployment must never send its
+ * contacts' tokens to the Wraps platform, so an unset NEXT_PUBLIC_API_URL
+ * logs and skips the call.
  */
 async function emitPreferenceEvents(
   token: string,
@@ -44,7 +48,21 @@ async function emitPreferenceEvents(
     return;
   }
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://api.wraps.dev";
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (!apiUrl) {
+    logger.warn(
+      {
+        flow: "preferences",
+        op: "emit-workflow-events",
+        failure: "unconfigured",
+        contactId,
+        organizationId,
+      },
+      "NEXT_PUBLIC_API_URL is not set; topic workflow events not emitted"
+    );
+    return;
+  }
+
   await fetch(`${apiUrl}/v1/preference-events`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
