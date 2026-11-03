@@ -65,7 +65,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/contact": "2026-10-30T11:20:41-06:00",
   "/docs": "2026-10-27T09:08:58-06:00",
   "/docs/cdk-reference": "2026-10-26T08:57:16-06:00",
-  "/docs/cli-reference": "2026-11-02T21:06:18-07:00",
+  "/docs/cli-reference": "2026-11-02T21:09:08-07:00",
   "/docs/cli-reference/auth": "2026-04-14T13:00:57-06:00",
   "/docs/cli-reference/aws": "2026-08-21T20:49:06-06:00",
   "/docs/cli-reference/cdn": "2026-04-14T13:00:57-06:00",
