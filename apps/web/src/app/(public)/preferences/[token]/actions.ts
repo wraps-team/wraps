@@ -10,7 +10,7 @@ import {
   topic,
 } from "@wraps/db";
 import { determineSubscriptionStatus } from "@wraps/email";
-import { and } from "drizzle-orm";
+import { and, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { auditLogEntry, getAuditContext } from "@/lib/audit";
 import { logger } from "@/lib/logger";
@@ -357,8 +357,101 @@ export async function updatePreferences(
   }
 }
 
+/** How long the preference center waits for the API's unsubscribe-all. */
+const UNSUBSCRIBE_ALL_TIMEOUT_MS = 10_000;
+
 /**
- * Unsubscribe contact from all emails globally
+ * Ask the API to do the global unsubscribe, so it can emit contact_updated
+ * (the web cannot enqueue workflow jobs). True only when the API answered
+ * 2xx with `success: true`; anything else means the caller must write the
+ * unsubscribe itself. Never throws.
+ *
+ * No default API URL: a self-hosted deployment must never send its
+ * contacts' tokens to the Wraps platform.
+ */
+async function unsubscribeAllViaApi(
+  token: string,
+  contactId: string,
+  organizationId: string
+): Promise<boolean> {
+  const context = {
+    flow: "preferences",
+    op: "unsubscribe-all-api",
+    contactId,
+    organizationId,
+  };
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (!apiUrl) {
+    logger.warn(
+      { ...context, failure: "unconfigured" },
+      "NEXT_PUBLIC_API_URL is not set; unsubscribing without the API"
+    );
+    return false;
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`${apiUrl}/v1/preference-events/unsubscribe-all`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+      signal: AbortSignal.timeout(UNSUBSCRIBE_ALL_TIMEOUT_MS),
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "TimeoutError") {
+      logger.error(
+        {
+          ...context,
+          failure: "timeout",
+          timeoutMs: UNSUBSCRIBE_ALL_TIMEOUT_MS,
+        },
+        "Unsubscribe-all API call timed out; unsubscribing without the API"
+      );
+    } else {
+      logger.error(
+        { ...context, failure: "network", err },
+        "Unsubscribe-all API call failed; unsubscribing without the API"
+      );
+    }
+    return false;
+  }
+
+  if (!response.ok) {
+    logger.error(
+      { ...context, failure: "status", status: response.status },
+      "Unsubscribe-all API call was rejected; unsubscribing without the API"
+    );
+    return false;
+  }
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    body = null;
+  }
+  if (
+    !(
+      body &&
+      typeof body === "object" &&
+      (body as { success?: unknown }).success === true
+    )
+  ) {
+    logger.error(
+      { ...context, failure: "body", status: response.status },
+      "Unsubscribe-all API call answered without success; unsubscribing without the API"
+    );
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Unsubscribe contact from all emails globally.
+ *
+ * The API does the write and emits contact_updated. If it cannot be reached
+ * or does not confirm, the unsubscribe is written here instead, so it is
+ * never lost; that path emits topic events but no contact_updated.
  */
 export async function unsubscribeGlobally(
   token: string,
@@ -371,54 +464,79 @@ export async function unsubscribeGlobally(
     return { success: false, error: "Invalid token" };
   }
 
+  if (await unsubscribeAllViaApi(token, contactId, organizationId)) {
+    revalidatePath(`/preferences/${token}`);
+    return { success: true };
+  }
+
   try {
     const now = new Date();
 
-    // Get all subscribed topics before unsubscribing (for event emission)
-    const subscribedTopics = await db
-      .select({
-        topicId: contactTopic.topicId,
-        topicName: topic.name,
-      })
-      .from(contactTopic)
-      .innerJoin(topic, eq(topic.id, contactTopic.topicId))
-      .where(
-        and(
-          eq(contactTopic.contactId, contactId),
-          eq(contactTopic.status, "subscribed")
-        )
-      );
-
-    // Update contact to unsubscribed
-    await db
-      .update(contact)
-      .set({
-        emailStatus: "unsubscribed",
-        emailUnsubscribedAt: now,
-      })
+    // contact_topic has no org column: this org-scoped lookup is the gate
+    // for the topic writes below.
+    const [existingContact] = await db
+      .select({ id: contact.id })
+      .from(contact)
       .where(
         and(
           eq(contact.id, contactId),
           eq(contact.organizationId, organizationId)
         )
-      );
+      )
+      .limit(1);
 
-    // Unsubscribe from all topics for this contact
-    await db
-      .update(contactTopic)
-      .set({
-        status: "unsubscribed",
-        unsubscribedAt: now,
-      })
-      .where(eq(contactTopic.contactId, contactId));
+    if (existingContact) {
+      // Guarded, like the API's write: if the API did complete before the
+      // call above gave up, the first emailUnsubscribedAt stays.
+      await db
+        .update(contact)
+        .set({
+          emailStatus: "unsubscribed",
+          emailUnsubscribedAt: now,
+        })
+        .where(
+          and(
+            eq(contact.id, contactId),
+            eq(contact.organizationId, organizationId),
+            sql`${contact.emailStatus} IS DISTINCT FROM 'unsubscribed'`
+          )
+        );
 
-    // Emit workflow events for all previously subscribed topics
-    const changes: TopicChange[] = subscribedTopics.map((t) => ({
-      topicId: t.topicId,
-      topicName: t.topicName,
-      action: "unsubscribed" as const,
-    }));
-    await emitPreferenceEvents(token, contactId, organizationId, changes);
+      // Topic events come only from rows this write moved, so a fallback
+      // after an API call that did complete emits nothing twice.
+      const unsubscribedTopics = await db
+        .update(contactTopic)
+        .set({
+          status: "unsubscribed",
+          unsubscribedAt: now,
+        })
+        .from(topic)
+        .where(
+          and(
+            eq(contactTopic.contactId, contactId),
+            eq(contactTopic.status, "subscribed"),
+            eq(topic.id, contactTopic.topicId),
+            eq(topic.organizationId, organizationId)
+          )
+        )
+        .returning({ topicId: contactTopic.topicId, topicName: topic.name });
+
+      // Then every remaining subscription (pending ones too)
+      await db
+        .update(contactTopic)
+        .set({
+          status: "unsubscribed",
+          unsubscribedAt: now,
+        })
+        .where(eq(contactTopic.contactId, contactId));
+
+      const changes: TopicChange[] = unsubscribedTopics.map((t) => ({
+        topicId: t.topicId,
+        topicName: t.topicName,
+        action: "unsubscribed" as const,
+      }));
+      await emitPreferenceEvents(token, contactId, organizationId, changes);
+    }
 
     revalidatePath(`/preferences/${token}`);
     return { success: true };
