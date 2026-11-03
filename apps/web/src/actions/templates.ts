@@ -319,11 +319,13 @@ export const publishTemplateToSES = orgAction(
  */
 class TemplatesInUseError extends Error {
   readonly blockers: TemplateBlocker[];
+  readonly targets: TemplateDeleteTarget[];
 
-  constructor(blockers: TemplateBlocker[]) {
+  constructor(blockers: TemplateBlocker[], targets: TemplateDeleteTarget[]) {
     super("Templates in use");
     this.name = "TemplatesInUseError";
     this.blockers = blockers;
+    this.targets = targets;
   }
 }
 
@@ -375,7 +377,7 @@ export const bulkDeleteTemplates = orgAction(
             targets.map((target) => target.id)
           );
           if (blockers.length > 0) {
-            throw new TemplatesInUseError(blockers);
+            throw new TemplatesInUseError(blockers, targets);
           }
 
           await tx.delete(template).where(
@@ -402,7 +404,10 @@ export const bulkDeleteTemplates = orgAction(
       );
     } catch (error) {
       if (error instanceof TemplatesInUseError) {
-        return { success: false, error: templateInUseMessage(error.blockers) };
+        return {
+          success: false,
+          error: templateInUseMessage(error.blockers, error.targets),
+        };
       }
       throw error;
     }

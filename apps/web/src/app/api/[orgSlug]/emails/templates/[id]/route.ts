@@ -358,7 +358,11 @@ export async function DELETE(_request: Request, context: RouteContext) {
         tx
       ): Promise<
         | { kind: "not_found" }
-        | { kind: "blocked"; blockers: TemplateBlocker[] }
+        | {
+            kind: "blocked";
+            blockers: TemplateBlocker[];
+            target: TemplateDeleteTarget;
+          }
         | { kind: "deleted"; target: TemplateDeleteTarget }
       > => {
         const [target] = await lockTemplatesForDelete(tx, organizationId, [id]);
@@ -370,7 +374,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
           target.id,
         ]);
         if (blockers.length > 0) {
-          return { kind: "blocked", blockers };
+          return { kind: "blocked", blockers, target };
         }
 
         await tx
@@ -405,7 +409,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     if (outcome.kind === "blocked") {
       return NextResponse.json(
         {
-          error: templateInUseMessage(outcome.blockers),
+          error: templateInUseMessage(outcome.blockers, [outcome.target]),
           blockingIds: [id],
         },
         { status: 409 }

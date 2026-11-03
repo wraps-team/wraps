@@ -167,12 +167,13 @@ function uniq(label: string): string {
 }
 
 async function newTemplate(
-  overrides: Partial<typeof template.$inferInsert> = {}
+  overrides: Partial<typeof template.$inferInsert> = {},
+  organizationId = testOrg.id
 ): Promise<string> {
   const id = uniq("t");
   await db.insert(template).values({
     id,
-    organizationId: testOrg.id,
+    organizationId,
     name: `Template ${id}`,
     content: {},
     sourceFormat: "react-email",
@@ -231,12 +232,35 @@ async function insertEnabledWorkflow(
   });
 }
 
-async function templateExists(id: string): Promise<boolean> {
+async function templateExists(
+  id: string,
+  organizationId = testOrg.id
+): Promise<boolean> {
   const rows = await db
     .select({ id: template.id })
     .from(template)
-    .where(and(eq(template.id, id), eq(template.organizationId, testOrg.id)));
+    .where(
+      and(eq(template.id, id), eq(template.organizationId, organizationId))
+    );
   return rows.length === 1;
+}
+
+/** Every template.deleted audit row, in any org, that names `templateId`. */
+async function auditRowsNaming(templateId: string) {
+  const rows = await db
+    .select({ metadata: auditLog.metadata, resourceId: auditLog.resourceId })
+    .from(auditLog)
+    .where(
+      and(
+        inArray(auditLog.organizationId, [testOrg.id, otherOrg.id]),
+        eq(auditLog.action, "template.deleted")
+      )
+    );
+  return rows.filter(
+    (row) =>
+      row.resourceId === templateId ||
+      JSON.stringify(row.metadata ?? {}).includes(templateId)
+  );
 }
 
 async function deletedAuditRows() {
@@ -332,7 +356,7 @@ describe("bulkDeleteTemplates refuses templates still in use", () => {
 
       expect(result).toEqual({
         success: false,
-        error: `Can't delete: still used by broadcast "${PREFIX} Spring sale" (${status}).`,
+        error: `Can't delete "Template ${id}": still used by broadcast "${PREFIX} Spring sale" (${status}).`,
       });
       expect(await templateExists(id)).toBe(true);
       expect(await deletedAuditRows()).toHaveLength(0);
@@ -348,7 +372,7 @@ describe("bulkDeleteTemplates refuses templates still in use", () => {
 
     expect(result).toEqual({
       success: false,
-      error: `Can't delete: still used by enabled workflow "${PREFIX} Welcome".`,
+      error: `Can't delete "Template ${id}": still used by enabled workflow "${PREFIX} Welcome".`,
     });
     expect(await templateExists(id)).toBe(true);
     expect(await deletedAuditRows()).toHaveLength(0);
@@ -365,7 +389,9 @@ describe("bulkDeleteTemplates refuses templates still in use", () => {
 
     expect(result.success).toBe(false);
     if (result.success) return;
-    expect(result.error).toMatch(/^Can't delete: still used by /);
+    expect(
+      result.error.startsWith(`Can't delete "Template ${id}": still used by `)
+    ).toBe(true);
     expect(result.error.match(/\(draft\)/g)).toHaveLength(5);
     expect(result.error).toMatch(/ and 2 more\.$/);
   });
@@ -379,7 +405,7 @@ describe("bulkDeleteTemplates refuses templates still in use", () => {
 
     expect(result).toEqual({
       success: false,
-      error: `Can't delete: still used by broadcast "${PREFIX} Half done" (draft).`,
+      error: `Can't delete "Template ${blocked}": still used by broadcast "${PREFIX} Half done" (draft).`,
     });
     expect(await templateExists(free)).toBe(true);
     expect(await templateExists(blocked)).toBe(true);
@@ -402,6 +428,46 @@ describe("bulkDeleteTemplates refuses templates still in use", () => {
     expect(audit[0]?.metadata).toEqual({ count: 1, templateIds: [id] });
     expect(mockDeleteSESTemplate).toHaveBeenCalledTimes(1);
     expect(seen).toEqual([{ templateName: `wraps-${id}`, rowExisted: false }]);
+  });
+
+  it("keeps the SES template when a surviving template shares its SES name", async () => {
+    const sharedName = `wraps-${PREFIX}-shared`;
+    const deleted = await newTemplate({ sesTemplateName: sharedName });
+    const survivor = await newTemplate({ sesTemplateName: sharedName });
+
+    const result = await bulkDeleteTemplates(testOrg.id, [deleted]);
+
+    expect(result).toEqual({ success: true, count: 1 });
+    expect(await templateExists(deleted)).toBe(false);
+    expect(await templateExists(survivor)).toBe(true);
+    expect(mockDeleteSESTemplate).not.toHaveBeenCalled();
+  });
+
+  it("deletes a shared SES name once when every template using it is deleted", async () => {
+    const sharedName = `wraps-${PREFIX}-shared-all`;
+    const first = await newTemplate({ sesTemplateName: sharedName });
+    const second = await newTemplate({ sesTemplateName: sharedName });
+
+    const result = await bulkDeleteTemplates(testOrg.id, [first, second]);
+
+    expect(result).toEqual({ success: true, count: 2 });
+    expect(mockDeleteSESTemplate).toHaveBeenCalledTimes(1);
+    expect(mockDeleteSESTemplate).toHaveBeenCalledWith(
+      expect.anything(),
+      "us-east-1",
+      sharedName
+    );
+  });
+
+  it("another org's template id deletes nothing: count 0, row intact, SES untouched, no audit row names it", async () => {
+    const foreign = await newTemplate({}, otherOrg.id);
+
+    const result = await bulkDeleteTemplates(testOrg.id, [foreign]);
+
+    expect(result).toEqual({ success: true, count: 0 });
+    expect(await templateExists(foreign, otherOrg.id)).toBe(true);
+    expect(mockDeleteSESTemplate).not.toHaveBeenCalled();
+    expect(await auditRowsNaming(foreign)).toHaveLength(0);
   });
 
   it("another org's draft broadcast pointing at this org's template does not block", async () => {
@@ -428,7 +494,7 @@ describe("DELETE /api/[orgSlug]/emails/templates/[id] refuses templates still in
 
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({
-      error: `Can't delete: still used by broadcast "${PREFIX} Spring sale" (draft).`,
+      error: `Can't delete "Template ${id}": still used by broadcast "${PREFIX} Spring sale" (draft).`,
       blockingIds: [id],
     });
     expect(await templateExists(id)).toBe(true);
@@ -444,7 +510,7 @@ describe("DELETE /api/[orgSlug]/emails/templates/[id] refuses templates still in
 
     expect(response.status).toBe(409);
     expect((await response.json()).error).toBe(
-      `Can't delete: still used by enabled workflow "${PREFIX} Welcome".`
+      `Can't delete "Template ${id}": still used by enabled workflow "${PREFIX} Welcome".`
     );
     expect(await templateExists(id)).toBe(true);
     expect(mockDeleteSESTemplate).not.toHaveBeenCalled();
@@ -463,6 +529,31 @@ describe("DELETE /api/[orgSlug]/emails/templates/[id] refuses templates still in
     expect(audit).toHaveLength(1);
     expect(audit[0]?.resourceId).toBe(id);
     expect(seen).toEqual([{ templateName: `wraps-${id}`, rowExisted: false }]);
+  });
+
+  it("keeps the SES template when a surviving template shares its SES name", async () => {
+    const sharedName = `wraps-${PREFIX}-route-shared`;
+    const deleted = await newTemplate({ sesTemplateName: sharedName });
+    const survivor = await newTemplate({ sesTemplateName: sharedName });
+
+    const response = await routeDelete(deleted);
+
+    expect(response.status).toBe(200);
+    expect(await templateExists(deleted)).toBe(false);
+    expect(await templateExists(survivor)).toBe(true);
+    expect(mockDeleteSESTemplate).not.toHaveBeenCalled();
+  });
+
+  it("another org's template id is 404: row intact, SES untouched, no audit row names it", async () => {
+    const foreign = await newTemplate({}, otherOrg.id);
+
+    const response = await routeDelete(foreign);
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "Template not found" });
+    expect(await templateExists(foreign, otherOrg.id)).toBe(true);
+    expect(mockDeleteSESTemplate).not.toHaveBeenCalled();
+    expect(await auditRowsNaming(foreign)).toHaveLength(0);
   });
 
   it("another org's draft broadcast pointing at this org's template does not block", async () => {
