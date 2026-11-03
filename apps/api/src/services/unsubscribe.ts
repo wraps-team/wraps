@@ -24,12 +24,14 @@ export type GlobalUnsubscribeResult = {
 
 /**
  * Unsubscribe the org's contact from all email: the contact becomes
- * `unsubscribed` and every topic subscription is unsubscribed. Emits
- * `topic_unsubscribed` per previously subscribed topic, and `contact_updated`
- * (changeSource "unsubscribe") only when the contact's status changed.
+ * `unsubscribed` and each of its subscriptions to the org's topics is
+ * unsubscribed. Emits `topic_unsubscribed` per previously subscribed topic of
+ * the org, and `contact_updated` (changeSource "unsubscribe") only when the
+ * contact's status changed.
  *
  * `contact_topic` has no org column, so the org-scoped contact lookup comes
- * first: a contact outside the org returns `found: false` and touches nothing.
+ * first (a contact outside the org returns `found: false` and touches
+ * nothing), and the topic read and write are limited to the org's topics.
  */
 export async function unsubscribeContactGlobally(
   organizationId: string,
