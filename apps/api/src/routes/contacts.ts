@@ -1033,7 +1033,10 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
           company: updated.company,
           jobTitle: updated.jobTitle,
           preferredChannel: updated.preferredChannel,
+          emailStatus: updated.emailStatus,
         },
+        // API keys carry a userId too, so the key id is the tell.
+        changeSource: authContext.apiKeyId ? "api" : "user",
       }).catch((err) => {
         log.error("Failed to emit contact_updated event", err, {
           organizationId: authContext.organizationId,

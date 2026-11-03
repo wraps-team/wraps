@@ -46,7 +46,11 @@ vi.mock("@wraps/db", () => {
       })),
       update: vi.fn(() => ({
         set: vi.fn(() => ({
-          where: vi.fn(),
+          // The global contact write is guarded and reads back the row it
+          // changed (.returning()); the topic write awaits .where() directly.
+          where: vi.fn(() => ({
+            returning: vi.fn(() => [{ id: "contact-123" }]),
+          })),
         })),
       })),
     },
@@ -60,9 +64,11 @@ vi.mock("@wraps/db", () => {
 
 vi.mock("drizzle-orm", () => ({
   and: vi.fn(),
+  sql: vi.fn(),
 }));
 
 vi.mock("../services/workflow-events", () => ({
+  emitContactsUpdated: vi.fn(async () => ({ workflowsTriggered: 0 })),
   emitTopicUnsubscribed: vi.fn(async () => {}),
 }));
 

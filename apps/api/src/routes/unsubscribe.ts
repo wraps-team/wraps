@@ -8,11 +8,14 @@
  */
 
 import { contact, contactTopic, db, eq, topic } from "@wraps/db";
-import { and } from "drizzle-orm";
+import { and, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { log } from "../lib/logger";
 import { verifyUnsubscribeToken } from "../lib/unsubscribe-token";
-import { emitTopicUnsubscribed } from "../services/workflow-events";
+import {
+  emitContactsUpdated,
+  emitTopicUnsubscribed,
+} from "../services/workflow-events";
 
 export const unsubscribeRoutes = new Elysia({ prefix: "/unsubscribe" })
   /**
@@ -132,7 +135,10 @@ export const unsubscribeRoutes = new Elysia({ prefix: "/unsubscribe" })
             )
           );
 
-        await db
+        // Guarded so only a real change writes and emits: two concurrent
+        // one-click POSTs emit once, and a repeat keeps the first
+        // emailUnsubscribedAt. The topic writes below stay unconditional.
+        const changed = await db
           .update(contact)
           .set({
             emailStatus: "unsubscribed",
@@ -141,9 +147,11 @@ export const unsubscribeRoutes = new Elysia({ prefix: "/unsubscribe" })
           .where(
             and(
               eq(contact.id, contactId),
-              eq(contact.organizationId, organizationId)
+              eq(contact.organizationId, organizationId),
+              sql`${contact.emailStatus} IS DISTINCT FROM 'unsubscribed'`
             )
-          );
+          )
+          .returning({ id: contact.id });
 
         // Also unsubscribe from all topics
         await db
@@ -170,6 +178,22 @@ export const unsubscribeRoutes = new Elysia({ prefix: "/unsubscribe" })
             })
           )
         );
+
+        // After the contact write. A failed emit is logged: a committed
+        // unsubscribe never becomes a 500.
+        if (changed.length > 0) {
+          await emitContactsUpdated(organizationId, [
+            {
+              contactId,
+              updatedFields: ["emailStatus"],
+              changeSource: "unsubscribe",
+            },
+          ]).catch((err) => {
+            log.error("Failed to emit contact_updated event", err, {
+              contactId,
+            });
+          });
+        }
 
         log.info("Unsubscribe: global unsubscribe", {
           contactId,
