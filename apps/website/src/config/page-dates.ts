@@ -58,7 +58,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/compare/klaviyo-vs-wraps": "2026-10-30T11:20:41-06:00",
   "/compare/mailgun-vs-wraps": "2026-10-30T11:20:41-06:00",
   "/compare/postmark-vs-wraps": "2026-10-30T11:20:41-06:00",
-  "/compare/resend-vs-wraps": "2026-10-30T11:20:41-06:00",
+  "/compare/resend-vs-wraps": "2026-11-03T16:22:11-07:00",
   "/compare/sendgrid-vs-wraps": "2026-10-30T11:20:41-06:00",
   "/compare/ses-bounce-handling-hand-rolled-vs-wraps":
     "2026-10-30T11:20:41-06:00",
@@ -173,7 +173,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/migrate/amazon-pinpoint": "2026-10-30T11:20:41-06:00",
   "/migrate/mailgun": "2026-10-30T11:20:41-06:00",
   "/migrate/postmark": "2026-10-30T11:20:41-06:00",
-  "/migrate/resend": "2026-10-30T11:20:41-06:00",
+  "/migrate/resend": "2026-11-03T16:22:11-07:00",
   "/migrate/sendgrid": "2026-10-30T11:20:41-06:00",
   "/platform": "2026-10-30T14:31:42-06:00",
   "/privacy": "2026-08-28T11:14:02-06:00",
