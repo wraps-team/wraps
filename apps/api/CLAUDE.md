@@ -77,7 +77,7 @@ Two auth methods, both via `Authorization: Bearer <token>`:
 type AuthContext = {
   apiKeyId: string | null;      // Set if API key auth
   organizationId: string;        // Always set
-  userId: string | null;         // null for API keys, set for sessions
+  userId: string | null;         // the session's user, or an API key's creator (null if gone); use apiKeyId to tell a key from a session
   planId: string | null;         // null if no valid subscription
 };
 ```

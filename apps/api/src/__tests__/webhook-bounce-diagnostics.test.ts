@@ -68,7 +68,7 @@ function createTestApp() {
 function selectChain(rows: unknown[]) {
   const whereResult = Object.assign(Promise.resolve(rows), {
     limit: vi.fn().mockResolvedValue(rows),
-    // The contact-bounce helpers lock the contact row (SELECT … FOR UPDATE).
+    // The contact-bounce helpers lock the contact row (SELECT … FOR NO KEY UPDATE).
     for: vi.fn().mockResolvedValue(rows),
   });
   return {

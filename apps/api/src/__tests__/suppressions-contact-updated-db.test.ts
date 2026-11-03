@@ -513,7 +513,7 @@ describe("bulk add", () => {
     }
   });
 
-  it("a single-entry bulk also emits once, with the same workflow lookups", async () => {
+  it("a single-entry bulk also emits once", async () => {
     const email = uniqueEmail("bulkOne");
     const contactId = await seedContact(email, "active");
 

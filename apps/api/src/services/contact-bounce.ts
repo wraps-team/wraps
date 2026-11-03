@@ -17,14 +17,15 @@
  *   the count AND clears `emailLastSoftBouncedAt`: "consecutive" ends at a
  *   successful delivery, so the 24-hour rule must not look back across it.
  *
- * Every write is a single atomic UPDATE scoped by organizationId. They accept
- * an optional `client` so callers can run them inside their own transaction.
+ * Every write is a single atomic UPDATE scoped by organizationId.
  *
  * The writes that can end sendability (bounced, soft bounce, complained,
- * suppressed) first lock the contact row and read its status in the same
- * transaction, and return what changed so the caller can emit
- * `contact_updated` once the transaction commits. Recovery returns nothing:
- * it never emits.
+ * suppressed) first lock the contact row and read its status, then return
+ * what changed so the caller can emit `contact_updated` once the transaction
+ * commits. They require a transaction `client`: on the pool the read would
+ * auto-commit and release its lock before the UPDATE, and two concurrent
+ * calls could both report the same change. Recovery takes an optional
+ * `client`, returns nothing and never emits.
  */
 
 import {
@@ -44,7 +45,8 @@ import {
 import { and, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import type { ContactChangeSource } from "./workflow-events";
 
-type DbClient = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type DbClient = typeof db | DbTransaction;
 
 /** A contact's email status before and after one of the writes below. */
 export type EmailStatusChange = {
@@ -70,11 +72,15 @@ export function emitsContactUpdated(
 
 /**
  * Lock the contact row and read its status, scoped like the UPDATE that
- * follows. Run on the caller's transaction so the read and the write see the
- * same row.
+ * follows, on the caller's transaction so the read and the write see the same
+ * row. `FOR NO KEY UPDATE` is the lock that UPDATE takes anyway (it sets no
+ * key column), so the read adds no new conflict: unlike `FOR UPDATE` it does
+ * not block the `FOR KEY SHARE` lock a foreign-key check takes when a row
+ * referencing the contact (contact_event, message_send, workflow_execution,
+ * contact_topic) is inserted. It still serializes concurrent writers.
  */
 async function lockEmailStatus(
-  client: DbClient,
+  client: DbTransaction,
   organizationId: string,
   contactId: string
 ): Promise<{ emailStatus: EmailStatus | null } | undefined> {
@@ -84,7 +90,7 @@ async function lockEmailStatus(
     .where(
       and(eq(contact.id, contactId), eq(contact.organizationId, organizationId))
     )
-    .for("update");
+    .for("no key update");
   return row;
 }
 
@@ -103,16 +109,17 @@ function statusChange(
   };
 }
 
+/** `client` must be a transaction: the row lock lasts until it commits. */
 export async function recordSoftBounce({
   organizationId,
   contactId,
   bouncedAt,
-  client = db,
+  client,
 }: {
   organizationId: string;
   contactId: string;
   bouncedAt: Date;
-  client?: DbClient;
+  client: DbTransaction;
 }): Promise<EmailStatusChange | null> {
   // ISO string cast so the stored wall time is UTC regardless of host timezone.
   const at = sql`${bouncedAt.toISOString()}::timestamp`;
@@ -176,16 +183,17 @@ export async function clearSoftBounce({
     );
 }
 
+/** `client` must be a transaction: the row lock lasts until it commits. */
 export async function markContactBounced({
   organizationId,
   contactId,
   bouncedAt,
-  client = db,
+  client,
 }: {
   organizationId: string;
   contactId: string;
   bouncedAt: Date;
-  client?: DbClient;
+  client: DbTransaction;
 }): Promise<EmailStatusChange | null> {
   const before = await lockEmailStatus(client, organizationId, contactId);
   const [after] = await client
@@ -198,16 +206,17 @@ export async function markContactBounced({
   return statusChange(contactId, before, after);
 }
 
+/** `client` must be a transaction: the row lock lasts until it commits. */
 export async function markContactComplained({
   organizationId,
   contactId,
   complainedAt,
-  client = db,
+  client,
 }: {
   organizationId: string;
   contactId: string;
   complainedAt: Date;
-  client?: DbClient;
+  client: DbTransaction;
 }): Promise<EmailStatusChange | null> {
   const before = await lockEmailStatus(client, organizationId, contactId);
   const [after] = await client
@@ -220,16 +229,17 @@ export async function markContactComplained({
   return statusChange(contactId, before, after);
 }
 
+/** `client` must be a transaction: the row lock lasts until it commits. */
 export async function markContactSuppressed({
   organizationId,
   contactId,
   suppressedAt,
-  client = db,
+  client,
 }: {
   organizationId: string;
   contactId: string;
   suppressedAt: Date;
-  client?: DbClient;
+  client: DbTransaction;
 }): Promise<EmailStatusChange | null> {
   const before = await lockEmailStatus(client, organizationId, contactId);
   const [after] = await client
@@ -338,20 +348,21 @@ function withSource(
  * Apply an SES lifecycle event to a contact with the same rules the webhook
  * uses for broadcast sends. Used when the first event for an SDK send creates
  * the message row. Returns the write's change and its `changeSource`; a
- * Delivery (recovery) or an event that writes nothing returns null.
+ * Delivery (recovery) or an event that writes nothing returns null. `client`
+ * must be a transaction (see the helpers it calls).
  */
 export async function applyLifecycleToContact({
   organizationId,
   contactId,
   eventType,
   detail,
-  client = db,
+  client,
 }: {
   organizationId: string;
   contactId: string;
   eventType: string;
   detail: LifecycleDetail;
-  client?: DbClient;
+  client: DbTransaction;
 }): Promise<LifecycleChange | null> {
   switch (eventType) {
     case "Bounce": {
