@@ -1,5 +1,6 @@
 "use server";
 
+import { isDeepStrictEqual } from "node:util";
 import {
   CONTACT_SORT_FIELDS,
   type ContactSort,
@@ -18,6 +19,11 @@ import {
 } from "@wraps/db";
 import { revalidatePath } from "next/cache";
 import { trackContactCreated } from "@/lib/activation-tracking";
+import {
+  CONTACT_UPDATED_FIELDS,
+  type ContactUpdatedField,
+  emitContactsUpdatedViaApi,
+} from "@/lib/contact-updated-api";
 import type {
   ContactStatus,
   CreateContactResult,
@@ -668,6 +674,22 @@ export const updateContact = orgAction(
       (k) => data[k as keyof typeof data] !== undefined
     );
 
+    // contact_updated reports the fields whose stored value changes: only
+    // the reportable ones this update sets (never updatedAt, hashes,
+    // timestamps or soft-bounce counters), compared with the current row.
+    const changedFields: ContactUpdatedField[] = CONTACT_UPDATED_FIELDS.filter(
+      (field) => {
+        if (!(field in updateData)) {
+          return false;
+        }
+        const next = updateData[field];
+        const current = existing[field];
+        return field === "properties"
+          ? !isDeepStrictEqual(next, current)
+          : next !== current;
+      }
+    );
+
     // Update contact + write audit log in one transaction
     await ctx.audited(
       async (tx) => {
@@ -686,6 +708,12 @@ export const updateContact = orgAction(
         metadata: { contactId, fields: updatedFields },
       })
     );
+
+    if (changedFields.length > 0) {
+      await emitContactsUpdatedViaApi(ctx, organizationId, [
+        { contactId, updatedFields: changedFields },
+      ]);
+    }
 
     // Revalidate
     revalidateContacts(ctx.access.orgSlug);

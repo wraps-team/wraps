@@ -6,8 +6,8 @@ import {
   awsAccount,
   db,
   eq,
-  suppressContactByEmail,
-  unsuppressContactByEmail,
+  suppressContactByEmailWithChange,
+  unsuppressContactByEmailWithChange,
 } from "@wraps/db";
 import { revalidatePath } from "next/cache";
 import { normalizeAddressInput } from "@/lib/address-explanation";
@@ -18,6 +18,7 @@ import {
   putSuppressedAddress,
   type SuppressionListPage,
 } from "@/lib/aws/ses-suppression";
+import { emitContactsUpdatedViaApi } from "@/lib/contact-updated-api";
 import { type OrgActionCtx, orgAction } from "./shared/org-action";
 
 // Verbatim copy of the string `mapCommonAwsError` returns for an
@@ -132,10 +133,11 @@ export const removeSuppression = orgAction(
 
     // Broadcasts read the contact's status, not the SES list: put a contact
     // this address's suppression had parked back in the audience.
-    const contactRestored = await unsuppressContactByEmail(
+    const restored = await unsuppressContactByEmailWithChange(
       organizationId,
       email
     );
+    const contactRestored = restored.changed;
 
     try {
       await ctx.audited(
@@ -165,6 +167,12 @@ export const removeSuppression = orgAction(
       );
     }
 
+    if (restored.contactId) {
+      await emitContactsUpdatedViaApi(ctx, organizationId, [
+        { contactId: restored.contactId, updatedFields: ["emailStatus"] },
+      ]);
+    }
+
     revalidatePath(`/${ctx.access.orgSlug}/emails`, "page");
 
     return {
@@ -189,27 +197,38 @@ export type SuppressionRequest = {
   reason: "BOUNCE" | "COMPLAINT";
 };
 
+type SuppressOneOutcome = {
+  result: AddSuppressionResult;
+  /** The contact whose email status this call changed, if any. */
+  changedContactId: string | null;
+};
+
+function failed(error: string): SuppressOneOutcome {
+  return { result: { success: false, error }, changedContactId: null };
+}
+
 /**
  * Validates, writes and audits one suppression. Shared by `addSuppression` and
- * `addSuppressions`; the callers revalidate, so a batch revalidates once.
+ * `addSuppressions`; the callers revalidate and emit contact_updated, so a
+ * batch does each once.
  */
 async function suppressOne(
   ctx: OrgActionCtx,
   { awsAccountId, email, reason }: SuppressionRequest
-): Promise<AddSuppressionResult> {
+): Promise<SuppressOneOutcome> {
   const { organizationId } = ctx;
   // Never trust a reason from the client: SES only accepts these two.
   if (!ADDABLE_REASONS.includes(reason)) {
-    return { success: false, error: "Reason must be BOUNCE or COMPLAINT." };
+    return failed("Reason must be BOUNCE or COMPLAINT.");
   }
 
   const normalized = normalizeAddressInput(email);
   if (!normalized.ok) {
-    return { success: false, error: normalized.error };
+    return failed(normalized.error);
   }
   const address = normalized.address.toLowerCase();
   if (address.length > MAX_EMAIL_LENGTH || !EMAIL_SHAPE.test(address)) {
-    return { success: false, error: "Enter a valid email address." };
+    return failed("Enter a valid email address.");
   }
 
   // Never trust an AWS account id from the client — scope to the caller's
@@ -221,14 +240,14 @@ async function suppressOne(
     ),
   });
   if (!account) {
-    return { success: false, error: "AWS account not found" };
+    return failed("AWS account not found");
   }
 
   // Read the current record first. A repeat add is a no-op, and a COMPLAINT
   // is never weakened to a BOUNCE. If the read is denied, fail closed.
   const current = await getSuppressedAddress({ account, email: address });
   if (current.status === "denied") {
-    return { success: false, error: PERMISSION_DENIED_ERROR };
+    return failed(PERMISSION_DENIED_ERROR);
   }
   if (
     current.status === "found" &&
@@ -237,8 +256,14 @@ async function suppressOne(
   ) {
     // SES already has it, but the contact may not: a list entry SES added
     // itself, or one written before contacts were kept in step. Idempotent.
-    await suppressContactByEmail(organizationId, address);
-    return { success: true, email: address, alreadyPresent: true };
+    const write = await suppressContactByEmailWithChange(
+      organizationId,
+      address
+    );
+    return {
+      result: { success: true, email: address, alreadyPresent: true },
+      changedContactId: write.contactId,
+    };
   }
 
   // AWS first, same as removeSuppression: the write cannot run inside the
@@ -249,7 +274,7 @@ async function suppressOne(
     reason,
   });
   if (added.status === "denied") {
-    return { success: false, error: PERMISSION_DENIED_ERROR };
+    return failed(PERMISSION_DENIED_ERROR);
   }
 
   // Broadcasts choose recipients from the contact's status and never read the
@@ -257,10 +282,8 @@ async function suppressOne(
   // still sends to it. Outside the audit transaction, so a failed audit write
   // cannot roll it back; if this throws, the action reports failure and a
   // retry takes the already-present path above, which repeats it.
-  const contactSuppressed = await suppressContactByEmail(
-    organizationId,
-    address
-  );
+  const write = await suppressContactByEmailWithChange(organizationId, address);
+  const contactSuppressed = write.changed;
 
   try {
     await ctx.audited(
@@ -289,7 +312,10 @@ async function suppressOne(
     );
   }
 
-  return { success: true, email: address, alreadyPresent: false };
+  return {
+    result: { success: true, email: address, alreadyPresent: false },
+    changedContactId: write.contactId,
+  };
 }
 
 export const addSuppression = orgAction(
@@ -307,12 +333,21 @@ export const addSuppression = orgAction(
   },
   async (
     ctx,
-    _organizationId: string,
+    organizationId: string,
     awsAccountId: string,
     email: string,
     reason: "BOUNCE" | "COMPLAINT"
   ): Promise<AddSuppressionResult> => {
-    const result = await suppressOne(ctx, { awsAccountId, email, reason });
+    const { result, changedContactId } = await suppressOne(ctx, {
+      awsAccountId,
+      email,
+      reason,
+    });
+    if (changedContactId) {
+      await emitContactsUpdatedViaApi(ctx, organizationId, [
+        { contactId: changedContactId, updatedFields: ["emailStatus"] },
+      ]);
+    }
     if (result.success && !result.alreadyPresent) {
       revalidatePath(`/${ctx.access.orgSlug}/emails`, "page");
     }
@@ -351,7 +386,7 @@ export const addSuppressions = orgAction(
   },
   async (
     ctx,
-    _organizationId: string,
+    organizationId: string,
     requests: SuppressionRequest[]
   ): Promise<AddSuppressionsResult> => {
     if (!Array.isArray(requests) || requests.length === 0) {
@@ -365,6 +400,7 @@ export const addSuppressions = orgAction(
     }
 
     const results: AddSuppressionsItem[] = new Array(requests.length);
+    const changedContactIds = new Set<string>();
     let next = 0;
 
     const worker = async () => {
@@ -373,7 +409,10 @@ export const addSuppressions = orgAction(
         next += 1;
         const request = requests[index];
         try {
-          const result = await suppressOne(ctx, request);
+          const { result, changedContactId } = await suppressOne(ctx, request);
+          if (changedContactId) {
+            changedContactIds.add(changedContactId);
+          }
           results[index] = result.success
             ? {
                 email: request.email,
@@ -397,6 +436,17 @@ export const addSuppressions = orgAction(
 
     const workerCount = Math.min(SUPPRESS_CONCURRENCY, requests.length);
     await Promise.all(Array.from({ length: workerCount }, () => worker()));
+
+    // One call for the whole batch (at most MAX_BATCH_SUPPRESSIONS contacts,
+    // the API's limit too).
+    await emitContactsUpdatedViaApi(
+      ctx,
+      organizationId,
+      [...changedContactIds].map((contactId) => ({
+        contactId,
+        updatedFields: ["emailStatus"],
+      }))
+    );
 
     if (results.some((r) => r.success && !r.alreadyPresent)) {
       revalidatePath(`/${ctx.access.orgSlug}/emails`, "page");

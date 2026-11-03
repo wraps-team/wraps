@@ -118,6 +118,32 @@ vi.mock("@aws-sdk/client-sesv2", () => ({
   },
 }));
 
+// Plan 023b: these actions now report contact_updated through the API
+// (POST /v1/contacts/events/updated). Answer that call here so no test makes
+// a real HTTP request when NEXT_PUBLIC_API_URL is set, as it is in CI.
+const originalFetchForContactUpdated = globalThis.fetch;
+beforeAll(() => {
+  vi.stubGlobal(
+    "fetch",
+    (url: string | URL | Request, options?: RequestInit) => {
+      const urlStr =
+        typeof url === "string"
+          ? url
+          : url instanceof URL
+            ? url.toString()
+            : url.url;
+      if (urlStr.includes("/v1/contacts/events/updated")) {
+        return Promise.resolve(Response.json({ accepted: 0 }));
+      }
+      return originalFetchForContactUpdated(url as RequestInfo, options);
+    }
+  );
+});
+
+afterAll(() => {
+  vi.unstubAllGlobals();
+});
+
 // ─── Test fixtures ──────────────────────────────────────────────────────────
 
 const testUser = {
