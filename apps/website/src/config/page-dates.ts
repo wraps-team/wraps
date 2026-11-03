@@ -209,7 +209,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/tools/dmarc-checker": "2026-10-30T11:20:41-06:00",
   "/tools/email-header-analyzer": "2026-11-03T10:21:45-07:00",
   "/tools/mx-lookup": "2026-10-30T11:20:41-06:00",
-  "/tools/ses-calculator": "2026-11-03T10:27:36-07:00",
+  "/tools/ses-calculator": "2026-11-03T16:40:19-07:00",
   "/tools/ses-production-access": "2026-10-30T11:20:41-06:00",
   "/tools/spf-builder": "2026-11-03T10:21:45-07:00",
   "/versus": "2026-09-16T13:30:58-06:00",
