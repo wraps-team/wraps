@@ -13,7 +13,7 @@
  */
 
 import { swagger } from "@elysiajs/swagger";
-import { db, eq, template, workflow } from "@wraps/db";
+import { and, db, eq, template, workflow } from "@wraps/db";
 import { inArray } from "drizzle-orm";
 import { Elysia } from "elysia";
 import {
@@ -132,14 +132,6 @@ describe("POST /v1/templates/push 200", () => {
     const first = await call("POST", "/v1/templates/push", templatePush("a"));
     expect(first.status).toBe(201);
     const created = await first.json();
-    // The 201 has no declared schema, so its body is the handler's, unvalidated.
-    expect(sortedKeys(created)).toEqual([
-      "id",
-      "remoteHash",
-      "slug",
-      "status",
-      "updatedAt",
-    ]);
 
     const res = await call(
       "POST",
@@ -160,6 +152,77 @@ describe("POST /v1/templates/push 200", () => {
     expect(body.status).toBe("PUBLISHED");
     expect(body.remoteHash).toBe("hash-a2");
     expect(new Date(body.updatedAt).toISOString()).toBe(body.updatedAt);
+  });
+});
+
+describe("first-push 201 bodies", () => {
+  it("POST /v1/templates/push passes the 201 body through in handler order", async () => {
+    const res = await call("POST", "/v1/templates/push", templatePush("c"));
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(Object.keys(body)).toEqual([
+      "id",
+      "slug",
+      "status",
+      "updatedAt",
+      "remoteHash",
+    ]);
+    const [row] = await db
+      .select({ id: template.id })
+      .from(template)
+      .where(and(eq(template.organizationId, ids.org), eq(template.slug, "c")));
+    expect(body).toEqual({
+      id: row.id,
+      slug: "c",
+      status: "PUBLISHED",
+      updatedAt: body.updatedAt,
+      remoteHash: "hash-c",
+    });
+    expect(new Date(body.updatedAt).toISOString()).toBe(body.updatedAt);
+  });
+
+  it("POST /v1/workflows/push passes the 201 body through in handler order", async () => {
+    const res = await call("POST", "/v1/workflows/push", workflowPush("c"));
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(Object.keys(body)).toEqual([
+      "id",
+      "slug",
+      "status",
+      "updatedAt",
+      "remoteHash",
+    ]);
+    const [row] = await db
+      .select({ id: workflow.id })
+      .from(workflow)
+      .where(and(eq(workflow.organizationId, ids.org), eq(workflow.slug, "c")));
+    expect(body).toEqual({
+      id: row.id,
+      slug: "c",
+      status: "enabled",
+      updatedAt: body.updatedAt,
+      remoteHash: "hash-c",
+    });
+    expect(new Date(body.updatedAt).toISOString()).toBe(body.updatedAt);
+  });
+
+  it("POST /v1/workflows/push keeps scheduleError on a 201", async () => {
+    const res = await call(
+      "POST",
+      "/v1/workflows/push",
+      workflowPush("sc", { triggerType: "schedule", triggerConfig: {} })
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(Object.keys(body)).toEqual([
+      "id",
+      "slug",
+      "status",
+      "updatedAt",
+      "remoteHash",
+      "scheduleError",
+    ]);
+    expect(body.status).toBe("draft");
   });
 });
 
@@ -208,6 +271,20 @@ describe("GET /v1/templates/pull 200", () => {
     "variables",
   ];
 
+  const HANDLER_ORDER = [
+    "id",
+    "slug",
+    "subject",
+    "emailType",
+    "channel",
+    "variables",
+    "sourceHash",
+    "status",
+    "updatedAt",
+    "lastEditedFrom",
+    "source",
+  ];
+
   it("returns {templates: []} with no nextCursor key when the org has none", async () => {
     const res = await call("GET", "/v1/templates/pull");
     expect(res.status).toBe(200);
@@ -229,6 +306,9 @@ describe("GET /v1/templates/pull 200", () => {
     expect(body.templates).toHaveLength(2);
     for (const row of body.templates) {
       expect(sortedKeys(row)).toEqual(ROW_KEYS);
+      // Order too: the response is rebuilt in schema key order, which must be
+      // the order mapRow emits (select columns, then source).
+      expect(Object.keys(row)).toEqual(HANDLER_ORDER);
       expect(row.status).toBe("PUBLISHED");
       expect(row.lastEditedFrom).toBe("cli");
       expect(row.variables).toEqual([
@@ -241,6 +321,78 @@ describe("GET /v1/templates/pull 200", () => {
     expect(p2.subject).toBe("Subject p2");
     expect(p2.sourceHash).toBe("hash-p2");
     expect(p2.source).toContain("p2");
+  });
+
+  it("serves rows the dashboard or the public API wrote, with nulls and other statuses", async () => {
+    const at = new Date("2026-01-02T03:04:05.000Z");
+    const base = {
+      organizationId: ids.org,
+      content: {},
+      sourceFormat: "react-email",
+      updatedAt: at,
+      createdAt: at,
+    };
+    await db.insert(template).values([
+      {
+        ...base,
+        id: `${PREFIX}-null-row`,
+        name: "Null row",
+        source: "export default () => null;",
+        slug: null,
+        subject: null,
+        sourceHash: null,
+        variables: null,
+        lastEditedFrom: null,
+        status: "DRAFT",
+      },
+      {
+        ...base,
+        id: `${PREFIX}-api-row`,
+        name: "Api row",
+        source: "export default () => 1;",
+        slug: "api-row",
+        subject: "From the API",
+        sourceHash: "h",
+        variables: [{ name: "x" }],
+        lastEditedFrom: "api",
+        status: "ARCHIVED",
+        emailType: "transactional",
+        channel: "sms",
+      },
+    ] as unknown as (typeof template.$inferInsert)[]);
+
+    const res = await call("GET", "/v1/templates/pull");
+    expect(res.status).toBe(200);
+    const { templates } = await res.json();
+    const byId = Object.fromEntries(
+      templates.map((r: { id: string }) => [r.id, r])
+    );
+    expect(byId[`${PREFIX}-null-row`]).toEqual({
+      id: `${PREFIX}-null-row`,
+      slug: null,
+      subject: null,
+      emailType: "marketing",
+      channel: "email",
+      variables: null,
+      sourceHash: null,
+      status: "DRAFT",
+      updatedAt: at.toISOString(),
+      lastEditedFrom: null,
+      source: "export default () => null;",
+    });
+    expect(byId[`${PREFIX}-api-row`]).toEqual({
+      id: `${PREFIX}-api-row`,
+      slug: "api-row",
+      subject: "From the API",
+      emailType: "transactional",
+      channel: "sms",
+      variables: [{ name: "x" }],
+      sourceHash: "h",
+      status: "ARCHIVED",
+      updatedAt: at.toISOString(),
+      lastEditedFrom: "api",
+      source: "export default () => 1;",
+    });
   });
 
   it("returns nextCursor on a paginated page and null on the last", async () => {
@@ -530,6 +682,7 @@ describe("GET /v1/workflows/pull 200", () => {
     // row it serves today into a 422 over a null or a missing optional key.
     const steps = [
       { id: "s1", type: "trigger", name: "Start" },
+      { id: "s3", type: "delay", name: "Null position", position: null },
       {
         id: "s2",
         type: "delay",
@@ -718,7 +871,18 @@ describe("OpenAPI document", () => {
     });
   }
 
-  it("keeps the declared 403 next to the 200 and the injected error refs", async () => {
+  it("declares the first-push 201 on both push routes with the 200 schema", async () => {
+    const spec = await fetchSpec();
+    for (const path of ["/v1/templates/push", "/v1/workflows/push"]) {
+      const responses = spec.paths[path].post.responses;
+      const ok = responses["200"]?.content?.["application/json"]?.schema;
+      const created = responses["201"]?.content?.["application/json"]?.schema;
+      expect(created, `${path} lists a 201 JSON schema`).toBeDefined();
+      expect(created, `${path}: 201 matches 200`).toEqual(ok);
+    }
+  });
+
+  it("keeps the injected error responses next to the 200", async () => {
     const spec = await fetchSpec();
     for (const c of cases) {
       const responses = spec.paths[c.path][c.method].responses;

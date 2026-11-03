@@ -23,7 +23,7 @@ const pushedTemplateStatus = t.Literal("PUBLISHED", {
   description: "Every template a push writes is published",
 });
 
-/** 200 body of `POST /push`. A first push answers 201 with the same body. */
+/** 200 body of `POST /push`, also declared as the 201 a first push answers. */
 const pushResponse = t.Object(
   {
     id: t.String({ description: "Template id" }),
@@ -62,12 +62,6 @@ const pullTemplateRow = t.Object({
   slug: t.Union([t.String(), t.Null()], {
     description: "Template slug (filename without extension)",
   }),
-  source: t.Optional(
-    t.Union([t.String(), t.Null()], {
-      description:
-        "React Email TSX source. Absent when `source=false`. Rows with no source are filtered out, so it is never null in practice.",
-    })
-  ),
   subject: t.Union([t.String(), t.Null()], {
     description: "Email subject line",
   }),
@@ -75,8 +69,9 @@ const pullTemplateRow = t.Object({
     description: "Email type for compliance",
   }),
   channel: t.String({ description: "Template channel: email or sms" }),
-  variables: t.Union([t.Array(t.Record(t.String(), t.Unknown())), t.Null()], {
-    description: "Template variables ({ name, fallback? })",
+  variables: t.Union([t.Array(t.Unknown()), t.Null()], {
+    description:
+      "Template variables, each { name: string, fallback?: string }. Items are not validated: the column is unconstrained jsonb.",
   }),
   sourceHash: t.Union([t.String(), t.Null()], {
     description: "SHA256 hash of the pushed source file",
@@ -89,6 +84,14 @@ const pullTemplateRow = t.Object({
   lastEditedFrom: t.Union([t.String(), t.Null()], {
     description: "Where the template was last edited: cli, dashboard or api",
   }),
+  // Last on purpose: mapRow emits `source` after the other columns, and the
+  // response is rebuilt in schema key order.
+  source: t.Optional(
+    t.Union([t.String(), t.Null()], {
+      description:
+        "React Email TSX source. Absent when `source=false`. Rows with no source are filtered out, so it is never null in practice.",
+    })
+  ),
 });
 
 /** 200 body of `GET /pull`. */
@@ -203,7 +206,7 @@ export const templatesSyncRoutes = createAuthenticatedRoutes("/v1/templates")
         description:
           "Upserts a template compiled from React Email source. Used by `wraps push`.",
       },
-      response: { 200: pushResponse, 403: errorResponse },
+      response: { 200: pushResponse, 201: pushResponse, 403: errorResponse },
     }
   )
 

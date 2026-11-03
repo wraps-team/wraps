@@ -47,18 +47,22 @@ const permissionDeniedResponse = t.Object({
   error: t.String(),
 });
 
-const workflowStatus = t.Union(
-  [
-    t.Literal("draft"),
-    t.Literal("enabled"),
-    t.Literal("paused"),
-    t.Literal("archived"),
-  ],
-  { description: "Workflow status after the push" }
-);
+const workflowStatus = (description: string) =>
+  t.Union(
+    [
+      t.Literal("draft"),
+      t.Literal("enabled"),
+      t.Literal("paused"),
+      t.Literal("archived"),
+    ],
+    { description }
+  );
+
+const pushedStatusDescription =
+  "Workflow status after the push: draft, enabled or paused (a schedule that could not be registered leaves it draft)";
 
 /**
- * 200 body of `POST /push`. A first push answers 201 with the same body.
+ * 200 body of `POST /push`, also declared as the 201 a first push answers.
  * `scheduleError` appears only when a schedule could not be registered; the
  * workflow was then saved as draft.
  */
@@ -66,7 +70,7 @@ const pushResponse = t.Object(
   {
     id: t.String({ description: "Workflow id" }),
     slug: t.String({ description: "Workflow slug" }),
-    status: workflowStatus,
+    status: workflowStatus(pushedStatusDescription),
     updatedAt: t.String({
       description: "ISO 8601 time the workflow was written",
     }),
@@ -90,7 +94,7 @@ const pushBatchResponse = t.Object(
       t.Object({
         slug: t.String({ description: "Workflow slug" }),
         id: t.String({ description: "Workflow id" }),
-        status: workflowStatus,
+        status: workflowStatus(pushedStatusDescription),
         scheduleError: t.Optional(
           t.String({
             description:
@@ -109,16 +113,27 @@ const pushBatchResponse = t.Object(
 // Steps, transitions and trigger config are jsonb with no database-level shape,
 // and the dashboard and older CLIs also write them. Elysia strips an unlisted
 // field from a declared response and answers 422 for a mistyped one, so these
-// schemas stay loose on purpose: only id, type, name and the transition ids are
-// required, every other known field may be missing or null, and unknown keys
-// pass through. A stricter schema could turn a pull that works today into a 422.
+// schemas stay loose on purpose. Required: step id, type and name, and the
+// transition id, fromStepId and toStepId. Nullable or missing: step position,
+// config, cascadeGroupId and cascadeChannels, a transition's condition, and
+// every trigger config key. Unknown keys pass through. A stricter schema could
+// turn a pull that works today into a 422.
 const pullStep = t.Object(
   {
     id: t.String(),
     type: t.String({ description: "Step type, e.g. send_email or delay" }),
     name: t.String(),
     position: t.Optional(
-      t.Object({ x: t.Number(), y: t.Number() }, { additionalProperties: true })
+      t.Union(
+        [
+          t.Object(
+            { x: t.Number(), y: t.Number() },
+            { additionalProperties: true }
+          ),
+          t.Null(),
+        ],
+        { description: "Canvas position" }
+      )
     ),
     config: t.Optional(
       t.Any({ description: "Step configuration, shape depends on type" })
@@ -129,8 +144,9 @@ const pullStep = t.Object(
       })
     ),
     cascadeChannels: t.Optional(
-      t.Union([t.Array(t.Record(t.String(), t.Unknown())), t.Null()], {
-        description: "Cascade reconstruction metadata, first step of a group",
+      t.Union([t.Array(t.Unknown()), t.Null()], {
+        description:
+          "Cascade reconstruction metadata, first step of a group. Each item is { type: email | sms, id?, templateId?, body?, engagement?, waitDuration? }; items are not validated.",
       })
     ),
   },
@@ -182,7 +198,7 @@ const pullWorkflowRow = t.Object({
   sourceHash: t.Union([t.String(), t.Null()], {
     description: "SHA256 hash of the pushed source file",
   }),
-  status: workflowStatus,
+  status: workflowStatus("Workflow status"),
   triggerType: t.Union([t.String(), t.Null()], {
     description: "Trigger type",
   }),
@@ -376,6 +392,7 @@ export const workflowsSyncRoutes = createAuthenticatedRoutes("/v1/workflows")
       },
       response: {
         200: pushResponse,
+        201: pushResponse,
         403: pushDeniedResponse,
       },
     }

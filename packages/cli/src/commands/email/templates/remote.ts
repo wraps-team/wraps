@@ -108,7 +108,7 @@ type ApiTemplate = {
   compiledText?: string | null;
 };
 
-/** A row from `GET /v1/templates/pull`. That route has no response schema, so only these fields are read. */
+/** A row from `GET /v1/templates/pull`. The route's 200 schema lists more columns; only these fields are read. */
 type PullRow = {
   id: string;
   slug?: string | null;
@@ -954,9 +954,9 @@ export async function templatesDelete(
  *
  * Uses the paginated form of `GET /v1/templates/pull` (`limit` set), not the
  * legacy unpaginated form. The unpaginated form returns everything in one
- * response with no `nextCursor`, and it has no response schema. The paginated
- * form is bounded per request. This command follows `nextCursor` until it is
- * null, then writes, so a partial read is never written.
+ * response with no `nextCursor`. The paginated form is bounded per request.
+ * This command follows `nextCursor` until it is null, then writes, so a partial
+ * read is never written.
  *
  * Consequence: `nextCursor` is not part of pull's envelope. A partial result is
  * never written, so there is no cursor to resume from.
