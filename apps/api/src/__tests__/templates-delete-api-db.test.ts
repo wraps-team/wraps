@@ -524,7 +524,7 @@ describe("permission and scope", () => {
 });
 
 describe("in use by a broadcast", () => {
-  it.each(["scheduled", "queued", "processing"] as const)(
+  it.each(["draft", "scheduled", "queued", "processing"] as const)(
     "409 for a %s broadcast, and nothing is deleted",
     async (status) => {
       const id = await newTemplate();
@@ -543,7 +543,32 @@ describe("in use by a broadcast", () => {
     }
   );
 
-  it.each(["draft", "completed"] as const)(
+  it("409 for a draft names the draft broadcast and keeps the template and the draft's link to it", async () => {
+    const id = await newTemplate();
+    const draft = await insertBroadcast(id, "draft");
+
+    const res = await call(
+      asOwner(),
+      "DELETE",
+      `/v1/templates/${id}?confirm=true`
+    );
+
+    expect(res.status).toBe(409);
+    expect(res.body).toMatchObject({ blockingIds: [id] });
+    expect(String(res.body?.error)).toContain(
+      `broadcast "${PREFIX} batch draft" (draft)`
+    );
+    expect(await templateExists(id)).toBe(true);
+    expect(await auditRowsFor(id)).toHaveLength(0);
+    expect(mockDeleteSESTemplate).not.toHaveBeenCalled();
+    const [draftRow] = await db
+      .select({ emailTemplateId: batchSend.emailTemplateId })
+      .from(batchSend)
+      .where(eq(batchSend.id, draft));
+    expect(draftRow?.emailTemplateId).toBe(id);
+  });
+
+  it.each(["completed", "failed", "cancelled"] as const)(
     "a %s broadcast does not block the delete",
     async (status) => {
       const id = await newTemplate();
@@ -824,6 +849,22 @@ describe("org isolation", () => {
       organizationId: ids.otherOrg,
     });
     expect(await templateExists(foreignTemplate)).toBe(true);
+  });
+
+  it("another org's draft broadcast pointing at this org's template does not block the delete", async () => {
+    // Would block if the broadcast query lost its organizationId predicate:
+    // the draft's status blocks and its emailTemplateId is this template.
+    const own = await newTemplate();
+    await insertBroadcast(own, "draft", ids.otherOrg);
+
+    const res = await call(
+      asOwner(),
+      "DELETE",
+      `/v1/templates/${own}?confirm=true`
+    );
+
+    expect(res.status).toBe(200);
+    expect(await templateExists(own)).toBe(false);
   });
 
   it("another org's live broadcast or enabled workflow pointing at this org's template does not block the delete", async () => {

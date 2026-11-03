@@ -16,11 +16,17 @@ import { workflow } from "../schema/workflows";
 type Selector = Pick<typeof db, "select">;
 
 /**
- * Broadcast statuses that keep a template from being deleted: a send that is
- * committed or already running. `draft`, `completed`, `failed` and
- * `cancelled` do not block.
+ * Broadcast statuses that keep a template from being deleted: a draft (which
+ * would otherwise lose its template to the FK's SET NULL and be found broken
+ * later), and a send that is committed or already running. A paused broadcast
+ * is `processing` with `paused_reason` set, so it blocks too. `completed`,
+ * `failed` and `cancelled` do not block.
+ *
+ * Not the same list as apps/api/src/routes/segments.ts: a draft does not keep
+ * a segment from being deleted. The two rules are separate on purpose.
  */
 export const TEMPLATE_DELETE_BLOCKING_BROADCAST_STATUSES = [
+  "draft",
   "scheduled",
   "queued",
   "processing",
