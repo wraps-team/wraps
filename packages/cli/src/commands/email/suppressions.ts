@@ -680,9 +680,7 @@ export async function suppressionsRemove(
       `Removed ${email} from the suppression list of account ${accountId}.`
     );
   } else {
-    log.warn(
-      `${email} was no longer on the list of account ${accountId}; nothing changed.`
-    );
+    log.warn(`${email} was no longer on the list of account ${accountId}.`);
   }
 }
 
