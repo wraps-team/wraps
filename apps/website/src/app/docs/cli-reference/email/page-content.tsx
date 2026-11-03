@@ -64,7 +64,7 @@ const EMAIL_DATA_COMMANDS: EmailDataCommand[] = [
       "--yes (required), --dry-run (previews the delete and makes no request)",
     data: "dryRun, route (single or bulk), deleted, notFound, count, and wouldDelete in a dry run",
     notes:
-      "If any template is still used by a scheduled, queued or processing broadcast, or by an enabled workflow, the whole delete is refused with CONFLICT and nothing is deleted. The error names the blocking template ids.",
+      "If any template is still used by a draft, scheduled, queued or processing broadcast, or by an enabled workflow, the whole delete is refused with CONFLICT and nothing is deleted. The error names the blocking template ids.",
   },
   {
     command: "email suppressions add <email...>",
