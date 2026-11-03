@@ -352,7 +352,8 @@ function toListItem(row: {
 const DELETE_CONFLICT_RESPONSE = t.Object({
   error: t.String(),
   blockingIds: t.Array(t.String(), {
-    description: "Template ids that a live broadcast or enabled workflow uses",
+    description:
+      "Template ids that a draft, scheduled, queued or processing broadcast, or an enabled workflow, uses",
   }),
 });
 
@@ -379,7 +380,7 @@ function deleteConflictBody(blockers: TemplateBlocker[]) {
   const shown = blockers.slice(0, 5).map(describeBlocker).join(", ");
   const more = blockers.length > 5 ? ` and ${blockers.length - 5} more` : "";
   return {
-    error: `Cannot delete: still in use by ${shown}${more}. Nothing was deleted. Point each draft broadcast that uses it at another template, or clear its template. Wait for or cancel each scheduled, queued or processing broadcast that uses it. Disable each enabled workflow in the dashboard, or remove the template from its steps and push it again. Then retry.`,
+    error: `Cannot delete: still in use by ${shown}${more}. Nothing was deleted. Point each draft broadcast that uses it at another template, or clear its template. Wait for or cancel each scheduled, queued or processing broadcast that uses it. Pause each enabled workflow in the dashboard, or, for a workflow defined in code, remove the template from its steps and run \`wraps email workflows push\` again (if the push reports a dashboard edit, ask the user before using \`--force\`, which overwrites those edits). Then retry.`,
     blockingIds,
   };
 }
