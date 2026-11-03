@@ -113,6 +113,46 @@ export const Code = ({ children }: { children: ReactNode }) => (
 
 export const releases: Release[] = [
   {
+    slug: "template-deletes-check-drafts-and-suppression-removal-restores-contacts",
+    title:
+      "Template deletes check drafts, and suppression removal restores contacts",
+    date: "2026-11-03",
+    tags: ["dashboard", "api", "cli", "agents"],
+    summary:
+      "A template delete is refused while a draft broadcast uses it, in the dashboard as well as the API, CLI and MCP, and removing a suppression puts the contact back in your broadcasts.",
+    icon: LayoutTemplate,
+    versions: ["MCP v0.11.1"],
+    items: [
+      <>
+        Expect a template delete to be refused while a draft, scheduled, queued
+        or processing broadcast, or an enabled workflow, uses the template. A
+        draft used to let the delete through and lost its template. Point the
+        draft at another template, cancel the live broadcast, or pause the
+        workflow, then retry
+      </>,
+      <>
+        Delete templates in bulk, from the row menu or from the editor, and the
+        dashboard now applies the same check. The error names the broadcasts and
+        workflows in the way, and nothing is deleted. The published SES copy
+        stays when another template with the same SES name still uses it
+      </>,
+      <>
+        Remove an address from the suppression list with{" "}
+        <Code>DELETE /v1/suppressions/:email</Code>,{" "}
+        <Code>wraps email suppressions remove</Code> or{" "}
+        <Code>remove_suppression</Code>, and a contact in{" "}
+        <Code>suppressed</Code> status goes back to <Code>active</Code>, so
+        broadcasts include it again. The dashboard already did this
+      </>,
+      <>
+        Update to <Code>@wraps.dev/mcp</Code> v0.11.1 so the{" "}
+        <Code>delete_template</Code> and <Code>remove_suppression</Code> tool
+        descriptions match, including the steps that unblock a delete
+      </>,
+    ],
+    docs: "/docs/cli-reference",
+  },
+  {
     slug: "inbound-brand-kits-drafts-and-deletes-for-agents",
     versions: [
       "CLI v3.19.0",
