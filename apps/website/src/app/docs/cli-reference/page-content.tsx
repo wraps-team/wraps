@@ -829,11 +829,10 @@ export default function CLIReferencePageContent() {
               request: contacts delete, contacts import with --validate,
               contacts validate, segments delete, topics delete, email
               suppressions add, email suppressions remove, email templates
-              publish, broadcasts create,
-              broadcasts send, broadcasts resume, broadcasts cancel, workflows
-              trigger, workflows enable, workflows retry, workflows cancel,
-              email agent approvals approve, email agent approvals reject,
-              api-keys revoke, and brand-kits delete.
+              publish, broadcasts create, broadcasts send, broadcasts resume,
+              broadcasts cancel, workflows trigger, workflows enable, workflows
+              retry, workflows cancel, email agent approvals approve, email
+              agent approvals reject, api-keys revoke, and brand-kits delete.
             </p>
             <p className="text-muted-foreground text-sm">
               email templates pull fetches without --yes, but it refuses to
