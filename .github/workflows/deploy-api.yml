@@ -31,7 +31,7 @@ on:
 permissions:
   contents: read
   id-token: write # Required for AWS OIDC
-  actions: read # `gate` reads the last successful run of this workflow
+  deployments: write # `gate` reads, and `deploy` writes, the `api-<stage>` deployment record
 
 env:
   AWS_REGION: us-east-1
@@ -39,7 +39,8 @@ env:
 jobs:
   # `workflow_run` has no `paths:` filter, so the path list that used to live in
   # the `on: push` trigger is applied here instead — and against the last commit
-  # this workflow actually deployed, not against HEAD^.
+  # this workflow actually deployed, not against HEAD^. The logic lives in
+  # scripts/ci/deploy-gate.sh so scripts/__tests__/deploy-gate.test.ts can run it.
   #
   # Comparing to the last deployed commit is what makes a skip self-healing. A
   # HEAD^ comparison only sees the newest commit, so a multi-commit push, or a
@@ -48,6 +49,19 @@ jobs:
   # there is nothing to do. Diffing from the last success means every file
   # changed since the last thing that really reached production is considered,
   # however many pushes ago that was.
+  #
+  # "The last thing that really reached production" is read from a GitHub
+  # Deployment in the `api-<stage>` environment, written by the last step of the
+  # `deploy` job. It is not read from past runs of this workflow: a run whose
+  # gate skipped still concludes `success`, and a `workflow_run` run's head_sha
+  # is main's HEAD at trigger time, not the commit it tested. On 2026-11-03 that
+  # made #247 (API) compare bf89a46..bf89a46 after the docs-only #248, skip, and
+  # never deploy (runs 41681472352, 41683100866). The environment is named
+  # `api-<stage>`, not `production`, so GitHub's automatic job-environment
+  # deployment records (which carry github.sha, the same wrong commit) are never
+  # read. The first run after this shipped finds no `api-production` record and
+  # deploys; that is the intended bootstrap, and every failure to read the record
+  # also falls through to deploying.
   #
   # GitHub-hosted, not the shared Blacksmith pool.
   #
@@ -88,43 +102,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
           EVENT_NAME: ${{ github.event_name }}
-        run: |
-          set -euo pipefail
-          echo "sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
-
-          # The manual button exists to ship out of band — never second-guess it.
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            echo "deploy=true" >> "$GITHUB_OUTPUT"
-            echo "manual dispatch: deploying"
-            exit 0
-          fi
-
-          # `|| echo ""` so a transient API failure falls through to deploying.
-          # This whole job exists to stop deploys going missing quietly; a blip
-          # reading run history is not a reason to add another way that happens.
-          last=$(gh api \
-            "repos/$GITHUB_REPOSITORY/actions/workflows/deploy-api.yml/runs?branch=main&status=success&per_page=1" \
-            --jq '.workflow_runs[0].head_sha // ""' 2>/dev/null || echo "")
-
-          # No previous success, or its commit is not in this history (a force
-          # push, a fresh workflow): deploy rather than guess.
-          if [ -z "$last" ] || ! git cat-file -e "${last}^{commit}" 2>/dev/null; then
-            echo "deploy=true" >> "$GITHUB_OUTPUT"
-            echo "no usable previous deploy: deploying"
-            exit 0
-          fi
-
-          echo "comparing $last..$HEAD_SHA"
-
-          # Keep in sync with `pnpm --filter "@wraps/api^..." list`.
-          if git diff --name-only "$last" "$HEAD_SHA" | grep -qE \
-            '^(apps/api/|packages/(analytics|auth|core|db|email|email-check|email-send|template-render|unsubscribe-token)/|infra/|sst\.config\.ts$|\.github/workflows/deploy-api\.yml$)'; then
-            echo "deploy=true" >> "$GITHUB_OUTPUT"
-            echo "api-relevant paths changed: deploying"
-          else
-            echo "deploy=false" >> "$GITHUB_OUTPUT"
-            echo "nothing api-relevant changed: skipping"
-          fi
+          # A `workflow_run` trigger always deploys production, as `deploy` assumes.
+          STAGE: ${{ github.event.inputs.stage || 'production' }}
+        run: bash scripts/ci/deploy-gate.sh
 
   # Migrate BEFORE deploying, not after. `sst deploy` publishes each Lambda's
   # new code the moment that function updates — well before the command returns
@@ -222,6 +202,32 @@ jobs:
           ALERT_EMAIL: ${{ vars.ALERT_EMAIL }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_RELEASE: ${{ needs.gate.outputs.sha }}
+
+      # Record what reached the stage so the next run's gate diffs against it.
+      # Runs only when `sst deploy` succeeded (the default `if: success()`), and
+      # records the tested commit, not github.sha. `required_contexts: []` so the
+      # API does not 409 on commit statuses; `auto_merge: false` so it does not
+      # try to merge the base branch into the ref.
+      - name: Record the deployed commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOYED_SHA: ${{ needs.gate.outputs.sha }}
+          STAGE: ${{ github.event.inputs.stage || 'production' }}
+        run: |
+          set -euo pipefail
+          id=$(jq -n \
+            --arg ref "$DEPLOYED_SHA" \
+            --arg env "api-$STAGE" \
+            --arg stage "$STAGE" \
+            '{ref: $ref, environment: $env, auto_merge: false, required_contexts: [],
+              transient_environment: false, production_environment: ($stage == "production"),
+              description: "Deploy API"}' |
+            gh api -X POST "repos/$GITHUB_REPOSITORY/deployments" --input - --jq '.id')
+          jq -n \
+            --arg url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{state: "success", log_url: $url, description: "sst deploy succeeded"}' |
+            gh api -X POST "repos/$GITHUB_REPOSITORY/deployments/$id/statuses" --input - >/dev/null
+          echo "recorded api-$STAGE deployment $id at $DEPLOYED_SHA"
 
       - name: Print outputs
         run: |
