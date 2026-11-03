@@ -1,10 +1,10 @@
 /**
- * The 200 bodies of the six template/workflow sync routes, on a real DB.
+ * The 200 (and first-push 201) bodies of the six template/workflow sync routes, on a real DB.
  *
  * Elysia validates and strips (`normalize`) a response against the schema
  * declared for the status the handler set, so a 200 schema that is narrower than
  * the handler's body would silently drop fields from a working call. Each test
- * pins the exact key set and values of a 200 body (these assertions held before
+ * pins the exact key set and values of a 200 or 201 body (these assertions held before
  * the schemas were declared), and the last block pins the generated OpenAPI
  * document.
  *
@@ -156,7 +156,7 @@ describe("POST /v1/templates/push 200", () => {
 });
 
 describe("first-push 201 bodies", () => {
-  it("POST /v1/templates/push passes the 201 body through in handler order", async () => {
+  it("POST /v1/templates/push keeps the 201 body and its key order", async () => {
     const res = await call("POST", "/v1/templates/push", templatePush("c"));
     expect(res.status).toBe(201);
     const body = await res.json();
@@ -181,7 +181,7 @@ describe("first-push 201 bodies", () => {
     expect(new Date(body.updatedAt).toISOString()).toBe(body.updatedAt);
   });
 
-  it("POST /v1/workflows/push passes the 201 body through in handler order", async () => {
+  it("POST /v1/workflows/push keeps the 201 body and its key order", async () => {
     const res = await call("POST", "/v1/workflows/push", workflowPush("c"));
     expect(res.status).toBe(201);
     const body = await res.json();
