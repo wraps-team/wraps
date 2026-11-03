@@ -228,6 +228,13 @@ jobs:
       # records the tested commit, not github.sha. `required_contexts: []` so the
       # API does not 409 on commit statuses; `auto_merge: false` so it does not
       # try to merge the base branch into the ref.
+      #
+      # Deliberately not `continue-on-error`: if this fails after `sst deploy`
+      # succeeded, the job goes red on purpose. A deployment created but never
+      # given its `success` status is skipped by the gate in favour of the
+      # previous record, so the next run diffs against a stale baseline and a
+      # revert of this deploy would look like "nothing changed". The red job is
+      # the only signal, so re-run this job's record step (or dispatch a deploy).
       - name: Record the deployed commit
         env:
           GH_TOKEN: ${{ github.token }}

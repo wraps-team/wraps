@@ -52,13 +52,18 @@ fi
 # `::notice::` for the expected bootstrap, so a lost permission cannot quietly
 # turn the gate into "always deploy".
 #
-# A deployment that failed, is still in progress, or was never given a status is
-# skipped in favour of the one before it. Only the first 30 are considered; the
-# newest success is almost always the first or second.
+# A deployment whose status was read and is not `success` (failed, in progress,
+# or never given one) is skipped in favour of the one before it. A status that
+# cannot be read at all is different: it fails open. Falling back to an older
+# record would diff against a stale baseline, and a revert of the newest deploy
+# (whose status could not be read) would then look like "nothing changed".
+# Only the first 30 are considered; the newest success is almost always the
+# first or second.
 #
 # Each `gh` call is bounded (DEPLOY_GATE_GH_TIMEOUT seconds, default 20) so a
 # stalled API fails open instead of running the job into its timeout. A timeout
-# exits 124, which lands in the same failure branches as any other gh error.
+# exits 124, which lands in the same failure branches as any other gh error; the
+# exit code is in each warning so the two can be told apart.
 last_deployed_sha() {
   local timeout_s="${DEPLOY_GATE_GH_TIMEOUT:-20}"
   local deployments rows id sha state rc count=0
@@ -75,7 +80,10 @@ last_deployed_sha() {
     return 0
   fi
 
-  rows=$(jq -r '.[] | [.id, .sha] | @tsv' <<<"$deployments") || return 0
+  rows=$(jq -r '.[] | select(.id != null and .sha != null) | [.id, .sha] | @tsv' <<<"$deployments") || {
+    echo "::warning::could not parse the api-$STAGE deployments response: deploying without a baseline" >&2
+    return 0
+  }
 
   while IFS=$'\t' read -r id sha; do
     [ -n "$id" ] || continue
@@ -84,8 +92,9 @@ last_deployed_sha() {
     state=$(timeout "$timeout_s" gh api \
       "repos/$GITHUB_REPOSITORY/deployments/$id/statuses?per_page=1" |
       jq -r '.[0].state // ""') || {
-      echo "::warning::could not read the status of api-$STAGE deployment $id; trying the next one" >&2
-      continue
+      rc=$?
+      echo "::warning::could not read the status of api-$STAGE deployment $id (exit $rc): deploying without a baseline" >&2
+      return 0
     }
     if [ "$state" = "success" ]; then
       echo "$sha"
@@ -93,7 +102,9 @@ last_deployed_sha() {
     fi
   done <<<"$rows"
 
-  if [ "$count" -eq 0 ]; then
+  if [ "$count" -eq 0 ] && jq -e 'length > 0' <<<"$deployments" >/dev/null 2>&1; then
+    echo "::warning::api-$STAGE deployments came back without ids: deploying without a baseline" >&2
+  elif [ "$count" -eq 0 ]; then
     echo "::notice::no api-$STAGE deployment record yet (expected on the first run after this gate shipped)" >&2
   else
     echo "::warning::none of the $count newest api-$STAGE deployments has a success status" >&2
@@ -103,7 +114,8 @@ last_deployed_sha() {
 last=$(last_deployed_sha)
 
 # No usable record (the first run after this gate shipped is the intended
-# bootstrap): deploy rather than guess. The reason was printed above.
+# bootstrap): deploy rather than guess. Every way of getting here printed its
+# reason above.
 if [ -z "$last" ]; then
   deploy "no previous deploy to compare against"
 fi
@@ -122,13 +134,14 @@ fi
 # diff, so an error here never blocks a deploy.
 if [ "$last" != "$HEAD_SHA" ] && git merge-base --is-ancestor "$HEAD_SHA" "$last"; then
   echo "deploy=false" >> "$OUT"
+  echo "::notice::$HEAD_SHA is older than deployed $last: skipping (dispatch Deploy API by hand to roll back on purpose)"
   echo "$HEAD_SHA is older than deployed $last: skipping"
   exit 0
 fi
 
 echo "comparing $last..$HEAD_SHA"
 
-# so a file moved out of an API path still lists its old path.
+# --no-renames so a file moved out of an API path still lists its old path.
 changed=$(git diff --name-only --no-renames "$last" "$HEAD_SHA") ||
   deploy "could not diff $last..$HEAD_SHA"
 

@@ -36,6 +36,7 @@ case "$path" in
   */deployments\\?*) cat "$FAKE_GH_DIR/deployments.json" ;;
   */deployments/*/statuses*)
     id="\${path#*/deployments/}"; id="\${id%%/*}"
+    if [ -f "$FAKE_GH_DIR/slow-statuses-$id" ]; then exec sleep 30; fi
     cat "$FAKE_GH_DIR/statuses-$id.json" || exit 1 ;;
   *) echo "unexpected gh call: $*" >&2; exit 1 ;;
 esac
@@ -222,6 +223,57 @@ describe("deploy-gate.sh", () => {
       expect(result.stderr).toContain("::warning::api-production deployments");
     });
 
+    it("deploys a revert when the newest record's status can't be read", () => {
+      const d1 = commit("README.md", "older deploy");
+      const d2 = commit("apps/api/src/route.ts", "api change, deployed");
+      git("revert", "--no-edit", d2);
+      const head = git("rev-parse", "HEAD");
+      // No statuses-2.json, so reading D2's status fails like a 5xx. Falling
+      // back to D1 would diff D1..head as empty and skip a real revert.
+      serve([
+        { id: 2, sha: d2 },
+        { id: 1, sha: d1, statuses: ["success"] },
+      ]);
+
+      const result = runGate(head);
+
+      expect(result.deploy).toBe("true");
+      expect(result.stderr).toContain("deploying without a baseline");
+    });
+
+    it("deploys a revert when only the status call hangs", () => {
+      const d1 = commit("README.md", "older deploy");
+      const d2 = commit("apps/api/src/route.ts", "api change, deployed");
+      git("revert", "--no-edit", d2);
+      const head = git("rev-parse", "HEAD");
+      serve([
+        { id: 2, sha: d2, statuses: ["success"] },
+        { id: 1, sha: d1, statuses: ["success"] },
+      ]);
+      // Only the newest record's status hangs; the older one reads fine.
+      writeFileSync(join(ghDir, "slow-statuses-2"), "");
+
+      const result = runGate(head, { env: { DEPLOY_GATE_GH_TIMEOUT: "1" } });
+
+      expect(result.deploy).toBe("true");
+      expect(result.stderr).toContain("(exit 124)");
+    });
+
+    it("deploys when the deployments come back without ids", () => {
+      const head = commit("apps/website/page.tsx", "docs only");
+      writeFileSync(
+        join(ghDir, "deployments.json"),
+        JSON.stringify([{ sha: head }])
+      );
+
+      const result = runGate(head);
+
+      expect(result.deploy).toBe("true");
+      expect(result.stderr).toContain(
+        "::warning::api-production deployments came back without ids"
+      );
+    });
+
     it("deploys when every status lookup fails", () => {
       const head = commit("apps/website/page.tsx", "docs only");
       // Listing works; no statuses-1.json exists, so the stub exits 1.
@@ -381,6 +433,23 @@ describe("deploy-gate.sh", () => {
       expect(result.status).toBe(0);
       expect(result.deploy).toBe("false");
       expect(result.stdout).toContain("is older than deployed");
+      expect(result.stdout).toContain("::notice::");
+      expect(result.stdout).toContain("dispatch Deploy API by hand");
+    });
+
+    it("deploys a revert of the recorded deploy", () => {
+      commit("README.md", "base");
+      const deployed = commit("apps/api/src/route.ts", "api change, deployed");
+      git("revert", "--no-edit", deployed);
+      const head = git("rev-parse", "HEAD");
+      serve([{ id: 1, sha: deployed, statuses: ["success"] }]);
+
+      // The revert descends from the record, so the guard does not fire, and
+      // the diff lists the reverted path even though the tree equals the base.
+      const result = runGate(head);
+
+      expect(result.deploy).toBe("true");
+      expect(result.stdout).toContain(`comparing ${deployed}..${head}`);
     });
 
     it("still deploys an older commit when dispatched by hand", () => {

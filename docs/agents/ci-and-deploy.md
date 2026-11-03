@@ -39,8 +39,11 @@ Consequences to know before editing either file:
   tested — on 2026-11-03 that hid API commit #247 behind the docs-only #248 until a manual
   dispatch. **Never use `api-<stage>` as a job `environment:`**: GitHub's automatic job
   records carry `github.sha`, the same wrong commit, and would corrupt the lookup. Every
-  failure to read the record (none yet, API error, timeout, SHA not in history) deploys;
-  the gate never deploys backwards onto a commit older than the recorded one.
+  failure to read the record (none yet, API error, timeout, an unreadable status, SHA not
+  in history) deploys. When it can read the record, the gate skips a commit older than the
+  recorded one; a manual dispatch always deploys, which is how to roll back on purpose.
+  A failed record step leaves the job red on purpose: a deployment without its `success`
+  status is skipped in favour of the previous record, which is a stale baseline.
 - **The deploy checks out the tested SHA** (`needs.gate.outputs.sha`), not the branch tip.
   Under `workflow_run` the default checkout is main's head at trigger time, which may
   already be a newer, untested commit.
