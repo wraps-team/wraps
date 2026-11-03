@@ -113,6 +113,51 @@ export const Code = ({ children }: { children: ReactNode }) => (
 
 export const releases: Release[] = [
   {
+    slug: "inbound-brand-kits-drafts-and-deletes-for-agents",
+    versions: [
+      "CLI v3.19.0",
+      "CLI v3.20.0",
+      "MCP v0.10.0",
+      "MCP v0.11.0",
+      "@wraps.dev/client v0.15.0",
+    ],
+    date: "2026-11-02",
+    icon: Bot,
+    title: "Inbound email, brand kits, drafts and deletes for agents",
+    tags: ["cli", "api", "agents", "sdk"],
+    summary:
+      "Read inbound email, manage brand kits, stage broadcast drafts, delete templates and add suppressions from the CLI, the API or an MCP client.",
+    items: [
+      <>
+        Run <Code>wraps email inbound list</Code> and{" "}
+        <Code>wraps email inbound get</Code> to read parsed inbound emails, and{" "}
+        <Code>wraps brand-kits</Code> to list, create, update, delete and set
+        the default brand kit. The API routes are <Code>/v1/email/inbound</Code>{" "}
+        and <Code>/v1/brand-kits</Code>
+      </>,
+      <>
+        Run <Code>wraps broadcasts draft</Code> to save a broadcast without
+        sending it, so someone can review it before{" "}
+        <Code>wraps broadcasts send</Code>
+      </>,
+      <>
+        Run <Code>wraps email templates delete &lt;id...&gt;</Code> to delete up
+        to 100 templates, or <Code>wraps email suppressions add</Code> to add up
+        to 100 addresses to an account&apos;s suppression list. Both need{" "}
+        <Code>--yes</Code> and take <Code>--dry-run</Code>. A template that a
+        scheduled broadcast or an enabled workflow uses is refused, and nothing
+        is deleted
+      </>,
+      <>
+        Check the scopes on any API key that writes data: a key without the
+        matching scope, and a read-only member&apos;s session, now get 403 from
+        batch, contact, segment, template and workflow write routes. The MCP
+        server adds tools for these routes in v0.10.0 and v0.11.0
+      </>,
+    ],
+    docs: "/docs/cli-reference",
+  },
+  {
     slug: "wcag-aaa-contrast-across-the-dashboard",
     date: "2026-10-30",
     icon: LayoutDashboard,
