@@ -566,11 +566,12 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
       "aws ses pricing",
       "ses pricing",
       "aws ses pricing calculator",
+      "amazon ses free tier",
       "ses true cost lambda dynamodb",
     ],
     audience: "stranger-with-problem",
     rationale:
-      "Re-aimed 2026-09-24 from Search Console: it already ranks ~7.5 for amazon/aws ses pricing (~7.9K impressions in 90 days), and is the only page-1 result showing all four 2026 SES plans rather than the old $0.10/1K.",
+      "Re-aimed 2026-09-24 from Search Console: it already ranks ~7.5 for amazon/aws ses pricing (~7.9K impressions in 90 days). Restructured 2026-11-03 to answer first — rate, default plan, free tier and plan table above the calculator — after a 0.22% CTR at position ~6 showed the calculator-first page was not what pricing searchers clicked for.",
   },
   {
     route: "/tools/spf-builder",

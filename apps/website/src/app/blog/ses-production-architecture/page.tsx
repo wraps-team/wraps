@@ -339,11 +339,19 @@ export default function Page() {
                 />
 
                 <p className="text-muted-foreground text-sm mt-4">
-                  See our{" "}
+                  To see what a dedicated IP adds to your bill, set your volume
+                  in the{" "}
+                  <Link
+                    className="text-primary hover:underline"
+                    href="/tools/ses-calculator"
+                  >
+                    Amazon SES pricing calculator
+                  </Link>
+                  , which also prices the event pipeline below. See our{" "}
                   <a className="text-primary hover:underline" href="/#pricing">
                     pricing page
                   </a>{" "}
-                  for full cost breakdowns including Wraps platform features.
+                  for Wraps platform features.
                 </p>
 
                 <Callout title="IP Warming Reality Check" type="warning">

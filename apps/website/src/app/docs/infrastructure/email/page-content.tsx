@@ -615,8 +615,17 @@ export default function InfrastructureEmailPageContent() {
         <div className="mt-4 rounded-lg border-primary border-l-4 bg-primary/10 p-4">
           <p className="font-medium text-sm">AWS SES pricing</p>
           <p className="mt-1 text-muted-foreground text-sm">
-            SES charges $0.10 per 1,000 emails sent. Infrastructure costs
-            (DynamoDB, Lambda, SQS) are additional but minimal at most volumes.
+            SES charges $0.10 per 1,000 emails sent on à la carte pricing; AWS
+            starts new accounts on the Essentials plan at $0.16 per 1,000.
+            Infrastructure costs (DynamoDB, Lambda, SQS) are additional but
+            minimal at most volumes. The{" "}
+            <Link
+              className="text-primary underline-offset-4 hover:underline"
+              href="/tools/ses-calculator"
+            >
+              Amazon SES pricing calculator
+            </Link>{" "}
+            compares all four SES plans and prices this stack at your volume.
           </p>
         </div>
       </section>

@@ -1,6 +1,7 @@
 import { Card } from "@wraps/ui/components/ui/card";
 import { ArrowRight, Database, DollarSign, Shield, Zap } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
@@ -821,7 +822,15 @@ await email.send({
               </p>
               <ul className="mb-4 space-y-2 pl-6">
                 <li className="text-foreground/80 leading-relaxed">
-                  SES: $0.10 per 1,000 emails
+                  SES: $0.10 per 1,000 emails on à la carte, or $0.16 on the
+                  Essentials plan AWS starts new accounts on (see{" "}
+                  <Link
+                    className="text-primary hover:underline"
+                    href="/tools/ses-calculator"
+                  >
+                    Amazon SES pricing for all four plans
+                  </Link>
+                  )
                 </li>
                 <li className="text-foreground/80 leading-relaxed">
                   DynamoDB: ~$0.25 per million reads/writes
