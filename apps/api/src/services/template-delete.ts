@@ -50,9 +50,12 @@ export type DeleteTemplatesInput = {
  * Delete the org's templates among `ids`, or refuse with the blockers.
  *
  * All-or-nothing: the in-use check and the delete run in one transaction, and
- * the org's template rows are locked (FOR UPDATE) first. A broadcast or
- * workflow that starts referencing one of them meanwhile waits on the lock.
- * If any target is blocked, nothing is deleted. The audit row is written in
+ * the org's template rows are locked (FOR UPDATE) first. A broadcast that
+ * starts pointing at one of them meanwhile (batch_send.email_template_id is a
+ * foreign key) waits on the lock. Workflows reference templates inside their
+ * JSON steps, with no foreign key, so they do not wait: a workflow enabled
+ * between the check and the commit is not blocked, and is left pointing at a
+ * deleted template. If any target is blocked, nothing is deleted. The audit row is written in
  * the same transaction as the delete.
  *
  * SES is cleaned up only after the commit. If the DB delete failed first, the

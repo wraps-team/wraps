@@ -544,7 +544,8 @@ describe("in use by a broadcast", () => {
   );
 
   it("409 for a draft names the draft broadcast and keeps the template and the draft's link to it", async () => {
-    const id = await newTemplate();
+    // A published SES copy, so the "SES untouched" assertion below can fail.
+    const id = await newTemplate({ sesTemplateName: `${PREFIX}-ses-draft` });
     const draft = await insertBroadcast(id, "draft");
 
     const res = await call(
