@@ -6,6 +6,9 @@
 //   node scripts/test-db/ci-branch.mjs ensure   find or create this run's branch
 //   node scripts/test-db/ci-branch.mjs push     drizzle-kit push to that branch
 //   node scripts/test-db/ci-branch.mjs delete   delete it when the run ends
+//   node scripts/test-db/ci-branch.mjs push-worktree
+//       push this checkout's schema to its own wt-* branch, never the parent;
+//       without --force, so a human at a terminal answers any prompt
 //   node scripts/test-db/ci-branch.mjs refresh-parent [--dry-run]
 //       push main's schema to the project's default branch, the parent every
 //       branch is cut from (refresh-test-parent.yml, on schema changes to main)
@@ -26,10 +29,13 @@
 // Never prints a connection string, password or key.
 
 import { spawn } from "node:child_process";
-import { appendFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { parseEnv } from "node:util";
 import {
+  branchNameForWorktree,
+  checkoutRootName,
   expiresAtFrom,
   extendBranchExpiry,
   fetchConnectionUri,
@@ -39,9 +45,11 @@ import {
   NeonApiError,
   neonFetch,
   pollUntilReady,
+  WT_BRANCH_TTL_HOURS,
 } from "./resolve-branch.mjs";
 
 export const CI_BRANCH_PATTERN = /^ci-[0-9a-f]{7}-\d+-\d+$/;
+const WT_BRANCH_PATTERN = /^wt-/;
 export const CI_BRANCH_TTL_HOURS = 3;
 const LEADING_SLASH = /^\//;
 // A no-op push takes ~15s. Serialised jobs wait on each other, so a stuck
@@ -50,8 +58,11 @@ const PUSH_TIMEOUT_MS = 3 * 60_000;
 const INTERACTIVE_PROMPT = /Interactive prompts require a TTY/;
 const PUSH_SUCCEEDED = /Changes applied|No changes detected/;
 const LOCK_TIMEOUT = "5min";
+const CONNECT_TIMEOUT_MS = 30_000;
+// drizzle-kit needs only DATABASE_URL.
+const CHILD_ENV_STRIPPED = ["NEON_API_KEY", "TEST_DATABASE_URL"];
 const PR_PROMPT_ADVICE =
-  "Either the wraps-test parent is behind main (a table both gains and loses a column; check the latest Refresh test parent run), or this PR renames one. If the parent is behind, refresh it from current main (`pnpm test-db:refresh` on main). For a real rename, refresh it from this PR rebased on main, then merge the PR straight away: until then the parent is ahead of every other run";
+  "This branch's schema and the wraps-test parent differ in a way drizzle-kit reads as a possible rename. One of four things: (1) the parent is behind main, because the latest Refresh test parent run failed: refresh it from current main (`pnpm test-db:refresh` on main, or re-run that workflow); (2) the parent is ahead of main, because someone pushed an unmerged schema to it: refresh it from current main the same way; (3) this run's commit is older than a schema change already on main and the parent: rebase on main, or re-run on a newer commit; (4) this PR really renames a column or table: refresh the parent from this PR rebased on main, then merge the PR straight away, since until then the parent is ahead of every other run";
 const PARENT_PROMPT_ADVICE =
   "A rename landed on main. Refresh the parent once by hand from a checkout of main (`pnpm test-db:refresh`) and answer the prompt; later refreshes see no diff";
 // Endpoint host prefixes of the prod and dev databases in the old shared
@@ -83,6 +94,9 @@ const FALLBACK =
  * @property {() => Date} [now]
  * @property {typeof spawn} [spawnImpl]
  * @property {(url: string) => Promise<PgClient>} [connectPg]
+ * @property {(pid: number, signal: string) => void} [killImpl]
+ * @property {number} [pushTimeoutMs]
+ * @property {number} [connectTimeoutMs]
  */
 
 /**
@@ -417,29 +431,58 @@ async function deleteAllNamed(opts, target) {
 }
 
 /**
- * Runs `drizzle-kit push --force` against `directUrl`, echoing its output and
- * returning it, since drizzle-kit can fail with exit code 0.
+ * drizzle-kit's environment: this process's, minus the Neon secrets it has
+ * no use for, with DATABASE_URL set to the target. drizzle.config.ts loads
+ * .env.local with dotenv, which never overrides a set variable, so this URL
+ * is the one it uses.
  *
- * @param {typeof spawn} spawnImpl
  * @param {string} directUrl
- * @param {(line: string) => void} log
+ * @returns {NodeJS.ProcessEnv}
+ */
+function drizzleEnv(directUrl) {
+  const env = { ...process.env, DATABASE_URL: directUrl };
+  for (const secret of CHILD_ENV_STRIPPED) {
+    delete env[secret];
+  }
+  return env;
+}
+
+/**
+ * Runs `drizzle-kit push` against `directUrl`.
+ *
+ * Default (CI): `--force`, no TTY, output piped through and returned, since
+ * drizzle-kit can fail with exit code 0. It runs in its own process group so
+ * the timeout kills drizzle-kit itself, not just the pnpm wrapping it.
+ *
+ * `interactive` (a human at a terminal): stdio inherited so drizzle-kit's
+ * prompts reach them, in the foreground group, with no timeout. The output is
+ * not captured; the exit code is all there is.
+ *
+ * @param {CiIo} io
+ * @param {string} directUrl
+ * @param {{force?: boolean, interactive?: boolean}} [mode]
  * @returns {Promise<{code: number, output: string}>}
  */
-function runDrizzlePush(spawnImpl, directUrl, log) {
+function runDrizzlePush(io, directUrl, mode = {}) {
+  const { force = true, interactive = false } = mode;
+  const log = logger(io);
+  const spawnImpl = io.spawnImpl ?? spawn;
+  const killImpl = io.killImpl ?? process.kill.bind(process);
+  const timeoutMs = io.pushTimeoutMs ?? PUSH_TIMEOUT_MS;
+  const args = ["--filter", "@wraps/db", "exec", "drizzle-kit", "push"];
+  if (force) {
+    args.push("--force");
+  }
+
   return new Promise((resolve) => {
-    const child = spawnImpl(
-      "pnpm",
-      ["--filter", "@wraps/db", "exec", "drizzle-kit", "push", "--force"],
-      {
-        cwd: REPO_ROOT,
-        // drizzle.config.ts loads .env.local with dotenv, which never
-        // overrides a set variable, so this URL is the one it uses.
-        env: { ...process.env, DATABASE_URL: directUrl },
-        // No TTY, as on a runner: a rename prompt --force can't answer
-        // must fail here, not wait for input.
-        stdio: ["ignore", "pipe", "pipe"],
-      }
-    );
+    const child = spawnImpl("pnpm", args, {
+      cwd: REPO_ROOT,
+      env: drizzleEnv(directUrl),
+      // Without a TTY a rename prompt --force can't answer fails at once
+      // rather than waiting for input.
+      stdio: interactive ? "inherit" : ["ignore", "pipe", "pipe"],
+      detached: !interactive,
+    });
     let output = "";
     const collect = (stream, sink) => {
       stream?.on("data", (chunk) => {
@@ -450,12 +493,18 @@ function runDrizzlePush(spawnImpl, directUrl, log) {
     collect(child.stdout, process.stdout);
     collect(child.stderr, process.stderr);
 
-    const timer = setTimeout(() => {
-      log(
-        `::error::[ci-branch] drizzle-kit push still running after ${PUSH_TIMEOUT_MS / 60_000} min, killing it`
-      );
-      child.kill("SIGKILL");
-    }, PUSH_TIMEOUT_MS);
+    const timer = interactive
+      ? undefined
+      : setTimeout(() => {
+          log(
+            `::error::[ci-branch] drizzle-kit push still running after ${timeoutMs / 1000}s, killing its process group`
+          );
+          try {
+            killImpl(-child.pid, "SIGKILL");
+          } catch {
+            child.kill("SIGKILL");
+          }
+        }, timeoutMs);
     child.on("error", (err) => {
       clearTimeout(timer);
       resolve({ code: 1, output: `${output}\n${err.message}` });
@@ -495,7 +544,10 @@ async function connectPgDefault(url) {
   // Imported here, not at the top: `ensure` and `delete` run before
   // `pnpm install`, when pg is not there yet.
   const { default: pg } = await import("pg");
-  const client = new pg.Client({ connectionString: url });
+  const client = new pg.Client({
+    connectionString: url,
+    connectionTimeoutMillis: CONNECT_TIMEOUT_MS,
+  });
   // A dropped connection emits 'error'; unhandled, it would crash the step
   // with a stack trace instead of the message below.
   client.on("error", (err) => {
@@ -550,6 +602,26 @@ function lockFailureReason(err) {
 }
 
 /**
+ * Rejects if `promise` has not settled within `ms`.
+ *
+ * @template T
+ * @param {Promise<T>} promise
+ * @param {number} ms
+ * @param {string} what
+ * @returns {Promise<T>}
+ */
+function withTimeout(promise, ms, what) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${what} took over ${ms / 1000}s`)),
+      ms
+    );
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+/**
  * Takes the push advisory lock on `directUrl` (direct, not pooled: PgBouncer
  * would not keep a session lock), runs `body` while holding it, and always
  * releases it. The wait is bounded by `lock_timeout`.
@@ -567,7 +639,11 @@ async function withPushLock(directUrl, io, label, body) {
 
   let client;
   try {
-    client = await connectPg(directUrl);
+    client = await withTimeout(
+      connectPg(directUrl),
+      io.connectTimeoutMs ?? CONNECT_TIMEOUT_MS,
+      "connecting to the database"
+    );
     await client.query(`SET lock_timeout = '${LOCK_TIMEOUT}'`);
     await client.query("SELECT pg_advisory_lock($1)", [PUSH_LOCK_KEY]);
   } catch (err) {
@@ -601,19 +677,17 @@ async function withPushLock(directUrl, io, label, body) {
  *
  * @param {CiIo} io
  * @param {string} directUrl
- * @param {{label: string, consequence: string, promptAdvice?: string}} report
- *   the target's name, what a failure means, and what to do about a rename
- *   prompt
+ * @param {{label: string, consequence: string, promptAdvice?: string, force?: boolean}} report
+ *   the target's name, what a failure means, what to do about a rename
+ *   prompt, and whether to pass --force (default true)
  * @returns {Promise<boolean>}
  */
 async function checkedPush(io, directUrl, report) {
   const { label, consequence, promptAdvice = PR_PROMPT_ADVICE } = report;
   const log = logger(io);
-  const { code, output } = await runDrizzlePush(
-    io.spawnImpl ?? spawn,
-    directUrl,
-    log
-  );
+  const { code, output } = await runDrizzlePush(io, directUrl, {
+    force: report.force ?? true,
+  });
   const failure = pushFailure(code, output, promptAdvice);
   if (failure) {
     log(
@@ -850,6 +924,141 @@ export async function refreshParent(env, io = {}) {
   });
 }
 
+/**
+ * Why `branch` must not take a worktree push, or null. Only this checkout's
+ * own `wt-*` branch may, and never the project's default branch.
+ *
+ * @param {{name: string, default?: boolean}} branch
+ * @returns {string | null}
+ */
+export function worktreeTargetProblem(branch) {
+  if (!WT_BRANCH_PATTERN.test(branch.name)) {
+    return `"${branch.name}" is not a wt-* branch`;
+  }
+  if (branch.default === true) {
+    return `"${branch.name}" is the project's default branch, the parent`;
+  }
+  return null;
+}
+
+/**
+ * Pushes this checkout's schema to its own `wt-*` branch, so a PR's schema
+ * reaches its tests without touching the shared parent. The branch is the
+ * one the resolver gives this checkout (created if missing). Runs
+ * drizzle-kit WITHOUT --force: at a terminal its prompts (renames, data
+ * loss) go to the human; with no terminal the prompt detection fails it.
+ *
+ * @param {Record<string, string | undefined>} env NEON_API_KEY,
+ *   NEON_PROJECT_ID and DATABASE_URL (the parent), as in apps/web/.env.test
+ * @param {CiIo & {execImpl?: Function, interactive?: boolean}} [io]
+ * @returns {Promise<{exitCode: number, status: "pushed" | "refused" | "failed"}>}
+ */
+export async function pushWorktree(env, io = {}) {
+  const log = logger(io);
+  const fail = (status, message) => {
+    log(`[ci-branch] push-worktree: ${message}`);
+    return { exitCode: 1, status };
+  };
+  if (env.GITHUB_ACTIONS === "true") {
+    return fail("refused", "not in CI; CI runs use `push`");
+  }
+  if (!(env.NEON_API_KEY && env.NEON_PROJECT_ID && env.DATABASE_URL)) {
+    return fail(
+      "refused",
+      "NEON_API_KEY, NEON_PROJECT_ID and DATABASE_URL must be set in apps/web/.env.test"
+    );
+  }
+  const checkout = checkoutRootName(process.cwd(), {
+    execImpl: io.execImpl,
+  });
+  if (!checkout) {
+    return fail("refused", "not inside a git checkout");
+  }
+
+  const apiKey = env.NEON_API_KEY;
+  const projectId = env.NEON_PROJECT_ID;
+  const opts = { fetchImpl: io.fetchImpl, sleepImpl: io.sleepImpl };
+  const branchName = branchNameForWorktree(checkout);
+  let directUri;
+  try {
+    const parsedBase = new URL(env.DATABASE_URL);
+    const found = await findOrCreateBranch(opts, {
+      apiKey,
+      projectId,
+      branchName,
+      parsedBase,
+      expiresAt: expiresAtFrom(new Date(), WT_BRANCH_TTL_HOURS),
+    });
+    const branch = await pollUntilReady(opts, apiKey, projectId, found.id);
+    const problem = worktreeTargetProblem(branch);
+    if (problem) {
+      return fail("refused", `refusing to push: ${problem}`);
+    }
+    ({ directUri } = await branchUris(opts, {
+      apiKey,
+      projectId,
+      branchId: branch.id,
+      parsedBase,
+      pooled: false,
+    }));
+    if (
+      new URL(directUri).hostname ===
+      parsedBase.hostname.replace("-pooler.", ".")
+    ) {
+      return fail(
+        "refused",
+        "refusing to push: the branch resolves to the parent's endpoint"
+      );
+    }
+  } catch (err) {
+    return fail("failed", describeNeonError(err));
+  }
+
+  const interactive =
+    io.interactive ?? Boolean(process.stdin.isTTY && process.stdout.isTTY);
+  return await withPushLock(directUri, io, branchName, async () => {
+    if (interactive) {
+      const { code } = await runDrizzlePush(io, directUri, {
+        force: false,
+        interactive: true,
+      });
+      if (code !== 0) {
+        return fail(
+          "failed",
+          `drizzle-kit push to ${branchName} exited ${code}`
+        );
+      }
+    } else {
+      const ok = await checkedPush(io, directUri, {
+        label: branchName,
+        consequence: "Nothing was pushed",
+        promptAdvice:
+          "Run `node scripts/test-db/ci-branch.mjs push-worktree` from a terminal and answer it",
+        force: false,
+      });
+      if (!ok) {
+        return { exitCode: 1, status: "failed" };
+      }
+    }
+    log(`[ci-branch] schema pushed to ${branchName}`);
+    return { exitCode: 0, status: "pushed" };
+  });
+}
+
+/**
+ * apps/web/.env.test over the process env, as the vitest configs see it.
+ *
+ * @returns {Record<string, string | undefined>}
+ */
+function envTest() {
+  const file = path.resolve(REPO_ROOT, "apps/web/.env.test");
+  try {
+    return { ...process.env, ...parseEnv(readFileSync(file, "utf8")) };
+  } catch {
+    return { ...process.env };
+  }
+}
+
 async function main(argv) {
   const [command, name] = argv;
   switch (command) {
@@ -860,13 +1069,15 @@ async function main(argv) {
       return (await pushSchema(process.env)).exitCode;
     case "delete":
       return (await deleteCiBranch(process.env, { branchName: name })).exitCode;
+    case "push-worktree":
+      return (await pushWorktree(envTest())).exitCode;
     case "refresh-parent":
       return (
         await refreshParent(process.env, { dryRun: name === "--dry-run" })
       ).exitCode;
     default:
       process.stderr.write(
-        "Usage: node scripts/test-db/ci-branch.mjs ensure | push | delete [ci-branch-name] | refresh-parent [--dry-run]\n"
+        "Usage: node scripts/test-db/ci-branch.mjs ensure | push | delete [ci-branch-name] | push-worktree | refresh-parent [--dry-run]\n"
       );
       return 2;
   }

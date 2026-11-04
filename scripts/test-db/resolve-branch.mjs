@@ -37,7 +37,7 @@ const POLL_MAX_MS = 60_000;
 const LEADING_SLASH = /^\//;
 const ALREADY_EXISTS = /already exists/i;
 const MILLISECONDS = /\.\d{3}Z$/;
-const WT_BRANCH_TTL_HOURS = 24;
+export const WT_BRANCH_TTL_HOURS = 24;
 // Neon answers 423 Locked while another operation on the project (such as a
 // concurrent branch create from a sibling CI job) is still running. Retry the
 // create with backoff for up to this long, re-listing first each time.

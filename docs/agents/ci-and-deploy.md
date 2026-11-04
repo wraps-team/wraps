@@ -67,11 +67,15 @@ named `ci-<sha7>-<run_id>-<run_attempt>` (on a PR, `sha7` is the merge commit).
   job, since the tests would run on a stale schema.
 - `push` fails when drizzle-kit asks whether a column or table was renamed: `--force`
   doesn't answer that, and a runner has no TTY. (drizzle-kit exits 0 there;
-  `ci-branch.mjs` reads its output to catch it.) The prompt fires in two cases:
+  `ci-branch.mjs` reads its output to catch it.) The prompt fires in four cases:
   - **The parent is behind main**: a table gains one column and loses another relative
     to the parent. `refresh-test-parent.yml` keeps the parent on main's schema, so this
     means its latest run failed (most often on a rename that landed on main). Refresh the
     parent from current main (`pnpm test-db:refresh` in a checkout of main) and re-run.
+  - **The parent is ahead of main**: someone pushed an unmerged schema to it. Refresh it
+    from current main the same way.
+  - **The run's commit is older than the parent**: a schema change landed on main (and
+    the parent) after this commit was cut. Rebase on main, or re-run on a newer commit.
   - **The PR really renames something.** Refresh the parent from the PR rebased on main,
     answer the prompt, and merge the PR straight away: until it merges, the parent is
     ahead of main and every other run sees the rename in reverse.
@@ -94,6 +98,11 @@ Which steps get which secrets:
 - The test steps: `TEST_DATABASE_URL`, but only as the fallback inside
   `DATABASE_URL: ${{ env.CI_DATABASE_URL || secrets.TEST_DATABASE_URL }}`.
 - `push` gets no secret; it reads the branch URL `ensure` wrote.
+- `refresh-test-parent.yml`'s refresh step: `NEON_API_KEY`, `NEON_PROJECT_ID` and
+  `TEST_DATABASE_URL`.
+
+drizzle-kit itself never sees `NEON_API_KEY` or `TEST_DATABASE_URL`: `ci-branch.mjs`
+strips both from its environment and hands it only the target's `DATABASE_URL`.
 
 The Neon key is scoped to the test-only project, which is the real control: a same-repo
 PR can still read it by editing the workflow.
@@ -106,10 +115,26 @@ role password differed from the parent's, so a leaked branch URL did not open th
 
 ## `refresh-test-parent.yml` keeps the test parent on main's schema
 
-On a push to main that changes `packages/db/src/schema/**`, `packages/db/src/migrations/**`
-or `packages/db/drizzle.config.ts` (or on `workflow_dispatch` from main), it runs
-`ci-branch.mjs refresh-parent`. That pushes main's schema to the `wraps-test` default
-branch with the same drizzle-kit wrapper, prompt detection and advisory lock as `push`.
+On a push to main that changes `packages/db/src/schema/**`, `packages/db/src/migrations/**`,
+`packages/db/drizzle.config.ts` or `packages/db/package.json` (or on `workflow_dispatch`
+from main), it runs `ci-branch.mjs refresh-parent`. That pushes main's schema to the
+`wraps-test` default branch with the same drizzle-kit wrapper and prompt detection as
+`push`, and takes the same advisory lock on the parent.
+
+The lock on the parent only keeps two refreshes from overlapping. It does not stop
+anything else from seeing a refresh half done: drizzle-kit applies its statements one by
+one, with no transaction around them.
+
+- A `ci-*` branch cut mid-refresh starts from a partial schema; its own push then brings
+  it to the run's schema.
+- A `wt-*` branch cut mid-refresh keeps the partial schema until it is re-cut.
+- A run on the `TEST_DATABASE_URL` fallback tests on the parent itself, so it can see
+  DDL applied under it.
+
+So: after a failed or killed refresh, re-run it (`workflow_dispatch`). After any refresh,
+run `node scripts/test-db/reap-branches.mjs --self` in each worktree that needs main's
+schema. A push stuck past 3 minutes is killed together with its whole process group, so
+no drizzle-kit is left running against the parent.
 
 - It refuses unless the project has no prod or dev endpoint (the P1 host-prefix check),
   every endpoint belongs to the default branch or a `wt-*`/`ci-*` branch, and

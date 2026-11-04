@@ -34,9 +34,10 @@ the checkout, so reaping first finds nothing and leaves the branch live indefini
 
 Every CI run and every worktree branches from the parent, the `wraps-test` project's
 default branch. `.github/workflows/refresh-test-parent.yml` keeps it on main's schema: on
-every push to main that touches `packages/db/src/schema/**`, `packages/db/src/migrations/**`
-or `packages/db/drizzle.config.ts`, it runs `ci-branch.mjs refresh-parent`, which pushes
-main's schema to the default branch. It refuses unless the project is the test-only one
+every push to main that touches `packages/db/src/schema/**`,
+`packages/db/src/migrations/**`, `packages/db/drizzle.config.ts` or
+`packages/db/package.json`, it runs `ci-branch.mjs refresh-parent`, which pushes main's
+schema to the default branch. It refuses unless the project is the test-only one
 and `TEST_DATABASE_URL` names that default branch, and it never gates a deploy.
 
 Refresh the parent by hand (`pnpm test-db:refresh`, from a checkout of **main**) only to
@@ -45,30 +46,52 @@ recover:
 - **The refresh run failed on a rename.** drizzle-kit asks whether a column or table was
   renamed, which no runner can answer. Run it by hand once and answer the prompt; later
   refreshes see no diff.
-- **The refresh run failed for another reason**, or the parent drifted some other way.
-  Re-run the workflow (`workflow_dispatch`) or refresh by hand.
+- **The refresh run failed or was killed for another reason**, or the parent drifted some
+  other way. Re-run the workflow (`workflow_dispatch`) or refresh by hand.
+
+After any refresh, automatic or by hand, run `reap-branches.mjs --self` in each worktree
+that needs main's schema: a `wt-*` branch cut while a refresh was running keeps a partial
+schema.
 
 Never refresh the parent from an unmerged PR; the one exception is a real rename that CI
 can't get past, covered in `docs/agents/ci-and-deploy.md`.
 
-## After a migration lands: refresh — two steps, not one
+## After a schema change merges: re-cut your branch
 
 An **existing** `wt-*` branch is reused as it is until it expires: `resolve-branch.mjs`
-cuts a branch from the shared test DB only when one does not already exist, and never
-re-cuts or migrates it afterwards. So a schema change reaches your tests only if you both
-update the parent *and* drop the stale child:
+cuts a branch from the parent only when one does not already exist, and never re-cuts or
+migrates it afterwards. Once a schema change merges, `refresh-test-parent.yml` brings the
+parent to main's schema. All you do is drop your stale branch, so it re-cuts from the
+refreshed parent on the next test run:
 
 ```bash
-pnpm test-db:refresh   # = db:push:test (updates the shared parent)
-                       #   + reap-branches.mjs --self (drops THIS checkout's
-                       #     branch so it re-cuts from that parent next run)
+node scripts/test-db/reap-branches.mjs --self
 ```
 
 `--self` is the concurrency-safe form of `--all`: it deletes only the current
 checkout's branch, so it leaves other agents' worktrees untouched mid-run. Reach for
 `--all` only when you deliberately want every checkout onto fresh schema.
 
-`db:push` and `db:push:test` alone are half the job. `db:push` targets the dev DB in
-`.env.local`; `db:push:test` targets the raw `DATABASE_URL` in `.env.test` — the shared
-*parent*. Neither is the branch your tests read. Tests still failing `42703` after either
-push is this gap, not a broken push.
+## Testing a PR's schema change: push it to your own branch
+
+Before a schema change merges, the parent doesn't have it, so your tests fail `42703`.
+Put the PR's schema on **this worktree's own branch**, never the parent:
+
+```bash
+node scripts/test-db/ci-branch.mjs push-worktree
+```
+
+It resolves this checkout's `wt-*` branch the way the tests do (creating it if needed),
+refuses anything that isn't `wt-*` or is the project's default branch, and runs
+`drizzle-kit push` **without `--force`**. Run it in a terminal: drizzle-kit asks you about
+renames and data loss, and you answer. With no terminal (an agent's shell, say) a prompt
+fails it red instead. To return to main's schema afterwards, `reap-branches.mjs --self`.
+
+Don't run `pnpm test-db:refresh` or `db:push:test` from a PR: both push to the shared
+parent, putting it ahead of main, and then every other run, main's included, hits
+drizzle-kit's rename prompt and fails.
+
+Neither `db:push` nor `db:push:test` reaches the branch your tests read. `db:push`
+targets the dev DB in `.env.local`; `db:push:test` targets the raw `DATABASE_URL` in
+`.env.test`, the shared *parent*. Tests still failing `42703` after either push is this
+gap, not a broken push.

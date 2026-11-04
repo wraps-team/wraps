@@ -20,6 +20,8 @@ on:
       # The migrations live here, not in packages/db/drizzle/.
       - "packages/db/src/migrations/**"
       - "packages/db/drizzle.config.ts"
+      # A drizzle-kit bump can change what push emits.
+      - "packages/db/package.json"
   workflow_dispatch:
 
 permissions:

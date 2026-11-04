@@ -323,9 +323,11 @@ jobs:
   # Deletes this run's Neon branch once every job that used it has finished,
   # pass or fail. Nothing here may turn the run red, because deploy-api.yml
   # deploys only after a green Test run, and Neon expires the branch on its
-  # own 3h after creation anyway. So the job is continue-on-error (which also
-  # covers its checkout and a job timeout), and the delete step has its own
-  # short timeout inside the job's.
+  # own 3h after creation anyway. Every step is continue-on-error or bounded
+  # by a short step timeout, which together finish well inside the job's 5
+  # minutes, so the job timeout never fires. Job-level continue-on-error is a
+  # second net for a failed step; it may not cover a job timeout or a lost
+  # runner, which is why the step timeouts carry the weight.
   cleanup-db-branch:
     if: always() && github.repository == 'wraps-team/wraps'
     needs: [test-api, test-auth, test-web, test-db]
@@ -335,11 +337,13 @@ jobs:
 
     steps:
       - name: Checkout scripts/test-db
+        timeout-minutes: 1
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
         with:
           sparse-checkout: scripts/test-db
 
       - name: Setup Node.js 24.x
+        timeout-minutes: 1
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.x

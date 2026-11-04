@@ -7,7 +7,9 @@ import {
   ensure,
   parentTargetProblem,
   pushSchema,
+  pushWorktree,
   refreshParent,
+  worktreeTargetProblem,
 } from "../ci-branch.mjs";
 import { expiresAtFrom } from "../resolve-branch.mjs";
 
@@ -534,21 +536,25 @@ describe("pushSchema", () => {
   const TTY_ERROR =
     "Error: Interactive prompts require a TTY terminal (process.stdin.isTTY or process.stdout.isTTY is false).\n";
 
-  function fakeChild(exitCode: number, stdout: string) {
+  function fakeChild(exitCode: number | null, stdout: string) {
     const child = Object.assign(new EventEmitter(), {
+      pid: 4242,
       stdout: new EventEmitter(),
       stderr: new EventEmitter(),
       kill: vi.fn(),
     });
-    setTimeout(() => {
-      child.stdout.emit("data", stdout);
-      child.emit("close", exitCode);
-    }, 0);
+    // exitCode null: a push that hangs until something kills it.
+    if (exitCode !== null) {
+      setTimeout(() => {
+        child.stdout.emit("data", stdout);
+        child.emit("close", exitCode);
+      }, 0);
+    }
     return child;
   }
 
   function pushHarness({
-    exitCode = 0,
+    exitCode = 0 as number | null,
     stdout = APPLIED,
     markerTable = false,
     markedBranches = [] as string[],
@@ -705,6 +711,62 @@ describe("pushSchema", () => {
     expect(h.order).toEqual(["timeout", "end"]);
     expect(h.lines.find((l) => l.startsWith("::error::"))).toContain(
       "held the push lock"
+    );
+  });
+
+  it("strips the Neon secrets from drizzle-kit's environment and runs it in its own process group", async () => {
+    const before = { ...process.env };
+    process.env.NEON_API_KEY = "leak-me-not";
+    process.env.TEST_DATABASE_URL = "postgres://parent";
+    try {
+      const h = pushHarness();
+      await pushSchema(pushEnv, h.io);
+      h.restore();
+      const [, , options] = h.spawnImpl.mock.calls[0] as [
+        string,
+        string[],
+        any,
+      ];
+      expect(options.env.NEON_API_KEY).toBeUndefined();
+      expect(options.env.TEST_DATABASE_URL).toBeUndefined();
+      expect(options.env.DATABASE_URL).toBe(DIRECT_URI);
+      expect(options.detached).toBe(true);
+    } finally {
+      process.env = before;
+    }
+  });
+
+  it("kills the whole process group when the push times out", async () => {
+    const h = pushHarness({ exitCode: null });
+    const killImpl = vi.fn((_pid: number, _signal: string) => {
+      const child = h.spawnImpl.mock.results[0].value;
+      child.emit("close", null);
+    });
+    const result = await pushSchema(pushEnv, {
+      ...h.io,
+      killImpl,
+      pushTimeoutMs: 5,
+    });
+    h.restore();
+
+    expect(killImpl).toHaveBeenCalledWith(-4242, "SIGKILL");
+    expect(result).toEqual({ exitCode: 1, status: "failed" });
+    expect(h.order).not.toContain("mark");
+  });
+
+  it("fails without pushing when connecting takes too long", async () => {
+    const h = pushHarness();
+    h.connectPg.mockImplementationOnce(() => new Promise(() => {}));
+    const result = await pushSchema(pushEnv, {
+      ...h.io,
+      connectTimeoutMs: 5,
+    });
+    h.restore();
+
+    expect(result).toEqual({ exitCode: 1, status: "failed" });
+    expect(h.spawnImpl).not.toHaveBeenCalled();
+    expect(h.lines.find((l) => l.startsWith("::error::"))).toContain(
+      "connecting to the database took over"
     );
   });
 
@@ -978,5 +1040,162 @@ describe("refreshParent", () => {
     ])("refuses %s", (_case, branches, endpoints, host, phrase) => {
       expect(parentTargetProblem(branches, endpoints, host)).toContain(phrase);
     });
+  });
+});
+
+describe("pushWorktree", () => {
+  const WT = "wt-agent-abc";
+  const PARENT_URL =
+    "postgresql://testrole:pp@ep-parent-pooler.us-east-2.aws.neon.tech/testdb?sslmode=require";
+  const WT_DIRECT =
+    "postgresql://testrole:wp@ep-wt.us-east-2.aws.neon.tech/testdb?sslmode=require";
+  const wtEnv = {
+    NEON_API_KEY: "test-key",
+    NEON_PROJECT_ID: "proj-1",
+    DATABASE_URL: PARENT_URL,
+  };
+  const execAt = (dir: string) =>
+    vi.fn(() => `/home/x/Projects/${dir}\n`) as any;
+
+  function wtHarness(
+    branches: Array<{ id: string; name: string; default?: boolean }>,
+    connUri = WT_DIRECT
+  ) {
+    const fetchImpl = vi.fn(async (url: string, init: RequestInit = {}) => {
+      const parsed = new URL(url);
+      if (parsed.pathname.endsWith("/connection_uri")) {
+        return jsonResponse({ uri: connUri });
+      }
+      if (parsed.pathname.endsWith("/endpoints")) {
+        return jsonResponse({
+          endpoints: [
+            {
+              host: "ep-parent.us-east-2.aws.neon.tech",
+              branch_id: "br-parent",
+            },
+          ],
+        });
+      }
+      if (init.method === "POST") {
+        const body = JSON.parse(String(init.body));
+        const branch = {
+          id: "br-new",
+          name: body.branch.name,
+          current_state: "ready",
+        };
+        branches.push(branch);
+        return jsonResponse({ branch }, 201);
+      }
+      return jsonResponse({
+        branches: branches.map((b) => ({ current_state: "ready", ...b })),
+      });
+    });
+    const client = {
+      query: vi.fn(async () => ({ rows: [] })),
+      end: vi.fn(async () => {}),
+    };
+    const spawnImpl = vi.fn((..._args: unknown[]) => {
+      const child = Object.assign(new EventEmitter(), {
+        pid: 1,
+        stdout: new EventEmitter(),
+        stderr: new EventEmitter(),
+        kill: vi.fn(),
+      });
+      setTimeout(() => {
+        child.stdout.emit("data", "[✓] Changes applied\n");
+        child.emit("close", 0);
+      }, 0);
+      return child;
+    });
+    const lines: string[] = [];
+    const stdoutWrite = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+    return {
+      io: {
+        fetchImpl,
+        connectPg: vi.fn(async () => client),
+        spawnImpl,
+        interactive: false,
+        log: (l: string) => lines.push(l),
+      } as any,
+      spawnImpl,
+      lines,
+      restore: () => stdoutWrite.mockRestore(),
+    };
+  }
+
+  it("pushes to this checkout's own wt-* branch, without --force", async () => {
+    const h = wtHarness([
+      { id: "br-parent", name: "production", default: true },
+      { id: "br-wt", name: WT },
+    ]);
+    const result = await pushWorktree(wtEnv, {
+      ...h.io,
+      execImpl: execAt("agent-abc"),
+    });
+    h.restore();
+
+    expect(result).toEqual({ exitCode: 0, status: "pushed" });
+    const [, args, options] = h.spawnImpl.mock.calls[0] as [
+      string,
+      string[],
+      any,
+    ];
+    expect(args).not.toContain("--force");
+    expect(options.env.DATABASE_URL).toBe(WT_DIRECT);
+  });
+
+  it("refuses when this checkout's branch is the default branch", async () => {
+    const h = wtHarness([{ id: "br-parent", name: WT, default: true }]);
+    const result = await pushWorktree(wtEnv, {
+      ...h.io,
+      execImpl: execAt("agent-abc"),
+    });
+    h.restore();
+
+    expect(result).toEqual({ exitCode: 1, status: "refused" });
+    expect(h.spawnImpl).not.toHaveBeenCalled();
+  });
+
+  it("refuses when the branch resolves to the parent's endpoint", async () => {
+    const h = wtHarness(
+      [{ id: "br-wt", name: WT }],
+      PARENT_URL.replace("-pooler.", ".")
+    );
+    const result = await pushWorktree(wtEnv, {
+      ...h.io,
+      execImpl: execAt("agent-abc"),
+    });
+    h.restore();
+
+    expect(result).toEqual({ exitCode: 1, status: "refused" });
+    expect(h.spawnImpl).not.toHaveBeenCalled();
+  });
+
+  it("refuses in CI without any call", async () => {
+    const h = wtHarness([]);
+    const result = await pushWorktree(
+      { ...wtEnv, GITHUB_ACTIONS: "true" },
+      { ...h.io, execImpl: execAt("agent-abc") }
+    );
+    h.restore();
+
+    expect(result).toEqual({ exitCode: 1, status: "refused" });
+    expect(h.io.fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ name: "production", default: true }, "not a wt-* branch"],
+    [{ name: "ci-0123456-1-1" }, "not a wt-* branch"],
+    [{ name: "wt-wraps", default: true }, "default branch"],
+  ])("worktreeTargetProblem refuses %j", (branch, phrase) => {
+    expect(worktreeTargetProblem(branch)).toContain(phrase);
+  });
+
+  it("worktreeTargetProblem accepts a non-default wt-* branch", () => {
+    expect(
+      worktreeTargetProblem({ name: "wt-wraps", default: false })
+    ).toBeNull();
   });
 });
