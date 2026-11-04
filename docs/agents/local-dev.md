@@ -43,8 +43,9 @@ runner, or an isolated git worktree. Its `typecheck:infra` step
 `/// <reference path="./.sst/platform/config.d.ts" />`. That file is *generated*, never
 built, so no amount of `turbo run build` produces it. The script checks for both
 directories first and, when one is missing, runs the two `sst install` commands itself
-(about 20 seconds, no AWS credentials). It prints the commands and exits 1 only if one of
-them fails. To bootstrap by hand, for example to run `tsc` directly:
+(about 20 seconds, no AWS credentials, but it needs network access to download the
+providers). It prints the commands and exits 1 if either fails or a file is still missing
+afterwards. To bootstrap by hand, for example to run `tsc` directly:
 
 ```bash
 pnpm install

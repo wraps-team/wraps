@@ -24,10 +24,11 @@ sst_missing
 # setup-worktree.sh prints as `bootstrap=`; keep them in step.
 if (( ${#missing[@]} > 0 )); then
   echo "typecheck:infra: missing generated SST platform types (${missing[*]}); running sst install"
-  if node_modules/.bin/sst install \
-    && (cd infra && ../node_modules/.bin/sst install --config selfhost.config.ts --stage production); then
-    sst_missing
-  fi
+  node_modules/.bin/sst install \
+    && (cd infra && ../node_modules/.bin/sst install --config selfhost.config.ts --stage production) \
+    || true
+  # Re-check unconditionally so the error below lists only what is really missing.
+  sst_missing
 fi
 
 if (( ${#missing[@]} > 0 )); then
