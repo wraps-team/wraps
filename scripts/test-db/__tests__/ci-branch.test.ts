@@ -410,18 +410,43 @@ describe("deleteCiBranch", () => {
 });
 
 describe("pushSchema", () => {
-  function fakeChild(exitCode: number) {
-    const child = new EventEmitter() as EventEmitter & { kill: () => void };
-    child.kill = vi.fn();
-    setTimeout(() => child.emit("exit", exitCode), 0);
+  const APPLIED = "[✓] Changes applied\n";
+  const TTY_ERROR =
+    "Error: Interactive prompts require a TTY terminal (process.stdin.isTTY or process.stdout.isTTY is false).\n";
+
+  function fakeChild(exitCode: number, stdout: string) {
+    const child = Object.assign(new EventEmitter(), {
+      stdout: new EventEmitter(),
+      stderr: new EventEmitter(),
+      kill: vi.fn(),
+    });
+    setTimeout(() => {
+      child.stdout.emit("data", stdout);
+      child.emit("close", exitCode);
+    }, 0);
     return child;
   }
 
-  function pushHarness(exitCode = 0) {
+  function pushHarness({
+    exitCode = 0,
+    stdout = APPLIED,
+    markerPresent = false,
+  } = {}) {
     const order: string[] = [];
     const client = {
       query: vi.fn(async (sql: string) => {
-        order.push(sql.includes("unlock") ? "unlock" : "lock");
+        if (sql.includes("to_regclass")) {
+          order.push("check");
+          return { rows: [{ pushed: markerPresent }] };
+        }
+        if (sql.includes("unlock")) {
+          order.push("unlock");
+        } else if (sql.includes("advisory_lock")) {
+          order.push("lock");
+        } else if (sql.startsWith("INSERT")) {
+          order.push("mark");
+        }
+        return { rows: [] };
       }),
       end: vi.fn(async () => {
         order.push("end");
@@ -430,15 +455,20 @@ describe("pushSchema", () => {
     const connectPg = vi.fn(async () => client);
     const spawnImpl = vi.fn((..._args: unknown[]) => {
       order.push("push");
-      return fakeChild(exitCode);
+      return fakeChild(exitCode, stdout);
     });
     const lines: string[] = [];
+    const stdoutWrite = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
     return {
       io: { connectPg, spawnImpl, log: (l: string) => lines.push(l) } as any,
       order,
+      client,
       connectPg,
       spawnImpl,
       lines,
+      restore: () => stdoutWrite.mockRestore(),
     };
   }
 
@@ -447,13 +477,14 @@ describe("pushSchema", () => {
     CI_DB_BRANCH: BRANCH,
   };
 
-  it("pushes under an advisory lock on the direct URL, with DATABASE_URL set to it", async () => {
+  it("pushes under an advisory lock on the direct URL, then writes the done-marker", async () => {
     const h = pushHarness();
     const result = await pushSchema(pushEnv, h.io);
+    h.restore();
 
     expect(result).toEqual({ exitCode: 0, status: "pushed" });
     expect(h.connectPg).toHaveBeenCalledWith(DIRECT_URI);
-    expect(h.order).toEqual(["lock", "push", "unlock", "end"]);
+    expect(h.order).toEqual(["lock", "check", "push", "mark", "unlock", "end"]);
     const [cmd, args, options] = h.spawnImpl.mock.calls[0] as [
       string,
       string[],
@@ -472,9 +503,27 @@ describe("pushSchema", () => {
     expect(options.stdio[0]).toBe("ignore");
   });
 
+  it("accepts a push that found nothing to change", async () => {
+    const h = pushHarness({ stdout: "[i] No changes detected\n" });
+    const result = await pushSchema(pushEnv, h.io);
+    h.restore();
+    expect(result).toEqual({ exitCode: 0, status: "pushed" });
+  });
+
+  it("skips without spawning when a sibling job already pushed", async () => {
+    const h = pushHarness({ markerPresent: true });
+    const result = await pushSchema(pushEnv, h.io);
+    h.restore();
+
+    expect(result).toEqual({ exitCode: 0, status: "skipped" });
+    expect(h.spawnImpl).not.toHaveBeenCalled();
+    expect(h.order).toEqual(["lock", "check", "unlock", "end"]);
+  });
+
   it("skips, touching nothing, when ensure fell back", async () => {
     const h = pushHarness();
     const result = await pushSchema({}, h.io);
+    h.restore();
 
     expect(result).toEqual({ exitCode: 0, status: "skipped" });
     expect(h.connectPg).not.toHaveBeenCalled();
@@ -486,6 +535,7 @@ describe("pushSchema", () => {
     async (name) => {
       const h = pushHarness();
       const result = await pushSchema({ ...pushEnv, CI_DB_BRANCH: name }, h.io);
+      h.restore();
 
       expect(result).toEqual({ exitCode: 1, status: "refused" });
       expect(h.connectPg).not.toHaveBeenCalled();
@@ -493,12 +543,34 @@ describe("pushSchema", () => {
     }
   );
 
-  it("fails the step, and still unlocks, when drizzle-kit push fails", async () => {
-    const h = pushHarness(1);
+  it("fails, writes no marker, and still unlocks when drizzle-kit exits non-zero", async () => {
+    const h = pushHarness({ exitCode: 1, stdout: "" });
     const result = await pushSchema(pushEnv, h.io);
+    h.restore();
 
     expect(result).toEqual({ exitCode: 1, status: "failed" });
-    expect(h.order).toEqual(["lock", "push", "unlock", "end"]);
+    expect(h.order).toEqual(["lock", "check", "push", "unlock", "end"]);
     expect(h.lines.some((l) => l.startsWith("::error::"))).toBe(true);
+  });
+
+  it("fails on a rename prompt even though drizzle-kit exits 0", async () => {
+    const h = pushHarness({ exitCode: 0, stdout: TTY_ERROR });
+    const result = await pushSchema(pushEnv, h.io);
+    h.restore();
+
+    expect(result).toEqual({ exitCode: 1, status: "failed" });
+    expect(h.order).not.toContain("mark");
+    const error = h.lines.find((l) => l.startsWith("::error::")) ?? "";
+    expect(error).toContain("renamed");
+    expect(error).toContain("test-db:refresh");
+  });
+
+  it("fails when drizzle-kit exits 0 without saying it applied anything", async () => {
+    const h = pushHarness({ exitCode: 0, stdout: "Reading config file\n" });
+    const result = await pushSchema(pushEnv, h.io);
+    h.restore();
+
+    expect(result).toEqual({ exitCode: 1, status: "failed" });
+    expect(h.order).not.toContain("mark");
   });
 });

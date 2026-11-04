@@ -60,9 +60,15 @@ named `ci-<sha7>-<run_id>-<run_attempt>` (on a PR, `sha7` is the merge commit).
   creates the branch with `expires_at` 3h out, masks the URLs, and writes
   `CI_DATABASE_URL`, `CI_DATABASE_DIRECT_URL` and `CI_DB_BRANCH` to `$GITHUB_ENV`.
 - `push` runs after install: `drizzle-kit push --force` against the branch's direct URL,
-  serialised across the run's jobs by an advisory lock, so the branch carries this
-  commit's schema. It refuses any branch not named `ci-*`, and skips when `ensure` fell
-  back. A failed push fails the job, since the tests would run on a stale schema.
+  so the branch carries this commit's schema. Every DB job calls it under an advisory
+  lock; the first pushes and writes a marker table (`ci_meta.schema_push`), and the rest
+  skip, so the push happens once per run and before any job's tests. It refuses any
+  branch not named `ci-*`, and skips when `ensure` fell back. A failed push fails the
+  job, since the tests would run on a stale schema.
+- A PR that renames a column or table fails `push`: drizzle-kit asks whether it is a
+  rename, `--force` doesn't answer that, and a runner has no TTY. (drizzle-kit exits 0
+  there; `ci-branch.mjs` reads its output to catch it.) Answer the prompt once on the
+  parent with `pnpm test-db:refresh` from a checkout of the PR, and later runs see no diff.
 - `delete` runs in `test.yml`'s `cleanup-db-branch` job and in e2e's last step, both
   `always()`. A failed delete only warns, so it can't block the deploy; the 3h expiry
   covers it.

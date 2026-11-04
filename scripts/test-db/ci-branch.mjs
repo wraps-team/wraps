@@ -40,7 +40,11 @@ import {
 export const CI_BRANCH_PATTERN = /^ci-[0-9a-f]{7}-\d+-\d+$/;
 export const CI_BRANCH_TTL_HOURS = 3;
 const LEADING_SLASH = /^\//;
-const PUSH_TIMEOUT_MS = 10 * 60_000;
+// A no-op push takes ~15s. Serialised jobs wait on each other, so a stuck
+// push must die well inside the jobs' 30-minute timeout.
+const PUSH_TIMEOUT_MS = 3 * 60_000;
+const INTERACTIVE_PROMPT = /Interactive prompts require a TTY/;
+const PUSH_SUCCEEDED = /Changes applied|No changes detected/;
 // Any constant works; it only has to be the same in every job of the run.
 const PUSH_LOCK_KEY = 31_031;
 const REPO_ROOT = path.resolve(import.meta.dirname, "../..");
@@ -308,6 +312,79 @@ export async function deleteCiBranch(env, io = {}) {
   }
 }
 
+/**
+ * Runs `drizzle-kit push --force` against `directUrl`, echoing its output and
+ * returning it, since drizzle-kit can fail with exit code 0.
+ *
+ * @param {typeof spawn} spawnImpl
+ * @param {string} directUrl
+ * @param {(line: string) => void} log
+ * @returns {Promise<{code: number, output: string}>}
+ */
+function runDrizzlePush(spawnImpl, directUrl, log) {
+  return new Promise((resolve) => {
+    const child = spawnImpl(
+      "pnpm",
+      ["--filter", "@wraps/db", "exec", "drizzle-kit", "push", "--force"],
+      {
+        cwd: REPO_ROOT,
+        // drizzle.config.ts loads .env.local with dotenv, which never
+        // overrides a set variable, so this URL is the one it uses.
+        env: { ...process.env, DATABASE_URL: directUrl },
+        // No TTY, as on a runner: a rename prompt --force can't answer
+        // must fail here, not wait for input.
+        stdio: ["ignore", "pipe", "pipe"],
+      }
+    );
+    let output = "";
+    const collect = (stream, sink) => {
+      stream?.on("data", (chunk) => {
+        output += String(chunk);
+        sink.write(chunk);
+      });
+    };
+    collect(child.stdout, process.stdout);
+    collect(child.stderr, process.stderr);
+
+    const timer = setTimeout(() => {
+      log(
+        `::error::[ci-branch] drizzle-kit push still running after ${PUSH_TIMEOUT_MS / 60_000} min, killing it`
+      );
+      child.kill("SIGKILL");
+    }, PUSH_TIMEOUT_MS);
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      resolve({ code: 1, output: `${output}\n${err.message}` });
+    });
+    child.on("close", (exitCode) => {
+      clearTimeout(timer);
+      resolve({ code: exitCode ?? 1, output });
+    });
+  });
+}
+
+/**
+ * Why a drizzle-kit push failed, or null if it succeeded. drizzle-kit 0.31
+ * exits 0 when a rename prompt meets a non-TTY, so the exit code alone is
+ * not enough: success also needs its "applied" or "no changes" line.
+ *
+ * @param {number} code
+ * @param {string} output
+ * @returns {string | null}
+ */
+export function pushFailure(code, output) {
+  if (INTERACTIVE_PROMPT.test(output)) {
+    return "it needs an interactive answer, most likely whether a column or table was renamed, which --force does not give. Answer it once on the parent (`pnpm test-db:refresh` from a checkout of this branch), and later runs will see no diff";
+  }
+  if (code !== 0) {
+    return `exit ${code}`;
+  }
+  if (!PUSH_SUCCEEDED.test(output)) {
+    return "it exited 0 without reporting changes applied or no changes";
+  }
+  return null;
+}
+
 /** @param {string} url @returns {Promise<PgClient>} */
 async function connectPgDefault(url) {
   // Imported here, not at the top: `ensure` and `delete` run before
@@ -320,10 +397,10 @@ async function connectPgDefault(url) {
 
 /**
  * Pushes packages/db's schema to this run's branch with
- * `drizzle-kit push --force`. Every DB job runs this; a session advisory lock
- * on the branch serialises them, so the first applies the diff and the rest
- * find nothing to do. Skips (exit 0) when `ensure` fell back: the shared
- * parent is never pushed to from CI.
+ * `drizzle-kit push --force`, once per run. Every DB job calls this; a session
+ * advisory lock serialises them, and the first to succeed writes a marker
+ * table (`ci_meta.schema_push`) so the rest skip. Skips (exit 0) when `ensure`
+ * fell back: the shared parent is never pushed to from CI.
  *
  * @param {Record<string, string | undefined>} env
  * @param {CiIo} [io]
@@ -365,40 +442,40 @@ export async function pushSchema(env, io = {}) {
   }
 
   try {
-    const code = await new Promise((resolve) => {
-      const child = spawnImpl(
-        "pnpm",
-        ["--filter", "@wraps/db", "exec", "drizzle-kit", "push", "--force"],
-        {
-          cwd: REPO_ROOT,
-          // drizzle.config.ts loads .env.local with dotenv, which never
-          // overrides a set variable, so this URL is the one it uses.
-          env: { ...process.env, DATABASE_URL: directUrl },
-          // No TTY, as on a runner: a rename prompt --force can't answer
-          // must fail here, not wait for input.
-          stdio: ["ignore", "inherit", "inherit"],
-        }
-      );
-      const timer = setTimeout(() => {
-        log(
-          `::error::[ci-branch] drizzle-kit push still running after ${PUSH_TIMEOUT_MS / 60_000} min; it may be waiting on a rename prompt --force does not answer`
-        );
-        child.kill("SIGKILL");
-      }, PUSH_TIMEOUT_MS);
-      child.on("error", () => {
-        clearTimeout(timer);
-        resolve(1);
-      });
-      child.on("exit", (exitCode) => {
-        clearTimeout(timer);
-        resolve(exitCode ?? 1);
-      });
-    });
-    if (code !== 0) {
+    // A sibling job of this run already pushed: the branch is current, and a
+    // second push would re-run drizzle's non-converging DDL (it drops and
+    // re-adds a primary key every time) under another job's running tests.
+    const marker = await client.query(
+      "SELECT to_regclass('ci_meta.schema_push') IS NOT NULL AS pushed"
+    );
+    if (marker?.rows?.[0]?.pushed) {
       log(
-        `::error::[ci-branch] drizzle-kit push to ${branchName} failed (exit ${code}); the tests would run against a stale schema`
+        `[ci-branch] a sibling job already pushed the schema to ${branchName}, skipping`
+      );
+      return { exitCode: 0, status: "skipped" };
+    }
+
+    const { code, output } = await runDrizzlePush(spawnImpl, directUrl, log);
+    const failure = pushFailure(code, output);
+    if (failure) {
+      log(
+        `::error::[ci-branch] drizzle-kit push to ${branchName} failed: ${failure}. The tests would run against a stale schema`
       );
       return { exitCode: 1, status: "failed" };
+    }
+
+    // Only after a successful push, so a failed one leaves the next job to
+    // retry. Outside `public`, so drizzle never sees it.
+    try {
+      await client.query("CREATE SCHEMA IF NOT EXISTS ci_meta");
+      await client.query(
+        "CREATE TABLE IF NOT EXISTS ci_meta.schema_push (pushed_at timestamptz NOT NULL DEFAULT now())"
+      );
+      await client.query("INSERT INTO ci_meta.schema_push DEFAULT VALUES");
+    } catch (err) {
+      log(
+        `::warning::[ci-branch] schema pushed, but the done-marker could not be written, so sibling jobs will push again: ${err instanceof Error ? err.message : String(err)}`
+      );
     }
     log(`[ci-branch] schema pushed to ${branchName}`);
     return { exitCode: 0, status: "pushed" };
