@@ -18,7 +18,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ContactWithMeta } from "@/lib/contacts";
 
 vi.mock("next/navigation", () => ({
@@ -389,12 +389,25 @@ describe("Save sends only the fields the user changed", () => {
     expect(sent.emailStatus).toBeUndefined();
   });
 
-  it("a status the user picks is still sent", async () => {
-    // Radix Select needs these in jsdom.
+  // Radix Select needs these in jsdom; set per test, restored after each.
+  const original = {
+    hasPointerCapture: Element.prototype.hasPointerCapture,
+    setPointerCapture: Element.prototype.setPointerCapture,
+    releasePointerCapture: Element.prototype.releasePointerCapture,
+    scrollIntoView: Element.prototype.scrollIntoView,
+  };
+  function stubPointerEvents() {
     Element.prototype.hasPointerCapture = () => false;
     Element.prototype.setPointerCapture = () => undefined;
     Element.prototype.releasePointerCapture = () => undefined;
     Element.prototype.scrollIntoView = () => undefined;
+  }
+  beforeEach(stubPointerEvents);
+  afterEach(() => {
+    Object.assign(Element.prototype, original);
+  });
+
+  it("a status the user picks is still sent", async () => {
     const user = userEvent.setup();
     const { onSave } = renderSheet({
       contact: makeContact({ phone: "+15550001111", smsStatus: null }),
