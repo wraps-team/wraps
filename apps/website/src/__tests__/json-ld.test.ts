@@ -7,7 +7,7 @@ const HOSTILE = {
   "@context": "https://schema.org",
   "@type": "Question",
   name: "</script><script>x</script>",
-  text: "a & b > c <!-- d \u2028 e \u2029 f",
+  text: "a & b > c <!-- d --> \u2028 e \u2029 f",
   nested: [{ k: "</SCRIPT >" }],
 };
 
@@ -27,6 +27,17 @@ describe("JsonLd", () => {
     expect(html.match(/<\/script/gi)).toHaveLength(1);
     expect(html.endsWith("</script>")).toBe(true);
     expect(html.match(/<script/gi)).toHaveLength(1);
+  });
+
+  it("writes <, >, & and <!-- as \\u escapes in the rendered tag", () => {
+    const html = renderToStaticMarkup(createElement(JsonLd, { data: HOSTILE }));
+
+    expect(html).not.toContain("<!--");
+    expect(html).not.toContain("-->");
+    expect(html).not.toContain("&amp;");
+    expect(html).toContain("\\u003c/script\\u003e");
+    expect(html).toContain("\\u003c!--");
+    expect(html).toContain("\\u0026");
   });
 
   it("round-trips: parsing the tag text gives back the input", () => {

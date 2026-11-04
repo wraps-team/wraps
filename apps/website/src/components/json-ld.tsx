@@ -1,5 +1,5 @@
-// Written with new RegExp and \\u escapes so no formatter rewrites them into
-// literal U+2028/U+2029, which are line terminators inside a regex literal.
+// Characters that are unsafe in an inline script. U+2028/U+2029 are line
+// terminators in older JS parsers although JSON allows them.
 const UNSAFE_IN_SCRIPT = /[<>&\u2028\u2029]/g;
 
 const ESCAPES: Record<string, string> = {
@@ -13,11 +13,12 @@ const ESCAPES: Record<string, string> = {
 /**
  * Serializes JSON-LD for inline embedding in a <script> tag.
  *
- * Raw JSON.stringify output is not safe there: a string containing
- * `</script>` would end the script element and let the rest be parsed as HTML.
- * `<`, `>` and `&` are written as \u escapes, and so are the line separators
- * U+2028 and U+2029 (legal in JSON, not in older JS parsers). A JSON parser
- * reads the escaped text back to exactly the same data.
+ * React 19 already rewrites `<script` and `</script` in script text (see
+ * `scriptRegex` in react-dom-server), so a literal `</script>` in a string
+ * cannot end the tag today. This serializer is defence in depth for what React
+ * leaves alone: `<!--`, `>`, `&`, and the line separators U+2028 and U+2029.
+ * All five are written as \u escapes, which a JSON parser reads back to
+ * exactly the same data.
  */
 export function serializeJsonLd(data: Record<string, unknown>): string {
   return JSON.stringify(data).replace(

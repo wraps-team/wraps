@@ -165,10 +165,15 @@ export const metadata: Metadata = {
 
 ### JSON-LD Schema
 
-Docs/guides include breadcrumb schema. Landing page includes FAQ + Organization schema:
+Docs/guides include breadcrumb schema. Landing page includes FAQ + Organization schema. Render
+JSON-LD with the `JsonLd` component (`src/components/json-ld.tsx`), never with
+`dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}`: `JsonLd` serializes through
+`serializeJsonLd`, which escapes `<`, `>`, `&` and U+2028/U+2029 so no string can break out of the tag.
 
 ```tsx
-<Script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }} />
+import { JsonLd } from "@/components/json-ld";
+
+<JsonLd data={schema} />
 ```
 
 ### Sitemap & Robots
