@@ -49,9 +49,8 @@ function stubPointerEvents() {
 
 /**
  * A contact with both channel statuses set. Statuses are diffed against the
- * stored value, so a contact whose `smsStatus` is null would legitimately
- * report a change on open (the form has to show *some* status) — that is
- * existing behaviour, and not what these tests are about.
+ * defaults the form fills in for a missing one, so a null status that the
+ * user leaves alone is not sent (see "a missing status is not sent" below).
  */
 function makeContact(overrides: Partial<ContactWithMeta> = {}) {
   return {
@@ -270,6 +269,44 @@ describe("edit mode", () => {
 
     const payload = await submitAndCapture(onSubmit, /^save changes$/i);
     expect(payload.topicIds).toEqual([]);
+  });
+});
+
+// Plan 023b review: the form fills a missing status with a default; edit
+// mode used to send that default as a change the user never made, and
+// contact_updated now reports what is sent.
+describe("edit mode: a missing status is not sent", () => {
+  it("an email-only contact edited in the company field sends only the company", async () => {
+    const { onSubmit } = renderDialog({
+      contact: makeContact({ phone: null, smsStatus: null }),
+      mode: "edit",
+    });
+
+    const company = screen.getByLabelText("Company");
+    await userEvent.clear(company);
+    await userEvent.type(company, "Babbage & Co");
+    const payload = await submitAndCapture(onSubmit, /^save changes$/i);
+
+    expect(setKeys(payload)).toEqual(["company"]);
+    expect(payload.company).toBe("Babbage & Co");
+    expect(payload.smsStatus).toBeUndefined();
+    expect(payload.emailStatus).toBeUndefined();
+  });
+
+  it("a phone-only contact edited in the company field sends only the company", async () => {
+    const { onSubmit } = renderDialog({
+      contact: makeContact({ email: null, emailStatus: null }),
+      mode: "edit",
+    });
+
+    const company = screen.getByLabelText("Company");
+    await userEvent.clear(company);
+    await userEvent.type(company, "Babbage & Co");
+    const payload = await submitAndCapture(onSubmit, /^save changes$/i);
+
+    expect(setKeys(payload)).toEqual(["company"]);
+    expect(payload.emailStatus).toBeUndefined();
+    expect(payload.smsStatus).toBeUndefined();
   });
 });
 

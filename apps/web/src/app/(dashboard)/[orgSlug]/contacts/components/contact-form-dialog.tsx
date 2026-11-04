@@ -186,12 +186,18 @@ function buildEditPayload({
     lastName: changedTextOrNull(values.lastName, contact?.lastName),
     company: changedTextOrNull(values.company, contact?.company),
     jobTitle: changedTextOrNull(values.jobTitle, contact?.jobTitle),
+    // Compared against the defaults `valuesForContact` fills in for a
+    // missing status, like the text fields compare against "": an untouched
+    // status is never sent (it would write, and report, a status the user
+    // never chose).
     emailStatus:
-      values.emailStatus !== contact?.emailStatus
+      values.emailStatus !== (contact?.emailStatus || "active")
         ? values.emailStatus
         : undefined,
     smsStatus:
-      values.smsStatus !== contact?.smsStatus ? values.smsStatus : undefined,
+      values.smsStatus !== (contact?.smsStatus || "pending_consent")
+        ? values.smsStatus
+        : undefined,
     properties: propertiesChanged ? propertiesObj : undefined,
     topicIds: topicsChanged ? topicIds : undefined,
   };
