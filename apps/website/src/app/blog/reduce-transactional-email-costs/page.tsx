@@ -779,9 +779,10 @@ wraps email plan --region us-east-1 --set NONE`}
               This is routinely called the highest-ROI optimization. The value
               of deleting an email is what it takes off the bill: your marginal
               rate above a plan&apos;s included volume, nothing inside it, and
-              more when the cut lets you drop to a cheaper tier. Here is what cutting 30,000 emails a month &mdash; a 30%
-              reduction, which is an ambitious engineering project &mdash; is
-              worth in each place you might be sending from:
+              more when the cut lets you drop to a cheaper tier. Here is what
+              cutting 30,000 emails a month &mdash; a 30% reduction, which is an
+              ambitious engineering project &mdash; is worth in each place you
+              might be sending from:
             </p>
 
             <div className="overflow-x-auto rounded-xl border">

@@ -1455,7 +1455,8 @@ const LOOPS_VS_RESEND: VersusPage = {
         "Not as the native authoring path. Loops expects its own editor, which is the point of the product: a non-engineer can change an email without a deploy. If having templates as components in your repository is a requirement rather than a preference, that requirement is pointing you at Resend, and it is a reasonable thing to let decide the question.",
     },
     {
-      question: "Is Resend's API rate limit really the same on every self-serve plan?",
+      question:
+        "Is Resend's API rate limit really the same on every self-serve plan?",
       answer:
         "Yes, on Free, Pro and Scale: ten requests per second per team by default, with an increase available to trusted senders on request. For request-response mail it never comes up. For anything batched you queue and drip, which is fine and is also an architectural constraint you should know about before you build. The relevant question is whether anything in your system ever wants to send thousands of messages in a short window, because if so the design has to account for it from the start.",
     },
@@ -4740,7 +4741,8 @@ const MAILGUN_VS_RESEND: VersusPage = {
         "The Flex plan closed to new signups in December 2025 and the legacy pay-as-you-go rate doubled, moving most pay-as-you-go accounts either onto the ladder or onto the new rate. If you are on grandfathered terms, confirm what they actually are before comparing anything, because a model built on the old figure will be wrong by a factor that matters. This is the most common reason people arrive at this comparison in 2026.",
     },
     {
-      question: "Is Resend's rate limit really the same on every self-serve plan?",
+      question:
+        "Is Resend's rate limit really the same on every self-serve plan?",
       answer:
         "Ten requests per second per team by default, on every self-serve tier (Free, Pro and Scale); upgrading does not raise it, though Resend lifts it for trusted senders on request. The batch endpoint, which sends up to 100 emails in a single API call, gives you substantially more headroom than one call per message, so the practical impact depends heavily on how your code is shaped. The point to internalise is that it is mostly architectural rather than commercial: if your traffic is batch-shaped, expect to build a queue.",
     },

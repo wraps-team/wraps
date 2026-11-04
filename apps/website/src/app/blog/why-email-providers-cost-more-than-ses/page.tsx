@@ -169,8 +169,8 @@ export default function Page() {
             <p className="mb-6 text-lg text-muted-foreground">
               Sending 100,000 transactional emails through Amazon SES costs
               about $10. The same volume is $35 on Resend Pro, $34.95 on
-              SendGrid Essentials, and $115 to $126 on Postmark, depending on the
-              plan.
+              SendGrid Essentials, and $115 to $126 on Postmark, depending on
+              the plan.
             </p>
             <p className="text-muted-foreground">
               That spread is not a markup on bandwidth. Sending an email is
@@ -220,9 +220,8 @@ export default function Page() {
             </div>
             <p className="mt-4 text-muted-foreground text-sm">
               List prices read off each vendor&apos;s own pricing page in
-              September 2026, with Postmark rechecked on November 3, 2026.
-              Every one of these changes; check before quoting
-              them back at anyone.
+              September 2026, with Postmark rechecked on November 3, 2026. Every
+              one of these changes; check before quoting them back at anyone.
             </p>
           </section>
 
