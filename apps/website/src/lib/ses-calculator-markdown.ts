@@ -90,7 +90,11 @@ function costsSection(): string {
       })).sort((a, b) => a.total - b.total)[0].id
   );
   const cheapestNote = cheapest.every((id) => id === cheapest[0])
-    ? `${SES_PLANS[cheapest[0]].name} is the cheapest plan on sending fees at every volume in the table. The other plans charge more per email or a monthly fee, and buy features: for example inbox placement testing, managed dedicated IPs and email validations.`
+    ? `${SES_PLANS[cheapest[0]].name} is the cheapest plan on sending fees at every volume in the table. The other plans charge more per email or a monthly fee, and buy features:
+
+${SES_PLAN_IDS.filter((id) => id !== cheapest[0])
+  .map((id) => `- **${SES_PLANS[id].name}:** ${SES_PLAN_INCLUDES[id]}`)
+  .join("\n")}`
     : "";
 
   return `## What sending costs per month
