@@ -17,8 +17,10 @@ minimumReleaseAgeExclude:
   - '@wraps.dev/sms@0.2.0'
   - cn@0.2.4
   - '@shadcn/lint@0.1.0'
-  # better-auth security release 2026-11-03 (12 advisories; plans/029).
-  # Exact versions only. Remove after 2026-11-10, when they pass the gate.
+  # better-auth security release 2026-11-03 (12 advisories):
+  # https://better-auth.com/blog/security-release-2026-11-03
+  # Exact versions only. Remove on or after 2026-11-11; 1.7.16 clears the
+  # 7-day gate at 2026-11-10T21:23Z.
   - better-auth@1.7.16
   - '@better-auth/core@1.7.16'
   - '@better-auth/drizzle-adapter@1.7.16'
