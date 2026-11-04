@@ -135,8 +135,9 @@ beforeEach(async () => {
   apiCalls.length = 0;
   vi.stubEnv("NEXT_PUBLIC_API_URL", API_URL);
   vi.stubGlobal("fetch", (url: string | URL | Request, init?: RequestInit) => {
-    const urlStr = typeof url === "string" ? url : url.toString();
-    if (urlStr.startsWith(API_URL)) {
+    const urlStr = url instanceof Request ? url.url : String(url);
+    // Exact origin, not a prefix: "http://api.test.example" is another host.
+    if (new URL(urlStr).origin === API_URL) {
       apiCalls.push({ url: urlStr, init: init ?? {} });
       return Promise.resolve(Response.json({ accepted: 1 }));
     }

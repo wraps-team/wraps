@@ -934,10 +934,17 @@ describe("Workflow event emission from preference center", () => {
             : url instanceof URL
               ? url.toString()
               : url.url;
-        if (urlStr.includes("/v1/preference-events/unsubscribe-all")) {
+        const { origin, pathname } = new URL(urlStr);
+        if (
+          origin === "http://api.test" &&
+          pathname === "/v1/preference-events/unsubscribe-all"
+        ) {
           return Promise.resolve(new Response("boom", { status: 500 }));
         }
-        if (urlStr.includes("/v1/preference-events")) {
+        if (
+          origin === "http://api.test" &&
+          pathname === "/v1/preference-events"
+        ) {
           apiCalls.push({ url: urlStr, options: options || {} });
           return Promise.resolve(
             new Response(
@@ -1096,17 +1103,23 @@ describe("unsubscribeGlobally — API first, local fallback", () => {
       "fetch",
       (url: string | URL | Request, options: RequestInit = {}) => {
         const urlStr = urlOf(url);
-        if (urlStr.includes("/v1/preference-events/unsubscribe-all")) {
+        // Exact origin and path, not substrings: "http://api.test.example"
+        // is another host.
+        const { origin, pathname } = new URL(urlStr);
+        if (
+          origin === API_URL &&
+          pathname === "/v1/preference-events/unsubscribe-all"
+        ) {
           unsubscribeAllCalls.push({ url: urlStr, options });
           return unsubscribeAll(options);
         }
-        if (urlStr.includes("/v1/preference-events")) {
+        if (origin === API_URL && pathname === "/v1/preference-events") {
           eventCalls.push({ url: urlStr, options });
           return Promise.resolve(
             Response.json({ success: true, subscribed: 0, unsubscribed: 0 })
           );
         }
-        if (urlStr.startsWith(API_URL)) {
+        if (origin === API_URL) {
           otherApiCalls.push({ url: urlStr, options });
           return Promise.resolve(new Response("unexpected", { status: 418 }));
         }

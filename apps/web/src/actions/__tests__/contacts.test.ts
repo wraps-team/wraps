@@ -140,7 +140,7 @@ beforeAll(() => {
           : url instanceof URL
             ? url.toString()
             : url.url;
-      if (urlStr.includes("/v1/contacts/events/updated")) {
+      if (new URL(urlStr).pathname === "/v1/contacts/events/updated") {
         return Promise.resolve(Response.json({ accepted: 0 }));
       }
       return originalFetchForContactUpdated(url as RequestInfo, options);
