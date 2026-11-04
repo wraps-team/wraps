@@ -36,13 +36,15 @@ If you keep the keys in `.env.local` instead, `vitest` does not read that file f
 
 ## `pnpm check:all` in a fresh checkout
 
-`pnpm install` is **not** enough for `check:all` in a tree nobody has built in — a fresh
-clone, a CI runner, or an isolated git worktree. Its `typecheck:infra` step
+`pnpm install` is all `check:all` needs in a tree nobody has built in: a fresh clone, a CI
+runner, or an isolated git worktree. Its `typecheck:infra` step
 (`scripts/typecheck-infra.sh`) runs the root `tsc` over `sst.config.ts` and
 `infra/selfhost.config.ts`, and both files open with
 `/// <reference path="./.sst/platform/config.d.ts" />`. That file is *generated*, never
 built, so no amount of `turbo run build` produces it. The script checks for both
-directories first and prints these commands when one is missing. Bootstrap it:
+directories first and, when one is missing, runs the two `sst install` commands itself
+(about 20 seconds, no AWS credentials). It prints the commands and exits 1 only if one of
+them fails. To bootstrap by hand, for example to run `tsc` directly:
 
 ```bash
 pnpm install
