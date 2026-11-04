@@ -6,6 +6,9 @@
 //   node scripts/test-db/ci-branch.mjs ensure   find or create this run's branch
 //   node scripts/test-db/ci-branch.mjs push     drizzle-kit push to that branch
 //   node scripts/test-db/ci-branch.mjs delete   delete it when the run ends
+//   node scripts/test-db/ci-branch.mjs refresh-parent [--dry-run]
+//       push main's schema to the project's default branch, the parent every
+//       branch is cut from (refresh-test-parent.yml, on schema changes to main)
 //
 // The branch is `ci-<sha7>-<run_id>-<run_attempt>`. Every DB job of a run
 // computes the same name and runs `ensure` itself, so the jobs converge on one
@@ -47,6 +50,14 @@ const PUSH_TIMEOUT_MS = 3 * 60_000;
 const INTERACTIVE_PROMPT = /Interactive prompts require a TTY/;
 const PUSH_SUCCEEDED = /Changes applied|No changes detected/;
 const LOCK_TIMEOUT = "5min";
+const PR_PROMPT_ADVICE =
+  "Either the wraps-test parent is behind main (a table both gains and loses a column; check the latest Refresh test parent run), or this PR renames one. If the parent is behind, refresh it from current main (`pnpm test-db:refresh` on main). For a real rename, refresh it from this PR rebased on main, then merge the PR straight away: until then the parent is ahead of every other run";
+const PARENT_PROMPT_ADVICE =
+  "A rename landed on main. Refresh the parent once by hand from a checkout of main (`pnpm test-db:refresh`) and answer the prompt; later refreshes see no diff";
+// Endpoint host prefixes of the prod and dev databases in the old shared
+// project. The test project must hold neither (plan 031, P1).
+const FORBIDDEN_HOST_PREFIXES = ["ep-damp-heart", "ep-autumn-block"];
+const TEST_BRANCH_PREFIXES = ["wt-", "ci-"];
 // Any constant works; it only has to be the same in every job of the run.
 const PUSH_LOCK_KEY = 31_031;
 // What a 404 means for each operation this script and the resolver make.
@@ -463,11 +474,12 @@ function runDrizzlePush(spawnImpl, directUrl, log) {
  *
  * @param {number} code
  * @param {string} output
+ * @param {string} [promptAdvice] what to do about a rename prompt
  * @returns {string | null}
  */
-export function pushFailure(code, output) {
+export function pushFailure(code, output, promptAdvice = PR_PROMPT_ADVICE) {
   if (INTERACTIVE_PROMPT.test(output)) {
-    return "drizzle-kit asked whether a column or table was renamed, which --force does not answer. Either the wraps-test parent is behind main (a table both gains and loses a column), or this PR renames one. If the parent is behind, refresh it from current main (`pnpm test-db:refresh` on main). For a real rename, refresh it from this PR rebased on main, then merge the PR straight away: until then the parent is ahead of every other run";
+    return `drizzle-kit asked whether a column or table was renamed, which --force does not answer. ${promptAdvice}`;
   }
   if (code !== 0) {
     return `exit ${code}`;
@@ -589,18 +601,20 @@ async function withPushLock(directUrl, io, label, body) {
  *
  * @param {CiIo} io
  * @param {string} directUrl
- * @param {string} label
- * @param {string} consequence what a failure means, appended to the error
+ * @param {{label: string, consequence: string, promptAdvice?: string}} report
+ *   the target's name, what a failure means, and what to do about a rename
+ *   prompt
  * @returns {Promise<boolean>}
  */
-async function checkedPush(io, directUrl, label, consequence) {
+async function checkedPush(io, directUrl, report) {
+  const { label, consequence, promptAdvice = PR_PROMPT_ADVICE } = report;
   const log = logger(io);
   const { code, output } = await runDrizzlePush(
     io.spawnImpl ?? spawn,
     directUrl,
     log
   );
-  const failure = pushFailure(code, output);
+  const failure = pushFailure(code, output, promptAdvice);
   if (failure) {
     log(
       `::error::[ci-branch] drizzle-kit push to ${label} failed: ${failure}. ${consequence}`
@@ -649,12 +663,10 @@ export async function pushSchema(env, io = {}) {
       );
       return { exitCode: 0, status: "skipped" };
     }
-    const ok = await checkedPush(
-      io,
-      directUrl,
-      branchName,
-      "The tests would run against a stale schema"
-    );
+    const ok = await checkedPush(io, directUrl, {
+      label: branchName,
+      consequence: "The tests would run against a stale schema",
+    });
     if (!ok) {
       return { exitCode: 1, status: "failed" };
     }
@@ -690,6 +702,154 @@ async function markPushed(client, branchName, log) {
   }
 }
 
+/**
+ * Checks that the project is the test-only one and that `parent` is its
+ * default branch, the one TEST_DATABASE_URL points at. Returns why not, or
+ * null. Never names a host.
+ *
+ * @param {{id: string, name: string, default?: boolean}[]} branches
+ * @param {{host: string, branch_id: string}[]} endpoints
+ * @param {string} baseHost TEST_DATABASE_URL's host
+ * @returns {string | null}
+ */
+export function parentTargetProblem(branches, endpoints, baseHost) {
+  const defaults = branches.filter((b) => b.default === true);
+  if (defaults.length !== 1) {
+    return `the project has ${defaults.length} default branches, expected exactly 1`;
+  }
+  const parent = defaults[0];
+
+  if (
+    endpoints.some((e) =>
+      FORBIDDEN_HOST_PREFIXES.some((p) => e.host.startsWith(p))
+    )
+  ) {
+    return "the project has a prod or dev endpoint: NEON_PROJECT_ID is not the test-only project";
+  }
+  const byId = new Map(branches.map((b) => [b.id, b]));
+  const stray = endpoints.filter((e) => {
+    const branch = byId.get(e.branch_id);
+    return !(
+      branch &&
+      (branch.id === parent.id ||
+        TEST_BRANCH_PREFIXES.some((p) => branch.name.startsWith(p)))
+    );
+  });
+  if (stray.length > 0) {
+    return `${stray.length} endpoint(s) belong to neither the default branch nor a wt-*/ci-* branch: NEON_PROJECT_ID may not be the test-only project`;
+  }
+
+  const strippedHost = baseHost.replace("-pooler.", ".");
+  const baseEndpoint = endpoints.find((e) => e.host === strippedHost);
+  if (!baseEndpoint) {
+    return "TEST_DATABASE_URL's host matches no endpoint in NEON_PROJECT_ID";
+  }
+  if (baseEndpoint.branch_id !== parent.id) {
+    return "TEST_DATABASE_URL points at a branch other than the project's default branch";
+  }
+  return null;
+}
+
+/**
+ * Lists the project's branches and endpoints.
+ *
+ * @param {import("./resolve-branch.mjs").ResolverOpts} opts
+ * @param {string} apiKey
+ * @param {string} projectId
+ */
+async function projectInventory(opts, apiKey, projectId) {
+  const branches = await listBranches(opts, apiKey, projectId);
+  const res = await neonFetch(
+    opts,
+    apiKey,
+    `${NEON_API_BASE}/projects/${projectId}/endpoints`,
+    { method: "GET" }
+  );
+  if (!res.ok) {
+    throw await NeonApiError.fromResponse("list endpoints", res);
+  }
+  const { endpoints = [] } = await res.json();
+  return { branches, endpoints };
+}
+
+/**
+ * Pushes the checked-out schema (main's, in refresh-test-parent.yml) to the
+ * project's default branch, the parent every wt-* and ci-* branch is cut
+ * from, under the same advisory lock and prompt detection as `push`.
+ * Refuses unless the project is the test-only one and TEST_DATABASE_URL
+ * names its default branch. No fallback: it gates nothing, so it fails red.
+ * `dryRun` resolves and checks the target, then stops before the lock.
+ *
+ * @param {Record<string, string | undefined>} env
+ * @param {CiIo & {dryRun?: boolean}} [io]
+ * @returns {Promise<{exitCode: number, status: "pushed" | "checked" | "refused" | "failed"}>}
+ */
+export async function refreshParent(env, io = {}) {
+  const log = logger(io);
+  const fail = (status, message) => {
+    log(`::error::[ci-branch] refresh-parent: ${message}`);
+    return { exitCode: 1, status };
+  };
+  if (!(env.NEON_API_KEY && env.NEON_PROJECT_ID && env.TEST_DATABASE_URL)) {
+    return fail(
+      "refused",
+      "NEON_API_KEY, NEON_PROJECT_ID and TEST_DATABASE_URL must all be set"
+    );
+  }
+
+  const apiKey = env.NEON_API_KEY;
+  const projectId = env.NEON_PROJECT_ID;
+  const opts = { fetchImpl: io.fetchImpl };
+  let parent;
+  let directUri;
+  try {
+    const parsedBase = new URL(env.TEST_DATABASE_URL);
+    const { branches, endpoints } = await projectInventory(
+      opts,
+      apiKey,
+      projectId
+    );
+    const problem = parentTargetProblem(
+      branches,
+      endpoints,
+      parsedBase.hostname
+    );
+    if (problem) {
+      return fail("refused", `refusing to push: ${problem}`);
+    }
+    parent = branches.find((b) => b.default === true);
+    ({ directUri } = await branchUris(opts, {
+      apiKey,
+      projectId,
+      branchId: parent.id,
+      parsedBase,
+      pooled: false,
+    }));
+  } catch (err) {
+    return fail("failed", describeNeonError(err));
+  }
+  maskUri(log, directUri);
+
+  const label = `the test parent (default branch ${parent.name})`;
+  if (io.dryRun) {
+    log(`[ci-branch] dry run: would push the schema to ${label}`);
+    return { exitCode: 0, status: "checked" };
+  }
+  return await withPushLock(directUri, io, label, async () => {
+    const ok = await checkedPush(io, directUri, {
+      label,
+      consequence:
+        "New ci-* branches start from the old schema, and each run's own push makes up the difference until the parent is refreshed",
+      promptAdvice: PARENT_PROMPT_ADVICE,
+    });
+    if (!ok) {
+      return { exitCode: 1, status: "failed" };
+    }
+    log(`[ci-branch] schema pushed to ${label}`);
+    return { exitCode: 0, status: "pushed" };
+  });
+}
+
 async function main(argv) {
   const [command, name] = argv;
   switch (command) {
@@ -700,9 +860,13 @@ async function main(argv) {
       return (await pushSchema(process.env)).exitCode;
     case "delete":
       return (await deleteCiBranch(process.env, { branchName: name })).exitCode;
+    case "refresh-parent":
+      return (
+        await refreshParent(process.env, { dryRun: name === "--dry-run" })
+      ).exitCode;
     default:
       process.stderr.write(
-        "Usage: node scripts/test-db/ci-branch.mjs ensure | push | delete [ci-branch-name]\n"
+        "Usage: node scripts/test-db/ci-branch.mjs ensure | push | delete [ci-branch-name] | refresh-parent [--dry-run]\n"
       );
       return 2;
   }

@@ -30,13 +30,26 @@ node scripts/test-db/reap-branches.mjs --all  # also delete LIVE wt-* branches
 **Remove the worktree first, then reap.** The reaper identifies orphans by the absence of
 the checkout, so reaping first finds nothing and leaves the branch live indefinitely.
 
-## After a schema change lands on main: refresh the parent from main
+## The parent follows main on its own
 
-This is a standing rule, not an optional step. Every CI run branches from the parent, and
-its schema push fails on drizzle-kit's rename prompt once the parent drifts far enough
-behind main (`docs/agents/ci-and-deploy.md`). Run the refresh below from a checkout of
-**main**. Never refresh the parent from an unmerged PR; the one exception is a real rename,
-which that doc covers.
+Every CI run and every worktree branches from the parent, the `wraps-test` project's
+default branch. `.github/workflows/refresh-test-parent.yml` keeps it on main's schema: on
+every push to main that touches `packages/db/src/schema/**`, `packages/db/src/migrations/**`
+or `packages/db/drizzle.config.ts`, it runs `ci-branch.mjs refresh-parent`, which pushes
+main's schema to the default branch. It refuses unless the project is the test-only one
+and `TEST_DATABASE_URL` names that default branch, and it never gates a deploy.
+
+Refresh the parent by hand (`pnpm test-db:refresh`, from a checkout of **main**) only to
+recover:
+
+- **The refresh run failed on a rename.** drizzle-kit asks whether a column or table was
+  renamed, which no runner can answer. Run it by hand once and answer the prompt; later
+  refreshes see no diff.
+- **The refresh run failed for another reason**, or the parent drifted some other way.
+  Re-run the workflow (`workflow_dispatch`) or refresh by hand.
+
+Never refresh the parent from an unmerged PR; the one exception is a real rename that CI
+can't get past, covered in `docs/agents/ci-and-deploy.md`.
 
 ## After a migration lands: refresh — two steps, not one
 

@@ -1,0 +1,63 @@
+name: Refresh test parent
+
+# Pushes main's DB schema to the wraps-test Neon project's default branch, the
+# parent every ci-* and wt-* test branch is cut from, so it never drifts behind
+# main. A parent too far behind makes each CI run's own schema push hit
+# drizzle-kit's rename prompt and fail (docs/agents/ci-and-deploy.md).
+#
+# A separate workflow on purpose: deploy-api.yml watches only the Test
+# workflow, so a red run here never gates a deploy. That is also why there is
+# no fallback: if Neon is down this fails, and the next schema change (or a
+# manual dispatch) retries.
+#
+# A rename on main fails this run with a pointer to the one-off manual
+# refresh (`pnpm test-db:refresh` from main), which answers the prompt.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/db/src/schema/**"
+      # The migrations live here, not in packages/db/drizzle/.
+      - "packages/db/src/migrations/**"
+      - "packages/db/drizzle.config.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: refresh-test-parent
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    # Only main's schema may reach the parent: a dispatch from any other ref
+    # would push an unmerged schema under every other run.
+    if: github.repository == 'wraps-team/wraps' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Setup Node.js 24.x
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.x
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Refuses unless NEON_PROJECT_ID is the test-only project (no prod or
+      # dev endpoint) and TEST_DATABASE_URL names its default branch.
+      - name: Push main's schema to the test parent
+        run: node scripts/test-db/ci-branch.mjs refresh-parent
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+          TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}

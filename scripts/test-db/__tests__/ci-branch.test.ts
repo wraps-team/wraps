@@ -5,7 +5,9 @@ import {
   ciBranchName,
   deleteCiBranch,
   ensure,
+  parentTargetProblem,
   pushSchema,
+  refreshParent,
 } from "../ci-branch.mjs";
 import { expiresAtFrom } from "../resolve-branch.mjs";
 
@@ -766,5 +768,215 @@ describe("pushSchema", () => {
 
     expect(result).toEqual({ exitCode: 1, status: "failed" });
     expect(h.order).not.toContain("mark");
+  });
+});
+
+describe("refreshParent", () => {
+  const PARENT_HOST = "ep-parent.us-east-2.aws.neon.tech";
+  const PARENT_DIRECT =
+    "postgresql://testrole:pp@ep-parent.us-east-2.aws.neon.tech/testdb?sslmode=require";
+  const BRANCHES = [
+    { id: "br-parent", name: "production", default: true },
+    { id: "br-wt", name: "wt-wraps", default: false },
+    { id: "br-ci", name: BRANCH, default: false },
+  ];
+  const ENDPOINTS = [
+    { host: PARENT_HOST, branch_id: "br-parent" },
+    { host: "ep-wt.us-east-2.aws.neon.tech", branch_id: "br-wt" },
+    { host: "ep-ci.us-east-2.aws.neon.tech", branch_id: "br-ci" },
+  ];
+
+  function refreshHarness({
+    branches = BRANCHES,
+    endpoints = ENDPOINTS,
+    stdout = "[✓] Changes applied\n",
+  } = {}) {
+    const calls: Call[] = [];
+    const fetchImpl = vi.fn(async (url: string, init: RequestInit = {}) => {
+      const parsed = new URL(url);
+      calls.push({
+        method: init.method ?? "GET",
+        path: parsed.pathname,
+        search: parsed.searchParams,
+      });
+      if (parsed.pathname.endsWith("/branches")) {
+        return jsonResponse({ branches });
+      }
+      if (parsed.pathname.endsWith("/endpoints")) {
+        return jsonResponse({ endpoints });
+      }
+      if (parsed.pathname.endsWith("/connection_uri")) {
+        return jsonResponse({ uri: PARENT_DIRECT });
+      }
+      throw new Error(`unhandled fetch: ${url}`);
+    });
+    const order: string[] = [];
+    const client = {
+      query: vi.fn(async (sql: string) => {
+        if (sql.includes("pg_advisory_lock")) {
+          order.push("lock");
+        }
+        return { rows: [] };
+      }),
+      end: vi.fn(async () => {
+        order.push("end");
+      }),
+    };
+    const connectPg = vi.fn(async () => client);
+    const spawnImpl = vi.fn((..._args: unknown[]) => {
+      order.push("push");
+      const child = Object.assign(new EventEmitter(), {
+        stdout: new EventEmitter(),
+        stderr: new EventEmitter(),
+        kill: vi.fn(),
+      });
+      setTimeout(() => {
+        child.stdout.emit("data", stdout);
+        child.emit("close", 0);
+      }, 0);
+      return child;
+    });
+    const lines: string[] = [];
+    const stdoutWrite = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+    return {
+      io: {
+        fetchImpl,
+        connectPg,
+        spawnImpl,
+        log: (l: string) => lines.push(l),
+      } as any,
+      calls,
+      connectPg,
+      spawnImpl,
+      order,
+      lines,
+      restore: () => stdoutWrite.mockRestore(),
+    };
+  }
+
+  const refreshEnv = {
+    NEON_API_KEY: "test-key",
+    NEON_PROJECT_ID: "proj-1",
+    TEST_DATABASE_URL: BASE_URL,
+  };
+
+  it("resolves the default branch and pushes to its direct URI under the lock", async () => {
+    const h = refreshHarness();
+    const result = await refreshParent(refreshEnv, h.io);
+    h.restore();
+
+    expect(result).toEqual({ exitCode: 0, status: "pushed" });
+    const conn = h.calls.find((c) => c.path.endsWith("/connection_uri"));
+    expect(conn?.search.get("branch_id")).toBe("br-parent");
+    expect(conn?.search.get("pooled")).toBe("false");
+    expect(h.connectPg).toHaveBeenCalledWith(PARENT_DIRECT);
+    const [, , options] = h.spawnImpl.mock.calls[0] as [string, string[], any];
+    expect(options.env.DATABASE_URL).toBe(PARENT_DIRECT);
+    expect(h.order).toEqual(["lock", "push", "end"]);
+    expect(h.lines).toContain(`::add-mask::${PARENT_DIRECT}`);
+  });
+
+  it("fails red on a rename prompt, pointing at a manual refresh from main", async () => {
+    const h = refreshHarness({
+      stdout:
+        "Error: Interactive prompts require a TTY terminal (process.stdin.isTTY or process.stdout.isTTY is false).\n",
+    });
+    const result = await refreshParent(refreshEnv, h.io);
+    h.restore();
+
+    expect(result).toEqual({ exitCode: 1, status: "failed" });
+    const error = h.lines.find((l) => l.startsWith("::error::")) ?? "";
+    expect(error).toContain("A rename landed on main");
+    expect(error).toContain("pnpm test-db:refresh");
+  });
+
+  it("with --dry-run, checks the target and stops before the lock", async () => {
+    const h = refreshHarness();
+    const result = await refreshParent(refreshEnv, { ...h.io, dryRun: true });
+    h.restore();
+
+    expect(result).toEqual({ exitCode: 0, status: "checked" });
+    expect(h.connectPg).not.toHaveBeenCalled();
+    expect(h.spawnImpl).not.toHaveBeenCalled();
+  });
+
+  it("refuses without touching the database when the guard fails", async () => {
+    const h = refreshHarness({
+      endpoints: [
+        ...ENDPOINTS,
+        { host: "ep-damp-heart-123.us-east-2.aws.neon.tech", branch_id: "x" },
+      ],
+    });
+    const result = await refreshParent(refreshEnv, h.io);
+    h.restore();
+
+    expect(result).toEqual({ exitCode: 1, status: "refused" });
+    expect(h.calls.some((c) => c.path.endsWith("/connection_uri"))).toBe(false);
+    expect(h.connectPg).not.toHaveBeenCalled();
+    const error = h.lines.find((l) => l.startsWith("::error::")) ?? "";
+    expect(error).not.toContain("ep-damp-heart");
+  });
+
+  it("fails without secrets rather than falling back", async () => {
+    const h = refreshHarness();
+    const result = await refreshParent({ NEON_API_KEY: "k" }, h.io);
+    h.restore();
+
+    expect(result).toEqual({ exitCode: 1, status: "refused" });
+    expect(h.calls).toEqual([]);
+  });
+
+  describe("parentTargetProblem", () => {
+    it("accepts the default branch named by TEST_DATABASE_URL, with only wt-*/ci-* beside it", () => {
+      expect(
+        parentTargetProblem(
+          BRANCHES,
+          ENDPOINTS,
+          "ep-parent-pooler.us-east-2.aws.neon.tech"
+        )
+      ).toBeNull();
+    });
+
+    it.each([
+      [
+        "a prod endpoint",
+        BRANCHES,
+        [...ENDPOINTS, { host: "ep-autumn-block-9.x", branch_id: "br-wt" }],
+        PARENT_HOST,
+        "prod or dev endpoint",
+      ],
+      [
+        "an endpoint on a branch that is neither default nor wt-*/ci-*",
+        [...BRANCHES, { id: "br-dev", name: "dev", default: false }],
+        [...ENDPOINTS, { host: "ep-dev.x", branch_id: "br-dev" }],
+        PARENT_HOST,
+        "neither the default branch",
+      ],
+      [
+        "no default branch",
+        BRANCHES.map((b) => ({ ...b, default: false })),
+        ENDPOINTS,
+        PARENT_HOST,
+        "0 default branches",
+      ],
+      [
+        "TEST_DATABASE_URL naming a wt-* branch",
+        BRANCHES,
+        ENDPOINTS,
+        "ep-wt.us-east-2.aws.neon.tech",
+        "other than the project's default branch",
+      ],
+      [
+        "TEST_DATABASE_URL naming no endpoint",
+        BRANCHES,
+        ENDPOINTS,
+        "ep-elsewhere.x",
+        "matches no endpoint",
+      ],
+    ])("refuses %s", (_case, branches, endpoints, host, phrase) => {
+      expect(parentTargetProblem(branches, endpoints, host)).toContain(phrase);
+    });
   });
 });

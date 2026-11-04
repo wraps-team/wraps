@@ -69,8 +69,9 @@ named `ci-<sha7>-<run_id>-<run_attempt>` (on a PR, `sha7` is the merge commit).
   doesn't answer that, and a runner has no TTY. (drizzle-kit exits 0 there;
   `ci-branch.mjs` reads its output to catch it.) The prompt fires in two cases:
   - **The parent is behind main**: a table gains one column and loses another relative
-    to the parent. Refresh the parent from current main (`pnpm test-db:refresh` in a
-    checkout of main) and re-run.
+    to the parent. `refresh-test-parent.yml` keeps the parent on main's schema, so this
+    means its latest run failed (most often on a rename that landed on main). Refresh the
+    parent from current main (`pnpm test-db:refresh` in a checkout of main) and re-run.
   - **The PR really renames something.** Refresh the parent from the PR rebased on main,
     answer the prompt, and merge the PR straight away: until it merges, the parent is
     ahead of main and every other run sees the rename in reverse.
@@ -102,6 +103,24 @@ job, `pnpm install` and its lifecycle scripts included, not only the test step. 
 masked in the logs (URI, endpoint host and password), and they open only this run's
 branch, which is deleted at the end. When checked on 2026-11-03, a new `ci-*` branch's
 role password differed from the parent's, so a leaked branch URL did not open the parent.
+
+## `refresh-test-parent.yml` keeps the test parent on main's schema
+
+On a push to main that changes `packages/db/src/schema/**`, `packages/db/src/migrations/**`
+or `packages/db/drizzle.config.ts` (or on `workflow_dispatch` from main), it runs
+`ci-branch.mjs refresh-parent`. That pushes main's schema to the `wraps-test` default
+branch with the same drizzle-kit wrapper, prompt detection and advisory lock as `push`.
+
+- It refuses unless the project has no prod or dev endpoint (the P1 host-prefix check),
+  every endpoint belongs to the default branch or a `wt-*`/`ci-*` branch, and
+  `TEST_DATABASE_URL` names the default branch.
+- It is its own workflow so it can never gate `deploy-api.yml`, which watches only Test.
+  So it has no fallback: a Neon failure turns it red, and nothing waits on it.
+- A rename on main turns it red with a pointer to the one-off manual refresh
+  (`docs/agents/test-database.md`). Do it promptly: until then every CI run's own push
+  hits the same prompt and fails. After any other failure, each run's push makes up the
+  difference on its own branch.
+- `refresh-parent --dry-run` resolves and checks the target, then stops before pushing.
 
 ## A red `test-api`/`test-web` on the shared database is usually contention
 
