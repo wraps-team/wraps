@@ -503,9 +503,10 @@ export const updateContact = orgAction(
     const updateData: Partial<InsertContactData> = {
       updatedAt: new Date(),
     };
-    // Set when an email is added to a contact that had none and the caller
-    // sent no status: it starts "active", as createContact does (and as the
-    // phone branch below defaults smsStatus).
+    // Fills a gap only: when an email is added to a contact that has no email
+    // and no email status, and the caller sent no status, it starts "active",
+    // as createContact does. A stored status (say "unsubscribed" set through
+    // the API) is a decision and is left alone.
     let defaultEmailStatus: EmailStatus | undefined;
 
     // Handle email update
@@ -532,7 +533,11 @@ export const updateContact = orgAction(
 
         updateData.email = email;
         updateData.emailHash = emailHashValue;
-        if (!existing.email && data.emailStatus === undefined) {
+        if (
+          !existing.email &&
+          existing.emailStatus == null &&
+          data.emailStatus === undefined
+        ) {
           defaultEmailStatus = "active";
         }
       } else {

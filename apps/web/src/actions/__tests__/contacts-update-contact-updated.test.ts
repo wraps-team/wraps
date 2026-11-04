@@ -246,6 +246,37 @@ describe("updateContact reports contact_updated", () => {
     expect(reportedFields()).toEqual([["email", "emailStatus"]]);
   });
 
+  it("adding an email to a contact that already has an email status keeps it", async () => {
+    // Reachable through the API: PATCH and POST store a status without an
+    // email. The sheet shows it and, untouched, does not send it.
+    await db
+      .update(contact)
+      .set({
+        email: null,
+        emailHash: null,
+        emailStatus: "unsubscribed",
+        emailVerifiedAt: null,
+        phone: "+15550005555",
+      })
+      .where(eq(contact.id, CONTACT_ID));
+
+    const result = await updateContact(CONTACT_ID, testOrg.id, {
+      email: `${PREFIX}-kept@example.com`,
+    });
+
+    expect(result.success).toBe(true);
+    const [row] = await db
+      .select({
+        emailStatus: contact.emailStatus,
+        emailVerifiedAt: contact.emailVerifiedAt,
+      })
+      .from(contact)
+      .where(eq(contact.id, CONTACT_ID));
+    expect(row.emailStatus).toBe("unsubscribed");
+    expect(row.emailVerifiedAt).toBeNull();
+    expect(reportedFields()).toEqual([["email"]]);
+  });
+
   it("adding an email with a chosen status keeps that status", async () => {
     await db
       .update(contact)
