@@ -1579,7 +1579,7 @@ const AMAZON_SES_VS_RESEND: VersusPage = {
     "A dashboard, a domain verification flow and a log view exist without anybody wiring them up, which is three projects that never appear on your backlog.",
   ],
   consB: [
-    "Ten API requests per second per team on every self-serve tier (Free, Pro and Scale), with no plan that raises it, so anything batch-shaped gets a queue you build and keep running unless Resend lifts the limit for you on request.",
+    "Ten API requests per second per team on every self-serve tier (Free, Pro and Scale), with no self-serve plan that raises it, so anything batch-shaped gets a queue you build and keep running unless Resend lifts the limit for you on request.",
     "Logs are purged at thirty days on every plan short of Enterprise, which covers an integration bug and does not cover a billing dispute, a compliance request or a year-over-year comparison.",
     "The standing you send on is theirs and shared, so a spike in your traffic can be paused by a platform making the correct decision for everybody else on the pool.",
     "Marketing contacts are metered separately from sends, so a list that grows on its own raises the invoice in a month when nothing was mailed to it.",
@@ -4566,7 +4566,7 @@ const RESEND_VS_SENDGRID: VersusPage = {
     {
       question: "Does the ten-requests-per-second limit apply to bulk sends?",
       answer:
-        "It applies to API requests, so the batch endpoint, which sends up to 100 emails in a single API call, goes considerably further than sending one message per call. The constraint bites hardest on architectures that loop over a list making individual calls, which is the shape most application code arrives in. The point worth internalising is that no plan raises the default, so if your traffic is batch-shaped you build the queue, or ask Resend to lift the limit for a trusted account.",
+        "It applies to API requests, so the batch endpoint, which sends up to 100 emails in a single API call, goes considerably further than sending one message per call. The constraint bites hardest on architectures that loop over a list making individual calls, which is the shape most application code arrives in. The point worth internalising is that no self-serve plan raises the default, so if your traffic is batch-shaped you build the queue, or ask Resend to lift the limit for a trusted account.",
     },
     {
       question: "Which one is better for deliverability?",
@@ -4645,7 +4645,7 @@ const MAILGUN_VS_RESEND: VersusPage = {
     {
       heading: "The throughput ceiling",
       a: "Mailgun's constraint is the plan's included volume rather than a request rate, so a burst costs money rather than time. Batch sending is ordinary and the API expects it. For a nightly digest to a large list this is simply not a design consideration, which is a quiet luxury that only becomes visible when you compare against something that caps you.",
-      b: "Ten API requests per second per team on every self-serve tier, and no plan raises it; Resend lifts it for trusted senders on request. Resend's batch endpoint sends up to 100 emails in a single API call, and its pricing FAQ says each batch request counts as a single request against the limit, which stretches this to roughly a thousand emails a second (the batch endpoint does not support attachments yet), but any architecture that loops over a list making individual calls will meet the limit on a large run. It matters most for bursty traffic written as one call per message.",
+      b: "Ten API requests per second per team on every self-serve tier, and no self-serve plan raises it; Resend lifts it for trusted senders on request. Resend's batch endpoint sends up to 100 emails in a single API call, and its pricing FAQ says each batch request counts as a single request against the limit, which stretches this to roughly a thousand emails a second (the batch endpoint does not support attachments yet), but any architecture that loops over a list making individual calls will meet the limit on a large run. It matters most for bursty traffic written as one call per message.",
     },
     {
       heading: "Templates and the developer experience gap",
@@ -5776,7 +5776,7 @@ const BREVO_VS_RESEND: VersusPage = {
     {
       question: "Does the ten-per-second limit affect campaigns?",
       answer:
-        "Noticeably at larger list sizes, if the send loop was written naively. Ten thousand recipients at ten calls a second is about seventeen minutes of drip, a hundred thousand is close to three hours, and no plan changes the default. The relief is the batch endpoint, which sends up to 100 emails in a single API call and so multiplies your effective throughput by up to a hundred. The point is that this is a design decision rather than a purchase: write the fan-out against batches on day one, because retrofitting it during the week of a launch is the worst possible time to discover the constraint.",
+        "Noticeably at larger list sizes, if the send loop was written naively. Ten thousand recipients at ten calls a second is about seventeen minutes of drip, a hundred thousand is close to three hours, and no self-serve plan changes the default. The relief is the batch endpoint, which sends up to 100 emails in a single API call and so multiplies your effective throughput by up to a hundred. The point is that this is a design decision rather than a purchase: write the fan-out against batches on day one, because retrofitting it during the week of a launch is the worst possible time to discover the constraint.",
     },
     {
       question: "Can I use React Email without switching vendors?",
@@ -5899,7 +5899,7 @@ const CUSTOMER_IO_VS_RESEND: VersusPage = {
   ],
   migrationChecklist: [
     "Inventory the sequences and count the branches, because that number is the migration. A linear three-message welcome with no conditions is a week of work on a send API. Anything with a branch, a wait that depends on behaviour, or an exit condition that has to fire the instant somebody converts is where the quarter goes, and the count of those is knowable today rather than after the decision.",
-    "Design the fan-out against a ten-per-second default before writing a line of it. Lifecycle sequences are bursty by nature — a cohort becomes eligible at the same moment and everybody expects their message at nine. That pattern meets the limit quickly at any real cohort size, no tier raises it, and the batch endpoint, at up to 100 emails in a single API call, is the whole of the relief. A drip over twenty minutes is an acceptable answer; discovering it is the answer during a launch is not.",
+    "Design the fan-out against a ten-per-second default before writing a line of it. Lifecycle sequences are bursty by nature — a cohort becomes eligible at the same moment and everybody expects their message at nine. That pattern meets the limit quickly at any real cohort size, no self-serve tier raises it, and the batch endpoint, at up to 100 emails in a single API call, is the whole of the relief. A drip over twenty minutes is an acceptable answer; discovering it is the answer during a launch is not.",
     "Work out which of your segment rules need a window longer than thirty days, because those are the ones that stop being computable. A platform built around a persistent profile keeps engagement history because its own segments depend on it; a sending API purges logs at thirty days on every plan short of the top one. A re-engagement rule about ninety days of silence needs the events to already be landing in your own storage, and there is no way to reconstruct them later.",
     "Map subscription topics down to what audiences can express, and be honest that it is less. One side lets a person opt out of a topic and honours it on every subsequent send; the other attaches an unsubscribe to an audience used for broadcasts and has no equivalent for transactional mail. Somebody who wanted the product notices but not the digest is the case that breaks, and it breaks silently in the direction of sending too much.",
     "Re-key every dashboard, because the webhooks identify different things. Reporting events from a workflow engine carry the campaign and the journey the message belonged to; events from a sending API carry the message. If anything downstream aggregates by campaign, that dimension does not exist unless you attach your own tags at send time, and a dashboard fed the new events without that change produces numbers that look plausible and are not.",
@@ -5940,7 +5940,7 @@ const CUSTOMER_IO_VS_RESEND: VersusPage = {
     {
       question: "What happens when I outgrow Resend's rate limit?",
       answer:
-        "You batch, and then you queue. Sending up to 100 emails in a single API call through the batch endpoint stretches the ten-per-second default considerably, and beyond that you spread the fan-out over time or ask Resend to raise the limit for a trusted account. No plan raises it by itself, so this is mostly a design decision rather than a purchase. For a lifecycle sequence that wakes up at nine and messages a large cohort, decide early whether a drip over twenty minutes is acceptable, because that is the shape you will be living with.",
+        "You batch, and then you queue. Sending up to 100 emails in a single API call through the batch endpoint stretches the ten-per-second default considerably, and beyond that you spread the fan-out over time or ask Resend to raise the limit for a trusted account. No self-serve plan raises it by itself, so this is mostly a design decision rather than a purchase. For a lifecycle sequence that wakes up at nine and messages a large cohort, decide early whether a drip over twenty minutes is acceptable, because that is the shape you will be living with.",
     },
     {
       question: "How do I build a segment like has not opened in ninety days?",
