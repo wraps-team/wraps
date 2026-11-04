@@ -90,7 +90,7 @@ function costsSection(): string {
       })).sort((a, b) => a.total - b.total)[0].id
   );
   const cheapestNote = cheapest.every((id) => id === cheapest[0])
-    ? `On sending fees alone ${SES_PLANS[cheapest[0]].name} is the cheapest plan at every volume in the table. The other plans charge more per email or a monthly fee, and buy features: for example inbox placement testing, managed dedicated IPs and email validations.`
+    ? `${SES_PLANS[cheapest[0]].name} is the cheapest plan on sending fees at every volume in the table. The other plans charge more per email or a monthly fee, and buy features: for example inbox placement testing, managed dedicated IPs and email validations.`
     : "";
 
   return `## What sending costs per month
@@ -103,7 +103,7 @@ ${cheapestNote}`;
 }
 
 function freeTierSection(): string {
-  return `## Free tier
+  return `## Does Amazon SES have a free tier?
 
 ${SES_FREE_TIER_ANSWER}`;
 }

@@ -102,7 +102,7 @@ describe("markdown content negotiation", () => {
     }
     expect(md).toContain(SES_FREE_TIER_ANSWER);
     // The claim in the markdown is derived from the rates, and holds today.
-    expect(md).toContain("À la carte is the cheapest plan at every volume");
+    expect(md).toContain("À la carte is the cheapest plan on sending fees");
     // Wraps' own plans are one link away, not inlined.
     expect(md).toContain("https://wraps.dev/pricing.md");
     expect(md).not.toContain("## Wraps plans");
