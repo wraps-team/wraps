@@ -25,11 +25,13 @@ import type { SesPlanId } from "@/lib/ses-cost";
 import {
   AWS_INFRA_PRICING,
   SES_EXAMPLE_VOLUMES,
+  SES_FREE_TIER_ANSWER,
   SES_PLAN_IDS,
   SES_PLAN_INCLUDES,
   SES_PLANS,
   SES_VOLUME_BANDS,
-  sesSendingCost,
+  sesBandRate,
+  sesMonthlyTotal,
 } from "@/lib/ses-cost";
 import SESCalculatorPageContent from "./page-content";
 
@@ -111,14 +113,8 @@ function formatUsd(amount: number): string {
   });
 }
 
-function bandRate(planId: SesPlanId, band: number): number {
-  const { tiers } = SES_PLANS[planId];
-  return (tiers[band] ?? tiers.at(-1) ?? tiers[0]).perThousandEmails;
-}
-
 function monthlyTotal(planId: SesPlanId, emails: number): number {
-  const plan = SES_PLANS[planId];
-  return plan.monthlyFee + sesSendingCost(plan, emails);
+  return sesMonthlyTotal(SES_PLANS[planId], emails);
 }
 
 const FAQS = [
@@ -134,8 +130,7 @@ const FAQS = [
   },
   {
     question: "Does AWS SES have a free tier?",
-    answer:
-      "Not a free sending allowance: the current Amazon SES pricing page lists none. New AWS customers get up to $200 in AWS Free Tier credits instead ($100 at sign-up and up to $100 more for trying services), and those credits can pay SES charges. The 3,000 free messages a month for the first 12 months that many guides quote still appears in the SES FAQ, but not on the pricing page. The Lambda, SQS and DynamoDB services behind an event pipeline have their own free tiers, which the calculator applies.",
+    answer: SES_FREE_TIER_ANSWER,
   },
   {
     question: "How much does a dedicated IP cost in AWS SES?",
@@ -264,7 +259,7 @@ export default function SESCalculatorPage() {
                         </TableCell>
                         {SES_VOLUME_BANDS.map((band, index) => (
                           <TableCell className="font-mono" key={band}>
-                            {formatRate(bandRate(id, index))}
+                            {formatRate(sesBandRate(SES_PLANS[id], index))}
                           </TableCell>
                         ))}
                         <TableCell className="min-w-64 whitespace-normal text-muted-foreground">

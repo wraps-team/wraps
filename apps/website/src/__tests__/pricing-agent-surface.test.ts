@@ -7,6 +7,7 @@ import { renderPricingMarkdown } from "@/lib/pricing-markdown";
 import { renderSesCalculatorMarkdown } from "@/lib/ses-calculator-markdown";
 import {
   estimateCost,
+  SES_FREE_TIER_ANSWER,
   SES_PLAN_IDS,
   SES_PLAN_INCLUDES,
   SES_PLANS,
@@ -99,7 +100,9 @@ describe("markdown content negotiation", () => {
     for (const id of SES_PLAN_IDS) {
       expect(md).toContain(SES_PLAN_INCLUDES[id]);
     }
-    expect(md).toMatch(/no free sending allowance/i);
+    expect(md).toContain(SES_FREE_TIER_ANSWER);
+    // The claim in the markdown is derived from the rates, and holds today.
+    expect(md).toContain("À la carte is the cheapest plan at every volume");
     // Wraps' own plans are one link away, not inlined.
     expect(md).toContain("https://wraps.dev/pricing.md");
     expect(md).not.toContain("## Wraps plans");

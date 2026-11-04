@@ -72,6 +72,20 @@ export function sesSendingCost(plan: SesPlan, emailsPerMonth: number): number {
   return cost;
 }
 
+/**
+ * The plan's rate in marginal band `band` (0-based). A flat plan such as
+ * à la carte charges one rate in every band.
+ */
+export function sesBandRate(plan: SesPlan, band: number): number {
+  const { tiers } = plan;
+  return (tiers[band] ?? tiers.at(-1) ?? tiers[0]).perThousandEmails;
+}
+
+/** Plan fee plus sending fees for `emailsPerMonth`. */
+export function sesMonthlyTotal(plan: SesPlan, emailsPerMonth: number): number {
+  return plan.monthlyFee + sesSendingCost(plan, emailsPerMonth);
+}
+
 export const SES_PLANS: Record<SesPlanId, SesPlan> = {
   alacarte: {
     id: "alacarte",
@@ -157,6 +171,12 @@ export const SES_VOLUME_BANDS = [
   "10M to 100M",
   "Over 100M",
 ] as const;
+
+/**
+ * Free-tier facts, shared by the calculator page's FAQ and its markdown twin.
+ */
+export const SES_FREE_TIER_ANSWER =
+  "Not a free sending allowance: the current Amazon SES pricing page lists none. New AWS customers get up to $200 in AWS Free Tier credits instead ($100 at sign-up and up to $100 more for trying services), and those credits can pay SES charges. The 3,000 free messages a month for the first 12 months that many guides quote still appears in the SES FAQ, but not on the pricing page. The Lambda, SQS and DynamoDB services behind an event pipeline have their own free tiers, which the calculator applies.";
 
 /** Volumes for the worked-cost table. 20M crosses the first band boundary. */
 export const SES_EXAMPLE_VOLUMES = [
