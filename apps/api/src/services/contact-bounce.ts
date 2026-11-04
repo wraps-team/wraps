@@ -43,7 +43,11 @@ import {
   hashContactValue,
 } from "@wraps/db";
 import { and, inArray, isNull, lt, or, sql } from "drizzle-orm";
-import type { ContactChangeSource } from "./workflow-events";
+import { log } from "../lib/logger";
+import {
+  type ContactChangeSource,
+  emitContactsUpdated,
+} from "./workflow-events";
 
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type DbClient = typeof db | DbTransaction;
@@ -68,6 +72,36 @@ export function emitsContactUpdated(
     change.previousStatus !== change.newStatus &&
     change.newStatus !== "soft_bounced"
   );
+}
+
+/**
+ * Emit `contact_updated` (updatedFields ["emailStatus"]) for a write's result
+ * when `emitsContactUpdated` says it changed. Call it after the transaction
+ * has committed, and after any execution resume that goes with it. A failed
+ * emit is logged, never thrown: a committed status write must not become a
+ * 500 (a retry would hit the duplicate guard and skip the resume).
+ */
+export async function emitEmailStatusChange(
+  organizationId: string,
+  change: EmailStatusChange | null,
+  changeSource: ContactChangeSource,
+  messageId: string
+): Promise<void> {
+  if (!emitsContactUpdated(change)) {
+    return;
+  }
+  await emitContactsUpdated(organizationId, [
+    {
+      contactId: change.contactId,
+      updatedFields: ["emailStatus"],
+      changeSource,
+    },
+  ]).catch((err) => {
+    log.error("Failed to emit contact_updated event", err, {
+      organizationId,
+      messageId,
+    });
+  });
 }
 
 /**

@@ -59,7 +59,7 @@ import {
   clearSoftBounce,
   clearSoftBounceByRecipient,
   type EmailStatusChange,
-  emitsContactUpdated,
+  emitEmailStatusChange,
   findContactIdByRecipient,
   type LifecycleChange,
   markContactBounced,
@@ -67,7 +67,6 @@ import {
   markContactSuppressed,
   recordSoftBounce,
 } from "../services/contact-bounce";
-import { emitContactsUpdated } from "../services/workflow-events";
 import {
   deleteScheduledStep,
   enqueueWorkflowStep,
@@ -343,19 +342,13 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
         // contact_updated once the row and the contact write have committed.
         // Only the event that created the row carries a change, so a
         // duplicate emits nothing. A failed emit is logged, never a 500.
-        if (emitsContactUpdated(contactChange)) {
-          await emitContactsUpdated(account.organizationId, [
-            {
-              contactId: contactChange.contactId,
-              updatedFields: ["emailStatus"],
-              changeSource: contactChange.changeSource,
-            },
-          ]).catch((err) => {
-            log.error("Failed to emit contact_updated event", err, {
-              organizationId: account.organizationId,
-              messageId,
-            });
-          });
+        if (contactChange) {
+          await emitEmailStatusChange(
+            account.organizationId,
+            contactChange,
+            contactChange.changeSource,
+            messageId
+          );
         }
       }
       // Only the event that created the row records its diagnostic. A duplicate
@@ -519,23 +512,14 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
               account.organizationId
             );
           }
-          // After the transaction and the resume. A failed emit is logged,
-          // never a 500 (a retry would hit the duplicate guard and skip the
-          // resume).
-          if (emitsContactUpdated(change)) {
-            await emitContactsUpdated(account.organizationId, [
-              {
-                contactId: change.contactId,
-                updatedFields: ["emailStatus"],
-                changeSource: "ses_suppression",
-              },
-            ]).catch((err) => {
-              log.error("Failed to emit contact_updated event", err, {
-                organizationId: account.organizationId,
-                messageId,
-              });
-            });
-          }
+          // After the transaction and the resume (emitEmailStatusChange logs
+          // a failed emit, never throws).
+          await emitEmailStatusChange(
+            account.organizationId,
+            change,
+            "ses_suppression",
+            messageId
+          );
           break;
         }
 
@@ -927,22 +911,13 @@ async function processBounce(
         organizationId
       );
     }
-    // After the transaction and the resume. A failed emit is logged, never a
-    // 500 (a retry would hit the duplicate guard and skip the resume).
-    if (emitsContactUpdated(change)) {
-      await emitContactsUpdated(organizationId, [
-        {
-          contactId: change.contactId,
-          updatedFields: ["emailStatus"],
-          changeSource: "ses_suppression",
-        },
-      ]).catch((err) => {
-        log.error("Failed to emit contact_updated event", err, {
-          organizationId,
-          messageId,
-        });
-      });
-    }
+    // After the transaction and the resume.
+    await emitEmailStatusChange(
+      organizationId,
+      change,
+      "ses_suppression",
+      messageId
+    );
     return;
   }
 
@@ -1044,22 +1019,8 @@ async function processBounce(
 
   // After the transaction and the resume: a hard bounce, or soft bounces
   // escalating to `bounced` (a soft bounce that stays `soft_bounced` does not
-  // qualify). A failed emit is logged, never a 500 (a retry would hit the
-  // duplicate guard and skip the resume).
-  if (emitsContactUpdated(change)) {
-    await emitContactsUpdated(organizationId, [
-      {
-        contactId: change.contactId,
-        updatedFields: ["emailStatus"],
-        changeSource: "bounce",
-      },
-    ]).catch((err) => {
-      log.error("Failed to emit contact_updated event", err, {
-        organizationId,
-        messageId,
-      });
-    });
-  }
+  // qualify).
+  await emitEmailStatusChange(organizationId, change, "bounce", messageId);
 
   log.info("Webhook: message bounced", {
     messageId: message.id,
@@ -1164,22 +1125,8 @@ async function processComplaint(
     );
   }
 
-  // After the transaction and the resume. A failed emit is logged, never a
-  // 500 (a retry would hit the duplicate guard and skip the resume).
-  if (emitsContactUpdated(change)) {
-    await emitContactsUpdated(organizationId, [
-      {
-        contactId: change.contactId,
-        updatedFields: ["emailStatus"],
-        changeSource: "complaint",
-      },
-    ]).catch((err) => {
-      log.error("Failed to emit contact_updated event", err, {
-        organizationId,
-        messageId,
-      });
-    });
-  }
+  // After the transaction and the resume.
+  await emitEmailStatusChange(organizationId, change, "complaint", messageId);
 
   log.info("Webhook: message complained", { messageId: message.id });
 }
