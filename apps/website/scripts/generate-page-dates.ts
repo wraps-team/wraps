@@ -13,8 +13,10 @@
  *    computed at build time is not guaranteed to run at all.
  *
  * Committing the dates sidesteps all three. Run this before committing a
- * content change; sitemap.test.ts fails when a route's files have moved on
- * without it.
+ * content change, and commit page-dates.ts in the same commit; sitemap.test.ts
+ * fails when the newest commit touching a route's files left its entry alone.
+ * A squash merge restamps that commit's date but keeps both changes, so it
+ * passes.
  *
  *   pnpm sitemap:dates
  */

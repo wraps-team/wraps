@@ -64,8 +64,13 @@ For tabbed examples (multiple frameworks): use `CodeTabs` + `CodeTabItem`.
 5. Docs pages only: a nav entry in `src/components/docs-nav.tsx`
 6. `src/config/search-intent.ts` — declare the page's target query
 
-Editing an existing page also trips (3): regenerate and commit `page-dates.ts`.
-A rebase or squash re-triggers it, because the check compares committer dates.
+Editing an existing page also trips (3): regenerate and commit `page-dates.ts`
+in the same commit. The check passes when the newest commit touching a route's
+files also rewrote that route's entry in `page-dates.ts`, so squash merges are
+fine: GitHub restamps the squash commit with the merge time, but the commit still
+carries both the page edit and the regenerated entry. Only when the newest commit
+left the entry alone does it fall back to comparing committer dates. A later
+page edit that skips the regenerate fails it.
 
 ## Architecture
 

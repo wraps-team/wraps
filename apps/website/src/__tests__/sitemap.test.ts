@@ -9,9 +9,6 @@ import {
   staticPageRoutes,
 } from "@/lib/page-dates";
 
-/** A `git log --format=%cI` line, as opposed to a file path. */
-const ISO_DATE_LINE = /^\d{4}-\d{2}-\d{2}T/;
-
 const webRoot = resolve(__dirname, "..", "..");
 const repoRoot = resolve(webRoot, "..", "..");
 const appDir = resolve(webRoot, "src/app");
@@ -56,6 +53,61 @@ describe("sitemap lastmod manifest stays in sync with the pages", () => {
   });
 });
 
+/** A `git log --format=%x00%H…` header line, as opposed to a file path or diff line. */
+const COMMIT_MARK = "\u0000";
+
+/** A manifest key line: `  "/route": "date",` or the wrapped `  "/route":`. */
+const MANIFEST_KEY_LINE = /^[ +-]\s*"([^"]+)":/;
+
+/** The value line of a wrapped manifest entry: `    "2026-…",`. */
+const MANIFEST_VALUE_LINE = /^\+\s+"[^"]*",?$/;
+
+const manifestPath = relative(
+  repoRoot,
+  resolve(webRoot, "src/config/page-dates.ts")
+);
+
+function gitLog(args: string[]): string {
+  return execFileSync("git", ["log", ...args], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
+}
+
+/**
+ * For every commit that touched the manifest, the routes whose entry it
+ * added or rewrote. One `git log -p` pass. The generator wraps long entries
+ * onto two lines, so a changed value can sit under an unchanged key line:
+ * -U1 keeps that key in view, and the last key seen owns a `+` value line.
+ */
+function routesRegeneratedByCommit(): Map<string, Set<string>> {
+  const log = gitLog(["--format=%x00%H", "-p", "-U1", "--", manifestPath]);
+  const byCommit = new Map<string, Set<string>>();
+  let changed = new Set<string>();
+  let key: string | undefined;
+  for (const line of log.split("\n")) {
+    if (line.startsWith(COMMIT_MARK)) {
+      changed = new Set<string>();
+      byCommit.set(line.slice(COMMIT_MARK.length), changed);
+      key = undefined;
+    } else if (line.startsWith("@@")) {
+      key = undefined;
+    } else {
+      const match = MANIFEST_KEY_LINE.exec(line);
+      if (match?.[1] !== undefined) {
+        key = match[1];
+        if (line.startsWith("+")) {
+          changed.add(key);
+        }
+      } else if (key !== undefined && MANIFEST_VALUE_LINE.test(line)) {
+        changed.add(key);
+      }
+    }
+  }
+  return byCommit;
+}
+
 describe("sitemap lastmod manifest is not stale", () => {
   // Needs real history. Vercel and the default actions/checkout both clone
   // shallow, where `git log -- <path>` reports nothing for most files; this is
@@ -79,17 +131,20 @@ describe("sitemap lastmod manifest is not stale", () => {
   it.skipIf(!hasFullHistory)(
     "has no route whose committed files moved on without a regenerate",
     () => {
-      const log = execFileSync(
-        "git",
-        [
-          "log",
-          "--format=%cI",
-          "--name-only",
-          "--",
-          relative(repoRoot, appDir),
-        ],
-        { cwd: repoRoot, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }
-      );
+      // A route is in sync when the newest commit touching any of its files
+      // also rewrote its own manifest entry. Comparing dates alone breaks on
+      // squash merges: the PR regenerates the manifest with branch commit
+      // times, then GitHub stamps the squash commit with the (later) merge
+      // time, so every route the PR touched looks stale on main. A page edit
+      // that skipped `pnpm sitemap:dates` still fails: its commit leaves the
+      // route's entry alone. No time window, because PRs can sit open for days.
+      const log = gitLog([
+        "--format=%x00%H%x00%cI",
+        "--name-only",
+        "--",
+        relative(repoRoot, appDir),
+      ]);
+      const regenerated = routesRegeneratedByCommit();
 
       const routeDirs = routeDirsByDepth(
         globSync("**/page.tsx", { cwd: appDir })
@@ -97,27 +152,28 @@ describe("sitemap lastmod manifest is not stale", () => {
 
       const seen = new Set<string>();
       const behind: string[] = [];
+      let commit = "";
       let commitDate = "";
       for (const line of log.split("\n")) {
         if (line === "") {
           continue;
         }
-        if (ISO_DATE_LINE.test(line)) {
-          commitDate = line;
+        if (line.startsWith(COMMIT_MARK)) {
+          [commit = "", commitDate = ""] = line
+            .slice(COMMIT_MARK.length)
+            .split(COMMIT_MARK);
           continue;
         }
-        if (seen.has(line)) {
-          continue; // newest commit first, so the first sighting is the current one
-        }
-        seen.add(line);
         const appRelative = relative(appDir, resolve(repoRoot, line));
         const route = ownerRouteFor(appRelative, routeDirs);
-        if (route === undefined) {
-          continue;
+        if (route === undefined || seen.has(route)) {
+          continue; // newest commit first, so a route's first sighting is its current one
         }
+        seen.add(route);
         const recorded = PAGE_DATES[route];
         if (
           recorded !== undefined &&
+          !regenerated.get(commit)?.has(route) &&
           Date.parse(commitDate) > Date.parse(recorded)
         ) {
           behind.push(
