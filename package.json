@@ -24,6 +24,7 @@
     "test:baseline": "pnpm test:architecture && pnpm baseline",
     "check:fast": "pnpm check:errors && pnpm check:design && pnpm test:baseline",
     "check:all": "./scripts/check-all.sh",
+    "check:changed": "./scripts/check-changed.sh",
     "check:cfn": "bash scripts/check-cloudformation-published.sh",
     "check:answers": "tsx scripts/check-answer-shaped.ts",
     "knip": "knip",

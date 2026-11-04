@@ -31,7 +31,7 @@
   ],
   "cacheMaxSize": "10GB",
   "cacheMaxAge": "7d",
-  "concurrency": "11",
+  "concurrency": "75%",
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
@@ -70,7 +70,8 @@
       "persistent": true
     },
     "test": {
-      "cache": false
+      "cache": false,
+      "passThroughEnv": ["VITEST_MAX_WORKERS"]
     },
     "test:ee": {
       "cache": false
@@ -87,7 +88,13 @@
     },
     "typecheck": {
       "dependsOn": ["^build"],
-      "cache": false
+      "outputs": [],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/tsconfig.base.json",
+        "next-env.d.ts",
+        ".next/types/**"
+      ]
     },
     "clean": {
       "cache": false

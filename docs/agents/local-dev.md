@@ -34,6 +34,28 @@ is `""`. See `docs/agents/test-database.md` for how it becomes a per-checkout br
 
 If you keep the keys in `.env.local` instead, `vitest` does not read that file for tests.
 
+## `pnpm check:changed`: the diff-only gate
+
+Use it while iterating; keep `pnpm check:all` for the final pre-merge run. It diffs
+against the merge-base with `origin/main` (committed, staged, unstaged and untracked
+files) and runs only what that diff can have affected, under `nice`, at half the cores:
+
+- **lint**: biome on the changed files only.
+- **typecheck**: `turbo --affected`, so the changed packages plus their dependents.
+  Cached, with `tsconfig.base.json` in the inputs.
+- **test**: the directly changed packages only. Dependents' tests, such as the real-DB
+  suites in `apps/api` and `apps/web` (~7 min), are left to `check:all`;
+  `CHECK_TEST_DEPENDENTS=1` runs them too. Tests are never cached.
+- **design, migrations, infra, scripts**: only when their paths changed.
+- **Skipped**: build and knip. `check:all` still runs them.
+
+A change to `turbo.json`, root `package.json` or the lockfile makes turbo treat every
+package as affected, so expect a full run then. `CHECK_BASE=<ref>` overrides the base.
+
+`VITEST_MAX_WORKERS` reaches vitest only through `passThroughEnv` on the `test` task.
+Turbo's strict env mode otherwise strips it, which is why the old `pnpm test` cap of 4
+never applied.
+
 ## `pnpm check:all` in a fresh checkout
 
 `pnpm install` is **not** enough for `check:all` in a tree nobody has built in — a fresh
