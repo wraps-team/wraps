@@ -715,7 +715,7 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
     primaryQuery: "migrate from resend to amazon ses",
     secondaryQueries: [
       "resend log retention 30 days",
-      "resend api rate limit per second",
+      "does upgrading resend raise the api rate limit",
       "resend to own aws account",
     ],
     audience: "stranger-with-problem",
@@ -1517,7 +1517,7 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
     primaryQuery: "resend or sendgrid for a new product",
     secondaryQueries: [
       "sendgrid replacement for a small dev team",
-      "resend api rate limit per second",
+      "resend 429 too many requests error",
       "sendgrid trial after free tier ended",
       "does resend have marketing campaigns",
       "converting sendgrid dynamic templates to react email",
@@ -1542,7 +1542,7 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
     ],
     audience: "stranger-with-problem",
     rationale:
-      "Teams arrive at this comparison after the December 2025 Mailgun repricing and evaluate Resend on developer experience alone, which is the half that is easy to see. The capabilities they would be giving up — inbound routing, validation, deep log search — are not on Resend's feature page to be missed.",
+      "Teams arrive at this comparison after the December 2025 Mailgun repricing and evaluate Resend on developer experience alone, which is the half that is easy to see. The capabilities they would be weighing — Mailgun's route-level inbound matching, validation, deep log search — are worth checking line by line against Resend's feature page.",
   },
   {
     route: "/versus/postmark-vs-sendgrid",

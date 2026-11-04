@@ -194,8 +194,8 @@ const DELETION_VALUE = [
   { where: "AWS SES, Essentials", rate: "$0.16 / 1,000", saved: "$4.80" },
   {
     where: "Resend, pay-as-you-go",
-    rate: "$0.65–0.90 / 1,000",
-    saved: "$19.50–27.00",
+    rate: "$0.46–0.90 / 1,000",
+    saved: "$13.80–27.00",
   },
   {
     where: "Postmark Platform overage",

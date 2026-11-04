@@ -152,7 +152,7 @@ export const VENDORS: Record<VendorId, Vendor> = {
     category:
       "Developer-first email API (built on SES, now with its own Forge MTA)",
     pricing:
-      "Free 3,000/mo (100/day). Pro $20 at 50K and $35 at 100K. Scale starts at $90 for the same 100K and runs to $350 at 500K. Overage $0.65–0.90 per 1,000. Marketing contacts billed separately at $40/mo per 5,000.",
+      "Free 3,000/mo (100/day). Pro $20 at 50K and $35 at 100K. Scale starts at $90 for the same 100K and runs to $350 at 500K. Overage $0.90 per 1,000 on Pro, falling to $0.46 on the largest Scale tier. Marketing contacts billed separately at $40/mo per 5,000.",
     bestFor:
       "The fastest path from an empty project to a sent email, especially with React Email.",
     watchOut:
@@ -272,7 +272,7 @@ export const VENDORS: Record<VendorId, Vendor> = {
     name: "Brevo",
     category: "EU marketing platform with a transactional API attached",
     pricing:
-      "Priced on send volume rather than contacts. Starter runs from $9/mo at 5,000 emails to roughly $82/mo at 100,000; the Standard tier is roughly $18/mo at 5,000 and roughly $139/mo at 100,000, and is where automation and A/B testing live.",
+      "Priced on monthly email volume, with a contact limit per volume tier. Starter is from $9/mo (5,000 emails a month); Standard is from $18/mo and is where automation and A/B testing live.",
     bestFor:
       "Small EU teams wanting email, SMS, and a light CRM on one invoice.",
     watchOut:
@@ -442,8 +442,8 @@ const RESEND_PAGE: AlternativesPage = {
     "Resend is a good product, and most people reading this are not leaving because it is bad. They are leaving because of a specific thing: logs vanishing at 30 days, a 10 request/second API limit, an overage line on an invoice, or a suspension at the worst possible hour. Which of those it is decides where you should go, so this list is ordered by how close each option is to being a straight replacement, not by which one we would prefer you pick.",
   whyPeopleLeave: [
     "Log retention is 30 days on every non-Enterprise plan. The bounce you need to explain three months later is not there any more.",
-    "The API is rate limited to 10 requests per second per team on every plan, Scale included; a higher limit is granted to trusted senders on request.",
-    "Overage bills automatically at $0.65 to $0.90 per 1,000 once you pass your tier, and the hard caps that used to stop it were removed in December 2025.",
+    "The API is rate limited to 10 requests per second per team on every self-serve plan (Free, Pro and Scale); a higher limit is granted to trusted senders on request.",
+    "Overage is billed per 1,000 beyond your tier, from $0.90 on Pro down to $0.46 on the largest Scale tier, once you turn on pay-as-you-go (“Transactional Overages” in team settings); without it you are notified and offered an upgrade.",
     "Account suspension during a traffic spike. It is the complaint that repeats across their public reviews, and it lands on signup and password-reset email first.",
   ],
   router: [
@@ -501,7 +501,7 @@ const RESEND_PAGE: AlternativesPage = {
     {
       vendor: "bavimail",
       verdict:
-        "The nearest thing on this list to Resend's shape at a fraction of the price, and it adds the half Resend does not have: inbound MX, parsing, and webhook routing are in the base product. Pro is $5 at 50K against Resend Pro's $20, and Startup covers 300K for $50 where Resend Scale is $350 at 500K. Read that gap as the risk it is. No published deliverability record, no dedicated IP to move to if a shared pool goes bad, and no overage rate on the pricing page, so model your worst month before you put payment receipts on it.",
+        "The nearest thing on this list to Resend's shape at a fraction of the price, and inbound MX, parsing and webhook routing are in its base product, where Resend's inbound is a receive-by-webhook feature. Pro is $5 at 50K against Resend Pro's $20, and Startup covers 300K for $50 where Resend Scale is $350 at 500K. Read that gap as the risk it is. No published deliverability record, no dedicated IP to move to if a shared pool goes bad, and no overage rate on the pricing page, so model your worst month before you put payment receipts on it.",
     },
     {
       vendor: "mailersend",

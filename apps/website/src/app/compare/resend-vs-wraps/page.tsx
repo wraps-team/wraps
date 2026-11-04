@@ -97,7 +97,7 @@ const tldrComparison = [
   },
   {
     dimension: "Rate limits",
-    resend: "10 req/sec (all plans)",
+    resend: "10 req/sec (Free, Pro, Scale)",
     wraps: "AWS SES limits (scales with reputation)",
   },
   {
@@ -783,11 +783,12 @@ export default function ResendVsWrapsPage() {
                 unlimited sends, contacts, domains, and templates.
               </p>
               <p>
-                Worth knowing on Resend: exceeding your tier auto-bills at
-                $0.65-0.90/1K. Getting Scale features at 100K costs $90/mo (the
-                $35 Pro tier skips SSO and caps domains at 10). CC/BCC count as
-                separate emails. Marketing contacts billed separately ($40/mo
-                for 5K contacts).
+                Worth knowing on Resend: exceeding your tier bills overage at
+                $0.90/1K on Pro, down to $0.46/1K on the largest Scale tier,
+                once pay-as-you-go is enabled. Getting Scale features at 100K
+                costs $90/mo (the $35 Pro tier skips SSO and caps domains at
+                10). CC/BCC count as separate emails. Marketing contacts billed
+                separately ($40/mo for 5K contacts).
               </p>
               <p>
                 At 50K/mo the two are priced about the same, so price is not the
