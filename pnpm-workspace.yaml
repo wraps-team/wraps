@@ -17,6 +17,21 @@ minimumReleaseAgeExclude:
   - '@wraps.dev/sms@0.2.0'
   - cn@0.2.4
   - '@shadcn/lint@0.1.0'
+  # better-auth security release 2026-11-03 (12 advisories; plans/029).
+  # Exact versions only. Remove after 2026-11-10, when they pass the gate.
+  - better-auth@1.7.16
+  - '@better-auth/core@1.7.16'
+  - '@better-auth/drizzle-adapter@1.7.16'
+  - '@better-auth/kysely-adapter@1.7.16'
+  - '@better-auth/memory-adapter@1.7.16'
+  - '@better-auth/mongo-adapter@1.7.16'
+  - '@better-auth/passkey@1.7.16'
+  - '@better-auth/prisma-adapter@1.7.16'
+  - '@better-auth/scim@1.7.16'
+  - '@better-auth/sso@1.7.16'
+  - '@better-auth/stripe@1.7.16'
+  - '@better-auth/telemetry@1.7.16'
+  - better-call@1.4.5
 
 # Version pins for transitive deps: advisory/CVE floors for indirect packages.
 overrides:
@@ -48,9 +63,9 @@ overrides:
   stage-js: 1.0.0-alpha.17
   'zod@>=4': 4.6.7
   deepmerge-ts: ^8.0.2
-  '@better-fetch/fetch': 1.3.2
-  better-call: 1.4.2
-  '@better-auth/utils': 0.5.0
+  '@better-fetch/fetch': 1.3.3
+  better-call: 1.4.5
+  '@better-auth/utils': 0.5.1
   react-router: ^7.18.2
   undici: ^7.30.1
   'diff@<5': ^4.0.4
@@ -118,7 +133,7 @@ catalog:
   '@types/pg': ^8.20.0
   '@vitest/coverage-v8': 4.1.11
   '@vitest/ui': 4.1.11
-  better-auth: 1.7.11
+  better-auth: 1.7.16
   '@byo-oss/mailer': 0.2.0
   '@byo-oss/notifications': 0.11.1
   dotenv: ^17.4.2
