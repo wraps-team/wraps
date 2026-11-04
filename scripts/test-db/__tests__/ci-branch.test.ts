@@ -852,17 +852,36 @@ describe("refreshParent", () => {
     branches = BRANCHES,
     endpoints = ENDPOINTS,
     stdout = "[✓] Changes applied\n",
+    snapshotStatus = 201,
   } = {}) {
     const calls: Call[] = [];
+    const order: string[] = [];
+    const listed = branches.map((b) => ({ current_state: "ready", ...b }));
     const fetchImpl = vi.fn(async (url: string, init: RequestInit = {}) => {
       const parsed = new URL(url);
+      const method = init.method ?? "GET";
+      const body = init.body ? JSON.parse(String(init.body)) : undefined;
       calls.push({
-        method: init.method ?? "GET",
+        method,
         path: parsed.pathname,
         search: parsed.searchParams,
+        body,
       });
+      if (method === "POST" && parsed.pathname.endsWith("/branches")) {
+        order.push("snapshot");
+        if (snapshotStatus !== 201) {
+          return jsonResponse({ message: "quota exceeded" }, snapshotStatus);
+        }
+        const branch = {
+          id: "br-backup",
+          name: body.branch.name,
+          current_state: "ready",
+        };
+        listed.push({ default: false, ...branch });
+        return jsonResponse({ branch }, 201);
+      }
       if (parsed.pathname.endsWith("/branches")) {
-        return jsonResponse({ branches });
+        return jsonResponse({ branches: listed });
       }
       if (parsed.pathname.endsWith("/endpoints")) {
         return jsonResponse({ endpoints });
@@ -872,7 +891,6 @@ describe("refreshParent", () => {
       }
       throw new Error(`unhandled fetch: ${url}`);
     });
-    const order: string[] = [];
     const client = {
       query: vi.fn(async (sql: string) => {
         if (sql.includes("pg_advisory_lock")) {
@@ -907,6 +925,7 @@ describe("refreshParent", () => {
         fetchImpl,
         connectPg,
         spawnImpl,
+        now: () => NOW,
         log: (l: string) => lines.push(l),
       } as any,
       calls,
@@ -922,7 +941,10 @@ describe("refreshParent", () => {
     NEON_API_KEY: "test-key",
     NEON_PROJECT_ID: "proj-1",
     TEST_DATABASE_URL: BASE_URL,
+    GITHUB_SHA: SHA,
+    GITHUB_RUN_ID: "41767588020",
   };
+  const BACKUP = "backup-0123456-41767588020";
 
   it("resolves the default branch and pushes to its direct URI under the lock", async () => {
     const h = refreshHarness();
@@ -936,7 +958,7 @@ describe("refreshParent", () => {
     expect(h.connectPg).toHaveBeenCalledWith(PARENT_DIRECT);
     const [, , options] = h.spawnImpl.mock.calls[0] as [string, string[], any];
     expect(options.env.DATABASE_URL).toBe(PARENT_DIRECT);
-    expect(h.order).toEqual(["lock", "push", "end"]);
+    expect(h.order).toEqual(["lock", "snapshot", "push", "end"]);
     expect(h.lines).toContain(`::add-mask::${PARENT_DIRECT}`);
   });
 
@@ -954,7 +976,7 @@ describe("refreshParent", () => {
     expect(error).toContain("pnpm test-db:refresh");
   });
 
-  it("with --dry-run, checks the target and stops before the lock", async () => {
+  it("with --dry-run, checks the target, names the planned snapshot, and stops before the lock", async () => {
     const h = refreshHarness();
     const result = await refreshParent(refreshEnv, { ...h.io, dryRun: true });
     h.restore();
@@ -962,6 +984,49 @@ describe("refreshParent", () => {
     expect(result).toEqual({ exitCode: 0, status: "checked" });
     expect(h.connectPg).not.toHaveBeenCalled();
     expect(h.spawnImpl).not.toHaveBeenCalled();
+    expect(h.calls.some((c) => c.method === "POST")).toBe(false);
+    expect(h.lines.join("\n")).toContain(BACKUP);
+  });
+
+  it("snapshots the parent as backup-<sha7>-<run_id>, with no compute and a 7-day expiry, before pushing", async () => {
+    const h = refreshHarness();
+    await refreshParent(refreshEnv, h.io);
+    h.restore();
+
+    const post = h.calls.find((c) => c.method === "POST");
+    expect(post?.body).toEqual({
+      branch: {
+        parent_id: "br-parent",
+        name: BACKUP,
+        expires_at: "2026-11-10T12:34:56Z",
+      },
+    });
+    expect(h.order.indexOf("snapshot")).toBeLessThan(h.order.indexOf("push"));
+  });
+
+  it("does not push when the snapshot fails", async () => {
+    const h = refreshHarness({ snapshotStatus: 422 });
+    const result = await refreshParent(refreshEnv, h.io);
+    h.restore();
+
+    expect(result).toEqual({ exitCode: 1, status: "failed" });
+    expect(h.spawnImpl).not.toHaveBeenCalled();
+    const error = h.lines.find((l) => l.startsWith("::error::")) ?? "";
+    expect(error).toContain(BACKUP);
+    expect(error).toContain("nothing was pushed");
+    expect(error).toContain("quota exceeded");
+  });
+
+  it("refuses without the run context to name the snapshot", async () => {
+    const h = refreshHarness();
+    const result = await refreshParent(
+      { ...refreshEnv, GITHUB_RUN_ID: undefined },
+      h.io
+    );
+    h.restore();
+
+    expect(result).toEqual({ exitCode: 1, status: "refused" });
+    expect(h.calls).toEqual([]);
   });
 
   it("refuses without touching the database when the guard fails", async () => {
@@ -991,6 +1056,19 @@ describe("refreshParent", () => {
   });
 
   describe("parentTargetProblem", () => {
+    it("accepts a backup-* endpoint beside the parent", () => {
+      expect(
+        parentTargetProblem(
+          [
+            ...BRANCHES,
+            { id: "br-bk", name: "backup-0123456-1", default: false },
+          ],
+          [...ENDPOINTS, { host: "ep-bk.x", branch_id: "br-bk" }],
+          PARENT_HOST
+        )
+      ).toBeNull();
+    });
+
     it("accepts the default branch named by TEST_DATABASE_URL, with only wt-*/ci-* beside it", () => {
       expect(
         parentTargetProblem(
@@ -1010,7 +1088,7 @@ describe("refreshParent", () => {
         "prod or dev endpoint",
       ],
       [
-        "an endpoint on a branch that is neither default nor wt-*/ci-*",
+        "an endpoint on a branch that is neither default nor wt-*/ci-*/backup-*",
         [...BRANCHES, { id: "br-dev", name: "dev", default: false }],
         [...ENDPOINTS, { host: "ep-dev.x", branch_id: "br-dev" }],
         PARENT_HOST,

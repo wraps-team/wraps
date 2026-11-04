@@ -68,7 +68,10 @@ const PARENT_PROMPT_ADVICE =
 // Endpoint host prefixes of the prod and dev databases in the old shared
 // project. The test project must hold neither (plan 031, P1).
 const FORBIDDEN_HOST_PREFIXES = ["ep-damp-heart", "ep-autumn-block"];
-const TEST_BRANCH_PREFIXES = ["wt-", "ci-"];
+const TEST_BRANCH_PREFIXES = ["wt-", "ci-", "backup-"];
+const BACKUP_TTL_HOURS = 7 * 24;
+const SHA7 = /^[0-9a-f]{7}$/;
+const DIGITS = /^\d+$/;
 // Any constant works; it only has to be the same in every job of the run.
 const PUSH_LOCK_KEY = 31_031;
 // What a 404 means for each operation this script and the resolver make.
@@ -810,7 +813,7 @@ export function parentTargetProblem(branches, endpoints, baseHost) {
     );
   });
   if (stray.length > 0) {
-    return `${stray.length} endpoint(s) belong to neither the default branch nor a wt-*/ci-* branch: NEON_PROJECT_ID may not be the test-only project`;
+    return `${stray.length} endpoint(s) belong to neither the default branch nor a wt-*/ci-*/backup-* branch: NEON_PROJECT_ID may not be the test-only project`;
   }
 
   const strippedHost = baseHost.replace("-pooler.", ".");
@@ -847,12 +850,47 @@ async function projectInventory(opts, apiKey, projectId) {
 }
 
 /**
+ * `backup-<sha7>-<run_id>`, or null without the GitHub run context. A re-run
+ * of the workflow finds the attempt-1 snapshot and keeps it: that is the
+ * state before any attempt touched the parent.
+ *
+ * @param {Record<string, string | undefined>} env
+ * @returns {string | null}
+ */
+export function backupBranchName(env) {
+  const sha = (env.GITHUB_SHA ?? "").toLowerCase().slice(0, 7);
+  const runId = env.GITHUB_RUN_ID ?? "";
+  if (!(SHA7.test(sha) && DIGITS.test(runId))) {
+    return null;
+  }
+  return `backup-${sha}-${runId}`;
+}
+
+/**
+ * Cuts a child of the parent (the branch TEST_DATABASE_URL names) with no
+ * compute, and waits until it is ready. Same create-and-poll code as
+ * `ensure`.
+ *
+ * @param {import("./resolve-branch.mjs").ResolverOpts} opts
+ * @param {import("./resolve-branch.mjs").BranchTarget} target
+ */
+async function snapshotParent(opts, target) {
+  const branch = await findOrCreateBranch(opts, {
+    ...target,
+    withEndpoint: false,
+  });
+  return await pollUntilReady(opts, target.apiKey, target.projectId, branch.id);
+}
+
+/**
  * Pushes the checked-out schema (main's, in refresh-test-parent.yml) to the
  * project's default branch, the parent every wt-* and ci-* branch is cut
  * from, under the same advisory lock and prompt detection as `push`.
  * Refuses unless the project is the test-only one and TEST_DATABASE_URL
- * names its default branch. No fallback: it gates nothing, so it fails red.
- * `dryRun` resolves and checks the target, then stops before the lock.
+ * names its default branch. Before pushing it snapshots the parent as
+ * `backup-<sha7>-<run_id>` (7-day expiry); no snapshot, no push. No
+ * fallback: it gates nothing, so it fails red. `dryRun` resolves and checks
+ * the target, prints the planned snapshot name, and stops before the lock.
  *
  * @param {Record<string, string | undefined>} env
  * @param {CiIo & {dryRun?: boolean}} [io]
@@ -871,13 +909,23 @@ export async function refreshParent(env, io = {}) {
     );
   }
 
+  const backupName = backupBranchName(env);
+  if (!backupName) {
+    return fail(
+      "refused",
+      "GITHUB_SHA and GITHUB_RUN_ID must be set to name the snapshot (set them by hand for a local dry run)"
+    );
+  }
+
   const apiKey = env.NEON_API_KEY;
   const projectId = env.NEON_PROJECT_ID;
   const opts = { fetchImpl: io.fetchImpl };
+  const now = io.now ?? (() => new Date());
   let parent;
   let directUri;
+  let parsedBase;
   try {
-    const parsedBase = new URL(env.TEST_DATABASE_URL);
+    parsedBase = new URL(env.TEST_DATABASE_URL);
     const { branches, endpoints } = await projectInventory(
       opts,
       apiKey,
@@ -906,10 +954,35 @@ export async function refreshParent(env, io = {}) {
 
   const label = `the test parent (default branch ${parent.name})`;
   if (io.dryRun) {
-    log(`[ci-branch] dry run: would push the schema to ${label}`);
+    log(
+      `[ci-branch] dry run: would snapshot the parent as ${backupName}, then push the schema to ${label}`
+    );
     return { exitCode: 0, status: "checked" };
   }
   return await withPushLock(directUri, io, label, async () => {
+    // Under the lock, so the snapshot is the state this push starts from.
+    // `--force` may TRUNCATE ... CASCADE a populated table (a NOT NULL column
+    // without a default, a type change); the snapshot is the way back.
+    try {
+      await snapshotParent(
+        { fetchImpl: io.fetchImpl, sleepImpl: io.sleepImpl },
+        {
+          apiKey,
+          projectId,
+          branchName: backupName,
+          parsedBase,
+          expiresAt: expiresAtFrom(now(), BACKUP_TTL_HOURS),
+        }
+      );
+    } catch (err) {
+      return fail(
+        "failed",
+        `could not snapshot the parent as ${backupName}, so nothing was pushed: ${describeNeonError(err)}`
+      );
+    }
+    log(
+      `[ci-branch] snapshot ${backupName} is ready; restore the parent from it in the Neon console if this push goes wrong`
+    );
     const ok = await checkedPush(io, directUri, {
       label,
       consequence:

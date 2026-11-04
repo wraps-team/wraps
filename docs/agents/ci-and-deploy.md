@@ -137,15 +137,26 @@ schema. A push stuck past 3 minutes is killed together with its whole process gr
 no drizzle-kit is left running against the parent.
 
 - It refuses unless the project has no prod or dev endpoint (the P1 host-prefix check),
-  every endpoint belongs to the default branch or a `wt-*`/`ci-*` branch, and
+  every endpoint belongs to the default branch or a `wt-*`/`ci-*`/`backup-*` branch, and
   `TEST_DATABASE_URL` names the default branch.
+- Before pushing, it snapshots the parent: a child branch `backup-<sha7>-<run_id>`, with
+  no compute and `expires_at` 7 days out, cut under the lock and waited on until ready.
+  No snapshot, no push: if the snapshot fails, the run fails red and the parent is
+  untouched. The push uses `--force`, which can `TRUNCATE ... CASCADE` a populated table
+  (a `NOT NULL` column without a default, or a column type change) without asking.
+- **To undo a refresh**, restore the parent from its `backup-*` branch in the Neon console
+  (the parent's Restore, with the backup branch as the source), then run
+  `reap-branches.mjs --self` in each worktree. A workflow re-run reuses the attempt-1
+  snapshot, which is the state before any attempt touched the parent.
 - It is its own workflow so it can never gate `deploy-api.yml`, which watches only Test.
   So it has no fallback: a Neon failure turns it red, and nothing waits on it.
 - A rename on main turns it red with a pointer to the one-off manual refresh
   (`docs/agents/test-database.md`). Do it promptly: until then every CI run's own push
   hits the same prompt and fails. After any other failure, each run's push makes up the
   difference on its own branch.
-- `refresh-parent --dry-run` resolves and checks the target, then stops before pushing.
+- `refresh-parent --dry-run` resolves and checks the target, prints the planned snapshot
+  name, and stops before snapshotting or pushing. Locally it needs `GITHUB_SHA` and
+  `GITHUB_RUN_ID` set by hand.
 
 ## A red `test-api`/`test-web` on the shared database is usually contention
 

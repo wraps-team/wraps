@@ -9,7 +9,8 @@ The branches live in the test-only Neon project `wraps-test`; `apps/web/.env.tes
 its project-scoped key. CI doesn't use the resolver: under `GITHUB_ACTIONS=true` it returns
 `DATABASE_URL` untouched, and each workflow run gets a `ci-*` branch from
 `scripts/test-db/ci-branch.mjs` instead (`docs/agents/ci-and-deploy.md`). Never delete or
-reap `ci-*` branches by hand; they expire 3h after creation.
+reap `ci-*` branches by hand; they expire 3h after creation. `backup-*` branches are the
+parent refresh's snapshots and expire after 7 days.
 
 ## Branches expire 24h after their last test run
 
@@ -39,6 +40,10 @@ every push to main that touches `packages/db/src/schema/**`,
 `packages/db/package.json`, it runs `ci-branch.mjs refresh-parent`, which pushes main's
 schema to the default branch. It refuses unless the project is the test-only one
 and `TEST_DATABASE_URL` names that default branch, and it never gates a deploy.
+
+Each automatic refresh first snapshots the parent as a `backup-*` branch (7-day expiry).
+If a refresh damaged the parent's data, restore the parent from that branch in the Neon
+console (`docs/agents/ci-and-deploy.md`).
 
 Refresh the parent by hand (`pnpm test-db:refresh`, from a checkout of **main**) only to
 recover:

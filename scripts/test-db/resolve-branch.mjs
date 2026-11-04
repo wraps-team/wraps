@@ -324,6 +324,7 @@ function sleep(opts, ms) {
  * @property {string} branchName
  * @property {URL} parsedBase
  * @property {string} [expiresAt] RFC 3339 time Neon deletes the branch at
+ * @property {boolean} [withEndpoint] false: create it with no compute
  */
 
 /**
@@ -361,10 +362,11 @@ export async function findOrCreateBranch(opts, target) {
   if (expiresAt) {
     branchBody.expires_at = expiresAt;
   }
-  const requestBody = JSON.stringify({
-    branch: branchBody,
-    endpoints: [{ type: "read_write" }],
-  });
+  const requestBody = JSON.stringify(
+    target.withEndpoint === false
+      ? { branch: branchBody }
+      : { branch: branchBody, endpoints: [{ type: "read_write" }] }
+  );
 
   // A 423 means a concurrent create (a sibling CI job, say) holds the project
   // lock. Wait, then look again: that create may have made this very branch.

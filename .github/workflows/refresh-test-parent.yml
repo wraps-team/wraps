@@ -12,6 +12,11 @@ name: Refresh test parent
 #
 # A rename on main fails this run with a pointer to the one-off manual
 # refresh (`pnpm test-db:refresh` from main), which answers the prompt.
+#
+# Before pushing (with --force, which can truncate a populated table), it
+# snapshots the parent as backup-<sha7>-<run_id>, a no-compute child that
+# expires after 7 days. No snapshot, no push. To undo a refresh, restore the
+# parent from that branch in the Neon console.
 on:
   push:
     branches: [main]
@@ -56,7 +61,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # Refuses unless NEON_PROJECT_ID is the test-only project (no prod or
-      # dev endpoint) and TEST_DATABASE_URL names its default branch.
+      # dev endpoint) and TEST_DATABASE_URL names its default branch. Names
+      # the snapshot from GITHUB_SHA and GITHUB_RUN_ID.
       - name: Push main's schema to the test parent
         run: node scripts/test-db/ci-branch.mjs refresh-parent
         env:
