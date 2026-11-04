@@ -152,11 +152,11 @@ export const VENDORS: Record<VendorId, Vendor> = {
     category:
       "Developer-first email API (built on SES, now with its own Forge MTA)",
     pricing:
-      "Free 3,000/mo (100/day). Pro $20 at 50K and $35 at 100K. Scale starts at $90 for the same 100K and runs to $350 at 500K. Overage $0.65–0.90 per 1,000. Marketing contacts billed separately at $40/mo per 5,000.",
+      "Free 3,000/mo (100/day). Pro $20 at 50K and $35 at 100K. Scale starts at $90 for the same 100K, is $350 at 500K and runs to $1,150 at 2.5M. Overage is $0.90 per 1,000 on Pro and the first Scale tier, falling to $0.46 at 2.5M. Marketing contacts billed separately, from $40/mo for 5,000 contacts.",
     bestFor:
       "The fastest path from an empty project to a sent email, especially with React Email.",
     watchOut:
-      "Logs are purged at 30 days on every non-Enterprise plan, the API is capped at 2 requests per second on all tiers, and suspension during traffic spikes is the complaint that recurs in its public reviews.",
+      "Logs are purged at 30 days on every non-Enterprise plan, the API is limited to 10 requests per second per team on self-serve plans, and suspension during traffic spikes recurs in its public reviews.",
     url: "https://resend.com/pricing",
   },
   loops: {
@@ -272,11 +272,11 @@ export const VENDORS: Record<VendorId, Vendor> = {
     name: "Brevo",
     category: "EU marketing platform with a transactional API attached",
     pricing:
-      "Priced on send volume rather than contacts. Starter runs from roughly $9/mo at 5,000 emails to roughly $69/mo at 100,000; the Business tier is roughly double at each volume and is where automation and A/B testing live.",
+      "Priced on monthly email volume, with a contact limit per volume tier. Starter is from $9/mo (5,000 emails a month); Standard is from $18/mo and is where automation and A/B testing live.",
     bestFor:
       "Small EU teams wanting email, SMS, and a light CRM on one invoice.",
     watchOut:
-      "The headline tier is not the one you need — automation and removing the Brevo logo are both a step up. Shared-pool deliverability draws mixed reports.",
+      "The headline tier is not the one you need — automation needs Standard, and removing the Brevo logo needs Standard or a paid add-on on Starter. Shared-pool deliverability draws mixed reports.",
     url: "https://www.brevo.com/pricing/",
   },
   "scaleway-tem": {
@@ -439,11 +439,11 @@ const RESEND_PAGE: AlternativesPage = {
   description:
     "Twelve real alternatives to Resend, ranked, with published prices and the catch on each one. Postmark, Amazon SES, Loops, AhaSend, and where Wraps actually fits.",
   intro:
-    "Resend is a good product, and most people reading this are not leaving because it is bad. They are leaving because of a specific thing: logs vanishing at 30 days, a 2 request/second ceiling, an overage line on an invoice, or a suspension at the worst possible hour. Which of those it is decides where you should go, so this list is ordered by how close each option is to being a straight replacement, not by which one we would prefer you pick.",
+    "Resend is a good product, and most people reading this are not leaving because it is bad. They are leaving because of a specific thing: logs vanishing at 30 days, a 10 request/second API limit, an overage line on an invoice, or a suspension at the worst possible hour. Which of those it is decides where you should go, so this list is ordered by how close each option is to being a straight replacement, not by which one we would prefer you pick.",
   whyPeopleLeave: [
     "Log retention is 30 days on every non-Enterprise plan. The bounce you need to explain three months later is not there any more.",
-    "The API is rate limited to 2 requests per second on every plan, Scale included.",
-    "Overage bills automatically at $0.65 to $0.90 per 1,000 once you pass your tier, and the hard caps that used to stop it were removed in December 2025.",
+    "The API is rate limited to 10 requests per second per team on every self-serve plan (Free, Pro and Scale); a higher limit is granted to trusted senders on request.",
+    "Overage is billed per 1,000 beyond your tier, from $0.90 on Pro down to $0.46 on the largest Scale tier, once you turn on pay-as-you-go (“Transactional Overages” in team settings); without it you are notified and offered an upgrade.",
     "Account suspension during a traffic spike. It is the complaint that repeats across their public reviews, and it lands on signup and password-reset email first.",
   ],
   router: [
@@ -501,7 +501,7 @@ const RESEND_PAGE: AlternativesPage = {
     {
       vendor: "bavimail",
       verdict:
-        "The nearest thing on this list to Resend's shape at a fraction of the price, and it adds the half Resend does not have: inbound MX, parsing, and webhook routing are in the base product. Pro is $5 at 50K against Resend Pro's $20, and Startup covers 300K for $50 where Resend Scale is $350 at 500K. Read that gap as the risk it is. No published deliverability record, no dedicated IP to move to if a shared pool goes bad, and no overage rate on the pricing page, so model your worst month before you put payment receipts on it.",
+        "The nearest thing on this list to Resend's shape at a fraction of the price, and inbound MX, parsing and webhook routing are in its base product, where Resend's inbound is a receive-by-webhook feature. Pro is $5 at 50K against Resend Pro's $20, and Startup covers 300K for $50 where Resend Scale is $350 at 500K. Read that gap as the risk it is. No published deliverability record, no dedicated IP to move to if a shared pool goes bad, and no overage rate on the pricing page, so model your worst month before you put payment receipts on it.",
     },
     {
       vendor: "mailersend",
@@ -603,7 +603,7 @@ const SENDGRID_PAGE: AlternativesPage = {
     {
       vendor: "resend",
       verdict:
-        "The biggest single jump in quality of life if SendGrid's console and SDKs are what you resent, and cheaper too, at $35 for 100K against Pro's $89.95. Read its own terms before committing: logs purge at 30 days on every non-Enterprise plan, the API is capped at 2 requests per second on every plan, and suspension complaints exist there too, just fewer of them.",
+        "The biggest single jump in quality of life if SendGrid's console and SDKs are what you resent, and cheaper too, at $35 for 100K against Pro's $89.95. Read its own terms before committing: logs purge at 30 days on every non-Enterprise plan, the API is limited to 10 requests per second per team on every self-serve plan, and suspension complaints exist there too, just fewer of them.",
     },
     {
       vendor: "wraps",
@@ -628,7 +628,7 @@ const SENDGRID_PAGE: AlternativesPage = {
     {
       vendor: "brevo",
       verdict:
-        "The closest thing to a one-for-one replacement if you were using both transactional and Marketing Campaigns, and the only option here priced on send volume rather than contacts. Roughly $69 at 100K on Starter, against SendGrid Essentials plus a separate Marketing Campaigns plan. The developer experience is a clear step down, and the tier you actually need is usually one above the headline.",
+        "The closest thing to a one-for-one replacement if you were using both transactional and Marketing Campaigns, and the only marketing suite here priced on send volume rather than contacts, with a contact limit on each volume tier. Roughly $82 at 100K on Starter, against SendGrid Essentials plus a separate Marketing Campaigns plan. The developer experience is a clear step down, and the tier you actually need is usually one above the headline.",
     },
     {
       vendor: "ahasend",
@@ -715,7 +715,7 @@ const POSTMARK_PAGE: AlternativesPage = {
     {
       vendor: "resend",
       verdict:
-        "The nearest thing to Postmark's developer experience at a materially lower bill: $35 at 100K against roughly $133, and $350 at 500K against roughly $630. Both are transactional-first with good SDKs, so the migration is genuinely small. The costs are 30-day log retention on every non-Enterprise plan, a 2 request/second API ceiling, and a support culture that is not Postmark's.",
+        "The nearest thing to Postmark's developer experience at a materially lower bill: $35 at 100K against roughly $133, and $350 at 500K against roughly $630. Both are transactional-first with good SDKs, so the migration is genuinely small. The costs are 30-day log retention on every non-Enterprise plan, a 10 request/second API limit, and a support culture that is not Postmark's.",
     },
     {
       vendor: "wraps",
@@ -827,7 +827,7 @@ const MAILGUN_PAGE: AlternativesPage = {
     {
       vendor: "resend",
       verdict:
-        "The developer-experience upgrade, and cheaper than Mailgun Scale at the same volume: $35 at 100K against $90. React Email support and a clean SDK are the draw. Check the 30-day log retention and the 2 request/second rate limit against how you actually send, particularly if you were using Mailgun's log search to debug delivery months after the fact.",
+        "The developer-experience upgrade, and cheaper than Mailgun Scale at the same volume: $35 at 100K against $90. React Email support and a clean SDK are the draw. Check the 30-day log retention and the 10 request/second rate limit against how you actually send, particularly if you were using Mailgun's log search to debug delivery months after the fact.",
     },
     {
       vendor: "wraps",
@@ -950,7 +950,7 @@ const CUSTOMER_IO_PAGE: AlternativesPage = {
     {
       vendor: "brevo",
       verdict:
-        "Priced on send volume rather than profiles, which directly inverts the thing you are leaving, at roughly $69 for 100,000 emails on Starter regardless of how many contacts you store. That is the single biggest structural difference on this page after Wraps. Automation lives a tier up from the headline price, the developer experience is a step down, and the behavioural targeting is nowhere near what you have today.",
+        "Priced on send volume rather than profiles, which directly inverts the thing you are leaving, at roughly $82 for 100,000 emails on Starter, a tier that holds up to 500,000 contacts. That is the single biggest structural difference on this page after Wraps. Automation lives a tier up from the headline price, the developer experience is a step down, and the behavioural targeting is nowhere near what you have today.",
     },
     {
       vendor: "knock",
@@ -965,7 +965,7 @@ const CUSTOMER_IO_PAGE: AlternativesPage = {
     {
       vendor: "resend",
       verdict:
-        "For teams willing to admit the automation was never really used, which is more of them than the category would like. A clean API and a low bill, at $35 for 100K emails against a Customer.io invoice driven by profiles you may not message. The trade is that you are giving up journeys entirely, plus 30-day log retention and a 2 request/second cap.",
+        "For teams willing to admit the automation was never really used, which is more of them than the category would like. A clean API and a low bill, at $35 for 100K emails against a Customer.io invoice driven by profiles you may not message. The trade is that you are giving up journeys entirely, plus 30-day log retention and a 10 request/second API limit.",
     },
     {
       vendor: "postmark",

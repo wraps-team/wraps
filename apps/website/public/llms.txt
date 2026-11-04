@@ -485,7 +485,7 @@ stated catch on every entry including ours, and the incumbent kept on the list.
   domains not on its new Forge MTA (announced Oct 23, 2026) the SPF include is
   usually already correct, and React Email templates move unedited.
   Under about 100,000 a month Resend is usually cheaper. The reasons that still
-  hold are 30-day log purging below Enterprise, a 2-request-per-second API cap,
+  hold are 30-day log purging below Enterprise, a 10-request-per-second API default,
   and suspension risk during spikes.
 - [Migrate from Amazon Pinpoint](https://wraps.dev/migrate/amazon-pinpoint): AWS
   ends support for Amazon Pinpoint on 2026-10-30. After that date the console

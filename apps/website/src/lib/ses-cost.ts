@@ -72,6 +72,20 @@ export function sesSendingCost(plan: SesPlan, emailsPerMonth: number): number {
   return cost;
 }
 
+/**
+ * The plan's rate in marginal band `band` (0-based). A flat plan such as
+ * à la carte charges one rate in every band.
+ */
+export function sesBandRate(plan: SesPlan, band: number): number {
+  const { tiers } = plan;
+  return (tiers[band] ?? tiers.at(-1) ?? tiers[0]).perThousandEmails;
+}
+
+/** Plan fee plus sending fees for `emailsPerMonth`. */
+export function sesMonthlyTotal(plan: SesPlan, emailsPerMonth: number): number {
+  return plan.monthlyFee + sesSendingCost(plan, emailsPerMonth);
+}
+
 export const SES_PLANS: Record<SesPlanId, SesPlan> = {
   alacarte: {
     id: "alacarte",
@@ -136,6 +150,37 @@ export const SES_PLAN_IDS = [
   "essentials",
   "pro",
   "enterprise",
+] as const;
+
+/**
+ * What each plan's price covers beyond sending, per the AWS SES pricing page.
+ * Rendered by /tools/ses-calculator and its markdown twin.
+ */
+export const SES_PLAN_INCLUDES: Record<SesPlanId, string> = {
+  alacarte: "Sending only. Every other feature is billed on its own line.",
+  essentials:
+    "Virtual Deliverability Manager (SES deliverability) and Mail Manager email processing.",
+  pro: "Essentials, plus inbox placement testing, managed dedicated IPs and 2,500 email validations a month.",
+  enterprise:
+    "Pro, plus Global Endpoints, 1,000 tenants and 5,000 email validations a month.",
+};
+
+/** The three marginal volume bands every 2026 plan is priced in. */
+export const SES_VOLUME_BANDS = [
+  "First 10M",
+  "10M to 100M",
+  "Over 100M",
+] as const;
+
+/**
+ * Free-tier facts, shared by the calculator page's FAQ and its markdown twin.
+ */
+export const SES_FREE_TIER_ANSWER =
+  "Not a free sending allowance: the current Amazon SES pricing page lists none. New AWS customers get up to $200 in AWS Free Tier credits instead ($100 at sign-up and up to $100 more for trying services), and those credits can pay SES charges. The 3,000 free messages a month for the first 12 months that many guides quote still appears in the SES FAQ, but not on the pricing page. The Lambda, SQS and DynamoDB services behind an event pipeline have their own free tiers, which the calculator applies.";
+
+/** Volumes for the worked-cost table. 20M crosses the first band boundary. */
+export const SES_EXAMPLE_VOLUMES = [
+  10_000, 100_000, 1_000_000, 20_000_000,
 ] as const;
 
 export const DEFAULT_SES_PLAN: SesPlanId = "alacarte";

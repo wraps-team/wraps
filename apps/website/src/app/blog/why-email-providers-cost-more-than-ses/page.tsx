@@ -10,7 +10,7 @@ import { JsonLd } from "@/components/json-ld";
 const TITLE =
   "Why Transactional Email Providers Cost More Than Sending Through SES";
 const DESCRIPTION =
-  "At 100,000 emails a month SES costs about $10 and SendGrid, Resend and Postmark cost $35 to $133.50. A line-by-line account of what the difference buys, and when it is worth paying.";
+  "At 100,000 emails a month SES costs about $10 and SendGrid, Resend and Postmark cost $35 to $126. A line-by-line account of what the difference buys, and when it is worth paying.";
 const URL = "https://wraps.dev/blog/why-email-providers-cost-more-than-ses";
 const PUBLISHED = "2026-09-03T00:00:00.000Z";
 
@@ -21,7 +21,7 @@ const articleSchema = {
   description: DESCRIPTION,
   image: "https://wraps.dev/og-image.png",
   datePublished: PUBLISHED,
-  dateModified: PUBLISHED,
+  dateModified: "2026-11-03T00:00:00.000Z",
   author: {
     "@type": "Organization",
     name: "Wraps",
@@ -95,14 +95,19 @@ const PRICES: { provider: string; monthly: string; note: string }[] = [
     note: "Also 100K. The step up from Pro at the same volume, not a bigger bucket.",
   },
   {
-    provider: "Postmark Platform",
-    monthly: "$126",
-    note: "$18 base for 10K, then $1.20 per additional 1,000.",
+    provider: "Postmark Basic",
+    monthly: "$115",
+    note: "The 125K tier, which costs less than the 50K tier plus overage.",
   },
   {
     provider: "Postmark Pro",
-    monthly: "$133.50",
-    note: "$16.50 base for 10K, then $1.30 per additional 1,000.",
+    monthly: "$125.50",
+    note: "$60.50 for the 50K tier, then $1.30 per additional 1,000.",
+  },
+  {
+    provider: "Postmark Platform",
+    monthly: "$126",
+    note: "$66 for the 50K tier, then $1.20 per additional 1,000.",
   },
 ];
 
@@ -164,8 +169,8 @@ export default function Page() {
             <p className="mb-6 text-lg text-muted-foreground">
               Sending 100,000 transactional emails through Amazon SES costs
               about $10. The same volume is $35 on Resend Pro, $34.95 on
-              SendGrid Essentials, and $126 on the cheapest Postmark plan that
-              reaches it.
+              SendGrid Essentials, and $115 to $126 on Postmark, depending on
+              the plan.
             </p>
             <p className="text-muted-foreground">
               That spread is not a markup on bandwidth. Sending an email is
@@ -215,8 +220,8 @@ export default function Page() {
             </div>
             <p className="mt-4 text-muted-foreground text-sm">
               List prices read off each vendor&apos;s own pricing page in
-              September 2026. Every one of these changes; check before quoting
-              them back at anyone.
+              September 2026, with Postmark rechecked on November 3, 2026. Every
+              one of these changes; check before quoting them back at anyone.
             </p>
           </section>
 

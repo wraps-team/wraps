@@ -4,7 +4,14 @@ import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
 import { AGENT_CONTENT } from "@/lib/agent-content";
 import { renderPricingMarkdown } from "@/lib/pricing-markdown";
-import { estimateCost, SES_PLANS } from "@/lib/ses-cost";
+import { renderSesCalculatorMarkdown } from "@/lib/ses-calculator-markdown";
+import {
+  estimateCost,
+  SES_FREE_TIER_ANSWER,
+  SES_PLAN_IDS,
+  SES_PLAN_INCLUDES,
+  SES_PLANS,
+} from "@/lib/ses-cost";
 
 const webRoot = resolve(__dirname, "..", "..");
 const read = (relativePath: string) =>
@@ -74,6 +81,35 @@ describe("markdown content negotiation", () => {
   it("serves pricing on /pricing instead of falling back to llms.txt", () => {
     expect(AGENT_CONTENT["/pricing"]).toBe(renderPricingMarkdown());
     expect(AGENT_CONTENT["/pricing.md"]).toBe(renderPricingMarkdown());
+  });
+
+  it("serves SES pricing, not the Wraps plans doc, on /tools/ses-calculator", () => {
+    const md = AGENT_CONTENT["/tools/ses-calculator"];
+
+    expect(md).not.toBe(renderPricingMarkdown());
+    expect(md).toBe(renderSesCalculatorMarkdown());
+    expect(md).toMatch(/^# Amazon SES Pricing Calculator/);
+    // The rates are the ones ses-cost.ts (and so the page) renders.
+    for (const id of SES_PLAN_IDS) {
+      for (const tier of SES_PLANS[id].tiers) {
+        expect(md).toContain(`$${tier.perThousandEmails.toFixed(2)}`);
+      }
+    }
+    expect(md).toContain(`$${SES_PLANS.pro.monthlyFee}/mo`);
+    // What each plan includes is the text the page renders, not a second copy.
+    for (const id of SES_PLAN_IDS) {
+      expect(md).toContain(SES_PLAN_INCLUDES[id]);
+    }
+    expect(md).toContain(SES_FREE_TIER_ANSWER);
+    // The claim in the markdown is derived from the rates, and holds today.
+    expect(md).toContain("À la carte is the cheapest plan on sending fees");
+    // What the dearer plans buy is read from SES_PLAN_INCLUDES, per plan.
+    expect(md).toContain(
+      `- **${SES_PLANS.essentials.name}:** ${SES_PLAN_INCLUDES.essentials}`
+    );
+    // Wraps' own plans are one link away, not inlined.
+    expect(md).toContain("https://wraps.dev/pricing.md");
+    expect(md).not.toContain("## Wraps plans");
   });
 
   it("points agents at pricing.md and the estimator from llms.txt", () => {
