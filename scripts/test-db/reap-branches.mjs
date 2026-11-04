@@ -23,13 +23,13 @@
 //                                                     disturb another agent's
 //                                                     worktree mid-run.
 //
-// After a migration lands, the refresh is two steps: update the PARENT
-// (`pnpm --filter @wraps/db db:push:test`, which writes to the shared
-// .env.test database that every wt-* branch is cut from), then drop the stale
-// branch (--self here, or --all for every checkout). Existing wt-* branches
-// are reused verbatim by resolve-branch.mjs and are never re-cut on their
-// own, which is why step two is required and why `db:push:test` alone looks
-// like it did nothing.
+// After a schema change merges, refresh-test-parent.yml updates the PARENT
+// that every wt-* branch is cut from; then drop the stale branch here (--self,
+// or --all for every checkout). Existing wt-* branches are reused as they are
+// by resolve-branch.mjs until they expire, and are never re-cut on their own.
+// To test an unmerged schema, push it to this checkout's own branch with
+// `node scripts/test-db/ci-branch.mjs push-worktree`, never to the parent
+// (docs/agents/test-database.md).
 //
 // Reads apps/web/.env.test directly (no dotenv dependency) so it works
 // standalone, regardless of cwd.

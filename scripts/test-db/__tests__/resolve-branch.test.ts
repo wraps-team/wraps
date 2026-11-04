@@ -10,6 +10,9 @@ const BASE_URL =
   "postgres://testrole:secret@ep-foo-pooler.us-east-2.aws.neon.tech/testdb";
 const NEON_ENV = { NEON_API_KEY: "test-key", NEON_PROJECT_ID: "proj-1" };
 const BRANCH_NAME = "wt-agent-test123";
+const RFC3339_SECONDS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+const NOW = new Date("2026-11-03T12:00:00.500Z");
+const IN_24H = "2026-11-04T12:00:00Z";
 
 /** Minimal fetch Response fake — only the members the resolver reads. */
 function jsonResponse(body: unknown, status = 200) {
@@ -71,6 +74,16 @@ function createNeonMock(
       };
       branches.push(newBranch);
       return jsonResponse({ branch: newBranch });
+    }
+
+    if (method === "PATCH") {
+      const id = parsed.pathname.split("/").pop();
+      const branch = branches.find((b) => b.id === id);
+      if (!branch) {
+        return jsonResponse({ message: "not found" }, 404);
+      }
+      Object.assign(branch, body.branch);
+      return jsonResponse({ branch });
     }
 
     if (method === "DELETE") {
@@ -190,6 +203,38 @@ describe("detectWorktree", () => {
 });
 
 describe("resolveTestDatabaseUrl", () => {
+  it("under GitHub Actions, returns baseUrl with no git, Neon or reap call, even with keys", async () => {
+    const fetchImpl = vi.fn();
+    const execImpl = vi.fn();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const result = await resolveTestDatabaseUrl(
+      BASE_URL,
+      { ...NEON_ENV, GITHUB_ACTIONS: "true" },
+      { execImpl, fetchImpl }
+    );
+    // Give a stray fire-and-forget reap the chance to show itself.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(result).toBe(BASE_URL);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(execImpl).not.toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("under GitHub Actions without keys, returns baseUrl without the shared-database warning", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const result = await resolveTestDatabaseUrl(
+      BASE_URL,
+      { GITHUB_ACTIONS: "true" },
+      { execImpl: vi.fn(), fetchImpl: vi.fn() }
+    );
+    expect(result).toBe(BASE_URL);
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
   it("returns baseUrl when baseUrl is empty, without calling fetch", async () => {
     const fetchImpl = vi.fn();
     const result = await resolveTestDatabaseUrl(
@@ -241,6 +286,7 @@ describe("resolveTestDatabaseUrl", () => {
     expect(postCall).toBeDefined();
     expect(postCall?.body.branch).toEqual({
       parent_id: "parent-123",
+      expires_at: expect.stringMatching(RFC3339_SECONDS),
       name: "wt-wraps",
     });
     expect(result).toBe(
@@ -266,6 +312,7 @@ describe("resolveTestDatabaseUrl", () => {
     expect(postCall).toBeDefined();
     expect(postCall?.body.branch).toEqual({
       parent_id: "parent-123",
+      expires_at: expect.stringMatching(RFC3339_SECONDS),
       name: "wt-agent-abc123",
     });
     expect(result).toBe(
@@ -318,6 +365,7 @@ describe("resolveTestDatabaseUrl", () => {
     expect(postCall).toBeDefined();
     expect(postCall?.body.branch).toEqual({
       parent_id: "parent-123",
+      expires_at: expect.stringMatching(RFC3339_SECONDS),
       name: BRANCH_NAME,
     });
     expect(result).toBe(
@@ -400,6 +448,126 @@ describe("resolveTestDatabaseUrl", () => {
     expect(result).toBe(BASE_URL);
     expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();
+  });
+});
+
+describe("worktree branch expiry (sliding 24h TTL)", () => {
+  it("creates a missing branch with expires_at 24h out", async () => {
+    const { fetchImpl, calls } = createNeonMock([]);
+    await resolveTestDatabaseUrl(BASE_URL, NEON_ENV, {
+      execImpl: execWorktree("agent-test123"),
+      fetchImpl,
+      now: () => NOW,
+    });
+
+    const post = calls.find((c) => c.method === "POST");
+    expect(post?.body.branch).toEqual({
+      parent_id: "parent-123",
+      name: BRANCH_NAME,
+      expires_at: IN_24H,
+    });
+    // Just created with the right expiry: nothing to slide.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(calls.filter((c) => c.method === "PATCH")).toEqual([]);
+  });
+
+  it("slides an existing branch's expiry 24h forward with one PATCH", async () => {
+    const { fetchImpl, calls, getBranches } = createNeonMock([
+      { id: "branch-1", name: BRANCH_NAME, current_state: "ready" },
+    ]);
+    const result = await resolveTestDatabaseUrl(BASE_URL, NEON_ENV, {
+      execImpl: execWorktree("agent-test123"),
+      fetchImpl,
+      now: () => NOW,
+    });
+
+    expect(result).toBe(
+      "postgres://role:pw@ep-branch.us-east-2.aws.neon.tech/testdb"
+    );
+    await vi.waitFor(() => {
+      expect(calls.filter((c) => c.method === "PATCH")).toHaveLength(1);
+    });
+    const patch = calls.find((c) => c.method === "PATCH");
+    expect(patch?.url).toBe(
+      "https://console.neon.tech/api/v2/projects/proj-1/branches/branch-1"
+    );
+    expect(patch?.body).toEqual({ branch: { expires_at: IN_24H } });
+    expect(getBranches()[0]).toMatchObject({ expires_at: IN_24H });
+  });
+
+  it("still resolves the branch URL when the PATCH fails, and warns", async () => {
+    const { fetchImpl: base } = createNeonMock([
+      { id: "branch-1", name: BRANCH_NAME, current_state: "ready" },
+    ]);
+    const fetchImpl = vi.fn(async (url: string, init: RequestInit = {}) => {
+      if (init.method === "PATCH") {
+        return jsonResponse({ message: "branch has children" }, 422);
+      }
+      return base(url, init);
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const result = await resolveTestDatabaseUrl(BASE_URL, NEON_ENV, {
+      execImpl: execWorktree("agent-test123"),
+      fetchImpl,
+      now: () => NOW,
+    });
+
+    expect(result).toBe(
+      "postgres://role:pw@ep-branch.us-east-2.aws.neon.tech/testdb"
+    );
+    await vi.waitFor(() => {
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(`could not extend ${BRANCH_NAME}'s expiry`)
+      );
+    });
+    warnSpy.mockRestore();
+  });
+
+  it("still resolves when the PATCH request itself rejects", async () => {
+    const { fetchImpl: base } = createNeonMock([
+      { id: "branch-1", name: BRANCH_NAME, current_state: "ready" },
+    ]);
+    const fetchImpl = vi.fn((url: string, init: RequestInit = {}) => {
+      if (init.method === "PATCH") {
+        return Promise.reject(new Error("network down"));
+      }
+      return base(url, init);
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const result = await resolveTestDatabaseUrl(BASE_URL, NEON_ENV, {
+      execImpl: execWorktree("agent-test123"),
+      fetchImpl,
+    });
+
+    expect(result).toBe(
+      "postgres://role:pw@ep-branch.us-east-2.aws.neon.tech/testdb"
+    );
+    await vi.waitFor(() => {
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("network down")
+      );
+    });
+    warnSpy.mockRestore();
+  });
+
+  it("makes no Neon call at all under GitHub Actions, so nothing is created or extended", async () => {
+    const { fetchImpl } = createNeonMock([
+      { id: "branch-1", name: BRANCH_NAME, current_state: "ready" },
+    ]);
+    const execImpl = execWorktree("agent-test123");
+
+    const result = await resolveTestDatabaseUrl(
+      BASE_URL,
+      { ...NEON_ENV, GITHUB_ACTIONS: "true" },
+      { execImpl, fetchImpl, now: () => NOW }
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(result).toBe(BASE_URL);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(execImpl).not.toHaveBeenCalled();
   });
 });
 

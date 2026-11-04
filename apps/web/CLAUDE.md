@@ -213,12 +213,13 @@ opaque connection/query errors, not a helpful message.
   `ps aux | grep vitest` before blaming a flake.
 - In a **linked git worktree**, `scripts/test-db/resolve-branch.mjs` gives the
   worktree its own Neon branch (`wt-<name>`) automatically, but only if
-  `NEON_API_KEY` and `NEON_PROJECT_ID` are in the env that loads `.env.test`.
-  The main checkout and CI always use `.env.test`'s `DATABASE_URL` as-is. Any
+  `NEON_API_KEY` and `NEON_PROJECT_ID` are in the env that loads `.env.test`
+  (the main checkout gets `wt-wraps` the same way). CI skips the resolver and
+  runs on a per-run `ci-*` branch from `scripts/test-db/ci-branch.mjs`. Any
   resolver failure falls back to that base URL rather than erroring, so a
-  worktree silently sharing the main branch is a real possibility.
-- After deleting a worktree, reclaim its branch:
-  `node scripts/test-db/reap-branches.mjs`.
+  worktree silently sharing the parent database is a real possibility.
+- A `wt-*` branch expires 24h after its last test run, so reclaiming it after
+  deleting a worktree is optional: `node scripts/test-db/reap-branches.mjs`.
 - Default test environment is `node`; `src/components/**/*.test.{ts,tsx}` run in
   jsdom via `environmentMatchGlobs`.
 
