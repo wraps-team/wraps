@@ -56,6 +56,18 @@ const DATABASE_URL_FROM_SECRETS = /^\s+DATABASE_URL: \$\{\{ secrets\./m;
 const DECLARES_ENVIRONMENT = /^\s+environment: /m;
 const PINNED_TO_SELF_HOSTED_POOL = /^ +runs-on: blacksmith-/m;
 const TRIGGERED_BY_PUSH = /^ {2}push:$/m;
+const GATE_HEAD_SHA_FROM_TESTED_RUN =
+  /^\s+HEAD_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \|\| github\.sha \}\}$/m;
+const GATE_STAGE =
+  /^\s+STAGE: \$\{\{ github\.event\.inputs\.stage \|\| 'production' \}\}$/m;
+const RECORDS_TESTED_SHA =
+  /^\s+DEPLOYED_SHA: \$\{\{ needs\.gate\.outputs\.sha \}\}$/m;
+const POSTS_TO_DEPLOYMENTS = /-X POST/;
+const RECORDS_REF_FROM_DEPLOYED_SHA = /--arg ref "\$DEPLOYED_SHA"/;
+const RECORD_STEP_CONDITION = /^\s+(?:if|continue-on-error):/m;
+const OLD_RUNS_LOOKUP = /actions\/workflows\/deploy-api\.yml\/runs/;
+const DEPLOYMENTS_ENDPOINT = /repos\/\$GITHUB_REPOSITORY\/deployments/;
+const API_STAGE_ENVIRONMENT = /--arg env "api-\$STAGE"/;
 
 describe("the production migration gate", () => {
   it("runs migrations before the API deploy, as a dependency it cannot skip", () => {
@@ -188,5 +200,67 @@ describe("the release path is not hostage to the shared runner pool", () => {
     expect(jobBlock(migrateWorkflow, "migrate")).not.toMatch(
       PINNED_TO_SELF_HOSTED_POOL
     );
+  });
+});
+
+// The deploy gate compares against a GitHub Deployment that `deploy` writes, so
+// the two halves have to stay agreed. scripts/__tests__/deploy-gate.test.ts
+// covers the script that reads the record; these pin the workflow that writes
+// it. On 2026-11-03 the gate read the last successful *run's* head_sha, which
+// for a workflow_run is main's HEAD at trigger time rather than the tested
+// commit, so a skipped docs-only run hid an API commit and it never deployed.
+// Recording github.sha instead of the tested sha would bring that back with
+// every other test green.
+describe("the deploy gate's record of what was deployed", () => {
+  it("records the tested commit, not main's head at trigger time", () => {
+    const deployJob = jobBlock(apiWorkflow, "deploy");
+    expect(deployJob).toMatch(RECORDS_TESTED_SHA);
+    // The env var alone is not enough: the deployment's `ref` must be built
+    // from it, not from $GITHUB_SHA.
+    expect(deployJob).toMatch(RECORDS_REF_FROM_DEPLOYED_SHA);
+  });
+
+  it("records only after a successful deploy, and a failed record fails the job", () => {
+    const deployJob = jobBlock(apiWorkflow, "deploy");
+    const start = deployJob.indexOf("- name: Record the deployed commit");
+    const end = deployJob.indexOf("- name: Print outputs");
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+
+    // No `if: always()` (would record a failed deploy) and no
+    // `continue-on-error` (a green job with no record leaves the gate a stale
+    // baseline that skips a revert).
+    expect(deployJob.slice(start, end)).not.toMatch(RECORD_STEP_CONDITION);
+  });
+
+  it("records it as an api-<stage> deployment, after sst deploy succeeded", () => {
+    const deployJob = jobBlock(apiWorkflow, "deploy");
+
+    // A distinct environment, so GitHub's automatic job-environment records
+    // (which carry github.sha) are never what the gate reads.
+    expect(deployJob).toMatch(DEPLOYMENTS_ENDPOINT);
+    expect(deployJob).toMatch(API_STAGE_ENVIRONMENT);
+
+    const deployStep = deployJob.indexOf("- name: Deploy SST");
+    const recordStep = deployJob.indexOf("- name: Record the deployed commit");
+    expect(deployStep).toBeGreaterThan(-1);
+    expect(recordStep).toBeGreaterThan(deployStep);
+  });
+
+  it("writes the record only from the deploy job", () => {
+    expect(jobBlock(apiWorkflow, "gate")).not.toMatch(POSTS_TO_DEPLOYMENTS);
+    expect(jobBlock(apiWorkflow, "deploy")).toMatch(POSTS_TO_DEPLOYMENTS);
+  });
+
+  it("gates on the tested commit and the stage being deployed", () => {
+    const gateJob = jobBlock(apiWorkflow, "gate");
+    expect(gateJob).toMatch(GATE_HEAD_SHA_FROM_TESTED_RUN);
+    expect(gateJob).toMatch(GATE_STAGE);
+    // The deploy job records under the same stage it deployed.
+    expect(jobBlock(apiWorkflow, "deploy")).toMatch(GATE_STAGE);
+  });
+
+  it("no longer infers the last deploy from past runs of this workflow", () => {
+    expect(apiWorkflow).not.toMatch(OLD_RUNS_LOOKUP);
   });
 });
