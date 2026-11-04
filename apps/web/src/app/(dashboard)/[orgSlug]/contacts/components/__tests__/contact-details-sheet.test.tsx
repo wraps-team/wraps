@@ -18,7 +18,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ContactWithMeta } from "@/lib/contacts";
 
 vi.mock("next/navigation", () => ({
@@ -356,6 +356,96 @@ describe("closing mid-edit does not silently discard (M10)", () => {
     );
 
     expect(onSave).not.toHaveBeenCalled();
+  });
+});
+
+// Plan 023b review: the form fills a missing status with a default ("active",
+// "pending_consent"). Save used to compare against the stored null, so it sent
+// that default as a change the user never made, and contact_updated now
+// reports what is sent.
+describe("Save sends only the fields the user changed", () => {
+  async function editFirstNameAndSave(
+    user: ReturnType<typeof userEvent.setup>
+  ) {
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    const firstName = screen.getByLabelText("First name");
+    await user.clear(firstName);
+    await user.type(firstName, "Grace");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+  }
+
+  it("an email-only contact's missing SMS status is not sent", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderSheet({
+      contact: makeContact({ phone: null, smsStatus: null }),
+    });
+
+    await editFirstNameAndSave(user);
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    const sent = onSave.mock.calls[0][0];
+    expect(sent.firstName).toBe("Grace");
+    expect(sent.smsStatus).toBeUndefined();
+    expect(sent.emailStatus).toBeUndefined();
+  });
+
+  // Radix Select needs these in jsdom; set per test, restored after each.
+  const original = {
+    hasPointerCapture: Element.prototype.hasPointerCapture,
+    setPointerCapture: Element.prototype.setPointerCapture,
+    releasePointerCapture: Element.prototype.releasePointerCapture,
+    scrollIntoView: Element.prototype.scrollIntoView,
+  };
+  function stubPointerEvents() {
+    Element.prototype.hasPointerCapture = () => false;
+    Element.prototype.setPointerCapture = () => undefined;
+    Element.prototype.releasePointerCapture = () => undefined;
+    Element.prototype.scrollIntoView = () => undefined;
+  }
+  beforeEach(stubPointerEvents);
+  afterEach(() => {
+    Object.assign(Element.prototype, original);
+  });
+
+  it("a status the user picks is still sent", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderSheet({
+      contact: makeContact({ phone: "+15550001111", smsStatus: null }),
+    });
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    const smsStatus = screen
+      .getAllByRole("combobox")
+      .find((box) => box.textContent?.includes("Pending Consent"));
+    expect(smsStatus).toBeDefined();
+    await user.click(smsStatus as HTMLElement);
+    await user.click(await screen.findByRole("option", { name: "Opted In" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    const sent = onSave.mock.calls[0][0];
+    expect(sent.smsStatus).toBe("opted_in");
+    expect(sent.emailStatus).toBeUndefined();
+  });
+
+  it("a phone-only contact's missing email status is not sent", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderSheet({
+      contact: makeContact({
+        email: null,
+        emailStatus: null,
+        phone: "+15550001111",
+        smsStatus: "opted_in",
+      }),
+    });
+
+    await editFirstNameAndSave(user);
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    const sent = onSave.mock.calls[0][0];
+    expect(sent.firstName).toBe("Grace");
+    expect(sent.emailStatus).toBeUndefined();
+    expect(sent.smsStatus).toBeUndefined();
   });
 });
 

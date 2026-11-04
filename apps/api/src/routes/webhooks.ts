@@ -58,7 +58,10 @@ import {
   applyLifecycleToContact,
   clearSoftBounce,
   clearSoftBounceByRecipient,
+  type EmailStatusChange,
+  emitEmailStatusChange,
   findContactIdByRecipient,
+  type LifecycleChange,
   markContactBounced,
   markContactComplained,
   markContactSuppressed,
@@ -301,9 +304,11 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
           singleRecipient && (eventType === "Delivery" || contactId !== null);
 
         let inserted: { id: string }[];
+        let contactChange: LifecycleChange | null = null;
         if (linkable) {
-          inserted = await db.transaction(async (tx) => {
+          const written = await db.transaction(async (tx) => {
             const rows = await insertRow(tx);
+            let change: LifecycleChange | null = null;
             if (rows.length > 0) {
               if (eventType === "Delivery") {
                 await clearSoftBounceByRecipient({
@@ -315,7 +320,7 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
                   client: tx,
                 });
               } else if (contactId) {
-                await applyLifecycleToContact({
+                change = await applyLifecycleToContact({
                   organizationId: account.organizationId,
                   contactId,
                   eventType,
@@ -324,13 +329,27 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
                 });
               }
             }
-            return rows;
+            return { rows, change };
           });
+          inserted = written.rows;
+          contactChange = written.change;
         } else {
           inserted = await insertRow(db);
         }
         insertedRow = inserted.length > 0;
         insertedId = inserted[0]?.id;
+
+        // contact_updated once the row and the contact write have committed.
+        // Only the event that created the row carries a change, so a
+        // duplicate emits nothing. A failed emit is logged, never a 500.
+        if (contactChange) {
+          await emitEmailStatusChange(
+            account.organizationId,
+            contactChange,
+            contactChange.changeSource,
+            messageId
+          );
+        }
       }
       // Only the event that created the row records its diagnostic. A duplicate
       // lifecycle event inserts nothing and so records nothing new. The diagnostic
@@ -478,8 +497,8 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
           );
           break;
 
-        case "Suppressed":
-          await processSuppression(
+        case "Suppressed": {
+          const change = await processSuppression(
             message,
             account.organizationId,
             event.detail.suppression?.reason,
@@ -493,7 +512,16 @@ export const webhooksRoutes = new Elysia({ prefix: "/webhooks" }).post(
               account.organizationId
             );
           }
+          // After the transaction and the resume (emitEmailStatusChange logs
+          // a failed emit, never throws).
+          await emitEmailStatusChange(
+            account.organizationId,
+            change,
+            "ses_suppression",
+            messageId
+          );
           break;
+        }
 
         case "Reject":
           await processReject(message, messageId, account.organizationId);
@@ -869,7 +897,12 @@ async function processBounce(
   // Reputation.BounceRate, so they are suppressions, not bounces, even though
   // they arrive as Bounce events.
   if (isSuppressionBounceSubType(bounceSubType)) {
-    await processSuppression(message, organizationId, bounceSubType, timestamp);
+    const change = await processSuppression(
+      message,
+      organizationId,
+      bounceSubType,
+      timestamp
+    );
     if (message.contactId) {
       await resumeWaitingExecutions(
         messageId,
@@ -878,6 +911,13 @@ async function processBounce(
         organizationId
       );
     }
+    // After the transaction and the resume.
+    await emitEmailStatusChange(
+      organizationId,
+      change,
+      "ses_suppression",
+      messageId
+    );
     return;
   }
 
@@ -908,7 +948,7 @@ async function processBounce(
   // Contact update: hard bounces end sendability; soft bounces are counted
   // (see services/contact-bounce.ts).
   const kind = classifyBounce(bounceType, bounceSubType);
-  const transitioned = await db.transaction(async (tx) => {
+  const { transitioned, change } = await db.transaction(async (tx) => {
     // Update messageSend status — guarded on a genuine transition (WHERE status
     // <> 'bounced') so a duplicate Bounce event does not re-count.
     // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
@@ -926,7 +966,7 @@ async function processBounce(
       .returning({ id: messageSend.id });
 
     if (rows.length === 0) {
-      return false;
+      return { transitioned: false, change: null };
     }
 
     // Increment batchSend counter if applicable
@@ -940,15 +980,16 @@ async function processBounce(
         .where(eq(batchSend.id, message.batchSendId));
     }
 
+    let contactChange: EmailStatusChange | null = null;
     if (message.contactId && kind === "hard") {
-      await markContactBounced({
+      contactChange = await markContactBounced({
         organizationId,
         contactId: message.contactId,
         bouncedAt,
         client: tx,
       });
     } else if (message.contactId && kind === "soft") {
-      await recordSoftBounce({
+      contactChange = await recordSoftBounce({
         organizationId,
         contactId: message.contactId,
         bouncedAt,
@@ -956,7 +997,7 @@ async function processBounce(
       });
     }
 
-    return true;
+    return { transitioned: true, change: contactChange };
   });
 
   if (!transitioned) {
@@ -975,6 +1016,11 @@ async function processBounce(
       organizationId
     );
   }
+
+  // After the transaction and the resume: a hard bounce, or soft bounces
+  // escalating to `bounced` (a soft bounce that stays `soft_bounced` does not
+  // qualify).
+  await emitEmailStatusChange(organizationId, change, "bounce", messageId);
 
   log.info("Webhook: message bounced", {
     messageId: message.id,
@@ -1015,7 +1061,7 @@ async function processComplaint(
   // Transition, batch counter and contact write run in ONE transaction: if the
   // contact write fails, everything rolls back, so the EventBridge retry finds
   // the row untransitioned instead of hitting the duplicate-event return.
-  const transitioned = await db.transaction(async (tx) => {
+  const { transitioned, change } = await db.transaction(async (tx) => {
     // Update messageSend status — guarded on a genuine transition (WHERE status
     // <> 'complained') so a duplicate Complaint event does not re-count.
     // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
@@ -1034,7 +1080,7 @@ async function processComplaint(
       .returning({ id: messageSend.id });
 
     if (rows.length === 0) {
-      return false;
+      return { transitioned: false, change: null };
     }
 
     // Increment batchSend counter if applicable
@@ -1049,8 +1095,9 @@ async function processComplaint(
     }
 
     // Update contact status
+    let contactChange: EmailStatusChange | null = null;
     if (message.contactId) {
-      await markContactComplained({
+      contactChange = await markContactComplained({
         organizationId,
         contactId: message.contactId,
         complainedAt,
@@ -1058,7 +1105,7 @@ async function processComplaint(
       });
     }
 
-    return true;
+    return { transitioned: true, change: contactChange };
   });
 
   if (!transitioned) {
@@ -1077,6 +1124,9 @@ async function processComplaint(
       organizationId
     );
   }
+
+  // After the transaction and the resume.
+  await emitEmailStatusChange(organizationId, change, "complaint", messageId);
 
   log.info("Webhook: message complained", { messageId: message.id });
 }
@@ -1222,18 +1272,22 @@ async function processReject(
   log.info("Webhook: message rejected by SES", { messageId: message.id });
 }
 
+/**
+ * Returns the contact's status change when this call transitioned the row,
+ * for the caller to emit contact_updated after its resumeWaitingExecutions.
+ */
 async function processSuppression(
   message: MessageRecord,
   organizationId: string,
   suppressionReason?: string,
   timestamp?: string
-): Promise<void> {
+): Promise<EmailStatusChange | null> {
   const suppressedAt = timestamp ? new Date(timestamp) : new Date();
 
   // Transition, batch counter and contact write run in ONE transaction: if the
   // contact write fails, everything rolls back, so the EventBridge retry finds
   // the row untransitioned instead of hitting the duplicate-event return.
-  const transitioned = await db.transaction(async (tx) => {
+  const { transitioned, change } = await db.transaction(async (tx) => {
     // Update messageSend status — guarded on a genuine transition (WHERE status
     // <> 'suppressed') so a duplicate Suppressed event does not re-count.
     // biome-ignore lint/plugin: message.id comes from the org-scoped messageSend lookup in the route handler above (organizationId = account.organizationId).
@@ -1252,7 +1306,7 @@ async function processSuppression(
       .returning({ id: messageSend.id });
 
     if (rows.length === 0) {
-      return false;
+      return { transitioned: false, change: null };
     }
 
     // Increment batchSend counter if applicable
@@ -1267,8 +1321,9 @@ async function processSuppression(
     }
 
     // Update contact status - all suppressions mark contact as suppressed
+    let contactChange: EmailStatusChange | null = null;
     if (message.contactId) {
-      await markContactSuppressed({
+      contactChange = await markContactSuppressed({
         organizationId,
         contactId: message.contactId,
         suppressedAt,
@@ -1276,20 +1331,21 @@ async function processSuppression(
       });
     }
 
-    return true;
+    return { transitioned: true, change: contactChange };
   });
 
   if (!transitioned) {
     log.info("Webhook: duplicate suppression, skipping counter", {
       messageId: message.id,
     });
-    return;
+    return null;
   }
 
   log.info("Webhook: message suppressed", {
     messageId: message.id,
     reason: suppressionReason,
   });
+  return change;
 }
 
 async function processRenderingFailure(

@@ -54,6 +54,10 @@ vi.mock("@wraps/db", async () => ({
   EMAIL_STATUSES: (
     await vi.importActual<typeof import("@wraps/db")>("@wraps/db")
   ).EMAIL_STATUSES,
+  // Same for the dashboard's contact_updated route allowlist.
+  CONTACT_UPDATED_FIELDS: (
+    await vi.importActual<typeof import("@wraps/db")>("@wraps/db")
+  ).CONTACT_UPDATED_FIELDS,
   listContacts: mockListContacts,
   findContact: mockFindContact,
   findContactByEmailHash: mockFindContactByEmailHash,

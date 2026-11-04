@@ -71,7 +71,7 @@ defineWorkflow({
 | Type | Required Config | Description |
 |------|----------------|-------------|
 | \`contact_created\` | — | Fires when a new contact is created |
-| \`contact_updated\` | — | Fires when a contact is updated |
+| \`contact_updated\` | — | Fires on every contact update through the API or CLI (\`PATCH /v1/contacts/:id\`, \`wraps contacts update\`), when a contact is edited in the dashboard, and when its email status changes (suppressed, bounced, complained, unsubscribed, or active again after a suppression is removed). Imports (dashboard CSV, \`POST /v1/contacts/import\`, \`wraps contacts import\`) don't fire it. Event data carries \`updatedFields\` and \`changeSource\`: \`api\` (an API key), \`user\` (a signed-in user in the dashboard or CLI), \`bounce\`, \`complaint\`, \`ses_suppression\` or \`unsubscribe\` (the unsubscribe link, or the preference centre's "unsubscribe from all"). If the workflow sends email, set \`reentryDelaySeconds\` or branch on \`changeSource\`, so a bounce or unsubscribe from its own email does not start it again |
 | \`event\` | \`eventName: string\` | Fires on a custom event (e.g. \`'cart.abandoned'\`) |
 | \`segment_entry\` | \`segmentId: string\` | Fires when a contact enters a segment |
 | \`segment_exit\` | \`segmentId: string\` | Fires when a contact exits a segment |

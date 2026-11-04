@@ -80,6 +80,8 @@ function selectChain(rows: unknown[]) {
   // no .limit()) and .limit()-capable (the messageSend lookup uses .limit(1)).
   const whereResult = Object.assign(Promise.resolve(rows), {
     limit: vi.fn().mockResolvedValue(rows),
+    // The contact-bounce helpers lock the contact row (SELECT … FOR NO KEY UPDATE).
+    for: vi.fn().mockResolvedValue(rows),
   });
   return {
     from: vi.fn().mockReturnValue({
@@ -137,7 +139,12 @@ const mockMessageSend = {
 function selectChainNoLimit(rows: unknown[]) {
   return {
     from: vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue(rows),
+      // Awaitable, and .for()-capable for the contact-bounce helpers' row lock.
+      where: vi.fn().mockReturnValue(
+        Object.assign(Promise.resolve(rows), {
+          for: vi.fn().mockResolvedValue(rows),
+        })
+      ),
     }),
   };
 }

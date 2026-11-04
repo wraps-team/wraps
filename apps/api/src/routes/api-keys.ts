@@ -16,6 +16,7 @@
 import { notifyOrg } from "@wraps/auth/notify";
 import { t } from "elysia";
 import { log } from "../lib/logger";
+import { rejectApiKeyCaller } from "../lib/reject-api-key-caller";
 import { requirePermission } from "../lib/require-permission";
 import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
 import {
@@ -30,19 +31,6 @@ import {
 
 const API_KEYS_SESSION_ONLY =
   "API keys cannot manage API keys. Sign in with `wraps auth login` and retry.";
-
-/**
- * Session-only gate (N0 section 14b). Returns the 403 body when the request was
- * authenticated with an API key, otherwise null. Every handler calls it before
- * the permission and confirm checks.
- */
-function rejectApiKeyCaller(ctx: unknown): { error: string } | null {
-  if (getAuth(ctx).apiKeyId === null) {
-    return null;
-  }
-  (ctx as { set: { status: number } }).set.status = 403;
-  return { error: API_KEYS_SESSION_ONLY };
-}
 
 const errorResponse = t.Object({ error: t.String() });
 
@@ -100,7 +88,7 @@ export const apiKeysRoutes = createAuthenticatedRoutes("/v1/api-keys")
   .get(
     "/",
     async (ctx) => {
-      const denied = rejectApiKeyCaller(ctx);
+      const denied = rejectApiKeyCaller(ctx, API_KEYS_SESSION_ONLY);
       if (denied) {
         return denied;
       }
@@ -130,7 +118,7 @@ export const apiKeysRoutes = createAuthenticatedRoutes("/v1/api-keys")
     "/",
     async (ctx) => {
       const { body, set, request } = ctx;
-      const denied = rejectApiKeyCaller(ctx);
+      const denied = rejectApiKeyCaller(ctx, API_KEYS_SESSION_ONLY);
       if (denied) {
         return denied;
       }
@@ -219,7 +207,7 @@ export const apiKeysRoutes = createAuthenticatedRoutes("/v1/api-keys")
     "/:id",
     async (ctx) => {
       const { params, query, set, request } = ctx;
-      const denied = rejectApiKeyCaller(ctx);
+      const denied = rejectApiKeyCaller(ctx, API_KEYS_SESSION_ONLY);
       if (denied) {
         return denied;
       }

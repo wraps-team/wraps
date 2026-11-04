@@ -83,7 +83,17 @@ export default defineWorkflow({
 // New contact created
 trigger: { type: 'contact_created' }
 
-// Contact updated
+// Contact updated: every update through the API or CLI
+// (PATCH /v1/contacts/:id, `wraps contacts update`), an edit in the dashboard,
+// or an email status change (suppressed, bounced, complained, unsubscribed, or
+// active again after a suppression is removed). Imports (dashboard CSV,
+// POST /v1/contacts/import, `wraps contacts import`) don't fire it.
+// Event data has updatedFields and changeSource: 'api' (an API key), 'user'
+// (a signed-in user in the dashboard or CLI), 'bounce', 'complaint',
+// 'ses_suppression', or 'unsubscribe' (the unsubscribe link, or the
+// preference centre's "unsubscribe from all"). If the workflow sends email,
+// set reentryDelaySeconds or add a condition on the 'changeSource' field, so a
+// bounce or unsubscribe from its own email does not start it again.
 trigger: { type: 'contact_updated' }
 
 // Custom event

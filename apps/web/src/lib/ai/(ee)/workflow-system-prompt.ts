@@ -61,7 +61,7 @@ Config shape: \`{ type: "trigger", triggerType: string, ...triggerConfig }\`
 Trigger types:
 - \`"event"\` — Custom event. Add \`eventName\` (e.g., "user.signup", "cart.abandoned")
 - \`"contact_created"\` — New contact created
-- \`"contact_updated"\` — Contact updated
+- \`"contact_updated"\` — Contact updated: every update through the API or CLI (\`PATCH /v1/contacts/:id\`, \`wraps contacts update\`), an edit in the dashboard, or an email status change (suppressed, bounced, complained, unsubscribed, or active again after a suppression is removed). Imports (dashboard CSV, \`POST /v1/contacts/import\`, \`wraps contacts import\`) don't fire it. Event data has \`updatedFields\` and \`changeSource\` ("api" = an API key, "user" = a signed-in user in the dashboard or CLI, "bounce", "complaint", "ses_suppression", "unsubscribe" = the unsubscribe link or the preference centre's "unsubscribe from all"). If the workflow sends email, add a condition on the \`changeSource\` field (or tell the user to set a re-entry delay), so a bounce or unsubscribe from its own email does not start it again
 - \`"segment_entry"\` — Contact enters a segment. Add \`segmentId\`
 - \`"segment_exit"\` — Contact exits a segment. Add \`segmentId\`
 - \`"topic_subscribed"\` — Subscribed to a topic. Add \`topicId\`

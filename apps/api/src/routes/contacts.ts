@@ -9,10 +9,13 @@
  * PATCH /v1/contacts/:id - Update a contact (adds topics, doesn't replace)
  * DELETE /v1/contacts/:id - Delete a contact
  * DELETE /v1/contacts - Bulk delete contacts
+ * POST /v1/contacts/events/updated - contact_updated for a dashboard write
+ *   (session only, hidden from the spec)
  */
 
 import {
   bulkDeleteContacts,
+  CONTACT_UPDATED_FIELDS,
   type ContactRecord,
   contact,
   contactUniqueViolationField,
@@ -40,12 +43,14 @@ import { sql } from "drizzle-orm";
 import { t } from "elysia";
 
 import { log } from "../lib/logger";
+import { rejectApiKeyCaller } from "../lib/reject-api-key-caller";
 import { requirePermission } from "../lib/require-permission";
 import { createAuthenticatedRoutes, getAuth } from "../middleware/auth";
 import {
   checkSegmentEntry,
   checkSegmentExit,
   emitContactCreated,
+  emitContactsUpdated,
   emitContactUpdated,
   emitTopicSubscribed,
   getSegmentMembership,
@@ -251,6 +256,9 @@ const listContactsQuerySchema = t.Object({
     })
   ),
 });
+
+const DASHBOARD_ONLY =
+  "Only the Wraps dashboard can report contact updates. API keys cannot call this route.";
 
 export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
   // List contacts
@@ -1033,7 +1041,10 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
           company: updated.company,
           jobTitle: updated.jobTitle,
           preferredChannel: updated.preferredChannel,
+          emailStatus: updated.emailStatus,
         },
+        // API keys carry a userId too, so the key id is the tell.
+        changeSource: authContext.apiKeyId ? "api" : "user",
       }).catch((err) => {
         log.error("Failed to emit contact_updated event", err, {
           organizationId: authContext.organizationId,
@@ -1205,6 +1216,72 @@ export const contactsRoutes = createAuthenticatedRoutes("/v1/contacts")
         tags: ["contacts"],
         summary: "Bulk delete contacts",
         description: "Deletes multiple contacts at once (max 100)",
+      },
+    }
+  )
+  // contact_updated for a write the dashboard already committed. The web app
+  // cannot enqueue workflow jobs, so its server actions call this after their
+  // write. Session only: the dashboard is the only caller.
+  .post(
+    "/events/updated",
+    async (ctx) => {
+      const rejected = rejectApiKeyCaller(ctx, DASHBOARD_ONLY);
+      if (rejected) {
+        return rejected;
+      }
+      const gate = await requirePermission(ctx, "contacts", ["write"]);
+      if (!gate.ok) {
+        return gate.body;
+      }
+      const authContext = getAuth(ctx);
+
+      // One event per contact: a repeated id merges its fields.
+      const fieldsById = new Map<string, Set<string>>();
+      for (const item of ctx.body.contacts) {
+        const fields = fieldsById.get(item.contactId) ?? new Set<string>();
+        for (const field of item.updatedFields) {
+          fields.add(field);
+        }
+        fieldsById.set(item.contactId, fields);
+      }
+
+      // Ids outside the caller's org are dropped by the emitter.
+      const { contactsFound } = await emitContactsUpdated(
+        authContext.organizationId,
+        [...fieldsById].map(([contactId, fields]) => ({
+          contactId,
+          updatedFields: [...fields],
+          changeSource: "user" as const,
+        }))
+      );
+
+      return { accepted: contactsFound };
+    },
+    {
+      body: t.Object({
+        contacts: t.Array(
+          t.Object({
+            contactId: t.String({ minLength: 1, maxLength: 255 }),
+            updatedFields: t.Array(
+              t.Union(CONTACT_UPDATED_FIELDS.map((field) => t.Literal(field))),
+              { minItems: 1, maxItems: 10 }
+            ),
+          }),
+          { minItems: 1, maxItems: 100 }
+        ),
+      }),
+      response: {
+        200: t.Object({
+          accepted: t.Number({
+            description: "Contacts found in the organization and emitted for",
+          }),
+        }),
+        403: errorResponse,
+      },
+      detail: {
+        hide: true,
+        tags: ["contacts"],
+        summary: "Emit contact_updated for a dashboard write",
       },
     }
   );

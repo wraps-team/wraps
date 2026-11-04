@@ -21,11 +21,12 @@ import {
   and,
   auditLog,
   awsAccount,
+  type ContactEmailStatusWrite,
   db,
   eq,
   hashContactValue,
-  suppressContactByEmail,
-  unsuppressContactByEmail,
+  suppressContactByEmailWithChange,
+  unsuppressContactByEmailWithChange,
   user,
 } from "@wraps/db";
 import { t } from "elysia";
@@ -40,6 +41,7 @@ import {
   listSuppressedAddresses,
   putSuppressedAddress,
 } from "../services/ses-suppression";
+import { emitContactsUpdated } from "../services/workflow-events";
 
 type AwsAccountRow = typeof awsAccount.$inferSelect;
 
@@ -111,7 +113,13 @@ type AddAudit = {
 };
 
 type AddOutcome =
-  | { ok: true; email: string; alreadyPresent: boolean }
+  | {
+      ok: true;
+      email: string;
+      alreadyPresent: boolean;
+      /** The contact this add moved to `suppressed`, if any. */
+      changedContactId: string | null;
+    }
   | { ok: false; status: 400 | 403 | 404; error: string };
 
 type BulkAddResult =
@@ -199,8 +207,13 @@ async function addOne(
       current.address.reason === "COMPLAINT")
   ) {
     // SES already has it, but the contact may not. Idempotent.
-    await suppressContactByEmail(organizationId, email);
-    return { ok: true, email, alreadyPresent: true };
+    const write = await suppressContactByEmailWithChange(organizationId, email);
+    return {
+      ok: true,
+      email,
+      alreadyPresent: true,
+      changedContactId: write.contactId,
+    };
   }
 
   // AWS first: the write cannot be rolled back, so it runs before the audit row.
@@ -210,7 +223,8 @@ async function addOne(
   }
 
   // Broadcasts choose recipients from the contact's status, not the SES list.
-  const contactSuppressed = await suppressContactByEmail(organizationId, email);
+  const write = await suppressContactByEmailWithChange(organizationId, email);
+  const contactSuppressed = write.changed;
 
   try {
     await db.insert(auditLog).values({
@@ -240,7 +254,12 @@ async function addOne(
     );
   }
 
-  return { ok: true, email, alreadyPresent: false };
+  return {
+    ok: true,
+    email,
+    alreadyPresent: false,
+    changedContactId: write.contactId,
+  };
 }
 
 /** One bulk entry. An exception here is that entry's failure, never the batch's. */
@@ -248,16 +267,22 @@ async function addBulkEntry(
   organizationId: string,
   entry: { awsAccountId: string; email: string; reason: string },
   audit: AddAudit
-): Promise<BulkAddResult> {
+): Promise<{ result: BulkAddResult; changedContactId: string | null }> {
   try {
     const outcome = await addOne(organizationId, entry, audit);
     if (!outcome.ok) {
-      return { email: entry.email, success: false, error: outcome.error };
+      return {
+        result: { email: entry.email, success: false, error: outcome.error },
+        changedContactId: null,
+      };
     }
     return {
-      email: entry.email,
-      success: true,
-      alreadyPresent: outcome.alreadyPresent,
+      result: {
+        email: entry.email,
+        success: true,
+        alreadyPresent: outcome.alreadyPresent,
+      },
+      changedContactId: outcome.changedContactId,
     };
   } catch (error) {
     log.error("Failed to add suppression in bulk", error, {
@@ -265,9 +290,12 @@ async function addBulkEntry(
       awsAccountId: entry.awsAccountId,
     });
     return {
-      email: entry.email,
-      success: false,
-      error: "Failed to add suppression",
+      result: {
+        email: entry.email,
+        success: false,
+        error: "Failed to add suppression",
+      },
+      changedContactId: null,
     };
   }
 }
@@ -426,6 +454,23 @@ export const suppressionsRoutes = createAuthenticatedRoutes("/v1/suppressions")
         return { error: outcome.error };
       }
 
+      // After the contact write, on both the new and the already-present
+      // branch. A failed emit is logged, never the request's failure.
+      if (outcome.changedContactId) {
+        await emitContactsUpdated(organizationId, [
+          {
+            contactId: outcome.changedContactId,
+            updatedFields: ["emailStatus"],
+            // API keys carry a userId too, so the key id is the tell.
+            changeSource: authContext.apiKeyId ? "api" : "user",
+          },
+        ]).catch((err) => {
+          log.error("Failed to emit contact_updated event", err, {
+            organizationId,
+          });
+        });
+      }
+
       return {
         success: true as const,
         email: outcome.email,
@@ -484,16 +529,22 @@ export const suppressionsRoutes = createAuthenticatedRoutes("/v1/suppressions")
 
       // Results are written by request index, so the response keeps request order.
       const results: BulkAddResult[] = new Array(entries.length);
+      // Kept out of `results` so the response shape is unchanged.
+      const changedContactIds: string[] = [];
       let next = 0;
       const worker = async () => {
         while (next < entries.length) {
           const index = next;
           next += 1;
-          results[index] = await addBulkEntry(
+          const { result, changedContactId } = await addBulkEntry(
             organizationId,
             entries[index],
             audit
           );
+          results[index] = result;
+          if (changedContactId) {
+            changedContactIds.push(changedContactId);
+          }
         }
       };
       await Promise.all(
@@ -501,6 +552,25 @@ export const suppressionsRoutes = createAuthenticatedRoutes("/v1/suppressions")
           worker()
         )
       );
+
+      // One emit for the whole request, after every entry has run. A failed
+      // emit is logged, never the request's failure.
+      if (changedContactIds.length > 0) {
+        // API keys carry a userId too, so the key id is the tell.
+        const changeSource = authContext.apiKeyId ? "api" : "user";
+        await emitContactsUpdated(
+          organizationId,
+          changedContactIds.map((contactId) => ({
+            contactId,
+            updatedFields: ["emailStatus"],
+            changeSource,
+          }))
+        ).catch((err) => {
+          log.error("Failed to emit contact_updated event", err, {
+            organizationId,
+          });
+        });
+      }
 
       return { results };
     },
@@ -608,9 +678,12 @@ export const suppressionsRoutes = createAuthenticatedRoutes("/v1/suppressions")
       // fails, SES has already dropped the address; we report failure as the
       // dashboard does, but a retry answers 404 at the SES re-read and never
       // reaches this call, so the contact stays suppressed until fixed by hand.
-      let contactRestored: boolean;
+      let restored: ContactEmailStatusWrite;
       try {
-        contactRestored = await unsuppressContactByEmail(organizationId, email);
+        restored = await unsuppressContactByEmailWithChange(
+          organizationId,
+          email
+        );
       } catch (error) {
         log.error(
           "Failed to restore contact after suppression removal",
@@ -624,6 +697,7 @@ export const suppressionsRoutes = createAuthenticatedRoutes("/v1/suppressions")
         set.status = 502;
         return { error: "Failed to remove suppression" };
       }
+      const contactRestored = restored.changed;
 
       try {
         const [actor] = gate.userId
@@ -657,6 +731,23 @@ export const suppressionsRoutes = createAuthenticatedRoutes("/v1/suppressions")
           auditError,
           { organizationId, awsAccountId: account.id }
         );
+      }
+
+      // After the contact write. A failed emit is logged, never the request's
+      // failure.
+      if (restored.contactId) {
+        await emitContactsUpdated(organizationId, [
+          {
+            contactId: restored.contactId,
+            updatedFields: ["emailStatus"],
+            // API keys carry a userId too, so the key id is the tell.
+            changeSource: authContext.apiKeyId ? "api" : "user",
+          },
+        ]).catch((err) => {
+          log.error("Failed to emit contact_updated event", err, {
+            organizationId,
+          });
+        });
       }
 
       return {

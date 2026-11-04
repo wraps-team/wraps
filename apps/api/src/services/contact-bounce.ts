@@ -17,8 +17,15 @@
  *   the count AND clears `emailLastSoftBouncedAt`: "consecutive" ends at a
  *   successful delivery, so the 24-hour rule must not look back across it.
  *
- * Every write is a single atomic UPDATE scoped by organizationId. They accept
- * an optional `client` so callers can run them inside their own transaction.
+ * Every write is a single atomic UPDATE scoped by organizationId.
+ *
+ * The writes that can end sendability (bounced, soft bounce, complained,
+ * suppressed) first lock the contact row and read its status, then return
+ * what changed so the caller can emit `contact_updated` once the transaction
+ * commits. They require a transaction `client`: on the pool the read would
+ * auto-commit and release its lock before the UPDATE, and two concurrent
+ * calls could both report the same change. Recovery takes an optional
+ * `client`, returns nothing and never emits.
  */
 
 import {
@@ -30,32 +37,132 @@ import {
 import {
   contact,
   db,
+  type EmailStatus,
   eq,
   findContactByEmailHash,
   hashContactValue,
 } from "@wraps/db";
 import { and, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { log } from "../lib/logger";
+import {
+  type ContactChangeSource,
+  emitContactsUpdated,
+} from "./workflow-events";
 
-type DbClient = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type DbClient = typeof db | DbTransaction;
 
+/** A contact's email status before and after one of the writes below. */
+export type EmailStatusChange = {
+  contactId: string;
+  previousStatus: EmailStatus | null;
+  newStatus: EmailStatus | null;
+};
+
+/**
+ * Whether a write's result emits `contact_updated`: the status really changed,
+ * and it is not a soft bounce that left the contact `soft_bounced` (still
+ * sendable). A soft bounce that escalates to `bounced` does emit.
+ */
+export function emitsContactUpdated(
+  change: EmailStatusChange | null
+): change is EmailStatusChange {
+  return (
+    change !== null &&
+    change.previousStatus !== change.newStatus &&
+    change.newStatus !== "soft_bounced"
+  );
+}
+
+/**
+ * Emit `contact_updated` (updatedFields ["emailStatus"]) for a write's result
+ * when `emitsContactUpdated` says it changed. Call it after the transaction
+ * has committed, and after any execution resume that goes with it. A failed
+ * emit is logged, never thrown: a committed status write must not become a
+ * 500 (a retry would hit the duplicate guard and skip the resume).
+ */
+export async function emitEmailStatusChange(
+  organizationId: string,
+  change: EmailStatusChange | null,
+  changeSource: ContactChangeSource,
+  messageId: string
+): Promise<void> {
+  if (!emitsContactUpdated(change)) {
+    return;
+  }
+  await emitContactsUpdated(organizationId, [
+    {
+      contactId: change.contactId,
+      updatedFields: ["emailStatus"],
+      changeSource,
+    },
+  ]).catch((err) => {
+    log.error("Failed to emit contact_updated event", err, {
+      organizationId,
+      messageId,
+    });
+  });
+}
+
+/**
+ * Lock the contact row and read its status, scoped like the UPDATE that
+ * follows, on the caller's transaction so the read and the write see the same
+ * row. `FOR NO KEY UPDATE` is the lock that UPDATE takes anyway (it sets no
+ * key column), so the read adds no new conflict: unlike `FOR UPDATE` it does
+ * not block the `FOR KEY SHARE` lock a foreign-key check takes when a row
+ * referencing the contact (contact_event, message_send, workflow_execution,
+ * contact_topic) is inserted. It still serializes concurrent writers.
+ */
+async function lockEmailStatus(
+  client: DbTransaction,
+  organizationId: string,
+  contactId: string
+): Promise<{ emailStatus: EmailStatus | null } | undefined> {
+  const [row] = await client
+    .select({ emailStatus: contact.emailStatus })
+    .from(contact)
+    .where(
+      and(eq(contact.id, contactId), eq(contact.organizationId, organizationId))
+    )
+    .for("no key update");
+  return row;
+}
+
+function statusChange(
+  contactId: string,
+  before: { emailStatus: EmailStatus | null } | undefined,
+  after: { emailStatus: EmailStatus | null } | undefined
+): EmailStatusChange | null {
+  if (!(before && after)) {
+    return null;
+  }
+  return {
+    contactId,
+    previousStatus: before.emailStatus,
+    newStatus: after.emailStatus,
+  };
+}
+
+/** `client` must be a transaction: the row lock lasts until it commits. */
 export async function recordSoftBounce({
   organizationId,
   contactId,
   bouncedAt,
-  client = db,
+  client,
 }: {
   organizationId: string;
   contactId: string;
   bouncedAt: Date;
-  client?: DbClient;
-}): Promise<void> {
+  client: DbTransaction;
+}): Promise<EmailStatusChange | null> {
   // ISO string cast so the stored wall time is UTC regardless of host timezone.
   const at = sql`${bouncedAt.toISOString()}::timestamp`;
   const counts = sql`(${contact.emailLastSoftBouncedAt} IS NULL OR ${contact.emailLastSoftBouncedAt} <= ${at} - make_interval(hours => ${SOFT_BOUNCE_MIN_GAP_HOURS}))`;
   const nextCount = sql`(${contact.emailSoftBounceCount} + CASE WHEN ${counts} THEN 1 ELSE 0 END)`;
   const escalates = sql`${nextCount} >= ${SOFT_BOUNCE_ESCALATION_THRESHOLD}`;
 
-  await client
+  const before = await lockEmailStatus(client, organizationId, contactId);
+  const [after] = await client
     .update(contact)
     .set({
       emailSoftBounceCount: nextCount,
@@ -72,7 +179,9 @@ export async function recordSoftBounce({
           inArray(contact.emailStatus, ["active", "soft_bounced"])
         )
       )
-    );
+    )
+    .returning({ emailStatus: contact.emailStatus });
+  return statusChange(contactId, before, after);
 }
 
 export async function clearSoftBounce({
@@ -108,61 +217,73 @@ export async function clearSoftBounce({
     );
 }
 
+/** `client` must be a transaction: the row lock lasts until it commits. */
 export async function markContactBounced({
   organizationId,
   contactId,
   bouncedAt,
-  client = db,
+  client,
 }: {
   organizationId: string;
   contactId: string;
   bouncedAt: Date;
-  client?: DbClient;
-}): Promise<void> {
-  await client
+  client: DbTransaction;
+}): Promise<EmailStatusChange | null> {
+  const before = await lockEmailStatus(client, organizationId, contactId);
+  const [after] = await client
     .update(contact)
     .set({ emailStatus: "bounced", emailBouncedAt: bouncedAt })
     .where(
       and(eq(contact.id, contactId), eq(contact.organizationId, organizationId))
-    );
+    )
+    .returning({ emailStatus: contact.emailStatus });
+  return statusChange(contactId, before, after);
 }
 
+/** `client` must be a transaction: the row lock lasts until it commits. */
 export async function markContactComplained({
   organizationId,
   contactId,
   complainedAt,
-  client = db,
+  client,
 }: {
   organizationId: string;
   contactId: string;
   complainedAt: Date;
-  client?: DbClient;
-}): Promise<void> {
-  await client
+  client: DbTransaction;
+}): Promise<EmailStatusChange | null> {
+  const before = await lockEmailStatus(client, organizationId, contactId);
+  const [after] = await client
     .update(contact)
     .set({ emailStatus: "complained", emailComplainedAt: complainedAt })
     .where(
       and(eq(contact.id, contactId), eq(contact.organizationId, organizationId))
-    );
+    )
+    .returning({ emailStatus: contact.emailStatus });
+  return statusChange(contactId, before, after);
 }
 
+/** `client` must be a transaction: the row lock lasts until it commits. */
 export async function markContactSuppressed({
   organizationId,
   contactId,
   suppressedAt,
-  client = db,
+  client,
 }: {
   organizationId: string;
   contactId: string;
   suppressedAt: Date;
-  client?: DbClient;
-}): Promise<void> {
-  await client
+  client: DbTransaction;
+}): Promise<EmailStatusChange | null> {
+  const before = await lockEmailStatus(client, organizationId, contactId);
+  const [after] = await client
     .update(contact)
     .set({ emailStatus: "suppressed", emailSuppressedAt: suppressedAt })
     .where(
       and(eq(contact.id, contactId), eq(contact.organizationId, organizationId))
-    );
+    )
+    .returning({ emailStatus: contact.emailStatus });
+  return statusChange(contactId, before, after);
 }
 
 /**
@@ -240,72 +361,104 @@ function eventTime(timestamp: string | undefined): Date {
   return timestamp ? new Date(timestamp) : new Date();
 }
 
+/** The `changeSource` a lifecycle write reports. */
+export type LifecycleChangeSource = Extract<
+  ContactChangeSource,
+  "bounce" | "complaint" | "ses_suppression"
+>;
+
+export type LifecycleChange = EmailStatusChange & {
+  changeSource: LifecycleChangeSource;
+};
+
+function withSource(
+  change: EmailStatusChange | null,
+  changeSource: LifecycleChangeSource
+): LifecycleChange | null {
+  return change ? { ...change, changeSource } : null;
+}
+
 /**
  * Apply an SES lifecycle event to a contact with the same rules the webhook
  * uses for broadcast sends. Used when the first event for an SDK send creates
- * the message row.
+ * the message row. Returns the write's change and its `changeSource`; a
+ * Delivery (recovery) or an event that writes nothing returns null. `client`
+ * must be a transaction (see the helpers it calls).
  */
 export async function applyLifecycleToContact({
   organizationId,
   contactId,
   eventType,
   detail,
-  client = db,
+  client,
 }: {
   organizationId: string;
   contactId: string;
   eventType: string;
   detail: LifecycleDetail;
-  client?: DbClient;
-}): Promise<void> {
+  client: DbTransaction;
+}): Promise<LifecycleChange | null> {
   switch (eventType) {
     case "Bounce": {
       const bounceType = detail.bounce?.bounceType;
       const bounceSubType = detail.bounce?.bounceSubType;
       const bouncedAt = eventTime(detail.bounce?.timestamp);
       if (isSuppressionBounceSubType(bounceSubType)) {
-        await markContactSuppressed({
-          organizationId,
-          contactId,
-          suppressedAt: bouncedAt,
-          client,
-        });
-        return;
+        return withSource(
+          await markContactSuppressed({
+            organizationId,
+            contactId,
+            suppressedAt: bouncedAt,
+            client,
+          }),
+          "ses_suppression"
+        );
       }
       const kind = classifyBounce(bounceType, bounceSubType);
       if (kind === "hard") {
-        await markContactBounced({
-          organizationId,
-          contactId,
-          bouncedAt,
-          client,
-        });
-      } else if (kind === "soft") {
-        await recordSoftBounce({
-          organizationId,
-          contactId,
-          bouncedAt,
-          client,
-        });
+        return withSource(
+          await markContactBounced({
+            organizationId,
+            contactId,
+            bouncedAt,
+            client,
+          }),
+          "bounce"
+        );
       }
-      return;
+      if (kind === "soft") {
+        return withSource(
+          await recordSoftBounce({
+            organizationId,
+            contactId,
+            bouncedAt,
+            client,
+          }),
+          "bounce"
+        );
+      }
+      return null;
     }
     case "Complaint":
-      await markContactComplained({
-        organizationId,
-        contactId,
-        complainedAt: eventTime(detail.complaint?.timestamp),
-        client,
-      });
-      return;
+      return withSource(
+        await markContactComplained({
+          organizationId,
+          contactId,
+          complainedAt: eventTime(detail.complaint?.timestamp),
+          client,
+        }),
+        "complaint"
+      );
     case "Suppressed":
-      await markContactSuppressed({
-        organizationId,
-        contactId,
-        suppressedAt: eventTime(detail.suppression?.timestamp),
-        client,
-      });
-      return;
+      return withSource(
+        await markContactSuppressed({
+          organizationId,
+          contactId,
+          suppressedAt: eventTime(detail.suppression?.timestamp),
+          client,
+        }),
+        "ses_suppression"
+      );
     case "Delivery":
       await clearSoftBounce({
         organizationId,
@@ -313,8 +466,8 @@ export async function applyLifecycleToContact({
         deliveredAt: eventTime(detail.delivery?.timestamp),
         client,
       });
-      return;
+      return null;
     default:
-      return;
+      return null;
   }
 }

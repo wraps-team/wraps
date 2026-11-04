@@ -1,9 +1,12 @@
 "use server";
 
+import { isDeepStrictEqual } from "node:util";
 import {
   CONTACT_SORT_FIELDS,
+  CONTACT_UPDATED_FIELDS,
   type ContactSort,
   type ContactSortField,
+  type ContactUpdatedField,
   deleteContact as dbDeleteContact,
   fetchTopicsForSubscription,
   findContactByEmailHash,
@@ -18,6 +21,7 @@ import {
 } from "@wraps/db";
 import { revalidatePath } from "next/cache";
 import { trackContactCreated } from "@/lib/activation-tracking";
+import { emitContactsUpdatedViaApi } from "@/lib/contact-updated-api";
 import type {
   ContactStatus,
   CreateContactResult,
@@ -499,6 +503,11 @@ export const updateContact = orgAction(
     const updateData: Partial<InsertContactData> = {
       updatedAt: new Date(),
     };
+    // Fills a gap only: when an email is added to a contact that has no email
+    // and no email status, and the caller sent no status, it starts "active",
+    // as createContact does. A stored status (say "unsubscribed" set through
+    // the API) is a decision and is left alone.
+    let defaultEmailStatus: EmailStatus | undefined;
 
     // Handle email update
     if (data.email !== undefined) {
@@ -524,6 +533,13 @@ export const updateContact = orgAction(
 
         updateData.email = email;
         updateData.emailHash = emailHashValue;
+        if (
+          !existing.email &&
+          existing.emailStatus == null &&
+          data.emailStatus === undefined
+        ) {
+          defaultEmailStatus = "active";
+        }
       } else {
         // Clearing email
         updateData.email = null;
@@ -574,26 +590,28 @@ export const updateContact = orgAction(
       }
     }
 
-    // Handle email status update
-    if (data.emailStatus !== undefined) {
-      updateData.emailStatus = data.emailStatus;
+    // Handle email status update. A defaulted status goes through the same
+    // path as a chosen one, so it is stamped the same way (emailVerifiedAt).
+    const emailStatus = data.emailStatus ?? defaultEmailStatus;
+    if (emailStatus !== undefined) {
+      updateData.emailStatus = emailStatus;
 
       // Update timestamps based on status
-      if (data.emailStatus === "active" && existing.emailStatus !== "active") {
+      if (emailStatus === "active" && existing.emailStatus !== "active") {
         updateData.emailVerifiedAt = new Date();
-      } else if (data.emailStatus === "unsubscribed") {
+      } else if (emailStatus === "unsubscribed") {
         updateData.emailUnsubscribedAt = new Date();
-      } else if (data.emailStatus === "bounced") {
+      } else if (emailStatus === "bounced") {
         updateData.emailBouncedAt = new Date();
-      } else if (data.emailStatus === "complained") {
+      } else if (emailStatus === "complained") {
         updateData.emailComplainedAt = new Date();
-      } else if (data.emailStatus === "suppressed") {
+      } else if (emailStatus === "suppressed") {
         updateData.emailSuppressedAt = new Date();
       }
       // A manual reactivation clears the soft-bounce count AND its timestamp,
       // like a successful delivery does. A stale timestamp would make the
       // 24-hour rule skip the next soft bounce and leave count 0.
-      if (data.emailStatus === "active") {
+      if (emailStatus === "active") {
         updateData.emailSoftBounceCount = 0;
         updateData.emailLastSoftBouncedAt = null;
       }
@@ -668,6 +686,22 @@ export const updateContact = orgAction(
       (k) => data[k as keyof typeof data] !== undefined
     );
 
+    // contact_updated reports the fields whose stored value changes: only
+    // the reportable ones this update sets (never updatedAt, hashes,
+    // timestamps or soft-bounce counters), compared with the current row.
+    const changedFields: ContactUpdatedField[] = CONTACT_UPDATED_FIELDS.filter(
+      (field) => {
+        if (!(field in updateData)) {
+          return false;
+        }
+        const next = updateData[field];
+        const current = existing[field];
+        return field === "properties"
+          ? !isDeepStrictEqual(next, current)
+          : next !== current;
+      }
+    );
+
     // Update contact + write audit log in one transaction
     await ctx.audited(
       async (tx) => {
@@ -686,6 +720,12 @@ export const updateContact = orgAction(
         metadata: { contactId, fields: updatedFields },
       })
     );
+
+    if (changedFields.length > 0) {
+      await emitContactsUpdatedViaApi(ctx, organizationId, [
+        { contactId, updatedFields: changedFields },
+      ]);
+    }
 
     // Revalidate
     revalidateContacts(ctx.access.orgSlug);

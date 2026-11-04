@@ -12,6 +12,7 @@ import {
 import { and, eq } from "drizzle-orm";
 import {
   afterAll,
+  afterEach,
   beforeAll,
   beforeEach,
   describe,
@@ -20,6 +21,7 @@ import {
   vi,
 } from "vitest";
 
+import { logger } from "@/lib/logger";
 import { generateUnsubscribeToken } from "@/lib/unsubscribe-token";
 import {
   resendConfirmation,
@@ -796,6 +798,9 @@ describe("Workflow event emission from preference center", () => {
 
   beforeEach(async () => {
     apiCalls.length = 0;
+    // Plan 023b: emitPreferenceEvents has no default API URL any more, so
+    // these tests set one instead of relying on the developer's env.
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "http://api.test");
 
     // Intercept only API calls to preference-events, pass everything else through
     vi.stubGlobal(
@@ -831,6 +836,7 @@ describe("Workflow event emission from preference center", () => {
 
   afterAll(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it("should call API to emit topic_unsubscribed when a topic is unsubscribed", async () => {
@@ -913,7 +919,47 @@ describe("Workflow event emission from preference center", () => {
     }
   });
 
-  it("should call API to emit topic_unsubscribed for all topics on global unsubscribe", async () => {
+  // Rewritten by plan 023b: on success the API now does the global write and
+  // emits, so the web reports topic events only when it falls back to its own
+  // write. The API answers 500 here; only calls to the root
+  // /v1/preference-events path are recorded.
+  it("should call API to emit topic_unsubscribed for all topics when global unsubscribe falls back", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "http://api.test");
+    vi.stubGlobal(
+      "fetch",
+      (url: string | URL | Request, options?: RequestInit) => {
+        const urlStr =
+          typeof url === "string"
+            ? url
+            : url instanceof URL
+              ? url.toString()
+              : url.url;
+        const { origin, pathname } = new URL(urlStr);
+        if (
+          origin === "http://api.test" &&
+          pathname === "/v1/preference-events/unsubscribe-all"
+        ) {
+          return Promise.resolve(new Response("boom", { status: 500 }));
+        }
+        if (
+          origin === "http://api.test" &&
+          pathname === "/v1/preference-events"
+        ) {
+          apiCalls.push({ url: urlStr, options: options || {} });
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({ success: true, subscribed: 0, unsubscribed: 0 }),
+              {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              }
+            )
+          );
+        }
+        return originalFetch(url as RequestInfo, options);
+      }
+    );
+
     // Subscribe to multiple topics first
     await db.insert(contactTopic).values([
       {
@@ -937,7 +983,11 @@ describe("Workflow event emission from preference center", () => {
       testOrganization.id
     );
 
-    await unsubscribeGlobally(token, testContact.id, testOrganization.id);
+    try {
+      await unsubscribeGlobally(token, testContact.id, testOrganization.id);
+    } finally {
+      vi.unstubAllEnvs();
+    }
 
     expect(apiCalls.length).toBeGreaterThanOrEqual(1);
     const body = JSON.parse(apiCalls[0].options.body as string);
@@ -1003,6 +1053,468 @@ describe("Workflow event emission from preference center", () => {
       .limit(1);
 
     expect(subscription.status).toBe("unsubscribed");
+  });
+});
+
+// Plan 023b: "unsubscribe from all" asks the API to do the write (so it can
+// emit contact_updated) and writes locally only when the API does not
+// confirm. Each test installs its own fetch stub over the file-level one.
+describe("unsubscribeGlobally — API first, local fallback", () => {
+  const API_URL = "http://api.test";
+  // Another org's topic, for a contact_topic row that points across orgs.
+  const foreignOrg = {
+    id: "test-pref-org-foreign",
+    name: "Preferences Foreign Org",
+    slug: "pref-foreign-org",
+    createdAt: new Date(),
+    logo: null,
+    metadata: null,
+  };
+  const foreignTopic = {
+    id: "test-pref-topic-foreign",
+    organizationId: foreignOrg.id,
+    name: "Foreign Topic",
+    slug: "foreign-topic",
+    description: "Belongs to another organization",
+    public: true,
+    doubleOptIn: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    createdBy: testUser.id,
+  };
+  const originalFetch = globalThis.fetch;
+  type Call = { url: string; options: RequestInit };
+  const unsubscribeAllCalls: Call[] = [];
+  const eventCalls: Call[] = [];
+  const otherApiCalls: Call[] = [];
+
+  function urlOf(url: string | URL | Request): string {
+    if (typeof url === "string") {
+      return url;
+    }
+    return url instanceof URL ? url.toString() : url.url;
+  }
+
+  /** `unsubscribeAll` answers the /unsubscribe-all call; the root path answers 200. */
+  function stubApi(
+    unsubscribeAll: (options: RequestInit) => Promise<Response>
+  ): void {
+    vi.stubGlobal(
+      "fetch",
+      (url: string | URL | Request, options: RequestInit = {}) => {
+        const urlStr = urlOf(url);
+        // Exact origin and path, not substrings: "http://api.test.example"
+        // is another host.
+        const { origin, pathname } = new URL(urlStr);
+        if (
+          origin === API_URL &&
+          pathname === "/v1/preference-events/unsubscribe-all"
+        ) {
+          unsubscribeAllCalls.push({ url: urlStr, options });
+          return unsubscribeAll(options);
+        }
+        if (origin === API_URL && pathname === "/v1/preference-events") {
+          eventCalls.push({ url: urlStr, options });
+          return Promise.resolve(
+            Response.json({ success: true, subscribed: 0, unsubscribed: 0 })
+          );
+        }
+        if (origin === API_URL) {
+          otherApiCalls.push({ url: urlStr, options });
+          return Promise.resolve(new Response("unexpected", { status: 418 }));
+        }
+        return originalFetch(url as RequestInfo, options);
+      }
+    );
+  }
+
+  async function seed({
+    emailStatus,
+    emailUnsubscribedAt,
+    regular,
+    doubleOptIn,
+  }: {
+    emailStatus: "active" | "unsubscribed";
+    emailUnsubscribedAt: Date | null;
+    regular: "subscribed" | "pending" | "unsubscribed";
+    doubleOptIn: "subscribed" | "pending" | "unsubscribed";
+  }) {
+    await db
+      .update(contact)
+      .set({ emailStatus, emailUnsubscribedAt })
+      .where(eq(contact.id, testContact.id));
+    await db
+      .delete(contactTopic)
+      .where(eq(contactTopic.contactId, testContact.id));
+    await db.insert(contactTopic).values([
+      {
+        contactId: testContact.id,
+        topicId: testRegularTopic.id,
+        status: regular,
+        subscribedAt: new Date(),
+      },
+      {
+        contactId: testContact.id,
+        topicId: testDoubleOptInTopic.id,
+        status: doubleOptIn,
+        subscribedAt: new Date(),
+      },
+    ]);
+  }
+
+  async function readContact() {
+    const [row] = await db
+      .select({
+        emailStatus: contact.emailStatus,
+        emailUnsubscribedAt: contact.emailUnsubscribedAt,
+      })
+      .from(contact)
+      .where(eq(contact.id, testContact.id));
+    return row;
+  }
+
+  async function topicStatuses() {
+    const rows = await db
+      .select({ topicId: contactTopic.topicId, status: contactTopic.status })
+      .from(contactTopic)
+      .where(eq(contactTopic.contactId, testContact.id));
+    return Object.fromEntries(rows.map((r) => [r.topicId, r.status]));
+  }
+
+  /** The `failure` of each warn/error log for `op`, in order. */
+  function loggedFailures(op = "unsubscribe-all-api"): unknown[] {
+    return [
+      ...vi.mocked(logger.warn).mock.calls,
+      ...vi.mocked(logger.error).mock.calls,
+    ]
+      .map(([obj]) => obj as { op?: unknown; failure?: unknown } | undefined)
+      .filter((obj) => obj?.op === op && obj.failure !== undefined)
+      .map((obj) => obj?.failure);
+  }
+
+  beforeAll(async () => {
+    await db
+      .insert(organization)
+      .values(foreignOrg)
+      .onConflictDoUpdate({
+        target: organization.id,
+        set: { name: foreignOrg.name },
+      });
+    await db
+      .insert(topic)
+      .values(foreignTopic)
+      .onConflictDoUpdate({
+        target: topic.id,
+        set: { updatedAt: new Date() },
+      });
+  });
+
+  beforeEach(async () => {
+    unsubscribeAllCalls.length = 0;
+    eventCalls.length = 0;
+    otherApiCalls.length = 0;
+    vi.stubEnv("NEXT_PUBLIC_API_URL", API_URL);
+    vi.spyOn(logger, "warn");
+    vi.spyOn(logger, "error");
+    // The regular topic is subscribed; the double opt-in one is pending.
+    await seed({
+      emailStatus: "active",
+      emailUnsubscribedAt: null,
+      regular: "subscribed",
+      doubleOptIn: "pending",
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  afterAll(async () => {
+    vi.unstubAllGlobals();
+    await db
+      .update(contact)
+      .set({ emailStatus: "active", emailUnsubscribedAt: null })
+      .where(eq(contact.id, testContact.id));
+    await db
+      .delete(contactTopic)
+      .where(eq(contactTopic.topicId, foreignTopic.id));
+    await db.delete(topic).where(eq(topic.id, foreignTopic.id));
+    await db.delete(organization).where(eq(organization.id, foreignOrg.id));
+  });
+
+  it("API success: one unsubscribe-all call with the token, and no local write", async () => {
+    stubApi(() => Promise.resolve(Response.json({ success: true })));
+    const token = await generateUnsubscribeToken(
+      testContact.id,
+      testOrganization.id
+    );
+
+    const result = await unsubscribeGlobally(
+      token,
+      testContact.id,
+      testOrganization.id
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(unsubscribeAllCalls).toHaveLength(1);
+    expect(unsubscribeAllCalls[0].url).toBe(
+      `${API_URL}/v1/preference-events/unsubscribe-all`
+    );
+    expect(unsubscribeAllCalls[0].options.method).toBe("POST");
+    expect(JSON.parse(unsubscribeAllCalls[0].options.body as string)).toEqual({
+      token,
+    });
+    expect(eventCalls).toHaveLength(0);
+    expect(otherApiCalls).toHaveLength(0);
+    expect((await readContact()).emailStatus).toBe("active");
+    expect(await topicStatuses()).toEqual({
+      [testRegularTopic.id]: "subscribed",
+      [testDoubleOptInTopic.id]: "pending",
+    });
+    expect(loggedFailures()).toEqual([]);
+    expect(loggedFailures("emit-workflow-events")).toEqual([]);
+  });
+
+  const timeoutError = () =>
+    new DOMException(
+      "The operation was aborted due to timeout",
+      "TimeoutError"
+    );
+
+  const failures: {
+    name: string;
+    failure: string;
+    attempts: number;
+    setup: () => void;
+  }[] = [
+    {
+      name: "a 500",
+      failure: "status",
+      attempts: 1,
+      setup: () =>
+        stubApi(() => Promise.resolve(new Response("boom", { status: 500 }))),
+    },
+    {
+      name: "a 404 (the web shipped before the API)",
+      failure: "status",
+      attempts: 1,
+      setup: () =>
+        stubApi(() =>
+          Promise.resolve(
+            Response.json({ error: "NOT_FOUND" }, { status: 404 })
+          )
+        ),
+    },
+    {
+      name: "a timeout",
+      failure: "timeout",
+      attempts: 1,
+      setup: () => {
+        // The action's own AbortSignal.timeout(10s), already fired: no waiting.
+        vi.spyOn(AbortSignal, "timeout").mockReturnValueOnce(
+          AbortSignal.abort(timeoutError())
+        );
+        stubApi((options) =>
+          options.signal?.aborted
+            ? Promise.reject(options.signal.reason)
+            : Promise.resolve(Response.json({ success: true }))
+        );
+      },
+    },
+    {
+      name: "a network error",
+      failure: "network",
+      attempts: 1,
+      setup: () => stubApi(() => Promise.reject(new TypeError("fetch failed"))),
+    },
+    {
+      name: "a 2xx without success: true",
+      failure: "body",
+      attempts: 1,
+      setup: () => stubApi(() => Promise.resolve(Response.json({ ok: true }))),
+    },
+  ];
+
+  it.each(failures)(
+    "$name: writes locally, reports only the topics it moved, and logs the failure",
+    async ({ failure, attempts, setup }) => {
+      setup();
+      const token = await generateUnsubscribeToken(
+        testContact.id,
+        testOrganization.id
+      );
+
+      const result = await unsubscribeGlobally(
+        token,
+        testContact.id,
+        testOrganization.id
+      );
+
+      expect(result).toEqual({ success: true });
+      expect(unsubscribeAllCalls).toHaveLength(attempts);
+      const contactRow = await readContact();
+      expect(contactRow.emailStatus).toBe("unsubscribed");
+      expect(contactRow.emailUnsubscribedAt).toBeInstanceOf(Date);
+      expect(await topicStatuses()).toEqual({
+        [testRegularTopic.id]: "unsubscribed",
+        [testDoubleOptInTopic.id]: "unsubscribed",
+      });
+      // Exactly the subscribed topic the fallback moved; the pending one was
+      // never subscribed, so it fires nothing. No other API call is made, so
+      // nothing can emit contact_updated.
+      expect(eventCalls).toHaveLength(1);
+      expect(JSON.parse(eventCalls[0].options.body as string)).toEqual({
+        token,
+        contactId: testContact.id,
+        organizationId: testOrganization.id,
+        changes: [
+          {
+            topicId: testRegularTopic.id,
+            topicName: testRegularTopic.name,
+            action: "unsubscribed",
+          },
+        ],
+      });
+      expect(otherApiCalls).toHaveLength(0);
+      expect(loggedFailures()).toEqual([failure]);
+      expect(loggedFailures("emit-workflow-events")).toEqual([]);
+    }
+  );
+
+  it("NEXT_PUBLIC_API_URL unset: writes locally and calls no API at all (no default URL)", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "");
+    stubApi(() => Promise.resolve(Response.json({ success: true })));
+    const token = await generateUnsubscribeToken(
+      testContact.id,
+      testOrganization.id
+    );
+
+    const result = await unsubscribeGlobally(
+      token,
+      testContact.id,
+      testOrganization.id
+    );
+
+    expect(result).toEqual({ success: true });
+    const contactRow = await readContact();
+    expect(contactRow.emailStatus).toBe("unsubscribed");
+    expect(contactRow.emailUnsubscribedAt).toBeInstanceOf(Date);
+    expect(await topicStatuses()).toEqual({
+      [testRegularTopic.id]: "unsubscribed",
+      [testDoubleOptInTopic.id]: "unsubscribed",
+    });
+    // Neither the unsubscribe-all call nor the topic events go anywhere:
+    // a self-hosted deployment never sends the token to the Wraps platform.
+    expect(unsubscribeAllCalls).toHaveLength(0);
+    expect(eventCalls).toHaveLength(0);
+    expect(otherApiCalls).toHaveLength(0);
+    expect(loggedFailures()).toEqual(["unconfigured"]);
+    expect(loggedFailures("emit-workflow-events")).toEqual(["unconfigured"]);
+  });
+
+  it("the timeout is 10 seconds", async () => {
+    const timeoutSpy = vi
+      .spyOn(AbortSignal, "timeout")
+      .mockReturnValueOnce(AbortSignal.abort(timeoutError()));
+    stubApi((options) =>
+      options.signal?.aborted
+        ? Promise.reject(options.signal.reason)
+        : Promise.resolve(Response.json({ success: true }))
+    );
+    const token = await generateUnsubscribeToken(
+      testContact.id,
+      testOrganization.id
+    );
+
+    await unsubscribeGlobally(token, testContact.id, testOrganization.id);
+
+    expect(timeoutSpy).toHaveBeenCalledWith(10_000);
+    expect(unsubscribeAllCalls[0].options.signal?.aborted).toBe(true);
+  });
+
+  it("a fallback after the API already unsubscribed everything emits no topic events and keeps emailUnsubscribedAt", async () => {
+    const firstUnsubscribedAt = new Date("2026-10-01T12:00:00.000Z");
+    await seed({
+      emailStatus: "unsubscribed",
+      emailUnsubscribedAt: firstUnsubscribedAt,
+      regular: "unsubscribed",
+      doubleOptIn: "unsubscribed",
+    });
+    stubApi(() => Promise.resolve(new Response("boom", { status: 500 })));
+    const token = await generateUnsubscribeToken(
+      testContact.id,
+      testOrganization.id
+    );
+
+    const result = await unsubscribeGlobally(
+      token,
+      testContact.id,
+      testOrganization.id
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(eventCalls).toHaveLength(0);
+    const contactRow = await readContact();
+    expect(contactRow.emailStatus).toBe("unsubscribed");
+    expect(contactRow.emailUnsubscribedAt?.toISOString()).toBe(
+      firstUnsubscribedAt.toISOString()
+    );
+  });
+
+  it("a fallback leaves a subscription to another org's topic alone and does not report it", async () => {
+    // Bad data on purpose: contact_topic has no org column, so nothing stops
+    // a row for this org's contact pointing at another org's topic.
+    await db.insert(contactTopic).values({
+      contactId: testContact.id,
+      topicId: foreignTopic.id,
+      status: "subscribed",
+      subscribedAt: new Date(),
+    });
+    stubApi(() => Promise.resolve(new Response("boom", { status: 500 })));
+    const token = await generateUnsubscribeToken(
+      testContact.id,
+      testOrganization.id
+    );
+
+    const result = await unsubscribeGlobally(
+      token,
+      testContact.id,
+      testOrganization.id
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(await topicStatuses()).toEqual({
+      [testRegularTopic.id]: "unsubscribed",
+      [testDoubleOptInTopic.id]: "unsubscribed",
+      [foreignTopic.id]: "subscribed",
+    });
+    expect(eventCalls).toHaveLength(1);
+    expect(JSON.parse(eventCalls[0].options.body as string).changes).toEqual([
+      {
+        topicId: testRegularTopic.id,
+        topicName: testRegularTopic.name,
+        action: "unsubscribed",
+      },
+    ]);
+  });
+
+  it("a fallback for a token pairing this contact with another org touches none of its rows", async () => {
+    stubApi(() => Promise.resolve(new Response("boom", { status: 500 })));
+    // contact_topic has no org column: without the org-scoped contact lookup
+    // the fallback's topic writes would reach this contact's subscriptions.
+    const otherOrgId = "test-pref-org-not-the-owner";
+    const token = await generateUnsubscribeToken(testContact.id, otherOrgId);
+
+    const result = await unsubscribeGlobally(token, testContact.id, otherOrgId);
+
+    expect(result).toEqual({ success: true });
+    expect(eventCalls).toHaveLength(0);
+    expect((await readContact()).emailStatus).toBe("active");
+    expect(await topicStatuses()).toEqual({
+      [testRegularTopic.id]: "subscribed",
+      [testDoubleOptInTopic.id]: "pending",
+    });
   });
 });
 
