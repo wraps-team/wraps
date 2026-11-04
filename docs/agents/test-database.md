@@ -30,11 +30,19 @@ node scripts/test-db/reap-branches.mjs --all  # also delete LIVE wt-* branches
 **Remove the worktree first, then reap.** The reaper identifies orphans by the absence of
 the checkout, so reaping first finds nothing and leaves the branch live indefinitely.
 
+## After a schema change lands on main: refresh the parent from main
+
+This is a standing rule, not an optional step. Every CI run branches from the parent, and
+its schema push fails on drizzle-kit's rename prompt once the parent drifts far enough
+behind main (`docs/agents/ci-and-deploy.md`). Run the refresh below from a checkout of
+**main**. Never refresh the parent from an unmerged PR; the one exception is a real rename,
+which that doc covers.
+
 ## After a migration lands: refresh — two steps, not one
 
-An **existing** `wt-*` branch is reused verbatim forever: `resolve-branch.mjs` cuts a
-branch from the shared test DB only when one does not already exist, and never re-cuts
-or migrates it afterwards. So a schema change reaches your tests only if you both
+An **existing** `wt-*` branch is reused as it is until it expires: `resolve-branch.mjs`
+cuts a branch from the shared test DB only when one does not already exist, and never
+re-cuts or migrates it afterwards. So a schema change reaches your tests only if you both
 update the parent *and* drop the stale child:
 
 ```bash

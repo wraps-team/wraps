@@ -28,6 +28,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   expiresAtFrom,
+  extendBranchExpiry,
   fetchConnectionUri,
   findOrCreateBranch,
   listBranches,
@@ -45,8 +46,19 @@ const LEADING_SLASH = /^\//;
 const PUSH_TIMEOUT_MS = 3 * 60_000;
 const INTERACTIVE_PROMPT = /Interactive prompts require a TTY/;
 const PUSH_SUCCEEDED = /Changes applied|No changes detected/;
+const LOCK_TIMEOUT = "5min";
 // Any constant works; it only has to be the same in every job of the run.
 const PUSH_LOCK_KEY = 31_031;
+// What a 404 means for each operation this script and the resolver make.
+const NOT_FOUND_MEANS = {
+  "list branches": "NEON_PROJECT_ID names no project this key can see",
+  "list endpoints": "NEON_PROJECT_ID names no project this key can see",
+  "create branch": "the project or the parent branch is gone",
+  connection_uri:
+    "the branch, or TEST_DATABASE_URL's role or database, does not exist on it",
+  "extend branch expiry": "the branch is gone",
+  "delete branch": "the branch is gone",
+};
 const REPO_ROOT = path.resolve(import.meta.dirname, "../..");
 const FALLBACK =
   "tests use TEST_DATABASE_URL, the shared database, where concurrent runs can collide";
@@ -104,38 +116,48 @@ export function ciBranchName(env) {
 export function describeNeonError(err) {
   if (err instanceof NeonApiError) {
     const what = err.operation;
+    const neonSays = err.detail ? `. Neon says: ${err.detail}` : "";
     switch (err.status) {
       case 401:
       case 403:
-        return `Neon refused the API key on ${what} (${err.status}): NEON_API_KEY is wrong, revoked, or not scoped to NEON_PROJECT_ID`;
+        return `Neon refused the API key on ${what} (${err.status}): NEON_API_KEY is wrong, revoked, or not scoped to NEON_PROJECT_ID${neonSays}`;
       case 404:
-        return `Neon found nothing on ${what} (404): NEON_PROJECT_ID names no project this key can see, or the branch is gone`;
+        return `Neon found nothing on ${what} (404): ${NOT_FOUND_MEANS[what] ?? "the resource is gone"}${neonSays}`;
       case 409:
-        return `Neon reported a conflict on ${what} (409) and the branch could not be found to reuse`;
+        return `Neon reported a conflict on ${what} (409)${neonSays}`;
       case 422:
-        return `Neon rejected the request body on ${what} (422), likely expires_at; not retrying without it`;
+        return `Neon rejected the ${what} request (422)${
+          what === "create branch"
+            ? "; its body carries expires_at, and the create is not retried without it"
+            : ""
+        }${neonSays}`;
       case 423:
-        return `the Neon project stayed locked by other operations on ${what} (423) past the retry window`;
+        return `the Neon project stayed locked by other operations on ${what} (423) past the retry window${neonSays}`;
       default:
-        return `Neon ${what} failed (${err.status})`;
+        return `Neon ${what} failed (${err.status})${neonSays}`;
     }
   }
   if (err && typeof err === "object" && err.code === "NO_PARENT_ENDPOINT") {
     return "TEST_DATABASE_URL's host matches no compute endpoint in NEON_PROJECT_ID: the secrets point at different projects";
   }
+  if (err instanceof Error && err.name === "TimeoutError") {
+    return "a Neon request got no answer within 30s";
+  }
   return `Neon request failed: ${err instanceof Error ? err.message : String(err)}`;
 }
 
 /**
- * Masks a connection URI and its password, raw and URL-encoded, so neither
- * shows in any later log line of the job.
+ * Masks a connection URI, its endpoint host, and its password raw and
+ * URL-encoded, so none shows in any later log line of the job.
  *
  * @param {(line: string) => void} log
  * @param {string} uri
  */
 function maskUri(log, uri) {
   log(`::add-mask::${uri}`);
-  const encoded = new URL(uri).password;
+  const parsed = new URL(uri);
+  log(`::add-mask::${parsed.hostname}`);
+  const encoded = parsed.password;
   if (!encoded) {
     return;
   }
@@ -144,6 +166,48 @@ function maskUri(log, uri) {
   if (decoded !== encoded) {
     log(`::add-mask::${decoded}`);
   }
+}
+
+/**
+ * A sibling job (or an earlier `ensure`) made the branch: give it the full 3h
+ * from now. Failing that only costs TTL headroom, so it only warns.
+ *
+ * @param {import("./resolve-branch.mjs").ResolverOpts} opts
+ * @param {(line: string) => void} log
+ * @param {{apiKey: string, projectId: string, branchId: string, branchName: string, expiresAt: string}} target
+ */
+async function extendOnReuse(opts, log, target) {
+  try {
+    await extendBranchExpiry(opts, target);
+  } catch (err) {
+    log(
+      `::warning::[ci-branch] reusing ${target.branchName}, but could not extend its expiry: ${describeNeonError(err)}`
+    );
+  }
+}
+
+/**
+ * The branch's direct URI, and the URI the tests get: pooled when
+ * TEST_DATABASE_URL is pooled, else the direct one.
+ *
+ * @param {import("./resolve-branch.mjs").ResolverOpts} opts
+ * @param {{apiKey: string, projectId: string, branchId: string, parsedBase: URL, pooled: boolean}} args
+ * @returns {Promise<{testUri: string, directUri: string}>}
+ */
+async function branchUris(opts, args) {
+  const { apiKey, projectId, branchId, parsedBase, pooled } = args;
+  const conn = {
+    apiKey,
+    projectId,
+    branchId,
+    database: parsedBase.pathname.replace(LEADING_SLASH, ""),
+    role: decodeURIComponent(parsedBase.username),
+  };
+  const directUri = await fetchConnectionUri(opts, { ...conn, pooled: false });
+  const testUri = pooled
+    ? await fetchConnectionUri(opts, { ...conn, pooled: true })
+    : directUri;
+  return { testUri, directUri };
 }
 
 /**
@@ -203,19 +267,25 @@ export async function ensure(env, io = {}) {
       parsedBase,
       expiresAt,
     });
+    if (!found.createdHere) {
+      await extendOnReuse(opts, log, {
+        apiKey,
+        projectId,
+        branchId: found.id,
+        branchName,
+        expiresAt,
+      });
+    }
     const branch = await pollUntilReady(opts, apiKey, projectId, found.id);
 
-    const role = decodeURIComponent(parsedBase.username);
-    const database = parsedBase.pathname.replace(LEADING_SLASH, "");
-    const conn = { apiKey, projectId, branchId: branch.id, database, role };
-    const directUri = await fetchConnectionUri(opts, {
-      ...conn,
-      pooled: false,
-    });
     const pooled = parsedBase.hostname.includes("-pooler.");
-    const testUri = pooled
-      ? await fetchConnectionUri(opts, { ...conn, pooled: true })
-      : directUri;
+    const { testUri, directUri } = await branchUris(opts, {
+      apiKey,
+      projectId,
+      branchId: branch.id,
+      parsedBase,
+      pooled,
+    });
 
     // Mask before anything else can print them.
     maskUri(log, testUri);
@@ -282,27 +352,21 @@ export async function deleteCiBranch(env, io = {}) {
   const opts = { fetchImpl: io.fetchImpl };
 
   try {
-    const branch = (await listBranches(opts, apiKey, projectId)).find(
-      (b) => b.name === branchName
-    );
-    if (!branch) {
+    const { found, deleted } = await deleteAllNamed(opts, {
+      apiKey,
+      projectId,
+      branchName,
+    });
+    if (found === 0) {
       log(`[ci-branch] ${branchName} does not exist, nothing to delete`);
       return { exitCode: 0, status: "absent" };
     }
-    const res = await neonFetch(
-      opts,
-      apiKey,
-      `${NEON_API_BASE}/projects/${projectId}/branches/${branch.id}`,
-      { method: "DELETE" }
-    );
-    if (res.status === 404) {
+    if (deleted === 0) {
       log(`[ci-branch] ${branchName} was already deleted`);
       return { exitCode: 0, status: "absent" };
     }
-    if (!res.ok) {
-      throw new NeonApiError("delete branch", res.status);
-    }
-    log(`[ci-branch] deleted ${branchName}`);
+    const count = found > 1 ? ` (${found} branches by that name)` : "";
+    log(`[ci-branch] deleted ${branchName}${count}`);
     return { exitCode: 0, status: "deleted" };
   } catch (err) {
     log(
@@ -310,6 +374,35 @@ export async function deleteCiBranch(env, io = {}) {
     );
     return { exitCode: 1, status: "failed" };
   }
+}
+
+/**
+ * Deletes every branch named exactly `branchName`: Neon names need not be
+ * unique. A 404 means it went in the meantime.
+ *
+ * @param {import("./resolve-branch.mjs").ResolverOpts} opts
+ * @param {{apiKey: string, projectId: string, branchName: string}} target
+ * @returns {Promise<{found: number, deleted: number}>}
+ */
+async function deleteAllNamed(opts, target) {
+  const { apiKey, projectId, branchName } = target;
+  const matches = (await listBranches(opts, apiKey, projectId)).filter(
+    (b) => b.name === branchName
+  );
+  let deleted = 0;
+  for (const branch of matches) {
+    const res = await neonFetch(
+      opts,
+      apiKey,
+      `${NEON_API_BASE}/projects/${projectId}/branches/${branch.id}`,
+      { method: "DELETE" }
+    );
+    if (!(res.ok || res.status === 404)) {
+      throw await NeonApiError.fromResponse("delete branch", res);
+    }
+    deleted += res.ok ? 1 : 0;
+  }
+  return { found: matches.length, deleted };
 }
 
 /**
@@ -374,7 +467,7 @@ function runDrizzlePush(spawnImpl, directUrl, log) {
  */
 export function pushFailure(code, output) {
   if (INTERACTIVE_PROMPT.test(output)) {
-    return "it needs an interactive answer, most likely whether a column or table was renamed, which --force does not give. Answer it once on the parent (`pnpm test-db:refresh` from a checkout of this branch), and later runs will see no diff";
+    return "drizzle-kit asked whether a column or table was renamed, which --force does not answer. Either the wraps-test parent is behind main (a table both gains and loses a column), or this PR renames one. If the parent is behind, refresh it from current main (`pnpm test-db:refresh` on main). For a real rename, refresh it from this PR rebased on main, then merge the PR straight away: until then the parent is ahead of every other run";
   }
   if (code !== 0) {
     return `exit ${code}`;
@@ -391,16 +484,139 @@ async function connectPgDefault(url) {
   // `pnpm install`, when pg is not there yet.
   const { default: pg } = await import("pg");
   const client = new pg.Client({ connectionString: url });
+  // A dropped connection emits 'error'; unhandled, it would crash the step
+  // with a stack trace instead of the message below.
+  client.on("error", (err) => {
+    process.stderr.write(
+      `[ci-branch] database connection error: ${err.message}\n`
+    );
+  });
   await client.connect();
   return client;
 }
 
 /**
+ * Whether this run's branch already carries the done-marker. Keyed on the
+ * branch name: a branch inherits its parent's tables, so a bare "table
+ * exists" check would make a marker that leaked into the parent skip every
+ * run's push.
+ *
+ * @param {PgClient} client
+ * @param {string} branchName
+ * @returns {Promise<boolean>}
+ */
+async function alreadyPushed(client, branchName) {
+  const table = await client.query(
+    "SELECT to_regclass('ci_meta.schema_push') IS NOT NULL AS present"
+  );
+  if (!table?.rows?.[0]?.present) {
+    return false;
+  }
+  try {
+    const row = await client.query(
+      "SELECT 1 FROM ci_meta.schema_push WHERE branch = $1",
+      [branchName]
+    );
+    return (row?.rows?.length ?? 0) > 0;
+  } catch {
+    // A marker table of some other shape: treat as not pushed.
+    return false;
+  }
+}
+
+/**
+ * Why taking the push lock failed, in words.
+ *
+ * @param {unknown} err
+ * @returns {string}
+ */
+function lockFailureReason(err) {
+  if (err && typeof err === "object" && err.code === "55P03") {
+    return `another job held the push lock for over ${LOCK_TIMEOUT}`;
+  }
+  return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * Takes the push advisory lock on `directUrl` (direct, not pooled: PgBouncer
+ * would not keep a session lock), runs `body` while holding it, and always
+ * releases it. The wait is bounded by `lock_timeout`.
+ *
+ * @template T
+ * @param {string} directUrl
+ * @param {CiIo} io
+ * @param {string} label the target, for messages
+ * @param {(client: PgClient) => Promise<T>} body
+ * @returns {Promise<T | {exitCode: 1, status: "failed"}>}
+ */
+async function withPushLock(directUrl, io, label, body) {
+  const log = logger(io);
+  const connectPg = io.connectPg ?? connectPgDefault;
+
+  let client;
+  try {
+    client = await connectPg(directUrl);
+    await client.query(`SET lock_timeout = '${LOCK_TIMEOUT}'`);
+    await client.query("SELECT pg_advisory_lock($1)", [PUSH_LOCK_KEY]);
+  } catch (err) {
+    log(
+      `::error::[ci-branch] could not lock ${label} for the schema push: ${lockFailureReason(err)}`
+    );
+    await client?.end().catch(() => {
+      // The connection may never have opened; nothing to close.
+    });
+    return { exitCode: 1, status: "failed" };
+  }
+
+  try {
+    return await body(client);
+  } finally {
+    // Best effort: closing the session releases the lock regardless.
+    await client
+      .query("SELECT pg_advisory_unlock($1)", [PUSH_LOCK_KEY])
+      .catch(() => {
+        // Released by end() below.
+      });
+    await client.end().catch(() => {
+      // The runner exits right after; the server drops the session.
+    });
+  }
+}
+
+/**
+ * Runs the drizzle-kit push and reports the failure, if any, as an
+ * `::error::`. Returns whether it succeeded.
+ *
+ * @param {CiIo} io
+ * @param {string} directUrl
+ * @param {string} label
+ * @param {string} consequence what a failure means, appended to the error
+ * @returns {Promise<boolean>}
+ */
+async function checkedPush(io, directUrl, label, consequence) {
+  const log = logger(io);
+  const { code, output } = await runDrizzlePush(
+    io.spawnImpl ?? spawn,
+    directUrl,
+    log
+  );
+  const failure = pushFailure(code, output);
+  if (failure) {
+    log(
+      `::error::[ci-branch] drizzle-kit push to ${label} failed: ${failure}. ${consequence}`
+    );
+    return false;
+  }
+  return true;
+}
+
+/**
  * Pushes packages/db's schema to this run's branch with
  * `drizzle-kit push --force`, once per run. Every DB job calls this; a session
- * advisory lock serialises them, and the first to succeed writes a marker
- * table (`ci_meta.schema_push`) so the rest skip. Skips (exit 0) when `ensure`
- * fell back: the shared parent is never pushed to from CI.
+ * advisory lock serialises them, and the first to succeed records this
+ * branch in a marker table (`ci_meta.schema_push`) so the rest skip. Skips
+ * (exit 0) when `ensure` fell back: the shared parent is never pushed to from
+ * a test run.
  *
  * @param {Record<string, string | undefined>} env
  * @param {CiIo} [io]
@@ -408,9 +624,6 @@ async function connectPgDefault(url) {
  */
 export async function pushSchema(env, io = {}) {
   const log = logger(io);
-  const spawnImpl = io.spawnImpl ?? spawn;
-  const connectPg = io.connectPg ?? connectPgDefault;
-
   const directUrl = env.CI_DATABASE_DIRECT_URL;
   const branchName = env.CI_DB_BRANCH ?? "";
   if (!directUrl) {
@@ -426,69 +639,54 @@ export async function pushSchema(env, io = {}) {
     return { exitCode: 1, status: "refused" };
   }
 
-  let client;
-  try {
-    // Direct URI: PgBouncer (pooled) would not keep a session lock.
-    client = await connectPg(directUrl);
-    await client.query("SELECT pg_advisory_lock($1)", [PUSH_LOCK_KEY]);
-  } catch (err) {
-    log(
-      `::error::[ci-branch] could not lock ${branchName} for the schema push: ${err instanceof Error ? err.message : String(err)}`
-    );
-    await client?.end().catch(() => {
-      // The connection may never have opened; nothing to close.
-    });
-    return { exitCode: 1, status: "failed" };
-  }
-
-  try {
+  return await withPushLock(directUrl, io, branchName, async (client) => {
     // A sibling job of this run already pushed: the branch is current, and a
     // second push would re-run drizzle's non-converging DDL (it drops and
     // re-adds a primary key every time) under another job's running tests.
-    const marker = await client.query(
-      "SELECT to_regclass('ci_meta.schema_push') IS NOT NULL AS pushed"
-    );
-    if (marker?.rows?.[0]?.pushed) {
+    if (await alreadyPushed(client, branchName)) {
       log(
         `[ci-branch] a sibling job already pushed the schema to ${branchName}, skipping`
       );
       return { exitCode: 0, status: "skipped" };
     }
-
-    const { code, output } = await runDrizzlePush(spawnImpl, directUrl, log);
-    const failure = pushFailure(code, output);
-    if (failure) {
-      log(
-        `::error::[ci-branch] drizzle-kit push to ${branchName} failed: ${failure}. The tests would run against a stale schema`
-      );
+    const ok = await checkedPush(
+      io,
+      directUrl,
+      branchName,
+      "The tests would run against a stale schema"
+    );
+    if (!ok) {
       return { exitCode: 1, status: "failed" };
     }
-
-    // Only after a successful push, so a failed one leaves the next job to
-    // retry. Outside `public`, so drizzle never sees it.
-    try {
-      await client.query("CREATE SCHEMA IF NOT EXISTS ci_meta");
-      await client.query(
-        "CREATE TABLE IF NOT EXISTS ci_meta.schema_push (pushed_at timestamptz NOT NULL DEFAULT now())"
-      );
-      await client.query("INSERT INTO ci_meta.schema_push DEFAULT VALUES");
-    } catch (err) {
-      log(
-        `::warning::[ci-branch] schema pushed, but the done-marker could not be written, so sibling jobs will push again: ${err instanceof Error ? err.message : String(err)}`
-      );
-    }
+    await markPushed(client, branchName, log);
     log(`[ci-branch] schema pushed to ${branchName}`);
     return { exitCode: 0, status: "pushed" };
-  } finally {
-    // Best effort: closing the session releases the lock regardless.
-    await client
-      .query("SELECT pg_advisory_unlock($1)", [PUSH_LOCK_KEY])
-      .catch(() => {
-        // Released by end() below.
-      });
-    await client.end().catch(() => {
-      // The runner exits right after; the server drops the session.
-    });
+  });
+}
+
+/**
+ * Records `branchName` as pushed. Only after a successful push, so a failed
+ * one leaves the next job to retry. Outside `public`, so drizzle never sees
+ * it.
+ *
+ * @param {PgClient} client
+ * @param {string} branchName
+ * @param {(line: string) => void} log
+ */
+async function markPushed(client, branchName, log) {
+  try {
+    await client.query("CREATE SCHEMA IF NOT EXISTS ci_meta");
+    await client.query(
+      "CREATE TABLE IF NOT EXISTS ci_meta.schema_push (branch text PRIMARY KEY, pushed_at timestamptz NOT NULL DEFAULT now())"
+    );
+    await client.query(
+      "INSERT INTO ci_meta.schema_push (branch) VALUES ($1) ON CONFLICT DO NOTHING",
+      [branchName]
+    );
+  } catch (err) {
+    log(
+      `::warning::[ci-branch] schema pushed, but the done-marker could not be written, so sibling jobs will push again: ${err instanceof Error ? err.message : String(err)}`
+    );
   }
 }
 

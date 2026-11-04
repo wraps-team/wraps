@@ -104,6 +104,7 @@ jobs:
       - name: Delete this run's Neon branch
         if: always()
         continue-on-error: true
+        timeout-minutes: 2
         run: node scripts/test-db/ci-branch.mjs delete
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}

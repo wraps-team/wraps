@@ -288,13 +288,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Brings the branch to this commit's schema, once per run: every DB job
-      # calls it under an advisory lock, the first pushes and marks the branch,
-      # and the rest skip, so no job's tests start before the push is done.
-      # Skipped when ensure fell back: CI never pushes to the shared database.
-      - name: Push the schema to the per-run branch
-        run: node scripts/test-db/ci-branch.mjs push
-
       - name: Check migration snapshot integrity
         run: pnpm --filter @wraps/db exec drizzle-kit check
 
@@ -313,20 +306,32 @@ jobs:
             exit 1
           fi
 
+      # After the offline schema checks above, so a schema with no migration
+      # fails there first. Brings the branch to this commit's schema, once per
+      # run: every DB job calls it under an advisory lock, the first pushes and
+      # marks the branch, and the rest skip, so no job's tests start before the
+      # push is done. Skipped when ensure fell back: CI never pushes to the
+      # shared database.
+      - name: Push the schema to the per-run branch
+        run: node scripts/test-db/ci-branch.mjs push
+
       - name: Run db tests
         run: pnpm --filter @wraps/db test
         env:
           DATABASE_URL: ${{ env.CI_DATABASE_URL || secrets.TEST_DATABASE_URL }}
 
   # Deletes this run's Neon branch once every job that used it has finished,
-  # pass or fail. A failed delete only warns: it must not turn the run red,
-  # because deploy-api.yml deploys only after a green Test run, and Neon
-  # expires the branch on its own 3h after creation anyway.
+  # pass or fail. Nothing here may turn the run red, because deploy-api.yml
+  # deploys only after a green Test run, and Neon expires the branch on its
+  # own 3h after creation anyway. So the job is continue-on-error (which also
+  # covers its checkout and a job timeout), and the delete step has its own
+  # short timeout inside the job's.
   cleanup-db-branch:
     if: always() && github.repository == 'wraps-team/wraps'
     needs: [test-api, test-auth, test-web, test-db]
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    continue-on-error: true
 
     steps:
       - name: Checkout scripts/test-db
@@ -341,6 +346,7 @@ jobs:
 
       - name: Delete this run's Neon branch
         continue-on-error: true
+        timeout-minutes: 2
         run: node scripts/test-db/ci-branch.mjs delete
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}

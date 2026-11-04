@@ -117,6 +117,14 @@ function neonMock(
       branches.push(branch);
       return jsonResponse({ branch }, 201);
     }
+    if (method === "PATCH") {
+      const id = parsed.pathname.split("/").pop();
+      const branch = branches.find((b) => b.id === id);
+      if (branch) {
+        Object.assign(branch, body.branch);
+      }
+      return jsonResponse({ branch }, branch ? 200 : 404);
+    }
     if (method === "DELETE") {
       const id = parsed.pathname.split("/").pop();
       branches = branches.filter((b) => b.id !== id);
@@ -134,14 +142,21 @@ function neonMock(
 function harness(mock = neonMock()) {
   const lines: string[] = [];
   const written: Array<{ file: string; text: string }> = [];
+  const events: string[] = [];
   const io = {
     fetchImpl: mock.fetchImpl as unknown as typeof fetch,
     sleepImpl: vi.fn(async () => {}),
-    log: (line: string) => lines.push(line),
-    appendFile: (file: string, text: string) => written.push({ file, text }),
+    log: (line: string) => {
+      lines.push(line);
+      events.push(line.startsWith("::add-mask::") ? "mask" : "log");
+    },
+    appendFile: (file: string, text: string) => {
+      written.push({ file, text });
+      events.push("env");
+    },
     now: () => NOW,
   };
-  return { io, lines, written, mock };
+  return { io, lines, written, events, mock };
 }
 
 describe("ciBranchName", () => {
@@ -288,7 +303,7 @@ describe("ensure", () => {
   it.each([
     [401, "API key"],
     [403, "API key"],
-    [404, "NEON_PROJECT_ID"],
+    [404, "parent branch"],
     [422, "expires_at"],
     [500, "(500)"],
   ])(
@@ -309,6 +324,94 @@ describe("ensure", () => {
       expect(posts[0].body.branch.expires_at).toBe("2026-11-03T15:34:56Z");
     }
   );
+
+  it("writes every mask, endpoint hosts included, before the env file", async () => {
+    const { io, lines, events } = harness();
+    await ensure(ciEnv(), io);
+
+    expect(events.indexOf("env")).toBeGreaterThan(events.lastIndexOf("mask"));
+    expect(lines).toEqual(
+      expect.arrayContaining([
+        "::add-mask::ep-child-pooler.us-east-2.aws.neon.tech",
+        "::add-mask::ep-child.us-east-2.aws.neon.tech",
+      ])
+    );
+  });
+
+  it("slides a reused branch's expiry to 3h from now", async () => {
+    const { io, mock } = harness(
+      neonMock({
+        branches: [{ id: "br-existing", name: BRANCH, current_state: "ready" }],
+      })
+    );
+    await ensure(ciEnv(), io);
+
+    const patch = mock.calls.find((c) => c.method === "PATCH");
+    expect(patch?.path).toBe("/api/v2/projects/proj-1/branches/br-existing");
+    expect(patch?.body).toEqual({
+      branch: { expires_at: "2026-11-03T15:34:56Z" },
+    });
+  });
+
+  it("still hands over a reused branch when extending its expiry fails", async () => {
+    const { io, lines, written } = harness(
+      neonMock({
+        branches: [{ id: "br-existing", name: BRANCH, current_state: "ready" }],
+        fail: { method: "PATCH", pathEnds: "/br-existing", status: 500 },
+      })
+    );
+    const result = await ensure(ciEnv(), io);
+
+    expect(result.status).toBe("ready");
+    expect(written).toHaveLength(1);
+    expect(lines.find((l) => l.startsWith("::warning::"))).toContain(
+      "could not extend its expiry"
+    );
+  });
+
+  it("gives up on a 423 once the retry window runs out, and falls back", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const { io, lines, written, mock } = harness(
+        neonMock({ createStatus: Array(50).fill(423) })
+      );
+      io.sleepImpl = vi.fn(async (ms: number) => {
+        vi.setSystemTime(Date.now() + ms);
+      });
+      const result = await ensure(ciEnv(), io);
+
+      expect(result).toEqual({ status: "fallback" });
+      expect(written).toEqual([]);
+      const posts = mock.calls.filter((c) => c.method === "POST").length;
+      expect(posts).toBeGreaterThan(1);
+      expect(posts).toBeLessThan(20);
+      expect(lines.find((l) => l.startsWith("::warning::"))).toContain(
+        "(423) past the retry window"
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("passes Neon's own message and code through on a 422", async () => {
+    const mock = neonMock();
+    const base = mock.fetchImpl;
+    const { io, lines } = harness(mock);
+    io.fetchImpl = vi.fn(async (url: string, init: RequestInit = {}) => {
+      if (init.method === "POST") {
+        return jsonResponse(
+          { code: "", message: "expires_at must be in the future" },
+          422
+        );
+      }
+      return base(url, init);
+    }) as unknown as typeof fetch;
+    await ensure(ciEnv(), io);
+
+    expect(lines.find((l) => l.startsWith("::warning::"))).toContain(
+      "Neon says: expires_at must be in the future"
+    );
+  });
 
   it("falls back on a network error", async () => {
     const { io, lines, written } = harness();
@@ -379,6 +482,21 @@ describe("deleteCiBranch", () => {
     expect(lines.join("\n")).toContain("refusing");
   });
 
+  it("deletes every branch with this run's exact name", async () => {
+    const mock = neonMock({
+      branches: [
+        { id: "br-a", name: BRANCH, current_state: "ready" },
+        { id: "br-b", name: BRANCH, current_state: "ready" },
+        { id: "br-c", name: `${BRANCH}0`, current_state: "ready" },
+      ],
+    });
+    const { io } = harness(mock);
+    const result = await deleteCiBranch(ciEnv(), io);
+
+    expect(result).toEqual({ exitCode: 0, status: "deleted" });
+    expect(mock.branches().map((b) => b.id)).toEqual(["br-c"]);
+  });
+
   it("treats an absent branch as success", async () => {
     const { io } = harness();
     expect(await deleteCiBranch(ciEnv(), io)).toEqual({
@@ -430,14 +548,28 @@ describe("pushSchema", () => {
   function pushHarness({
     exitCode = 0,
     stdout = APPLIED,
-    markerPresent = false,
+    markerTable = false,
+    markedBranches = [] as string[],
+    lockError = undefined as undefined | Error,
   } = {}) {
     const order: string[] = [];
     const client = {
-      query: vi.fn(async (sql: string) => {
+      query: vi.fn(async (sql: string, params: unknown[] = []) => {
         if (sql.includes("to_regclass")) {
           order.push("check");
-          return { rows: [{ pushed: markerPresent }] };
+          return { rows: [{ present: markerTable }] };
+        }
+        if (sql.startsWith("SELECT 1 FROM ci_meta")) {
+          return {
+            rows: markedBranches.includes(String(params[0])) ? [{}] : [],
+          };
+        }
+        if (sql.startsWith("SET lock_timeout")) {
+          order.push("timeout");
+          return { rows: [] };
+        }
+        if (lockError && sql.includes("pg_advisory_lock")) {
+          throw lockError;
         }
         if (sql.includes("unlock")) {
           order.push("unlock");
@@ -484,7 +616,15 @@ describe("pushSchema", () => {
 
     expect(result).toEqual({ exitCode: 0, status: "pushed" });
     expect(h.connectPg).toHaveBeenCalledWith(DIRECT_URI);
-    expect(h.order).toEqual(["lock", "check", "push", "mark", "unlock", "end"]);
+    expect(h.order).toEqual([
+      "timeout",
+      "lock",
+      "check",
+      "push",
+      "mark",
+      "unlock",
+      "end",
+    ]);
     const [cmd, args, options] = h.spawnImpl.mock.calls[0] as [
       string,
       string[],
@@ -511,13 +651,59 @@ describe("pushSchema", () => {
   });
 
   it("skips without spawning when a sibling job already pushed", async () => {
-    const h = pushHarness({ markerPresent: true });
+    const h = pushHarness({ markerTable: true, markedBranches: [BRANCH] });
     const result = await pushSchema(pushEnv, h.io);
     h.restore();
 
     expect(result).toEqual({ exitCode: 0, status: "skipped" });
     expect(h.spawnImpl).not.toHaveBeenCalled();
-    expect(h.order).toEqual(["lock", "check", "unlock", "end"]);
+    expect(h.order).toEqual(["timeout", "lock", "check", "unlock", "end"]);
+  });
+
+  it("pushes when the marker table only names other branches (inherited from the parent)", async () => {
+    const h = pushHarness({
+      markerTable: true,
+      markedBranches: ["ci-aaaaaaa-1-1"],
+    });
+    const result = await pushSchema(pushEnv, h.io);
+    h.restore();
+
+    expect(result).toEqual({ exitCode: 0, status: "pushed" });
+    expect(h.spawnImpl).toHaveBeenCalledTimes(1);
+    const insert = h.client.query.mock.calls.find(([sql]) =>
+      String(sql).startsWith("INSERT")
+    );
+    expect(insert?.[1]).toEqual([BRANCH]);
+  });
+
+  it("fails without pushing when it cannot connect", async () => {
+    const h = pushHarness();
+    h.connectPg.mockRejectedValueOnce(new Error("connection refused"));
+    const result = await pushSchema(pushEnv, h.io);
+    h.restore();
+
+    expect(result).toEqual({ exitCode: 1, status: "failed" });
+    expect(h.spawnImpl).not.toHaveBeenCalled();
+    expect(h.lines.find((l) => l.startsWith("::error::"))).toContain(
+      "connection refused"
+    );
+  });
+
+  it("fails without pushing, and closes the connection, when the lock wait times out", async () => {
+    const timeout = Object.assign(
+      new Error("canceling statement due to lock timeout"),
+      { code: "55P03" }
+    );
+    const h = pushHarness({ lockError: timeout });
+    const result = await pushSchema(pushEnv, h.io);
+    h.restore();
+
+    expect(result).toEqual({ exitCode: 1, status: "failed" });
+    expect(h.spawnImpl).not.toHaveBeenCalled();
+    expect(h.order).toEqual(["timeout", "end"]);
+    expect(h.lines.find((l) => l.startsWith("::error::"))).toContain(
+      "held the push lock"
+    );
   });
 
   it("skips, touching nothing, when ensure fell back", async () => {
@@ -549,7 +735,14 @@ describe("pushSchema", () => {
     h.restore();
 
     expect(result).toEqual({ exitCode: 1, status: "failed" });
-    expect(h.order).toEqual(["lock", "check", "push", "unlock", "end"]);
+    expect(h.order).toEqual([
+      "timeout",
+      "lock",
+      "check",
+      "push",
+      "unlock",
+      "end",
+    ]);
     expect(h.lines.some((l) => l.startsWith("::error::"))).toBe(true);
   });
 
@@ -562,7 +755,8 @@ describe("pushSchema", () => {
     expect(h.order).not.toContain("mark");
     const error = h.lines.find((l) => l.startsWith("::error::")) ?? "";
     expect(error).toContain("renamed");
-    expect(error).toContain("test-db:refresh");
+    expect(error).toContain("behind main");
+    expect(error).toContain("rebased on main");
   });
 
   it("fails when drizzle-kit exits 0 without saying it applied anything", async () => {

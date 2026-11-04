@@ -65,10 +65,17 @@ named `ci-<sha7>-<run_id>-<run_attempt>` (on a PR, `sha7` is the merge commit).
   skip, so the push happens once per run and before any job's tests. It refuses any
   branch not named `ci-*`, and skips when `ensure` fell back. A failed push fails the
   job, since the tests would run on a stale schema.
-- A PR that renames a column or table fails `push`: drizzle-kit asks whether it is a
-  rename, `--force` doesn't answer that, and a runner has no TTY. (drizzle-kit exits 0
-  there; `ci-branch.mjs` reads its output to catch it.) Answer the prompt once on the
-  parent with `pnpm test-db:refresh` from a checkout of the PR, and later runs see no diff.
+- `push` fails when drizzle-kit asks whether a column or table was renamed: `--force`
+  doesn't answer that, and a runner has no TTY. (drizzle-kit exits 0 there;
+  `ci-branch.mjs` reads its output to catch it.) The prompt fires in two cases:
+  - **The parent is behind main**: a table gains one column and loses another relative
+    to the parent. Refresh the parent from current main (`pnpm test-db:refresh` in a
+    checkout of main) and re-run.
+  - **The PR really renames something.** Refresh the parent from the PR rebased on main,
+    answer the prompt, and merge the PR straight away: until it merges, the parent is
+    ahead of main and every other run sees the rename in reverse.
+
+  Never refresh the parent from an unmerged PR otherwise: every other run branches from it.
 - `delete` runs in `test.yml`'s `cleanup-db-branch` job and in e2e's last step, both
   `always()`. A failed delete only warns, so it can't block the deploy; the 3h expiry
   covers it.
@@ -78,9 +85,23 @@ named `ci-<sha7>-<run_id>-<run_attempt>` (on a PR, `sha7` is the merge commit).
 `resolveTestDatabaseUrl` returns `DATABASE_URL` untouched under `GITHUB_ACTIONS=true`, so
 the vitest configs never name, create or reap branches from a runner.
 
-The Neon secrets (`NEON_API_KEY`, `NEON_PROJECT_ID`, `TEST_DATABASE_URL`) reach only the
-`ensure` and `delete` steps. The key is scoped to the test-only project, which is the real
-control: a same-repo PR can still read it by editing the workflow.
+Which steps get which secrets:
+
+- `ensure`: `NEON_API_KEY`, `NEON_PROJECT_ID` and `TEST_DATABASE_URL` (the parent it
+  branches from).
+- `delete`: `NEON_API_KEY` and `NEON_PROJECT_ID`.
+- The test steps: `TEST_DATABASE_URL`, but only as the fallback inside
+  `DATABASE_URL: ${{ env.CI_DATABASE_URL || secrets.TEST_DATABASE_URL }}`.
+- `push` gets no secret; it reads the branch URL `ensure` wrote.
+
+The Neon key is scoped to the test-only project, which is the real control: a same-repo
+PR can still read it by editing the workflow.
+
+`ensure` writes the branch URLs to `$GITHUB_ENV`, so they reach every later step of the
+job, `pnpm install` and its lifecycle scripts included, not only the test step. They are
+masked in the logs (URI, endpoint host and password), and they open only this run's
+branch, which is deleted at the end. When checked on 2026-11-03, a new `ci-*` branch's
+role password differed from the parent's, so a leaked branch URL did not open the parent.
 
 ## A red `test-api`/`test-web` on the shared database is usually contention
 

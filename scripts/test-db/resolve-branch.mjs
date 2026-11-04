@@ -43,6 +43,8 @@ const WT_BRANCH_TTL_HOURS = 24;
 // create with backoff for up to this long, re-listing first each time.
 const LOCKED_RETRY_MAX_MS = 60_000;
 const LOCKED_BACKOFF_MS = [1000, 2000, 4000, 8000];
+// No Neon call may hang a test start or a CI step indefinitely.
+const NEON_FETCH_TIMEOUT_MS = 30_000;
 
 /**
  * A non-2xx answer from the Neon API. `status` lets callers give 401/403,
@@ -52,14 +54,50 @@ export class NeonApiError extends Error {
   /**
    * @param {string} operation
    * @param {number} status
-   * @param {string} [detail]
+   * @param {string} [body] the response body; Neon's `message` and `code` are
+   *   kept from it as `detail`
    */
-  constructor(operation, status, detail = "") {
+  constructor(operation, status, body = "") {
+    const detail = neonErrorDetail(body);
     super(`${operation} failed: ${status}${detail ? ` ${detail}` : ""}`);
     this.name = "NeonApiError";
     this.operation = operation;
     this.status = status;
+    this.detail = detail;
   }
+
+  /**
+   * @param {string} operation
+   * @param {Response} res
+   */
+  static async fromResponse(operation, res) {
+    const body = await res.text().catch(() => "");
+    return new NeonApiError(operation, res.status, body);
+  }
+}
+
+/**
+ * Neon error bodies are `{"code": "...", "message": "..."}`. Falls back to
+ * the raw text, cut short.
+ *
+ * @param {string} body
+ * @returns {string}
+ */
+function neonErrorDetail(body) {
+  if (!body) {
+    return "";
+  }
+  try {
+    const parsed = JSON.parse(body);
+    if (parsed && typeof parsed.message === "string") {
+      return parsed.code
+        ? `${parsed.message} (code ${parsed.code})`
+        : parsed.message;
+    }
+  } catch {
+    // Not JSON: use the text as it is.
+  }
+  return body.trim().slice(0, 300);
 }
 
 /**
@@ -165,6 +203,7 @@ export async function neonFetch(opts, apiKey, url, init = {}) {
   const fetchImpl = opts.fetchImpl ?? fetch;
   return await fetchImpl(url, {
     ...init,
+    signal: init.signal ?? AbortSignal.timeout(NEON_FETCH_TIMEOUT_MS),
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
@@ -187,7 +226,7 @@ export async function listBranches(opts, apiKey, projectId) {
     { method: "GET" }
   );
   if (!res.ok) {
-    throw new NeonApiError("list branches", res.status);
+    throw await NeonApiError.fromResponse("list branches", res);
   }
   const body = await res.json();
   return body.branches ?? [];
@@ -212,7 +251,7 @@ export async function resolveParentBranchId(opts, apiKey, projectId, hostname) {
     { method: "GET" }
   );
   if (!res.ok) {
-    throw new NeonApiError("list endpoints", res.status);
+    throw await NeonApiError.fromResponse("list endpoints", res);
   }
   const body = await res.json();
   const endpoints = body.endpoints ?? [];
@@ -411,7 +450,7 @@ export async function fetchConnectionUri(opts, args) {
     method: "GET",
   });
   if (!connRes.ok) {
-    throw new NeonApiError("connection_uri", connRes.status);
+    throw await NeonApiError.fromResponse("connection_uri", connRes);
   }
   const { uri } = await connRes.json();
   return uri;
@@ -547,8 +586,7 @@ export async function extendBranchExpiry(opts, target) {
     }
   );
   if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new NeonApiError("extend branch expiry", res.status, detail);
+    throw await NeonApiError.fromResponse("extend branch expiry", res);
   }
 }
 
