@@ -90,7 +90,12 @@ if [[ $FAIL -gt 0 ]]; then
   echo "FAILED: $FAILED_STEP"
   echo ""
 
-  logfile="$LOGDIR/$FAILED_STEP.log"
+  # Vitest and turbo colour their output, which wraps words like `Error` in
+  # ANSI escape codes and hides them from the greps below. Read a stripped copy.
+  # $'\033' rather than \x1b so this also works with BSD sed.
+  clean_log="$LOGDIR/$FAILED_STEP.clean.log"
+  sed -E "s/"$'\033'"\[[0-9;]*[A-Za-z]//g" "$LOGDIR/$FAILED_STEP.log" > "$clean_log"
+  logfile="$clean_log"
 
   # Step-specific error extraction for agent-friendly output
   case "$FAILED_STEP" in
