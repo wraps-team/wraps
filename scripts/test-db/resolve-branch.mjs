@@ -11,8 +11,13 @@
 // never fail to start because of this feature. Every checkout — main or a
 // linked worktree — gets its own branch, named after its directory; the only
 // way to fall back to the shared database is a missing NEON_API_KEY or
-// NEON_PROJECT_ID in the env that loads .env.test, which is why CI (no Neon
-// credentials) always takes the no-op path.
+// NEON_PROJECT_ID in the env that loads .env.test.
+//
+// CI never resolves here: under GitHub Actions (`GITHUB_ACTIONS=true`) the
+// resolver returns `baseUrl` untouched, with no naming, Neon call or reap. A
+// runner's `git worktree list` holds only itself, so a reap from there would
+// delete every live `wt-*` branch. CI gets its own per-run `ci-*` branch from
+// `ci-branch.mjs`, which hands the URL to the test step as DATABASE_URL.
 //
 // Every exported function accepts a trailing `opts = { fetchImpl, execImpl }`
 // (defaulting to the real global `fetch` and `execFileSync`) so unit tests
@@ -21,17 +26,41 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 
-const NEON_API_BASE = "https://console.neon.tech/api/v2";
+export const NEON_API_BASE = "https://console.neon.tech/api/v2";
 const POLL_INTERVAL_MS = 500;
 const POLL_MAX_MS = 60_000;
 const LEADING_SLASH = /^\//;
 const ALREADY_EXISTS = /already exists/i;
+// Neon answers 423 Locked while another operation on the project (such as a
+// concurrent branch create from a sibling CI job) is still running. Retry the
+// create with backoff for up to this long, re-listing first each time.
+const LOCKED_RETRY_MAX_MS = 60_000;
+const LOCKED_BACKOFF_MS = [1000, 2000, 4000, 8000];
+
+/**
+ * A non-2xx answer from the Neon API. `status` lets callers give 401/403,
+ * 404, 409, 422 and 423 their own messages.
+ */
+export class NeonApiError extends Error {
+  /**
+   * @param {string} operation
+   * @param {number} status
+   * @param {string} [detail]
+   */
+  constructor(operation, status, detail = "") {
+    super(`${operation} failed: ${status}${detail ? ` ${detail}` : ""}`);
+    this.name = "NeonApiError";
+    this.operation = operation;
+    this.status = status;
+  }
+}
 
 /**
  * @typedef {object} ResolverOpts
  * @property {typeof fetch} [fetchImpl]
  * @property {typeof execFileSync} [execImpl]
  * @property {boolean} [all]
+ * @property {(ms: number) => Promise<void>} [sleepImpl]
  */
 
 /**
@@ -124,7 +153,7 @@ export function branchNameForWorktree(name) {
  * @param {string} url
  * @param {RequestInit} [init]
  */
-async function neonFetch(opts, apiKey, url, init = {}) {
+export async function neonFetch(opts, apiKey, url, init = {}) {
   const fetchImpl = opts.fetchImpl ?? fetch;
   return await fetchImpl(url, {
     ...init,
@@ -142,7 +171,7 @@ async function neonFetch(opts, apiKey, url, init = {}) {
  * @param {string} projectId
  * @returns {Promise<Array<{id: string, name: string, current_state: string, parent_id?: string}>>}
  */
-async function listBranches(opts, apiKey, projectId) {
+export async function listBranches(opts, apiKey, projectId) {
   const res = await neonFetch(
     opts,
     apiKey,
@@ -150,7 +179,7 @@ async function listBranches(opts, apiKey, projectId) {
     { method: "GET" }
   );
   if (!res.ok) {
-    throw new Error(`list branches failed: ${res.status}`);
+    throw new NeonApiError("list branches", res.status);
   }
   const body = await res.json();
   return body.branches ?? [];
@@ -166,7 +195,7 @@ async function listBranches(opts, apiKey, projectId) {
  * @param {string} hostname
  * @returns {Promise<string>}
  */
-async function resolveParentBranchId(opts, apiKey, projectId, hostname) {
+export async function resolveParentBranchId(opts, apiKey, projectId, hostname) {
   const strippedHost = hostname.replace("-pooler.", ".");
   const res = await neonFetch(
     opts,
@@ -175,13 +204,17 @@ async function resolveParentBranchId(opts, apiKey, projectId, hostname) {
     { method: "GET" }
   );
   if (!res.ok) {
-    throw new Error(`list endpoints failed: ${res.status}`);
+    throw new NeonApiError("list endpoints", res.status);
   }
   const body = await res.json();
   const endpoints = body.endpoints ?? [];
   const endpoint = endpoints.find((e) => e.host === strippedHost);
   if (!endpoint) {
-    throw new Error(`no endpoint found for host ${strippedHost}`);
+    const err = new Error(`no endpoint found for host ${strippedHost}`);
+    // ci-branch.mjs matches on this rather than the message, which names a
+    // host CI logs must not show.
+    err.code = "NO_PARENT_ENDPOINT";
+    throw err;
   }
   return endpoint.branch_id;
 }
@@ -194,7 +227,7 @@ async function resolveParentBranchId(opts, apiKey, projectId, hostname) {
  * @param {string} projectId
  * @param {string} branchId
  */
-async function pollUntilReady(opts, apiKey, projectId, branchId) {
+export async function pollUntilReady(opts, apiKey, projectId, branchId) {
   const start = Date.now();
   for (;;) {
     const branches = await listBranches(opts, apiKey, projectId);
@@ -208,8 +241,20 @@ async function pollUntilReady(opts, apiKey, projectId, branchId) {
     if (Date.now() - start > POLL_MAX_MS) {
       throw new Error(`branch ${branchId} not ready after ${POLL_MAX_MS}ms`);
     }
-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+    await sleep(opts, POLL_INTERVAL_MS);
   }
+}
+
+/**
+ * @param {ResolverOpts} opts
+ * @param {number} ms
+ * @returns {Promise<void>}
+ */
+function sleep(opts, ms) {
+  if (opts.sleepImpl) {
+    return opts.sleepImpl(ms);
+  }
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -218,6 +263,7 @@ async function pollUntilReady(opts, apiKey, projectId, branchId) {
  * @property {string} projectId
  * @property {string} branchName
  * @property {URL} parsedBase
+ * @property {string} [expiresAt] RFC 3339 time Neon deletes the branch at
  */
 
 /**
@@ -231,12 +277,15 @@ async function pollUntilReady(opts, apiKey, projectId, branchId) {
  * @param {BranchTarget} target
  * @returns {Promise<{id: string, name: string, current_state: string}>}
  */
-async function findOrCreateBranch(opts, target) {
-  const { apiKey, projectId, branchName, parsedBase } = target;
+export async function findOrCreateBranch(opts, target) {
+  const { apiKey, projectId, branchName, parsedBase, expiresAt } = target;
 
-  const existing = (await listBranches(opts, apiKey, projectId)).find(
-    (b) => b.name === branchName
-  );
+  const findByName = async () =>
+    (await listBranches(opts, apiKey, projectId)).find(
+      (b) => b.name === branchName
+    );
+
+  const existing = await findByName();
   if (existing) {
     return existing;
   }
@@ -247,39 +296,103 @@ async function findOrCreateBranch(opts, target) {
     projectId,
     parsedBase.hostname
   );
+  const branchBody = { parent_id: parentId, name: branchName };
+  if (expiresAt) {
+    branchBody.expires_at = expiresAt;
+  }
+  const requestBody = JSON.stringify({
+    branch: branchBody,
+    endpoints: [{ type: "read_write" }],
+  });
+
+  // A 423 means a concurrent create (a sibling CI job, say) holds the project
+  // lock. Wait, then look again: that create may have made this very branch.
+  const start = Date.now();
+  for (let attempt = 0; ; attempt++) {
+    const result = await attemptCreate(opts, target, requestBody, findByName);
+    if (result.branch) {
+      return result.branch;
+    }
+    if (Date.now() - start >= LOCKED_RETRY_MAX_MS) {
+      throw new NeonApiError("create branch", 423, result.bodyText);
+    }
+    await sleep(
+      opts,
+      LOCKED_BACKOFF_MS[Math.min(attempt, LOCKED_BACKOFF_MS.length - 1)]
+    );
+    const appeared = await findByName();
+    if (appeared) {
+      return appeared;
+    }
+  }
+}
+
+/**
+ * One create POST. Returns the branch (created, or created first by a
+ * concurrent caller), or `locked` on a 423; throws on anything else.
+ *
+ * @param {ResolverOpts} opts
+ * @param {BranchTarget} target
+ * @param {string} requestBody
+ * @param {() => Promise<{id: string, name: string, current_state: string} | undefined>} findByName
+ * @returns {Promise<{branch?: {id: string, name: string, current_state: string}, locked?: true, bodyText?: string}>}
+ */
+async function attemptCreate(opts, target, requestBody, findByName) {
+  const { apiKey, projectId, branchName } = target;
   const createRes = await neonFetch(
     opts,
     apiKey,
     `${NEON_API_BASE}/projects/${projectId}/branches`,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        branch: { parent_id: parentId, name: branchName },
-        endpoints: [{ type: "read_write" }],
-      }),
-    }
+    { method: "POST", body: requestBody }
   );
 
   if (createRes.ok) {
     const created = await createRes.json();
-    return created.branch;
+    return { branch: created.branch };
   }
 
   const bodyText = await createRes.text().catch(() => "");
-  const isConflict = createRes.status === 409 || ALREADY_EXISTS.test(bodyText);
-  if (!isConflict) {
-    throw new Error(`create branch failed: ${createRes.status} ${bodyText}`);
+  if (createRes.status === 409 || ALREADY_EXISTS.test(bodyText)) {
+    const created = await findByName();
+    if (!created) {
+      throw new Error(
+        `branch create conflict but branch ${branchName} not found`
+      );
+    }
+    return { branch: created };
   }
+  if (createRes.status === 423) {
+    return { locked: true, bodyText };
+  }
+  throw new NeonApiError("create branch", createRes.status, bodyText);
+}
 
-  const created = (await listBranches(opts, apiKey, projectId)).find(
-    (b) => b.name === branchName
+/**
+ * Fetches a connection URI for `branchId`: pooled (through Neon's PgBouncer
+ * host) or direct. Session-level features such as advisory locks need direct.
+ *
+ * @param {ResolverOpts} opts
+ * @param {{apiKey: string, projectId: string, branchId: string, database: string, role: string, pooled: boolean}} args
+ * @returns {Promise<string>}
+ */
+export async function fetchConnectionUri(opts, args) {
+  const { apiKey, projectId, branchId, database, role, pooled } = args;
+  const connUri = new URL(
+    `${NEON_API_BASE}/projects/${projectId}/connection_uri`
   );
-  if (!created) {
-    throw new Error(
-      `branch create conflict but branch ${branchName} not found`
-    );
+  connUri.searchParams.set("branch_id", branchId);
+  connUri.searchParams.set("database_name", database);
+  connUri.searchParams.set("role_name", role);
+  connUri.searchParams.set("pooled", pooled ? "true" : "false");
+
+  const connRes = await neonFetch(opts, apiKey, connUri.toString(), {
+    method: "GET",
+  });
+  if (!connRes.ok) {
+    throw new NeonApiError("connection_uri", connRes.status);
   }
-  return created;
+  const { uri } = await connRes.json();
+  return uri;
 }
 
 /**
@@ -294,6 +407,16 @@ async function findOrCreateBranch(opts, target) {
  */
 export async function resolveTestDatabaseUrl(baseUrl, env, opts = {}) {
   if (!baseUrl) {
+    return baseUrl;
+  }
+
+  // CI: ci-branch.mjs already pointed DATABASE_URL at this run's own `ci-*`
+  // branch (or deliberately fell back to the shared one). Resolving here would
+  // also fire the reap below from a runner, whose worktree list holds only
+  // itself, deleting every live `wt-*` branch. Read from `env`, not
+  // process.env: callers pass process.env (or vite's copy of it) anyway, and
+  // tests running on a runner can then still exercise the local path.
+  if (env.GITHUB_ACTIONS === "true") {
     return baseUrl;
   }
 
@@ -335,21 +458,14 @@ export async function resolveTestDatabaseUrl(baseUrl, env, opts = {}) {
     });
     const branch = await pollUntilReady(opts, apiKey, projectId, found.id);
 
-    const connUri = new URL(
-      `${NEON_API_BASE}/projects/${projectId}/connection_uri`
-    );
-    connUri.searchParams.set("branch_id", branch.id);
-    connUri.searchParams.set("database_name", database);
-    connUri.searchParams.set("role_name", role);
-    connUri.searchParams.set("pooled", "true");
-
-    const connRes = await neonFetch(opts, apiKey, connUri.toString(), {
-      method: "GET",
+    const uri = await fetchConnectionUri(opts, {
+      apiKey,
+      projectId,
+      branchId: branch.id,
+      database,
+      role,
+      pooled: true,
     });
-    if (!connRes.ok) {
-      throw new Error(`connection_uri failed: ${connRes.status}`);
-    }
-    const { uri } = await connRes.json();
 
     // Fire-and-forget: sweep dead branches on every test start. Never await
     // this on the resolve path — it must not slow down or block test start.

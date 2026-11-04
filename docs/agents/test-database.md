@@ -5,6 +5,12 @@ parallel test runs cannot collide on the shared fixtures. Every vitest config re
 `DATABASE_URL` through `resolveTestDatabaseUrl` to that per-checkout branch, so the
 database your tests read is the branch, not anything named in an env file.
 
+The branches live in the test-only Neon project `wraps-test`; `apps/web/.env.test` holds
+its project-scoped key. CI doesn't use the resolver: under `GITHUB_ACTIONS=true` it returns
+`DATABASE_URL` untouched, and each workflow run gets a `ci-*` branch from
+`scripts/test-db/ci-branch.mjs` instead (`docs/agents/ci-and-deploy.md`). Never delete or
+reap `ci-*` branches by hand; they expire 3h after creation.
+
 ## After removing a worktree: reap its branch
 
 Deleting the worktree leaves its branch alive. Reclaim it:

@@ -22,8 +22,11 @@ permissions:
 
 # Not test.yml's test-db-<ref> group: GitHub keeps one pending run per group,
 # so a queued e2e run would cancel a pending Test run, and deploy-api.yml
-# deploys only when Test completes. e2e only inserts uniquely named rows
-# (a fresh owner and org per run), so it can't delete a fixture test-web reads.
+# deploys only when Test completes. e2e runs on its own Neon branch,
+# ci-<sha7>-<run_id>-<run_attempt>, made by the first step below and deleted by
+# the last, so it shares no database with a Test run. On the TEST_DATABASE_URL
+# fallback it only inserts uniquely named rows (a fresh owner and org per run),
+# so it still can't delete a fixture test-web reads.
 concurrency:
   group: e2e-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -48,8 +51,23 @@ jobs:
           node-version: 24.x
           cache: 'pnpm'
 
+      # This run's own Neon branch (scripts/test-db/ci-branch.mjs). Before
+      # install: it needs only Node. It never fails the job; on any problem it
+      # warns and the tests below fall back to TEST_DATABASE_URL.
+      - name: Per-run Neon test branch
+        run: node scripts/test-db/ci-branch.mjs ensure
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+          TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # Brings the branch to this commit's schema. Skipped when ensure fell
+      # back, so the shared database is never pushed to from CI.
+      - name: Push the schema to the per-run branch
+        run: node scripts/test-db/ci-branch.mjs push
 
       - name: Build web workspace dependencies
         run: pnpm --filter "@wraps/web^..." build
@@ -63,7 +81,7 @@ jobs:
       - name: Run e2e
         run: pnpm test:e2e --reporter list,junit
         env:
-          DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+          DATABASE_URL: ${{ env.CI_DATABASE_URL || secrets.TEST_DATABASE_URL }}
           BETTER_AUTH_SECRET: test-secret-key-for-testing-only
           AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
 
@@ -80,3 +98,13 @@ jobs:
             apps/e2e/.e2e/results
           if-no-files-found: warn
           retention-days: 7
+
+      # Runs even when the job fails or is cancelled. A failed delete only
+      # warns; Neon expires the branch 3h after creation regardless.
+      - name: Delete this run's Neon branch
+        if: always()
+        continue-on-error: true
+        run: node scripts/test-db/ci-branch.mjs delete
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}

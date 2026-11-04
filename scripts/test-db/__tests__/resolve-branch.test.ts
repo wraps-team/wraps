@@ -190,6 +190,38 @@ describe("detectWorktree", () => {
 });
 
 describe("resolveTestDatabaseUrl", () => {
+  it("under GitHub Actions, returns baseUrl with no git, Neon or reap call, even with keys", async () => {
+    const fetchImpl = vi.fn();
+    const execImpl = vi.fn();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const result = await resolveTestDatabaseUrl(
+      BASE_URL,
+      { ...NEON_ENV, GITHUB_ACTIONS: "true" },
+      { execImpl, fetchImpl }
+    );
+    // Give a stray fire-and-forget reap the chance to show itself.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(result).toBe(BASE_URL);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(execImpl).not.toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("under GitHub Actions without keys, returns baseUrl without the shared-database warning", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const result = await resolveTestDatabaseUrl(
+      BASE_URL,
+      { GITHUB_ACTIONS: "true" },
+      { execImpl: vi.fn(), fetchImpl: vi.fn() }
+    );
+    expect(result).toBe(BASE_URL);
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
   it("returns baseUrl when baseUrl is empty, without calling fetch", async () => {
     const fetchImpl = vi.fn();
     const result = await resolveTestDatabaseUrl(
