@@ -36,8 +36,9 @@ If you keep the keys in `.env.local` instead, `vitest` does not read that file f
 
 ## `pnpm check:all` in a fresh checkout
 
-`pnpm install` is all `check:all` needs in a tree nobody has built in: a fresh clone, a CI
-runner, or an isolated git worktree. Its `typecheck:infra` step
+`check:all` no longer needs a manual SST step in a tree nobody has built in: a fresh clone,
+a CI runner, or an isolated git worktree (tests still need `apps/web/.env.test`, above). Its
+`typecheck:infra` step
 (`scripts/typecheck-infra.sh`) runs the root `tsc` over `sst.config.ts` and
 `infra/selfhost.config.ts`, and both files open with
 `/// <reference path="./.sst/platform/config.d.ts" />`. That file is *generated*, never
