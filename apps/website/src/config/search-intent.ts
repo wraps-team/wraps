@@ -1123,7 +1123,7 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
     ],
     audience: "stranger-with-problem",
     rationale:
-      "The two facts that decide this in practice — Resend purging logs at thirty days on every non-Enterprise plan, and an API rate limit of ten requests per second that is the same on every plan — appear in neither vendor's own comparison, because neither vendor is going to write them down.",
+      "The two facts that decide this in practice — Resend purging logs at thirty days on every non-Enterprise plan, and an API rate limit of ten requests per second that is the same on every self-serve plan — appear in neither vendor's own comparison, because neither vendor is going to write them down.",
   },
   {
     route: "/versus/loops-vs-resend",
@@ -1517,7 +1517,7 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
     primaryQuery: "resend or sendgrid for a new product",
     secondaryQueries: [
       "sendgrid replacement for a small dev team",
-      "resend 429 too many requests error",
+      "does the resend rate limit apply to bulk sends",
       "sendgrid trial after free tier ended",
       "does resend have marketing campaigns",
       "converting sendgrid dynamic templates to react email",
@@ -1526,7 +1526,7 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
     ],
     audience: "stranger-with-problem",
     rationale:
-      "Almost every result is a migration guide published by one of the two. The facts that decide it — a request-rate default of ten per second on one side that is the same on every plan, a retired free tier on the other — are in neither guide, because neither company benefits from raising them.",
+      "Almost every result is a migration guide published by one of the two. The facts that decide it — a request-rate default of ten per second on one side that is the same on every self-serve plan, a retired free tier on the other — are in neither guide, because neither company benefits from raising them.",
   },
   {
     route: "/versus/mailgun-vs-resend",

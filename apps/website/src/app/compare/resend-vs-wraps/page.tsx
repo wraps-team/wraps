@@ -785,10 +785,10 @@ export default function ResendVsWrapsPage() {
               <p>
                 Worth knowing on Resend: exceeding your tier bills overage at
                 $0.90/1K on Pro, down to $0.46/1K on the largest Scale tier,
-                once pay-as-you-go is enabled. Getting Scale features at 100K
-                costs $90/mo (the $35 Pro tier skips SSO and caps domains at
-                10). CC/BCC count as separate emails. Marketing contacts billed
-                separately ($40/mo for 5K contacts).
+                once pay-as-you-go is enabled. Scale at 100K is $90/mo and lifts
+                the 10-domain cap; SSO is a $150/mo add-on on Scale and included
+                on Enterprise. CC/BCC count as separate emails. Marketing
+                contacts billed separately ($40/mo for 5K contacts).
               </p>
               <p>
                 At 50K/mo the two are priced about the same, so price is not the

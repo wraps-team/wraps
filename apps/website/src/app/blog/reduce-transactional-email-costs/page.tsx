@@ -24,7 +24,7 @@ const articleSchema = {
   headline: "How to Reduce Transactional Email Costs Above 100K a Month",
   description: DESCRIPTION,
   datePublished: "2026-08-21T00:00:00.000Z",
-  dateModified: "2026-08-21T00:00:00.000Z",
+  dateModified: "2026-11-03T00:00:00.000Z",
   author: {
     "@type": "Organization",
     name: "Wraps",
@@ -193,9 +193,9 @@ const DELETION_VALUE = [
   { where: "AWS SES, à la carte", rate: "$0.10 / 1,000", saved: "$3.00" },
   { where: "AWS SES, Essentials", rate: "$0.16 / 1,000", saved: "$4.80" },
   {
-    where: "Resend, pay-as-you-go",
-    rate: "$0.46–0.90 / 1,000",
-    saved: "$13.80–27.00",
+    where: "Resend, pay-as-you-go (Pro, or Scale at 100K)",
+    rate: "$0.90 / 1,000",
+    saved: "$27.00",
   },
   {
     where: "Postmark Platform overage",

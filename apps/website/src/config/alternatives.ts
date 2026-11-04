@@ -152,11 +152,11 @@ export const VENDORS: Record<VendorId, Vendor> = {
     category:
       "Developer-first email API (built on SES, now with its own Forge MTA)",
     pricing:
-      "Free 3,000/mo (100/day). Pro $20 at 50K and $35 at 100K. Scale starts at $90 for the same 100K and runs to $350 at 500K. Overage $0.90 per 1,000 on Pro, falling to $0.46 on the largest Scale tier. Marketing contacts billed separately at $40/mo per 5,000.",
+      "Free 3,000/mo (100/day). Pro $20 at 50K and $35 at 100K. Scale starts at $90 for the same 100K, is $350 at 500K and runs to $1,150 at 2.5M. Overage is $0.90 per 1,000 on Pro and the first Scale tier, falling to $0.46 at 2.5M. Marketing contacts billed separately at $40/mo per 5,000.",
     bestFor:
       "The fastest path from an empty project to a sent email, especially with React Email.",
     watchOut:
-      "Logs are purged at 30 days on every non-Enterprise plan, the API is limited to 10 requests per second per team on all tiers, and suspension during traffic spikes is the complaint that recurs in its public reviews.",
+      "Logs are purged at 30 days on every non-Enterprise plan, the API is limited to 10 requests per second per team on self-serve plans, and suspension during traffic spikes recurs in its public reviews.",
     url: "https://resend.com/pricing",
   },
   loops: {
@@ -276,7 +276,7 @@ export const VENDORS: Record<VendorId, Vendor> = {
     bestFor:
       "Small EU teams wanting email, SMS, and a light CRM on one invoice.",
     watchOut:
-      "The headline tier is not the one you need — automation and removing the Brevo logo are both a step up. Shared-pool deliverability draws mixed reports.",
+      "The headline tier is not the one you need — automation needs Standard, and removing the Brevo logo needs Standard or a paid add-on on Starter. Shared-pool deliverability draws mixed reports.",
     url: "https://www.brevo.com/pricing/",
   },
   "scaleway-tem": {
@@ -603,7 +603,7 @@ const SENDGRID_PAGE: AlternativesPage = {
     {
       vendor: "resend",
       verdict:
-        "The biggest single jump in quality of life if SendGrid's console and SDKs are what you resent, and cheaper too, at $35 for 100K against Pro's $89.95. Read its own terms before committing: logs purge at 30 days on every non-Enterprise plan, the API is limited to 10 requests per second per team on every plan, and suspension complaints exist there too, just fewer of them.",
+        "The biggest single jump in quality of life if SendGrid's console and SDKs are what you resent, and cheaper too, at $35 for 100K against Pro's $89.95. Read its own terms before committing: logs purge at 30 days on every non-Enterprise plan, the API is limited to 10 requests per second per team on every self-serve plan, and suspension complaints exist there too, just fewer of them.",
     },
     {
       vendor: "wraps",

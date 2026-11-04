@@ -151,7 +151,7 @@ const POSTMARK_VS_RESEND: VersusPage = {
       "enforced separation between bulk and transactional mail",
     ],
     rationale:
-      "The two facts that decide this in practice — Resend purging logs at thirty days on every non-Enterprise plan, and an API rate limit of ten requests per second that is the same on every plan — appear in neither vendor's own comparison, because neither vendor is going to write them down.",
+      "The two facts that decide this in practice — Resend purging logs at thirty days on every non-Enterprise plan, and an API rate limit of ten requests per second that is the same on every self-serve plan — appear in neither vendor's own comparison, because neither vendor is going to write them down.",
   },
   intro:
     "Both of these are transactional email APIs aimed at developers, both are genuinely good at it, and that is exactly why the choice is hard. The difference is not quality, it is what each company treats as its product. Postmark has spent a decade building a mail operation and sells inbox placement. Resend sells the twenty minutes between an empty project and a first sent email. If you already know which of those two you are short of, you already know the answer.",
@@ -224,7 +224,7 @@ const POSTMARK_VS_RESEND: VersusPage = {
   ],
   consB: [
     "Logs are purged at thirty days on every plan short of Enterprise, and the scenario that breaks is concrete: a customer disputes a notice from March and you are looking in June.",
-    "Ten requests per second per team on every tier, unmoved by any upgrade and raised only on request, so a batch job becomes a drip you build and operate.",
+    "Ten requests per second per team on every self-serve tier, unmoved by any upgrade and raised only on request, so a batch job becomes a drip you build and operate.",
     "Suspension during a traffic spike is the complaint that recurs across its public reviews, and it lands on exactly the mail you least want to lose.",
     "The account and the standing behind it belong to the vendor, so leaving means verifying elsewhere and earning reputation again from nothing.",
   ],
@@ -293,7 +293,7 @@ const POSTMARK_VS_RESEND: VersusPage = {
     {
       question: "Which one copes better with a sudden large send?",
       answer:
-        "Postmark, and not by a small margin, because the constraint on that side is the plan's included volume rather than a request rate. A burst costs money and completes. On Resend the same burst meets a default of ten requests per second on every tier, so it becomes a queue that drains over minutes or hours depending on its size. Batch endpoints accepting several recipients per call stretch that considerably, so the real answer depends on how your send loop is written — but it is an architectural constraint rather than a commercial one, which means you engineer around it, or ask Resend to raise it for a trusted account, rather than paying to remove it.",
+        "Postmark, and not by a small margin, because the constraint on that side is the plan's included volume rather than a request rate. A burst costs money and completes. On Resend the same burst meets a default of ten requests per second on every self-serve tier, so it becomes a queue that drains over minutes or hours depending on its size. Batch endpoints accepting several recipients per call stretch that considerably, so the real answer depends on how your send loop is written — but it is an architectural constraint rather than a commercial one, which means you engineer around it, or ask Resend to raise it for a trusted account, rather than paying to remove it.",
     },
   ],
 };
@@ -665,7 +665,7 @@ const BREVO_VS_SENDGRID: VersusPage = {
     },
     {
       heading: "Priced on volume, priced on tier",
-      a: "Brevo prices its plans on monthly email volume rather than a per-contact meter, which is unusual among marketing platforms and is the single most consequential thing about it. Each volume tier carries a contact limit (Brevo's pricing.md lists 500 contacts at the 5,000-email tier and 500,000 from 20,000 emails), so once you are past the smallest tiers a large, mostly dormant list does not raise the bill by itself. The cost arrives when you actually mail it, which is the month you can also attribute the revenue. Forecasting is easy: it tracks your campaign calendar.",
+      a: "Brevo prices its plans on monthly email volume rather than a per-contact meter, which is unusual among marketing platforms and is the single most consequential thing about it. Each volume tier carries a contact limit (Brevo's pricing page lists 500 contacts at the 5,000-email tier and 500,000 from 20,000 emails), so once you are past the smallest tiers a large, mostly dormant list does not raise the bill by itself. The cost arrives when you actually mail it, which is the month you can also attribute the revenue. Forecasting is easy: it tracks your campaign calendar.",
       b: "SendGrid prices in tiers with a volume allowance, and the marketing product has its own contact-based plan on top. That means your spend is a function of both what you send and how many contacts you keep, from two separate meters that do not talk to each other. It is predictable, but it is two forecasts rather than one.",
     },
     {
@@ -675,7 +675,7 @@ const BREVO_VS_SENDGRID: VersusPage = {
     },
     {
       heading: "The tier where the features you assumed actually live",
-      a: "On Brevo, the headline tier is not the one you want. Marketing automation, A/B testing and removing Brevo's own branding from the footer all sit a step up. Anyone pricing Brevo off its entry plan is pricing a product they will not be using by month two, and the step up is roughly a doubling at the same volume.",
+      a: "On Brevo, the headline tier is not the one you want. Marketing automation and A/B testing need the Standard tier, and removing Brevo's own branding from the footer needs Standard or a paid add-on on Starter. Anyone pricing Brevo off its entry plan is pricing a product they will not be using by month two, and Standard costs more than Starter at the same volume.",
       b: "On SendGrid, the same trap has a different shape: dedicated IPs and the more useful support tier sit on the upper plan, so a sender who needs isolation is buying a tier for one feature. The lesson is identical on both — find the tier that contains every feature on your actual requirement list, and compare those two numbers, not the headline ones.",
     },
     {
@@ -720,7 +720,7 @@ const BREVO_VS_SENDGRID: VersusPage = {
   ],
   consA: [
     "Contact attributes must be declared at account level with a type before anything can populate them, so an import carrying a field nobody created arrives without it and says nothing about it.",
-    "The headline tier is not the one you will end up on: automation, split testing and removing the vendor's logo from your footer all sit a rung higher, at roughly double the number for the same volume.",
+    "The headline tier is not the one you will end up on: automation and split testing need Standard, and removing the vendor's logo needs Standard or a paid add-on; Standard costs more than Starter at the same volume.",
     "Shared-pool placement draws mixed reports — fine for most senders, poor for some — which is the signature of who else is in the pool rather than of a technical defect.",
     "The transactional API is competent and unglamorous, and it is not the thing you would choose if inbox placement for product-critical mail were the only axis you cared about.",
   ],
@@ -759,7 +759,7 @@ const BREVO_VS_SENDGRID: VersusPage = {
     {
       question: "Is Brevo actually cheaper than SendGrid?",
       answer:
-        "It depends entirely on the shape of your list. Brevo meters sends and SendGrid's marketing side meters contacts, so a large dormant list favours Brevo heavily and a small list mailed very frequently favours SendGrid. Price your real numbers on both current plan pages, and on Brevo make sure you are pricing the tier that contains automation rather than the entry tier.",
+        "It depends entirely on the shape of your list. Brevo meters sends and SendGrid's marketing side meters contacts, so a large dormant list favours Brevo heavily, within the contact limit of each volume tier, and a small list mailed very frequently favours SendGrid. Price your real numbers on both current plan pages, and on Brevo make sure you are pricing the tier that contains automation rather than the entry tier.",
     },
     {
       question: "Does Brevo put its branding on my emails?",
@@ -3600,7 +3600,7 @@ const BREVO_VS_SCALEWAY_TEM: VersusPage = {
     },
     {
       heading: "How the price is counted",
-      a: "By send volume rather than by contacts stored, which is friendlier than the contact-priced marketing platforms and means a large dormant list does not sit on the invoice. The tier you need is usually not the headline one, because automation and removing the vendor's own branding both sit a step up.",
+      a: "By send volume rather than by contacts stored, which is friendlier than the contact-priced marketing platforms and means a large dormant list does not raise the invoice by itself, within the contact limit of each volume tier. The tier you need is usually not the headline one, because automation needs Standard and removing the vendor's own branding needs Standard or a paid add-on.",
       b: "Per thousand messages with no monthly platform fee, and a higher plan that bundles volume with a dedicated address. It is close to raw cloud sending economics and it is the cheapest credible European option for anyone sending a meaningful volume, provided the absent tooling really is absent from your requirements.",
     },
     {
@@ -4442,7 +4442,7 @@ const RESEND_VS_SENDGRID: VersusPage = {
     primaryQuery: "resend or sendgrid for a new product",
     secondaryQueries: [
       "sendgrid replacement for a small dev team",
-      "resend 429 too many requests error",
+      "does the resend rate limit apply to bulk sends",
       "sendgrid trial after free tier ended",
       "does resend have marketing campaigns",
       "converting sendgrid dynamic templates to react email",
@@ -4450,7 +4450,7 @@ const RESEND_VS_SENDGRID: VersusPage = {
       "what to do when a sendgrid trial expires",
     ],
     rationale:
-      "Almost every result is a migration guide published by one of the two. The facts that decide it — a request-rate default of ten per second on one side that is the same on every plan, a retired free tier on the other — are in neither guide, because neither company benefits from raising them.",
+      "Almost every result is a migration guide published by one of the two. The facts that decide it — a request-rate default of ten per second on one side that is the same on every self-serve plan, a retired free tier on the other — are in neither guide, because neither company benefits from raising them.",
   },
   intro:
     "These two are competing for the same search term and not really for the same customer. Resend is built around one person's first hour: a small SDK, fast domain verification, React Email, and a log view that answers did it send. SendGrid is built around an organisation's next three years: relay for systems nobody owns, a marketing console, a certification pack, a procurement contact. If you are one developer shipping a product, the second list is overhead. If you are a company with a marketing team and a compliance review, the first list is a toy.",
@@ -4515,7 +4515,7 @@ const RESEND_VS_SENDGRID: VersusPage = {
     "There is no settings page asking for a decision you are not qualified to make, which sounds like a small thing until you have spent an hour choosing between four supported ways to do one job.",
   ],
   consA: [
-    "Ten API requests per second per team on every tier, unchanged by any upgrade, so batch-shaped traffic gets a queue rather than a plan change.",
+    "Ten API requests per second per team on every self-serve tier, unchanged by any upgrade, so batch-shaped traffic gets a queue rather than a plan change.",
     "Marketing contacts are metered apart from sends — a contact-priced model quietly attached to a send-priced product — so an accumulating list raises the invoice with no campaign behind it.",
     "SMTP is supported rather than cultivated, so pointing a CRM, a build server and a WordPress install at it means writing the configuration notes that nobody else has written yet.",
     "Thirty days of log retention on every plan short of Enterprise, in a view designed to debug this week's integration rather than to answer a question about last quarter.",
@@ -4533,7 +4533,7 @@ const RESEND_VS_SENDGRID: VersusPage = {
     "The console carries fifteen years of accumulated surface, and a team that only ever calls the send endpoint experiences every bit of that breadth as friction.",
   ],
   migrationChecklist: [
-    "Measure the traffic shape against the rate ceiling before committing to anything else. Ten requests per second per team on every tier is the one constraint here that a plan upgrade does not change, and a nightly job that loops over a list making one call per recipient will meet it on the first large run. Batch endpoints taking several recipients per call are the mitigation; rewriting the send loop is the work.",
+    "Measure the traffic shape against the rate ceiling before committing to anything else. Ten requests per second per team on every self-serve tier is the one constraint here that a plan upgrade does not change, and a nightly job that loops over a list making one call per recipient will meet it on the first large run. Batch endpoints taking several recipients per call are the mitigation; rewriting the send loop is the work.",
     "Export all four SendGrid suppression collections — global unsubscribes, bounces, spam reports and blocks — and import them before the first message goes out. They sit behind separate endpoints, and a partial export is precisely how a migration re-mails everybody who previously complained.",
     "Re-implement the dynamic templates as components. The handlebars-style substitution is evaluated inside SendGrid and does not travel; the HTML does. This is usually the largest single chunk of the project, and unusually for a migration task it leaves the codebase better than it found it.",
     "Settle where the campaign mail lives. Broadcasts and an audience concept exist on the destination and are deliberately lighter than Marketing Campaigns — no segmentation engine, no visual designer. If a marketing team is working in that console today, have the conversation before the sending cutover rather than the week after it.",
@@ -4625,7 +4625,7 @@ const MAILGUN_VS_RESEND: VersusPage = {
       "Teams arrive at this comparison after the December 2025 Mailgun repricing and evaluate Resend on developer experience alone, which is the half that is easy to see. The capabilities they would be weighing — Mailgun's route-level inbound matching, validation, deep log search — are worth checking line by line against Resend's feature page.",
   },
   intro:
-    "This comparison usually starts with a Mailgun invoice that changed and a Resend demo that looked delightful, which is a bad way to choose infrastructure because it weighs the two most visible attributes and ignores the rest. Mailgun is a broad platform: it receives mail as well as sending it, validates addresses before you burn a bounce on them, and lets you search a year of logs from a console. Resend is narrow and excellent inside that narrowness. Whether the missing breadth matters is a question about your product, not about either vendor's taste.",
+    "This comparison usually starts with a Mailgun invoice that changed and a Resend demo that looked delightful, which is a bad way to choose infrastructure because it weighs the two most visible attributes and ignores the rest. Mailgun is a broad platform: it receives mail with route-level matching as well as sending it, validates addresses before you burn a bounce on them, and lets you search a year of logs from a console. Resend is narrow and excellent inside that narrowness. Whether the narrower breadth matters is a question about your product, not about either vendor's taste.",
   dimensions: [
     {
       heading: "Inbound mail, and how much of it you get",
@@ -4645,7 +4645,7 @@ const MAILGUN_VS_RESEND: VersusPage = {
     {
       heading: "The throughput ceiling",
       a: "Mailgun's constraint is the plan's included volume rather than a request rate, so a burst costs money rather than time. Batch sending is ordinary and the API expects it. For a nightly digest to a large list this is simply not a design consideration, which is a quiet luxury that only becomes visible when you compare against something that caps you.",
-      b: "Ten API requests per second per team on every tier, and no plan raises it; Resend lifts it for trusted senders on request. Resend's Batch API takes up to 100 emails per request and counts as one request, which stretches this to roughly a thousand emails a second, but any architecture that loops over a list making individual calls will meet the limit on a large run. It matters most for bursty traffic written as one call per message.",
+      b: "Ten API requests per second per team on every self-serve tier, and no plan raises it; Resend lifts it for trusted senders on request. Resend's batch endpoint sends up to 100 emails in a single API call, and its pricing FAQ says each batch request counts as a single request against the limit, which stretches this to roughly a thousand emails a second (the batch endpoint does not support attachments yet), but any architecture that loops over a list making individual calls will meet the limit on a large run. It matters most for bursty traffic written as one call per message.",
     },
     {
       heading: "Templates and the developer experience gap",
@@ -4669,7 +4669,7 @@ const MAILGUN_VS_RESEND: VersusPage = {
     },
   ],
   pickA: [
-    "Your product receives mail as well as sending it, and running a second vendor for inbound would split the conversation across two systems.",
+    "Your product routes inbound mail by recipient, sender or header, which Resend's pricing page does not describe, and you would rather not bolt a second service on to get it.",
     "An open signup form makes address validation a bounce-rate control rather than a nicety.",
     "Support needs to search logs far enough back to answer a question about last quarter, with the receiving server's response visible.",
     "A written data residency requirement covers where data is stored, not only where mail is sent from.",
@@ -4678,7 +4678,7 @@ const MAILGUN_VS_RESEND: VersusPage = {
     "Mail is triggered by user actions from your own codebase, comfortably under ten API calls a second, and nothing in the system is batch-shaped.",
     "Templates as reviewable components in the repository is worth more to the team than any capability on the other side of this page.",
     "Volume is small enough that the cheaper plan and the permanent free allowance genuinely change the monthly number.",
-    "You want the integration finished this afternoon and are willing to add a second service later if inbound ever becomes a requirement.",
+    "You want the integration finished this afternoon and are willing to add a routing layer later if you outgrow receiving mail by webhook.",
   ],
   prosA: [
     "Inbound routing is a whole subsystem arriving for free: expression matching on recipient, sender or header, with the message already broken into fields your endpoint can read.",
@@ -4701,11 +4701,11 @@ const MAILGUN_VS_RESEND: VersusPage = {
   consB: [
     "Inbound is the narrower half: received mail arrives by webhook with content and attachments parsed, but the pricing page describes no route matching on recipient, sender or header, so check it against your reply handling.",
     "No validation product either, which on an open signup form leaves a third-party API, a check you write, or a bounce rate you are gambling with.",
-    "Ten API requests per second per team on every tier, which is an architectural constraint rather than a commercial one and therefore not something a plan upgrade removes.",
+    "Ten API requests per second per team on every self-serve tier, which is an architectural constraint rather than a commercial one and therefore not something a plan upgrade removes.",
     "A sending region you can name, but account data stays in the United States whichever one you pick, so a residency clause about stored data is not met, and thirty days of retention on everything short of Enterprise.",
   ],
   migrationChecklist: [
-    "Count what you actually use inbound for before anything else, because there is none on the other side. Reply handling, ticket ingestion, per-customer addresses and catch-all forwarding each need a named replacement — Cloudflare Email Routing, an SES receipt rule, or keeping a minimal account open purely for Routes — and every answer costs a second set of credentials.",
+    "Count what you actually use inbound for before anything else, because Resend delivers received mail to a webhook but its pricing page describes no matching on recipient, sender or header. Reply handling is covered; ticket ingestion, per-customer addresses and catch-all forwarding each need checking against what Resend does, and a named replacement where it falls short — Cloudflare Email Routing, an SES receipt rule, or keeping a minimal account open purely for Routes — which costs a second set of credentials.",
     "Decide what happens at the signup form once validation stops. The realistic choices are a third-party validation API, a syntax and MX check of your own, or a higher bounce rate against an identity with no history to absorb it. The third is the one that gets accounts paused in the first month.",
     "Measure peak calls per second against Resend's ten-per-second default. Mailgun does not constrain request rate the way the destination does, so send loops written without that in mind meet the limit on the first run. Batch endpoints accepting several recipients per call are the mitigation; rewriting the loop is the work.",
     "Export the searchable history you still need while the plan's retention window is still yours. It shortens on downgrade and ends at cancellation, and the destination purges at thirty days on every plan short of Enterprise — so if anything downstream reads older records, the pipeline into your own store belongs inside this project.",
@@ -4718,7 +4718,7 @@ const MAILGUN_VS_RESEND: VersusPage = {
     "Does anything in our product depend on mail arriving rather than leaving, and have we listed every one of those flows rather than the obvious ones?",
     "What is our bounce rate on self-serve signups today, and what does it become if nothing validates the address at the form?",
     "Has anybody measured peak API calls per second, or are we reasoning about throughput from a monthly total?",
-    "Is our data residency requirement a written clause naming a region, or a preference somebody expressed in a meeting once?",
+    "Is our data residency requirement a written clause about where data is stored, or a preference somebody expressed in a meeting once?",
     "How far back does a support agent search today, and how often does that search go past thirty days?",
     "Who owns our templates — an engineer in a pull request or a marketer in a builder — and which of these two suits that person's week?",
     "If we are on grandfathered pay-as-you-go terms, what are they precisely, and is the comparison being drawn against those or against the current list?",
@@ -4986,7 +4986,7 @@ const AMAZON_SES_VS_BREVO: VersusPage = {
     {
       heading: "The tier that has the feature you assumed was included",
       a: "SES has no tiers in this sense. The plan affects the rate you pay rather than the capability you get, and there is no feature behind a paywall because there are barely any features. What you have on day one is what you will have in year three, which is either reassuring or bleak depending on what you needed.",
-      b: "The headline tier is usually not the one that works. Automation and A/B testing sit a step up, and removing the Brevo logo from your emails is also not on the entry plan. This is not hidden, but it is consistently how the evaluation goes wrong: a price is quoted from the cheapest row and the requirement list turns out to need the row above it. Price the tier that has the features, not the tier on the homepage.",
+      b: "The headline tier is usually not the one that works. Automation and A/B testing need the Standard tier, and removing the Brevo logo from your emails needs Standard or a paid add-on on Starter. This is not hidden, but it is consistently how the evaluation goes wrong: a price is quoted from the cheapest row and the requirement list turns out to need the row above it. Price the tier that has the features, not the tier on the homepage.",
     },
     {
       heading: "Deliverability and the shared pool",
@@ -5040,7 +5040,7 @@ const AMAZON_SES_VS_BREVO: VersusPage = {
     "Email, SMS, chat and a light CRM sit against one contact record, which for a small business replaces three vendors and the reconciliation between them.",
   ],
   consB: [
-    "Automation, A/B testing and removing the Brevo logo from your mail all live above the entry plan, so the tier people price is reliably not the tier they need.",
+    "Automation and A/B testing live on Standard, and removing the Brevo logo needs Standard or a paid add-on, so the tier people price is reliably not the tier they need.",
     "The shared sending pools draw mixed reports, and a sender with a purchased list discovers that the pool is shared in the direction they did not want.",
     "Each component is less capable than the specialist tool it replaces, so the value is in the integration rather than in any one piece being the best available.",
     "Growth ends either in climbing tiers until the invoice provokes a review or in an automation engine that cannot express what your lifecycle became.",
@@ -5073,7 +5073,7 @@ const AMAZON_SES_VS_BREVO: VersusPage = {
     {
       question: "Does Brevo charge per contact like most marketing tools?",
       answer:
-        "No, and this is the most genuinely distinctive thing about its pricing. Brevo charges on send volume rather than on stored contacts, which means a large dormant list does not raise the bill by itself — the opposite of how Klaviyo, Customer.io and Loops all work. If your list is big and your sending is occasional, that difference can be larger than every other factor in the comparison combined.",
+        "No, and this is the most genuinely distinctive thing about its pricing. Brevo charges on send volume rather than on stored contacts, which means a large dormant list does not raise the bill by itself, within the contact limit of each volume tier — the opposite of how Klaviyo, Customer.io and Loops all work. If your list is big and your sending is occasional, that difference can be larger than every other factor in the comparison combined.",
     },
     {
       question: "Is SES compliant with GDPR?",
@@ -5083,7 +5083,7 @@ const AMAZON_SES_VS_BREVO: VersusPage = {
     {
       question: "Which Brevo plan do I actually need?",
       answer:
-        "Almost certainly not the cheapest one. Automation and A/B testing live a tier up, and removing the Brevo logo from your emails is likewise not on the entry plan. Write down the features you need first, find the lowest row that has all of them, and compare that number rather than the headline. Evaluations of this product go wrong at this exact step more often than at any other.",
+        "Almost certainly not the cheapest one. Automation and A/B testing live on Standard, and removing the Brevo logo from your emails needs Standard or a paid add-on. Write down the features you need first, find the lowest row that has all of them, and compare that number rather than the headline. Evaluations of this product go wrong at this exact step more often than at any other.",
     },
     {
       question: "How much cheaper is SES in practice?",
@@ -5723,7 +5723,7 @@ const BREVO_VS_RESEND: VersusPage = {
     "A permanent free allowance means a staging environment or a weekend project does not appear on an invoice at all.",
   ],
   consB: [
-    "Ten API requests per second per team on every tier, unmoved by any upgrade, so a campaign fan-out written as a loop over a list meets the limit on its first large send.",
+    "Ten API requests per second per team on every self-serve tier, unmoved by any upgrade, so a campaign fan-out written as a loop over a list meets the limit on its first large send.",
     "Logs are purged at thirty days on every plan short of Enterprise, which is enough to debug an integration and not enough to answer a question about last quarter.",
     "Marketing contacts bill separately at a per-block rate, which is contact-based pricing quietly attached to a product everyone describes as send-priced.",
     "Suspension during a traffic spike is the recurring complaint in its public reviews, and a young company has less operating history behind the standing you inherit.",
@@ -5733,7 +5733,7 @@ const BREVO_VS_RESEND: VersusPage = {
     "Export the blocklist by reason and work out where the third category lands. Hard bounces, spam complaints and unsubscribes are kept apart on the suite side. On the other side the bounce and complaint record is the vendor's own, and the unsubscribe concept attaches to an audience used for broadcasts rather than to transactional sending. The people who opted out of marketing therefore need a home that is checked before every broadcast, and it is not the same object as the bounce list.",
     "Adopt React Email before you commit to anything, because it is separable from the vendor. It renders components to ordinary HTML, and the suite will send that HTML perfectly happily. Doing the template work first turns an all-or-nothing migration into two independent decisions, and it means the migration itself no longer has a rendering rewrite sitting on its critical path.",
     "Set up an event destination before the cutover if you report on anything monthly. One side retains contact-level history as a property of being built around a persistent record; the other purges logs at thirty days on every plan short of the top one. A month-over-month report survives that only if the events were already going somewhere you own, and there is no retroactive fix.",
-    "Count calls per second at peak rather than messages per month. A ten-per-second default applies on every tier, so a campaign that loops over ten thousand addresses becomes a drip of about seventeen minutes, and one over a hundred thousand takes close to three hours. The batch endpoint accepting several recipients per call stretches that a long way, and the send loop has to be written for it from the start rather than refactored the week of a launch.",
+    "Count calls per second at peak rather than messages per month. A ten-per-second default applies on every self-serve tier, so a campaign that loops over ten thousand addresses becomes a drip of about seventeen minutes, and one over a hundred thousand takes close to three hours. The batch endpoint accepting several recipients per call stretches that a long way, and the send loop has to be written for it from the start rather than refactored the week of a launch.",
     "Decide what happens to the non-email channels, because nothing replaces them. SMS, chat and the contact database have no counterpart on the sending-API side, and there is no scope decision pending that will add them. Either those workloads move to a third vendor with its own consent records, or they stop, and the second option needs saying out loud before the suite is cancelled.",
     "Re-read the residency requirement if that was ever a factor. One of these is a European company operating in Europe; the other is a US company that can send from an Irish region but stores account data, logs and email metadata in the United States whichever region you pick. If the requirement is a clause about where data is stored rather than where mail is sent from, this is not a migration that can be made compliant by configuration, and no amount of good documentation changes that.",
     "Split the subdomains and move the traffic in the order of least regret. Transactional mail first, from its own subdomain with its own key, because it is high-engagement and the fastest way to establish standing. Campaigns last, ramped, and never in the weeks around a launch — the pattern that triggers a spike suspension is precisely a large unfamiliar send from a new sender.",
@@ -5756,7 +5756,7 @@ const BREVO_VS_RESEND: VersusPage = {
     {
       question: "Does Brevo charge per contact?",
       answer:
-        "No, and it is the most distinctive thing about its pricing. Brevo charges on send volume rather than stored contacts, so a large dormant list does not raise the bill by itself — the opposite of Klaviyo, Customer.io and Loops. Resend, despite being a sending product, does bill marketing contacts separately from sends. If your list is large and your sending is occasional, that single difference can outweigh everything else on this page.",
+        "No, and it is the most distinctive thing about its pricing. Brevo charges on send volume rather than stored contacts, so a large dormant list does not raise the bill by itself, within the contact limit of each volume tier — the opposite of Klaviyo, Customer.io and Loops. Resend, despite being a sending product, does bill marketing contacts separately from sends. If your list is large and your sending is occasional, that single difference can outweigh everything else on this page.",
     },
     {
       question: "Is Resend usable by a non-technical person?",
@@ -5893,7 +5893,7 @@ const CUSTOMER_IO_VS_RESEND: VersusPage = {
   ],
   consB: [
     "Nothing decides anything. A sequence is a scheduler, per-user state, exit conditions and a suppression check that you write, operate and keep working.",
-    "Ten API requests per second per team on every tier, so a workflow that wakes at nine and messages a large cohort is a drip you designed rather than a send you made.",
+    "Ten API requests per second per team on every self-serve tier, so a workflow that wakes at nine and messages a large cohort is a drip you designed rather than a send you made.",
     "Logs are purged at thirty days short of Enterprise, which quietly removes any engagement-based rule that needs a window longer than a month.",
     "Marketing contacts are billed separately in blocks, so some of the per-person metering you were escaping follows you across.",
   ],
@@ -6022,7 +6022,7 @@ const KLAVIYO_VS_RESEND: VersusPage = {
     {
       heading: "Volume ceilings of different kinds",
       a: "Monthly volume is capped at roughly ten times your profile count, and sending halts past it. Most ecommerce patterns never come close. The merchants who do are the ones mailing a small devoted list frequently, and their only route past the cap is paying for more profiles than they have customers — a strange thing to discover during a peak week.",
-      b: "Ten API requests per second per team, on every self-serve tier, and the Batch API takes up to 100 emails per request as one request. For steady transactional traffic this is invisible, and only a very large burst sent one call per order meets it: batched, ten thousand confirmations clear in about ten seconds.",
+      b: "Ten API requests per second per team, on every self-serve tier. For steady transactional traffic this is invisible, and only a very large burst sent one call per order meets it: Resend's batch endpoint sends up to 100 emails in a single API call, and a short buffer that flushes into it clears ten thousand confirmations in about ten seconds at the default. The batch endpoint does not support attachments yet, so a confirmation carrying a PDF still goes as its own call.",
     },
     {
       heading: "Deliverability responsibility",
@@ -6061,14 +6061,14 @@ const KLAVIYO_VS_RESEND: VersusPage = {
     "The scope is deliberately narrow, so there is no customer database, no flow engine and no attribution report being paid for and not used.",
   ],
   consB: [
-    "Ten API requests per second per team on every self-serve tier, which steady order flow never approaches; only a very large burst sent one call per order exceeds it, and batched sends clear ten thousand confirmations in about ten seconds.",
+    "Ten API requests per second per team on every self-serve tier, which steady order flow never approaches; only a very large burst sent one call per order exceeds it, and a short buffer flushing into the batch endpoint (up to 100 emails in a single API call, no attachments yet) clears ten thousand confirmations in about ten seconds.",
     "Thirty days of logs short of Enterprise, so a dispute about a confirmation from three months ago has no record on the vendor side at all.",
     "There is no customer record, no order history, no segment builder and no attribution, so replacing the marketing programme means rebuilding all four.",
     "Suspension during a traffic spike recurs in its public reviews, and a store moving a promotional list onto a new sender in one evening is that pattern exactly.",
   ],
   migrationChecklist: [
     "Move the confirmations and leave the programme, at least to begin with. Order confirmations, shipping notices and receipts are often the majority of the messages and a minority of what the platform is actually providing, and they run on a send API better and far more cheaply. Campaigns, flows and attribution are a customer data model, and merchants who try to move that half usually finish the sending in days and abandon the campaign tool in a quarter.",
-    "Size the burst before writing the send path. Steady order flow is nowhere near ten calls a second, and only a very large burst sent one call per order passes it. Batches of up to 100 recipients per request clear ten thousand confirmations in about ten seconds at the default, so the answer is the batch endpoint, with a queue only if your bursts are larger than that. It is ordinary engineering that is much easier to build in a quiet week than during the sale that revealed the need for it.",
+    "Size the burst before writing the send path. Steady order flow is nowhere near ten calls a second, and only a very large burst sent one call per order passes it. A short buffer that flushes into the batch endpoint, up to 100 emails in a single API call, clears ten thousand confirmations in about ten seconds at the default, so that is the answer, with a queue only if your bursts are larger than that. The batch endpoint does not support attachments yet, so confirmations that carry a PDF still go out as individual calls. Build it in a quiet week, not during the sale.",
     "Decide where a three-month-old confirmation is looked up. A support agent asking whether a customer received their receipt in March is answering from a thirty-day log window on the new side, which means the answer is no longer available. Publish delivery events to your own storage from the first day of the cutover, because the gap is invisible until somebody asks and then it is permanent.",
     "Export the suppression states and find a home for the manual one. Unsubscribed shoppers, addresses judged invalid, and people somebody suppressed by hand are three distinct facts on the platform side. A send API keeps its own bounce record and attaches unsubscribes to broadcast audiences, and the hand-suppressed group — the customer who phoned and asked to be removed — has no object to live in. That becomes a table and a check, or it becomes a complaint.",
     "Verify that the profile count actually falls before counting the saving. The theory is that recipients who only ever received transactional mail stop needing to be profiles, and the theory is usually right. It is also checkable: look at how many of your profiles have received nothing but a confirmation in the last year, and confirm the plan threshold you would drop below. Plans ratchet up without stepping down, so somebody may need to trigger the reduction rather than waiting for it.",
@@ -6105,7 +6105,7 @@ const KLAVIYO_VS_RESEND: VersusPage = {
     {
       question: "Does Resend's rate limit matter for order confirmations?",
       answer:
-        "Rarely. Steady order flow is nowhere near ten API requests per second, and only a very large burst sent one call per order exceeds it. The Batch API takes up to 100 emails per request and counts as one request, so ten thousand confirmations clear in about ten seconds. Use batch sends, with a queue only if your bursts are larger than that; the default does not change with the plan.",
+        "Rarely. Steady order flow is nowhere near ten API requests per second, and only a very large burst sent one call per order exceeds it. Resend's batch endpoint sends up to 100 emails in a single API call, so a short buffer flushing into it clears ten thousand confirmations in about ten seconds; it does not support attachments yet, so receipts carrying a PDF go out as individual calls. Use batch sends, with a queue only if your bursts are larger than that; the default does not change with the plan.",
     },
     {
       question: "Why does my profile count keep going up?",
@@ -6135,7 +6135,7 @@ const KLAVIYO_VS_RESEND: VersusPage = {
     {
       question: "Is a flash sale a problem on a send API?",
       answer:
-        "Only for a very large burst. Sent one call per order, ten thousand confirmations at ten calls a second take about seventeen minutes; sent through the Batch API, which takes up to 100 emails per request and counts as one request, they clear in about ten seconds. Use batches, and put a queue in front only if your bursts are larger still. Build that before the sale; it is straightforward, and the alternative is customers wondering where their receipt went during your busiest hour.",
+        "Only for a very large burst. Sent one call per order, ten thousand confirmations at ten calls a second take about seventeen minutes; sent through a short buffer that flushes into the batch endpoint, which sends up to 100 emails in a single API call, they clear in about ten seconds. The batch endpoint does not support attachments yet, so confirmations carrying a PDF still go one call each. Use batches, and put a queue in front only if your bursts are larger still. Build that before the sale; it is straightforward, and the alternative is customers wondering where their receipt went during your busiest hour.",
     },
   ],
 };
@@ -6412,13 +6412,13 @@ const MAILERSEND_VS_RESEND: VersusPage = {
     "The floor underneath is AWS's, which is a high one to inherit for nothing, and the product surface is small enough that nobody spends an hour choosing between four ways to do one thing.",
   ],
   consB: [
-    "Ten requests per second per team on every tier, so anything that bunches at scale becomes a queue you build and operate.",
+    "Ten requests per second per team on every self-serve tier, so anything that bunches at scale becomes a queue you build and operate.",
     "Logs purge at thirty days below Enterprise, and the dispute that needs you in June to look at March does eventually arrive.",
     "Marketing contacts are metered apart from sending, so an audience that grows raises the invoice in a month when nobody sent anything to it.",
     "Inbound arrived later and stays deliberately narrower, so reply handling is the axis on which these two products are least comparable to each other.",
   ],
   migrationChecklist: [
-    "Measure calls per second at peak rather than messages per month, because Resend's API default is ten requests per second per team on every tier, which is not a limit anybody grows out of by spending more, and a batch endpoint that takes many messages per call is the mitigation rather than an exemption. Go and find the loops in your code that walk a list sending one at a time; those are what meet the limit on the very first run.",
+    "Measure calls per second at peak rather than messages per month, because Resend's API default is ten requests per second per team on every self-serve tier, which is not a limit anybody grows out of by spending more, and a batch endpoint that takes many messages per call is the mitigation rather than an exemption. Go and find the loops in your code that walk a list sending one at a time; those are what meet the limit on the very first run.",
     "Replace the webhook verification, not merely the URL it points at. The two sign differently — one with its own scheme over the payload, the other through a third-party signing convention with its own headers and replay window — so the handler's security code is new work that belongs in a review rather than in a follow-up ticket. Verification skipped for now during a migration is verification that stays skipped for years.",
     "Decide whether you want idempotent sends, because one side offers a key on the request and the other does not. If your send path retries on a timeout, and most of them do somewhere, the direction you are travelling determines whether a retry is safe or produces a second receipt. Moving toward the key is a chance to fix that properly; moving away from it means building the deduplication yourself and remembering why.",
     "Choose the domain's region deliberately if you are moving toward the side that asks. A sending domain is created in one region and the choice is made at setup, so five careless minutes become a property of your infrastructure. If nobody in the company has a view, the defensible answer is wherever your recipients actually are, and it is worth writing down why in case somebody asks in a year.",
@@ -6446,7 +6446,7 @@ const MAILERSEND_VS_RESEND: VersusPage = {
       question:
         "Is the ten-requests-per-second limit really on every Resend plan?",
       answer:
-        "Yes, for bursty traffic, and it is worth checking early. It is not a limit you grow out of by spending more, though Resend raises it for trusted senders on request. The workaround is standard — enqueue sends and drain the queue at a safe rate, with retries on the rejections — and it is perhaps a day of work. Budget the day, or confirm your traffic genuinely never bunches, before you commit the integration.",
+        "Yes. It matters most for bursty traffic, and it is worth checking early. It is not a limit you grow out of by spending more, though Resend raises it for trusted senders on request. The workaround is standard — enqueue sends and drain the queue at a safe rate, with retries on the rejections — and it is perhaps a day of work. Budget the day, or confirm your traffic genuinely never bunches, before you commit the integration.",
     },
     {
       question: "Which of these has better deliverability?",
@@ -6577,7 +6577,7 @@ const RESEND_VS_SMTP2GO: VersusPage = {
     "A permanent free allowance means a prototype or a weekend project does not generate an invoice, which is why so many integrations start here by default.",
   ],
   consA: [
-    "Ten requests per second per team on every tier means anything that bunches becomes a queue you build and then own, and a plan upgrade does not raise the default.",
+    "Ten requests per second per team on every self-serve tier means anything that bunches becomes a queue you build and then own, and a plan upgrade does not raise the default.",
     "Records purge at thirty days on every plan short of Enterprise, so what happened to that email eventually has no answer at all rather than a slow one.",
     "The React rendering story presumes a JavaScript build, and a Python or Go team gets a noticeably thinner version of the experience than the marketing suggests.",
     "There is no per-sender credential model, so a fleet of systems sharing one API key is exactly as isolated as that sounds — which is to say, not at all.",
@@ -6711,7 +6711,7 @@ const MANDRILL_VS_RESEND: VersusPage = {
     {
       heading: "How much you can push, and how fast",
       a: "Capacity is bought in blocks covering a fixed number of messages, and the constraint you meet is the block rather than a request-rate ceiling. A batch job that emits a large burst is an ordinary thing to do here, and the arithmetic to work out your real per-message cost has to include the platform subscription underneath, which the pricing page will not do for you.",
-      b: "Ten requests per second per team, on every plan, with no upgrade that raises it. A Mandrill integration written without a rate ceiling in mind can meet this at cutover: the nightly digest job starts collecting 429 rejections at two in the morning. Batch up to 100 emails per request, or queue, before you switch, not after.",
+      b: "Ten requests per second per team, on every self-serve plan, with no upgrade that raises it. A Mandrill integration written without a rate ceiling in mind can meet this at cutover: the nightly digest job starts collecting 429 rejections at two in the morning. Send in batches of up to 100 emails per API call, or queue, before you switch, not after.",
     },
     {
       heading: "Inbound mail and reply handling",
@@ -8509,7 +8509,7 @@ const BREVO_VS_LOOPS: VersusPage = {
     },
     {
       heading: "What the free tier is actually for",
-      a: "Getting a small business sending. Brevo's free allowance has a daily cap under it and is a genuine starting point rather than a demonstration, which is why so many small organisations run on it for months before ever paying. The visible cost is that the vendor's logo sits in the footer until you move up to Standard or pay for the add-on, which some businesses mind and many do not.",
+      a: "Getting a small business sending. Brevo's free allowance has a daily cap under it and is a genuine starting point rather than a demonstration, which is why so many small organisations run on it for months before ever paying. The visible cost is that the vendor's logo sits in the footer until you move up to Standard, or to Starter with the logo add-on, which some businesses mind and many do not.",
       b: "Proving the shape fits before you commit. The free band holds a modest number of contacts with a monthly send allowance, enough to wire the integration, build an onboarding sequence and watch it run against real signups. Because the paid plans are bands of contacts rather than unlocked features, what you build on the free tier is what you keep — there is no discovery later that the thing you designed around was a paid capability.",
     },
     {
