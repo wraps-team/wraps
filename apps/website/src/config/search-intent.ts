@@ -363,7 +363,7 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
     ],
     audience: "stranger-with-problem",
     rationale:
-      'Gives a line-by-line accounting of the $10 vs $35-$133.50 gap at 100K emails/month and states plainly when the difference is worth paying — a specific-numbers post, not a generic "ESPs are expensive" claim.',
+      'Gives a line-by-line accounting of the $10 vs $35-$126 gap at 100K emails/month and states plainly when the difference is worth paying — a specific-numbers post, not a generic "ESPs are expensive" claim.',
   },
   {
     route: "/blog/yc-w26-email-security-audit",

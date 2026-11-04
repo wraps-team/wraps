@@ -56,7 +56,7 @@ const faqSchema = {
       name: "How much does it cost to send 100,000 transactional emails per month?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "On Amazon SES à la carte pricing, 100,000 emails cost $10.00 per month. On the Essentials plan that AWS now assigns to new accounts by default, the same volume costs $16.00. On SES Pro it costs $127.00 and on SES Enterprise $523.00, because those plans carry monthly fees of $105 and $500 per account per Region. Managed providers at the same volume range from roughly $35 to $177 per month depending on plan.",
+        text: "On Amazon SES à la carte pricing, 100,000 emails cost $10.00 per month. On the Essentials plan that AWS now assigns to new accounts by default, the same volume costs $16.00. On SES Pro it costs $127.00 and on SES Enterprise $523.00, because those plans carry monthly fees of $105 and $500 per account per Region. Managed providers at the same volume range from roughly $35 to $126 per month depending on plan.",
       },
     },
     {
@@ -80,7 +80,7 @@ const faqSchema = {
       name: "Does sending fewer emails meaningfully reduce costs at 100K a month?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "It depends entirely on your marginal per-email rate. Cutting 30,000 emails a month saves $3.00 on SES à la carte and $4.80 on SES Essentials — not worth an engineering sprint. The same 30,000 emails saves $54.00 a month on Postmark's Basic overage rate of $1.80 per 1,000 and $39.00 on Mailgun's Foundation overage rate. Multiply the emails you would delete by your own overage rate before scoping the work.",
+        text: "It depends entirely on your marginal per-email rate. Cutting 30,000 emails a month saves $3.00 on SES à la carte and $4.80 on SES Essentials — not worth an engineering sprint. The same 30,000 emails saves $36.00 a month on Postmark Platform, at its $1.20 per 1,000 overage above the 50,000-email tier, and nothing on Resend Pro, because 70,000 emails still sit inside the 100,000-email tier. Multiply the emails you would delete by your own marginal rate, tier included, before scoping the work.",
       },
     },
     {
@@ -167,18 +167,18 @@ const PROVIDERS_AT_100K = [
   { provider: "Mailgun", plan: "Scale", monthly: "$90.00" },
   {
     provider: "Postmark",
-    plan: "Platform, $18 + 90K × $1.20",
+    plan: "Basic, 125K tier",
+    monthly: "$115.00",
+  },
+  {
+    provider: "Postmark",
+    plan: "Pro, 50K tier $60.50 + 50K × $1.30",
+    monthly: "$125.50",
+  },
+  {
+    provider: "Postmark",
+    plan: "Platform, 50K tier $66 + 50K × $1.20",
     monthly: "$126.00",
-  },
-  {
-    provider: "Postmark",
-    plan: "Pro, $16.50 + 90K × $1.30",
-    monthly: "$133.50",
-  },
-  {
-    provider: "Postmark",
-    plan: "Basic, $15 + 90K × $1.80",
-    monthly: "$177.00",
   },
 ];
 
@@ -190,24 +190,23 @@ const SES_CURVE = [
 ];
 
 const DELETION_VALUE = [
+  {
+    where: "Resend Pro, or Scale at 100K",
+    rate: "$0 inside the 100K tier; $0.90 / 1,000 only above it",
+    saved: "$0.00",
+  },
   { where: "AWS SES, à la carte", rate: "$0.10 / 1,000", saved: "$3.00" },
   { where: "AWS SES, Essentials", rate: "$0.16 / 1,000", saved: "$4.80" },
   {
-    where: "Resend, pay-as-you-go (Pro, or Scale at 100K)",
-    rate: "$0.90 / 1,000",
-    saved: "$27.00",
+    where: "Postmark Basic, 125K tier down to 50K tier plus overage",
+    rate: "$1.80 / 1,000 above 50K",
+    saved: "$24.00",
   },
   {
-    where: "Postmark Platform overage",
-    rate: "$1.20 / 1,000",
+    where: "Postmark Platform, 50K tier plus overage",
+    rate: "$1.20 / 1,000 above 50K",
     saved: "$36.00",
   },
-  {
-    where: "Mailgun Foundation overage",
-    rate: "$1.30 / 1,000",
-    saved: "$39.00",
-  },
-  { where: "Postmark Basic overage", rate: "$1.80 / 1,000", saved: "$54.00" },
 ];
 
 export const metadata: Metadata = {
@@ -320,7 +319,7 @@ export default function Page() {
                 </li>
                 <li>
                   <strong>3.</strong> Price a move off a managed provider
-                  honestly. At 100K the saving is $25&ndash;$167 a month. The
+                  honestly. At 100K the saving is $25&ndash;$116 a month. The
                   reason to move is the shape of the curve above 1M, not the
                   number at 100K.
                 </li>
@@ -643,7 +642,8 @@ wraps email plan --region us-east-1 --set NONE`}
               Here is 100,000 emails a month across the providers most
               transactional senders are actually choosing between, computed from
               published plan prices and overage rates as verified on July 13,
-              2026.
+              2026, with the Resend, Mailgun and Postmark prices rechecked on
+              November 3, 2026.
             </p>
 
             <div className="overflow-x-auto rounded-xl border">
@@ -685,23 +685,24 @@ wraps email plan --region us-east-1 --set NONE`}
             <p className="mt-6 mb-4 text-foreground/80 text-lg leading-relaxed">
               Two things are worth pulling out of that table. First, the spread
               between the cheapest and most expensive way to send the same
-              100,000 emails is <strong>17&times;</strong>, and nothing about
+              100,000 emails is <strong>12.6&times;</strong>, and nothing about
               the messages changed.
             </p>
 
             <p className="mb-6 text-foreground/80 text-lg leading-relaxed">
-              Second, look at the three Postmark rows. At exactly this volume
-              their <em>most expensive</em> base plan is the cheapest total:
-              Platform at $18 a month with a $1.20 overage comes to $126, while
-              Basic at $15 a month with a $1.80 overage comes to $177. Buying
-              the higher plan saves $51 a month. That inversion is a general
-              property of include-plus-overage pricing, not a Postmark quirk
-              &mdash; if your provider prices that way, recompute your own tier
-              at your own volume before you assume you're on the right one.
+              Second, look at the Postmark Basic row. Postmark sells each plan
+              in volume tiers, and at exactly this volume the cheapest way onto
+              Basic is <em>not</em> the 50K tier plus overage: $55 a month plus
+              50K &times; $1.80 comes to $145, while the 125K tier is $115.
+              Paying for 25,000 emails you won't send saves $30 a month. That
+              inversion is a general property of include-plus-overage pricing,
+              not a Postmark quirk &mdash; if your provider prices that way,
+              recompute your own tier at your own volume before you assume
+              you're on the right one.
             </p>
 
             <p className="mb-6 text-foreground/80 text-lg leading-relaxed">
-              But at 100K a month, moving to SES saves $25 to $167. That is real
+              But at 100K a month, moving to SES saves $25 to $116. That is real
               money and it is not, on its own, a good reason to migrate email
               infrastructure. The actual reason is the shape of the curve:
             </p>
@@ -815,10 +816,12 @@ wraps email plan --region us-east-1 --set NONE`}
             </div>
 
             <p className="mt-6 mb-6 text-foreground/80 text-lg leading-relaxed">
-              An 18&times; spread on identical work. On SES à la carte, deleting
-              nearly a third of your email volume saves $3.00 a month &mdash;
-              you cannot fund a sprint with that. On Postmark's Basic overage it
-              saves $54.00 a month, and the same sprint pays for itself.{" "}
+              From nothing to $36.00 on identical work. On Resend Pro the 30K
+              you delete were inside the 100K tier you still need, so the bill
+              does not move. On SES à la carte, deleting nearly a third of your
+              email volume saves $3.00 a month &mdash; you cannot fund a sprint
+              with that. On Postmark Platform's overage it saves $36.00 a month,
+              and the same sprint starts to pay for itself.{" "}
               <strong>Multiply before you scope.</strong> And if you find
               duplicate sends, race conditions firing two password resets, or a
               retry loop with no ceiling, fix them anyway &mdash; those are bugs
@@ -913,9 +916,10 @@ wraps email plan --region us-east-1 --set NONE`}
                   4. Recompute your provider tier at your real volume
                 </h3>
                 <p className="text-foreground/80 leading-relaxed">
-                  Include-plus-overage pricing regularly makes a more expensive
-                  base plan the cheaper total. Do the multiplication rather than
-                  assuming the entry tier is the frugal choice.
+                  Include-plus-overage pricing regularly makes a bigger tier the
+                  cheaper total than a smaller one plus overage. Do the
+                  multiplication rather than assuming the entry tier is the
+                  frugal choice.
                 </p>
               </div>
               <div className="rounded-lg border p-5">
