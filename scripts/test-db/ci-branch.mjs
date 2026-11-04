@@ -27,6 +27,7 @@ import { appendFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import {
+  expiresAtFrom,
   fetchConnectionUri,
   findOrCreateBranch,
   listBranches,
@@ -39,7 +40,6 @@ import {
 export const CI_BRANCH_PATTERN = /^ci-[0-9a-f]{7}-\d+-\d+$/;
 export const CI_BRANCH_TTL_HOURS = 3;
 const LEADING_SLASH = /^\//;
-const MILLISECONDS = /\.\d{3}Z$/;
 const PUSH_TIMEOUT_MS = 10 * 60_000;
 // Any constant works; it only has to be the same in every job of the run.
 const PUSH_LOCK_KEY = 31_031;
@@ -87,19 +87,6 @@ export function ciBranchName(env) {
     );
   }
   return name;
-}
-
-/**
- * RFC 3339 in UTC with whole seconds, as Neon's branch-expiration docs show.
- *
- * @param {Date} now
- * @param {number} hours
- * @returns {string}
- */
-export function expiresAtFrom(now, hours) {
-  return new Date(now.getTime() + hours * 3_600_000)
-    .toISOString()
-    .replace(MILLISECONDS, "Z");
 }
 
 /**

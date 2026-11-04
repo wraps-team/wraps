@@ -11,9 +11,16 @@ its project-scoped key. CI doesn't use the resolver: under `GITHUB_ACTIONS=true`
 `scripts/test-db/ci-branch.mjs` instead (`docs/agents/ci-and-deploy.md`). Never delete or
 reap `ci-*` branches by hand; they expire 3h after creation.
 
-## After removing a worktree: reap its branch
+## Branches expire 24h after their last test run
 
-Deleting the worktree leaves its branch alive. Reclaim it:
+A `wt-*` branch is created with `expires_at` 24h out, and every test run that resolves it
+slides that forward another 24h (a background PATCH; a failed one only warns). A worktree in
+use keeps its branch; one that was removed, or left idle for a day, loses it without anyone
+running anything. An expired branch is simply re-cut from the parent on the next run.
+
+## After removing a worktree: reaping is optional
+
+Deleting the worktree leaves its branch alive until it expires. To reclaim it now:
 
 ```bash
 node scripts/test-db/reap-branches.mjs        # delete wt-* branches whose worktree is gone

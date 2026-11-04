@@ -5,9 +5,9 @@ import {
   ciBranchName,
   deleteCiBranch,
   ensure,
-  expiresAtFrom,
   pushSchema,
 } from "../ci-branch.mjs";
+import { expiresAtFrom } from "../resolve-branch.mjs";
 
 const SHA = "0123456789abcdef0123456789abcdef01234567";
 const BRANCH = "ci-0123456-41767588020-2";

@@ -13,6 +13,11 @@
 // way to fall back to the shared database is a missing NEON_API_KEY or
 // NEON_PROJECT_ID in the env that loads .env.test.
 //
+// Each `wt-*` branch expires 24h after its checkout last ran tests: it is
+// created with `expires_at` 24h out, and every later resolve slides that
+// forward in the background. A removed or idle worktree's branch therefore
+// goes away on its own; `reap-branches.mjs` remains for doing it now.
+//
 // CI never resolves here: under GitHub Actions (`GITHUB_ACTIONS=true`) the
 // resolver returns `baseUrl` untouched, with no naming, Neon call or reap. A
 // runner's `git worktree list` holds only itself, so a reap from there would
@@ -31,6 +36,8 @@ const POLL_INTERVAL_MS = 500;
 const POLL_MAX_MS = 60_000;
 const LEADING_SLASH = /^\//;
 const ALREADY_EXISTS = /already exists/i;
+const MILLISECONDS = /\.\d{3}Z$/;
+const WT_BRANCH_TTL_HOURS = 24;
 // Neon answers 423 Locked while another operation on the project (such as a
 // concurrent branch create from a sibling CI job) is still running. Retry the
 // create with backoff for up to this long, re-listing first each time.
@@ -61,6 +68,7 @@ export class NeonApiError extends Error {
  * @property {typeof execFileSync} [execImpl]
  * @property {boolean} [all]
  * @property {(ms: number) => Promise<void>} [sleepImpl]
+ * @property {() => Date} [now]
  */
 
 /**
@@ -246,6 +254,19 @@ export async function pollUntilReady(opts, apiKey, projectId, branchId) {
 }
 
 /**
+ * RFC 3339 in UTC with whole seconds, as Neon's branch-expiration docs show.
+ *
+ * @param {Date} now
+ * @param {number} hours
+ * @returns {string}
+ */
+export function expiresAtFrom(now, hours) {
+  return new Date(now.getTime() + hours * 3_600_000)
+    .toISOString()
+    .replace(MILLISECONDS, "Z");
+}
+
+/**
  * @param {ResolverOpts} opts
  * @param {number} ms
  * @returns {Promise<void>}
@@ -268,7 +289,8 @@ function sleep(opts, ms) {
 
 /**
  * Finds the worktree's branch, creating it (from the parent implied by
- * `target.parsedBase`'s host) if it doesn't exist yet. Handles the 409
+ * `target.parsedBase`'s host) if it doesn't exist yet. The result carries
+ * `createdHere: true` only when this call's own POST made it. Handles the 409
  * raised when a concurrent vitest process in the same worktree (turbo runs
  * web/api/auth configs in parallel) creates it first: re-GETs and reuses
  * that branch.
@@ -348,7 +370,7 @@ async function attemptCreate(opts, target, requestBody, findByName) {
 
   if (createRes.ok) {
     const created = await createRes.json();
-    return { branch: created.branch };
+    return { branch: { ...created.branch, createdHere: true } };
   }
 
   const bodyText = await createRes.text().catch(() => "");
@@ -450,13 +472,35 @@ export async function resolveTestDatabaseUrl(baseUrl, env, opts = {}) {
     const role = parsedBase.username;
     const database = parsedBase.pathname.replace(LEADING_SLASH, "");
 
+    const expiresAt = expiresAtFrom(
+      (opts.now ?? (() => new Date()))(),
+      WT_BRANCH_TTL_HOURS
+    );
     const found = await findOrCreateBranch(opts, {
       apiKey,
       projectId,
       branchName,
       parsedBase,
+      expiresAt,
     });
     const branch = await pollUntilReady(opts, apiKey, projectId, found.id);
+
+    // Fire-and-forget, like the reap below: slide an existing branch's expiry
+    // 24h forward, so a worktree in use keeps its branch.
+    if (!found.createdHere) {
+      extendBranchExpiry(opts, {
+        apiKey,
+        projectId,
+        branchId: found.id,
+        expiresAt,
+      }).catch((err) => {
+        console.warn(
+          `[test-db] could not extend ${branchName}'s expiry: ${
+            err instanceof Error ? err.message : String(err)
+          }`
+        );
+      });
+    }
 
     const uri = await fetchConnectionUri(opts, {
       apiKey,
@@ -479,6 +523,32 @@ export async function resolveTestDatabaseUrl(baseUrl, env, opts = {}) {
       `[test-db] ${err instanceof Error ? err.message : String(err)}`
     );
     return baseUrl;
+  }
+}
+
+/**
+ * Moves a branch's `expires_at` (PATCH; `null` would remove it). Resolves on
+ * success and throws a NeonApiError otherwise, so the caller decides whether
+ * the failure matters.
+ *
+ * @param {ResolverOpts} opts
+ * @param {{apiKey: string, projectId: string, branchId: string, expiresAt: string}} target
+ * @returns {Promise<void>}
+ */
+export async function extendBranchExpiry(opts, target) {
+  const { apiKey, projectId, branchId, expiresAt } = target;
+  const res = await neonFetch(
+    opts,
+    apiKey,
+    `${NEON_API_BASE}/projects/${projectId}/branches/${branchId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ branch: { expires_at: expiresAt } }),
+    }
+  );
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new NeonApiError("extend branch expiry", res.status, detail);
   }
 }
 

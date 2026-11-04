@@ -218,8 +218,8 @@ opaque connection/query errors, not a helpful message.
   runs on a per-run `ci-*` branch from `scripts/test-db/ci-branch.mjs`. Any
   resolver failure falls back to that base URL rather than erroring, so a
   worktree silently sharing the parent database is a real possibility.
-- After deleting a worktree, reclaim its branch:
-  `node scripts/test-db/reap-branches.mjs`.
+- A `wt-*` branch expires 24h after its last test run, so reclaiming it after
+  deleting a worktree is optional: `node scripts/test-db/reap-branches.mjs`.
 - Default test environment is `node`; `src/components/**/*.test.{ts,tsx}` run in
   jsdom via `environmentMatchGlobs`.
 
