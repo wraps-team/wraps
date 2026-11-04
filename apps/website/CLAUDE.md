@@ -65,12 +65,15 @@ For tabbed examples (multiple frameworks): use `CodeTabs` + `CodeTabItem`.
 6. `src/config/search-intent.ts` — declare the page's target query
 
 Editing an existing page also trips (3): regenerate and commit `page-dates.ts`
-in the same commit. The check passes when the newest commit touching a route's
-files also rewrote that route's entry in `page-dates.ts`, so squash merges are
-fine: GitHub restamps the squash commit with the merge time, but the commit still
-carries both the page edit and the regenerated entry. Only when the newest commit
-left the entry alone does it fall back to comparing committer dates. A later
-page edit that skips the regenerate fails it.
+in the same commit, or in the same PR (it is squash-merged). The check passes
+when the newest commit on `main` touching a route's files also rewrote that
+route's entry in `page-dates.ts`, so squash merges are fine: GitHub restamps the
+squash commit with the merge time, but the commit still carries both the page
+edit and the regenerated entry. Only when the newest commit left the entry alone
+does it fall back to comparing committer dates, and a later page edit that skips
+the regenerate fails it. The check is per squashed PR, not per branch commit: a
+PR that regenerates and is then edited again before merge is not caught, so run
+`sitemap:dates` last.
 
 ## Architecture
 

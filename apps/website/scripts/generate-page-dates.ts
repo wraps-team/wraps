@@ -12,11 +12,12 @@
  *  - Turbo can restore a cached .next and skip the build entirely, so anything
  *    computed at build time is not guaranteed to run at all.
  *
- * Committing the dates sidesteps all three. Run this before committing a
- * content change, and commit page-dates.ts in the same commit; sitemap.test.ts
- * fails when the newest commit touching a route's files left its entry alone.
- * A squash merge restamps that commit's date but keeps both changes, so it
- * passes.
+ * Committing the dates sidesteps all three. Run this last, after your final
+ * content edit, and commit page-dates.ts in the same commit or the same PR;
+ * sitemap.test.ts fails when the newest commit on main touching a route's files
+ * left its entry alone. A squash merge restamps that commit's date but keeps
+ * both changes, so it passes. The check is per squashed PR: an edit made after
+ * the regenerate inside the same PR is not caught.
  *
  *   pnpm sitemap:dates
  */
