@@ -152,7 +152,7 @@ export const VENDORS: Record<VendorId, Vendor> = {
     category:
       "Developer-first email API (built on SES, now with its own Forge MTA)",
     pricing:
-      "Free 3,000/mo (100/day). Pro $20 at 50K and $35 at 100K. Scale starts at $90 for the same 100K, is $350 at 500K and runs to $1,150 at 2.5M. Overage is $0.90 per 1,000 on Pro and the first Scale tier, falling to $0.46 at 2.5M. Marketing contacts billed separately at $40/mo per 5,000.",
+      "Free 3,000/mo (100/day). Pro $20 at 50K and $35 at 100K. Scale starts at $90 for the same 100K, is $350 at 500K and runs to $1,150 at 2.5M. Overage is $0.90 per 1,000 on Pro and the first Scale tier, falling to $0.46 at 2.5M. Marketing contacts billed separately, from $40/mo for 5,000 contacts.",
     bestFor:
       "The fastest path from an empty project to a sent email, especially with React Email.",
     watchOut:
@@ -628,7 +628,7 @@ const SENDGRID_PAGE: AlternativesPage = {
     {
       vendor: "brevo",
       verdict:
-        "The closest thing to a one-for-one replacement if you were using both transactional and Marketing Campaigns, and the only option here priced on send volume rather than contacts. Roughly $69 at 100K on Starter, against SendGrid Essentials plus a separate Marketing Campaigns plan. The developer experience is a clear step down, and the tier you actually need is usually one above the headline.",
+        "The closest thing to a one-for-one replacement if you were using both transactional and Marketing Campaigns, and the only option here priced on send volume rather than contacts, with a contact limit on each volume tier. Roughly $69 at 100K on Starter, against SendGrid Essentials plus a separate Marketing Campaigns plan. The developer experience is a clear step down, and the tier you actually need is usually one above the headline.",
     },
     {
       vendor: "ahasend",
@@ -950,7 +950,7 @@ const CUSTOMER_IO_PAGE: AlternativesPage = {
     {
       vendor: "brevo",
       verdict:
-        "Priced on send volume rather than profiles, which directly inverts the thing you are leaving, at roughly $69 for 100,000 emails on Starter regardless of how many contacts you store. That is the single biggest structural difference on this page after Wraps. Automation lives a tier up from the headline price, the developer experience is a step down, and the behavioural targeting is nowhere near what you have today.",
+        "Priced on send volume rather than profiles, which directly inverts the thing you are leaving, at roughly $69 for 100,000 emails on Starter, a tier that holds up to 500,000 contacts. That is the single biggest structural difference on this page after Wraps. Automation lives a tier up from the headline price, the developer experience is a step down, and the behavioural targeting is nowhere near what you have today.",
     },
     {
       vendor: "knock",
