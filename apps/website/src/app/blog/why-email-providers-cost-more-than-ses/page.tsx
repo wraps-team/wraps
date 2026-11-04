@@ -220,7 +220,8 @@ export default function Page() {
             </div>
             <p className="mt-4 text-muted-foreground text-sm">
               List prices read off each vendor&apos;s own pricing page in
-              September 2026. Every one of these changes; check before quoting
+              September 2026, with Postmark rechecked on November 3, 2026.
+              Every one of these changes; check before quoting
               them back at anyone.
             </p>
           </section>

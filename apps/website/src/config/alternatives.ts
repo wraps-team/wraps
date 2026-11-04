@@ -628,7 +628,7 @@ const SENDGRID_PAGE: AlternativesPage = {
     {
       vendor: "brevo",
       verdict:
-        "The closest thing to a one-for-one replacement if you were using both transactional and Marketing Campaigns, and the only option here priced on send volume rather than contacts, with a contact limit on each volume tier. Roughly $69 at 100K on Starter, against SendGrid Essentials plus a separate Marketing Campaigns plan. The developer experience is a clear step down, and the tier you actually need is usually one above the headline.",
+        "The closest thing to a one-for-one replacement if you were using both transactional and Marketing Campaigns, and the only marketing suite here priced on send volume rather than contacts, with a contact limit on each volume tier. Roughly $82 at 100K on Starter, against SendGrid Essentials plus a separate Marketing Campaigns plan. The developer experience is a clear step down, and the tier you actually need is usually one above the headline.",
     },
     {
       vendor: "ahasend",
@@ -950,7 +950,7 @@ const CUSTOMER_IO_PAGE: AlternativesPage = {
     {
       vendor: "brevo",
       verdict:
-        "Priced on send volume rather than profiles, which directly inverts the thing you are leaving, at roughly $69 for 100,000 emails on Starter, a tier that holds up to 500,000 contacts. That is the single biggest structural difference on this page after Wraps. Automation lives a tier up from the headline price, the developer experience is a step down, and the behavioural targeting is nowhere near what you have today.",
+        "Priced on send volume rather than profiles, which directly inverts the thing you are leaving, at roughly $82 for 100,000 emails on Starter, a tier that holds up to 500,000 contacts. That is the single biggest structural difference on this page after Wraps. Automation lives a tier up from the headline price, the developer experience is a step down, and the behavioural targeting is nowhere near what you have today.",
     },
     {
       vendor: "knock",

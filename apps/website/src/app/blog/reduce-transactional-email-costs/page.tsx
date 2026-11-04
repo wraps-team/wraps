@@ -337,7 +337,8 @@ export default function Page() {
               page or computed from published rates, and the arithmetic is shown
               so you can check it. AWS rates were verified against the SES
               pricing page in August 2026. Competitor pricing was verified
-              against live pricing pages on July 13, 2026.
+              against live pricing pages on July 13, 2026, with Resend, Mailgun
+              and Postmark rechecked on November 3, 2026.
             </p>
           </section>
 
@@ -776,8 +777,9 @@ wraps email plan --region us-east-1 --set NONE`}
 
             <p className="mb-4 text-foreground/80 text-lg leading-relaxed">
               This is routinely called the highest-ROI optimization. The value
-              of deleting an email is exactly your marginal per-email rate, so
-              here is what cutting 30,000 emails a month &mdash; a 30%
+              of deleting an email is what it takes off the bill: your marginal
+              rate above a plan&apos;s included volume, nothing inside it, and
+              more when the cut lets you drop to a cheaper tier. Here is what cutting 30,000 emails a month &mdash; a 30%
               reduction, which is an ambitious engineering project &mdash; is
               worth in each place you might be sending from:
             </p>
@@ -963,7 +965,7 @@ wraps email plan --region us-east-1 --set NONE`}
             <p className="text-foreground/80 text-lg leading-relaxed">
               Which means the honest full-stack number at 100K a month is $12.50
               to AWS plus $0&ndash;29 to us &mdash; and worth comparing against
-              the $35&ndash;177 in the provider table, with the difference that
+              the $35&ndash;126 in the provider table, with the difference that
               the AWS half of it keeps costing $0.10 per 1,000 at 10M.
             </p>
           </section>

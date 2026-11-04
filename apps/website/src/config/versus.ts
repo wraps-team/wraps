@@ -4638,7 +4638,7 @@ const MAILGUN_VS_RESEND: VersusPage = {
       b: "Nothing equivalent. You are expected to keep your list clean by other means, which in practice means a third-party validation API or a syntax check you write. This is fine for a product with invited users and genuinely risky for one with an open signup form, because the first sign of trouble is usually a warning email about bounce rate rather than a dashboard number you were watching.",
     },
     {
-      heading: "Finding a message six months later",
+      heading: "Finding a message after the fact",
       a: "Log search is in the console with retention that widens as the plan does, and it shows the receiving server's actual SMTP response — which is the field that resolves an argument about whether a message was delivered or merely accepted. A support agent can use it without an engineer. The limit is that the retention is a plan feature and the history leaves with you only if you exported it.",
       b: "Thirty days on every plan short of Enterprise, in a log view designed for debugging an integration rather than for answering questions about last quarter. The view itself is clean and fast. The window is the problem, and it is not a problem you notice during evaluation, because during evaluation everything you want to look at happened this week.",
     },
@@ -4671,7 +4671,7 @@ const MAILGUN_VS_RESEND: VersusPage = {
   pickA: [
     "Your product routes inbound mail by recipient, sender or header, which Resend's pricing page does not describe, and you would rather not bolt a second service on to get it.",
     "An open signup form makes address validation a bounce-rate control rather than a nicety.",
-    "Support needs to search logs far enough back to answer a question about last quarter, with the receiving server's response visible.",
+    "Support needs to see the receiving server's response for a message within the plan's log window, without asking an engineer.",
     "A written data residency requirement covers where data is stored, not only where mail is sent from.",
   ],
   pickB: [
@@ -4719,7 +4719,7 @@ const MAILGUN_VS_RESEND: VersusPage = {
     "What is our bounce rate on self-serve signups today, and what does it become if nothing validates the address at the form?",
     "Has anybody measured peak API calls per second, or are we reasoning about throughput from a monthly total?",
     "Is our data residency requirement a written clause about where data is stored, or a preference somebody expressed in a meeting once?",
-    "How far back does a support agent search today, and how often does that search go past thirty days?",
+    "How far back does a support agent search today, and how often does that search go past the five days Foundation keeps?",
     "Who owns our templates — an engineer in a pull request or a marketer in a builder — and which of these two suits that person's week?",
     "If we are on grandfathered pay-as-you-go terms, what are they precisely, and is the comparison being drawn against those or against the current list?",
   ],
@@ -5664,7 +5664,7 @@ const BREVO_VS_RESEND: VersusPage = {
     {
       heading: "Where the money goes",
       a: "Send volume, not stored contacts, which is unusual and genuinely good in this category: a large dormant list does not raise the bill on its own until it outgrows the tier's contact limit. What raises it is the tier step, which is where the features live. Price the tier that contains what you need rather than the one on the homepage, because that is the most common way an evaluation of this product produces a wrong number.",
-      b: "A plan ladder for sending, plus marketing contacts billed separately in contact tiers. That second charge is contact-based pricing quietly attached to a send-priced product, so a growing audience raises the invoice in a month you sent nothing to it — which is exactly the model Brevo avoided. Two ladders also price the same volume differently depending which you are on, so check which one you are being quoted.",
+      b: "A plan ladder for sending, plus marketing contacts billed separately in contact tiers. That second charge is contact-based pricing quietly attached to a send-priced product, so a growing audience raises the invoice in a month you sent nothing to it — which Brevo mostly avoids. Two ladders also price the same volume differently depending which you are on, so check which one you are being quoted.",
     },
     {
       heading: "Europe, and what the requirement actually says",
@@ -8464,7 +8464,7 @@ const BREVO_VS_LOOPS: VersusPage = {
   dimensions: [
     {
       heading: "What the meter counts, and which list shape it punishes",
-      a: "Send volume. A contact costs nothing until you mail them, so a large quiet audience is cheap and a small engaged list mailed constantly is not. For a business with seasonal campaigns to a big list this is plainly the better shape, and it means every send decision carries a small cost calculation.",
+      a: "Send volume. Up to each volume tier's contact limit, a contact costs nothing until you mail them, so a large quiet audience is cheap and a small engaged list mailed constantly is not. For a business with seasonal campaigns to a big list this is plainly the better shape, and it means every send decision carries a small cost calculation.",
       b: "Subscribed contacts, with sending unlimited. You stop counting messages, which measurably changes behaviour — more experiments, more splits, less hesitation. The symmetric cost is that dormant free-tier signups sit on the invoice forever, so list pruning becomes a billing decision as much as a hygiene one.",
     },
     {
@@ -8531,7 +8531,7 @@ const BREVO_VS_LOOPS: VersusPage = {
     "You would rather a tool with no unlockable tiers than a headline price that is not the price of the product you need.",
   ],
   prosA: [
-    "A quiet audience costs nothing until you mail it, so a company with a large seasonal list is not paying monthly rent on people it contacts twice a year.",
+    "Within the tier's contact limit, a quiet audience costs nothing until you mail it, so a company with a large seasonal list is not paying monthly rent on people it contacts twice a year.",
     "Four channels and a small contact database arrive under one supplier relationship, which is a genuine reduction in paperwork for an organisation that buys software slowly.",
     "The surface is generic enough to suit a clinic, an agency or a shop, which is why a business in no obvious software category still finds it usable.",
     "There is always a higher band, so a capability you discover you need in month four is usually a purchase order rather than a change of supplier.",
@@ -8555,7 +8555,7 @@ const BREVO_VS_LOOPS: VersusPage = {
     "There is no band to buy when a capability turns out to be missing, so a gap found in month four is a gap you keep.",
   ],
   migrationChecklist: [
-    "Model the two meters against your own list before reading another feature page, because the crossover is sharper than either pricing page implies and it settles most of this. One side multiplies people by nothing and messages by frequency; the other multiplies people by a monthly rate and messages by nothing. Fifty thousand contacts written to each quarter and three thousand written to each week land on opposite answers, and the second figure — how often you genuinely send, not how often you intend to — is the one teams get wrong by a factor of two.",
+    "Model the two meters against your own list before reading another feature page, because the crossover is sharper than either pricing page implies and it settles most of this. One side multiplies people by nothing (up to each volume tier's contact limit) and messages by frequency; the other multiplies people by a monthly rate and messages by nothing. Fifty thousand contacts written to each quarter and three thousand written to each week land on opposite answers, and the second figure — how often you genuinely send, not how often you intend to — is the one teams get wrong by a factor of two.",
     "Find out whether somebody who unsubscribed still counts toward a contact-priced band, and get that from the vendor rather than from a forum thread. On a meter that charges for people instead of for messages, the population you are billed for and the population you are permitted to write to are two different sets, and the gap between them widens every month. A list that has been collecting signups for three years carries a quantity of dead weight that is invisible on a send-metered bill and expensive on the other kind.",
     "Check the daily ceiling underneath a monthly free allowance against your burstiest single day, not against your monthly average. A free tier generous enough to run a small product on is usually shaped as a monthly figure with a much tighter per-day limit below it, and a launch, an incident notice or an end-of-month billing run is exactly the traffic shape that fits the month and fails the day. Find the daily number, double your worst day, and see whether what you are looking at is a plan or a demonstration.",
     "Inventory the text-message sender registrations before assuming that channel travels with you. Sender identifiers, per-country approvals and the paperwork behind them belong to the account that applied for them rather than to your company, and several jurisdictions take weeks to grant one. A team treating text messaging as a feature toggle finds at switchover that the channel is dark for a month in its two largest markets. If it matters at all, start the replacement registrations before giving notice on anything.",
