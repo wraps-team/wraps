@@ -1533,7 +1533,7 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
     primaryQuery: "mailgun replacement for a modern stack",
     secondaryQueries: [
       "does resend support inbound email routing",
-      "resend api rate limit for bulk sending",
+      "how many emails fit in one resend batch call",
       "mailgun pay as you go plan discontinued",
       "email api with address validation built in",
       "what to do with mailgun routes when switching provider",
