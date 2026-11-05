@@ -90,7 +90,13 @@ if [[ $FAIL -gt 0 ]]; then
   echo "FAILED: $FAILED_STEP"
   echo ""
 
-  logfile="$LOGDIR/$FAILED_STEP.log"
+  # Vitest and turbo colour their output, which wraps words like `Error` in
+  # ANSI escape codes and hides them from the greps below. Read a stripped copy.
+  # $'\033' rather than \x1b, and LC_ALL=C so BSD sed does not abort on invalid
+  # UTF-8 bytes in the log.
+  clean_log="$LOGDIR/$FAILED_STEP.clean.log"
+  LC_ALL=C sed -E "s/"$'\033'"\[[0-9;]*[A-Za-z]//g" "$LOGDIR/$FAILED_STEP.log" > "$clean_log"
+  logfile="$clean_log"
 
   # Step-specific error extraction for agent-friendly output
   case "$FAILED_STEP" in
@@ -153,12 +159,22 @@ if [[ $FAIL -gt 0 ]]; then
       ;;
 
     test)
-      # Test failures: extract FAIL lines and assertion errors
+      # FAIL/x lines first, then a few lines under each FAIL, where vitest puts
+      # the `Error: ...` / `AssertionError: ...` text. Do not grep `Error:` over
+      # the whole log: passing tests log benign ones, and across many turbo
+      # packages they would use up the line budget before the real failure.
       echo "--- test failures ---"
-      grep -E '(FAIL |✗|×|AssertionError|Error:|expect\()' "$logfile" | head -40 || true
+      grep -E '(FAIL |✗|×)' "$logfile" | head -40 || true
       total=$(grep -cE '(FAIL |✗|×)' "$logfile" 2>/dev/null || true)
       if [[ "$total" -gt 40 ]]; then
         echo "  ... and $((total - 40)) more"
+      fi
+      echo ""
+      echo "--- failure details (lines under each FAIL) ---"
+      grep -E -A4 'FAIL ' "$logfile" | grep -v '^--$' | head -60 || true
+      if [[ "$total" -eq 0 ]]; then
+        # Not a vitest failure (turbo error, crashed worker): show the tail.
+        tail -40 "$logfile"
       fi
       ;;
 
