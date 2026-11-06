@@ -36,6 +36,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const params = useParams<{ orgSlug?: string }>();
   const pathname = usePathname();
   const orgSlug = activeOrganization?.slug ?? params.orgSlug ?? "";
+  const overviewActive = isOverviewActive(pathname, orgSlug);
   const productsStatus = useProductsStore((s) => s.status);
   const planFeatures = productsStatus?.planFeatures;
 
@@ -168,14 +169,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <OrganizationSwitcher />
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              isActive={isOverviewActive(pathname, orgSlug)}
-            >
+            <SidebarMenuButton asChild isActive={overviewActive}>
               <Link
-                aria-current={
-                  isOverviewActive(pathname, orgSlug) ? "page" : undefined
-                }
+                aria-current={overviewActive ? "page" : undefined}
                 href={`/${orgSlug}`}
               >
                 <LayoutDashboardIcon className="h-4 w-4" />

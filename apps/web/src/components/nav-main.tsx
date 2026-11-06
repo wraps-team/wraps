@@ -100,13 +100,14 @@ export function NavMain({
   return (
     <SidebarGroup>
       <SidebarMenu>
-        {items.map((item) =>
-          isCollapsed ? (
+        {items.map((item) => {
+          const groupActive = isGroupActive(item);
+          return isCollapsed ? (
             // Collapsed: show hover card with sub-items
             <HoverCard closeDelay={100} key={item.title} openDelay={0}>
               <HoverCardTrigger asChild>
                 <SidebarMenuItem>
-                  <SidebarMenuButton isActive={isGroupActive(item)}>
+                  <SidebarMenuButton isActive={groupActive}>
                     <item.icon />
                     <span>{item.title}</span>
                   </SidebarMenuButton>
@@ -131,7 +132,7 @@ export function NavMain({
                           className={cn(
                             "relative rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
                             active
-                              ? "font-medium text-foreground before:absolute before:inset-y-0 before:-left-[9px] before:w-0.5 before:bg-sidebar-indicator"
+                              ? "font-medium text-foreground before:absolute before:inset-y-0 before:-left-2.25 before:w-0.5 before:bg-sidebar-indicator"
                               : "text-muted-foreground"
                           )}
                           href={subItem.url}
@@ -159,49 +160,48 @@ export function NavMain({
                 <CollapsibleTrigger asChild>
                   <SidebarMenuButton tooltip={item.title}>
                     <item.icon />
-                    <span className={cn(isGroupActive(item) && "font-medium")}>
+                    <span
+                      className={cn(
+                        "min-w-0 flex-1 truncate",
+                        groupActive && "font-medium"
+                      )}
+                    >
                       {item.title}
                     </span>
-                    <span className="ml-auto flex items-center gap-2">
-                      {isGroupActive(item) && !isSectionOpen(item.title) && (
-                        <span
-                          aria-hidden="true"
-                          className="size-1.5 shrink-0 rounded-full bg-sidebar-indicator"
-                          data-slot="sidebar-group-indicator"
-                        />
-                      )}
-                      <ChevronRight className="transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                    </span>
+                    {groupActive && !isSectionOpen(item.title) && (
+                      <span
+                        aria-hidden="true"
+                        className="size-1.5 shrink-0 rounded-full bg-sidebar-indicator"
+                        data-slot="sidebar-group-indicator"
+                      />
+                    )}
+                    <ChevronRight className="transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                   </SidebarMenuButton>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <SidebarMenuSub>
-                    {item.items.map((subItem) => (
-                      <SidebarMenuSubItem key={subItem.title}>
-                        <SidebarMenuSubButton
-                          asChild
-                          isActive={isSubItemActive(subItem.url, item.items)}
-                        >
-                          <Link
-                            aria-current={
-                              isSubItemActive(subItem.url, item.items)
-                                ? "page"
-                                : undefined
-                            }
-                            href={subItem.url}
-                            prefetch={false}
-                          >
-                            <span>{subItem.title}</span>
-                          </Link>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                    ))}
+                    {item.items.map((subItem) => {
+                      const active = isSubItemActive(subItem.url, item.items);
+                      return (
+                        <SidebarMenuSubItem key={subItem.title}>
+                          <SidebarMenuSubButton asChild isActive={active}>
+                            <Link
+                              aria-current={active ? "page" : undefined}
+                              href={subItem.url}
+                              prefetch={false}
+                            >
+                              <span>{subItem.title}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      );
+                    })}
                   </SidebarMenuSub>
                 </CollapsibleContent>
               </SidebarMenuItem>
             </Collapsible>
-          )
-        )}
+          );
+        })}
       </SidebarMenu>
     </SidebarGroup>
   );

@@ -719,7 +719,7 @@ function SidebarMenuSubButton({
     <Comp
       className={cn(
         "relative -translate-x-px flex h-7 min-w-0 items-center gap-2 rounded-md px-2 text-muted-foreground outline-hidden ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground",
-        "data-[active=true]:font-medium data-[active=true]:text-sidebar-foreground data-[active=true]:before:absolute data-[active=true]:before:inset-y-0 data-[active=true]:before:-left-[10px] data-[active=true]:before:w-0.5 data-[active=true]:before:bg-sidebar-indicator",
+        "data-[active=true]:font-medium data-[active=true]:text-sidebar-foreground data-[active=true]:before:absolute data-[active=true]:before:inset-y-0 data-[active=true]:before:-left-2.5 data-[active=true]:before:w-0.5 data-[active=true]:before:bg-sidebar-indicator",
         size === "sm" && "text-xs",
         size === "md" && "text-sm",
         "group-data-[collapsible=icon]:hidden",
