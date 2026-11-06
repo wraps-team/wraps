@@ -10,11 +10,11 @@ import {
   Workflow,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import type * as React from "react";
 import { Logo } from "@/components/logo";
 import { NavHelp } from "@/components/nav-help";
-import { NavMain } from "@/components/nav-main";
+import { isOverviewActive, NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
 import { OrganizationSwitcher } from "@/components/organization-switcher";
 import { SidebarUpgrade } from "@/components/sidebar-upgrade";
@@ -34,6 +34,7 @@ import { useProductsStore } from "@/stores/products-store";
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { activeOrganization } = useActiveOrganization();
   const params = useParams<{ orgSlug?: string }>();
+  const pathname = usePathname();
   const orgSlug = activeOrganization?.slug ?? params.orgSlug ?? "";
   const productsStatus = useProductsStore((s) => s.status);
   const planFeatures = productsStatus?.planFeatures;
@@ -167,8 +168,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <OrganizationSwitcher />
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link href={`/${orgSlug}`}>
+            <SidebarMenuButton
+              asChild
+              isActive={isOverviewActive(pathname, orgSlug)}
+            >
+              <Link
+                aria-current={
+                  isOverviewActive(pathname, orgSlug) ? "page" : undefined
+                }
+                href={`/${orgSlug}`}
+              >
                 <LayoutDashboardIcon className="h-4 w-4" />
                 <span>Overview</span>
               </Link>

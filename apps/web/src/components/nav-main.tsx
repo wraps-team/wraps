@@ -25,6 +25,12 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useSidebarSections } from "@/hooks/use-sidebar-sections";
+import { cn } from "@/lib/utils";
+
+/** Overview is exact-match only: every dashboard route starts with `/${orgSlug}`. */
+export function isOverviewActive(pathname: string, orgSlug: string) {
+  return orgSlug !== "" && pathname === `/${orgSlug}`;
+}
 
 export function NavMain({
   items,
@@ -116,20 +122,27 @@ export function NavMain({
                   <div className="px-2 py-1.5 font-medium text-sm">
                     {item.title}
                   </div>
-                  {item.items.map((subItem) => (
-                    <Link
-                      className={`rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground ${
-                        isSubItemActive(subItem.url, item.items)
-                          ? "bg-accent font-medium text-accent-foreground"
-                          : "text-muted-foreground"
-                      }`}
-                      href={subItem.url}
-                      key={subItem.title}
-                      prefetch={false}
-                    >
-                      {subItem.title}
-                    </Link>
-                  ))}
+                  <div className="mx-2 flex flex-col gap-1 border-border border-l px-2">
+                    {item.items.map((subItem) => {
+                      const active = isSubItemActive(subItem.url, item.items);
+                      return (
+                        <Link
+                          aria-current={active ? "page" : undefined}
+                          className={cn(
+                            "relative rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
+                            active
+                              ? "font-medium text-foreground before:absolute before:inset-y-0 before:-left-[9px] before:w-0.5 before:bg-sidebar-indicator"
+                              : "text-muted-foreground"
+                          )}
+                          href={subItem.url}
+                          key={subItem.title}
+                          prefetch={false}
+                        >
+                          {subItem.title}
+                        </Link>
+                      );
+                    })}
+                  </div>
                 </div>
               </HoverCardContent>
             </HoverCard>
@@ -146,8 +159,19 @@ export function NavMain({
                 <CollapsibleTrigger asChild>
                   <SidebarMenuButton tooltip={item.title}>
                     <item.icon />
-                    <span>{item.title}</span>
-                    <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                    <span className={cn(isGroupActive(item) && "font-medium")}>
+                      {item.title}
+                    </span>
+                    <span className="ml-auto flex items-center gap-2">
+                      {isGroupActive(item) && !isSectionOpen(item.title) && (
+                        <span
+                          aria-hidden="true"
+                          className="size-1.5 shrink-0 rounded-full bg-sidebar-indicator"
+                          data-slot="sidebar-group-indicator"
+                        />
+                      )}
+                      <ChevronRight className="transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                    </span>
                   </SidebarMenuButton>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
@@ -158,7 +182,15 @@ export function NavMain({
                           asChild
                           isActive={isSubItemActive(subItem.url, item.items)}
                         >
-                          <Link href={subItem.url} prefetch={false}>
+                          <Link
+                            aria-current={
+                              isSubItemActive(subItem.url, item.items)
+                                ? "page"
+                                : undefined
+                            }
+                            href={subItem.url}
+                            prefetch={false}
+                          >
                             <span>{subItem.title}</span>
                           </Link>
                         </SidebarMenuSubButton>
