@@ -88,6 +88,7 @@
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-indicator: var(--sidebar-indicator);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 }
@@ -131,6 +132,12 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.544 0 0);
+  /*
+   * Marks the current page in the sidebar. Non-text, so it needs 3:1 against
+   * --sidebar (1.4.11); brand orange measures 2.77:1 there, hence the darker
+   * light-mode value (5.00:1).
+   */
+  --sidebar-indicator: oklch(0.553 0.195 38.402);
   /*
    * Status colours carry text (`text-success`, badges on `bg-success/15`) and
    * solid fills with a near-white label. Both pass 7:1 at these values.
@@ -208,6 +215,7 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.601 0 0);
+  --sidebar-indicator: oklch(0.75 0.183 55.934);
   --success: oklch(0.775 0.2 145);
   --success-foreground: oklch(0.145 0 0);
   --warning: oklch(0.807 0.126 55);
