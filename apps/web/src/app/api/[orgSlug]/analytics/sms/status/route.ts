@@ -1,7 +1,7 @@
 import { auth } from "@wraps/auth";
 import { db } from "@wraps/db";
 import { awsAccount } from "@wraps/db/schema/app";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import {
   getSMSPhoneNumbers,
@@ -83,9 +83,14 @@ export async function GET(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Get all AWS accounts for this organization
+    // Only SMS-enabled accounts: the console role carries no sms-voice
+    // permissions otherwise, so every read below would be AccessDenied (and
+    // reported to Sentry) by design. Same gate as the products route.
     const accounts = await db.query.awsAccount.findMany({
-      where: eq(awsAccount.organizationId, orgWithMembership.id),
+      where: and(
+        eq(awsAccount.organizationId, orgWithMembership.id),
+        eq(awsAccount.smsEnabled, true)
+      ),
     });
 
     if (accounts.length === 0) {
