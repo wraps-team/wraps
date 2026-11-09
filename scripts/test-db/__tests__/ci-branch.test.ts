@@ -6,9 +6,12 @@ import {
   deleteCiBranch,
   ensure,
   parentTargetProblem,
+  projectIdentityProblem,
+  projectIdSha256,
   pushSchema,
   pushWorktree,
   refreshParent,
+  TEST_PROJECT_ID_SHA256,
   worktreeTargetProblem,
 } from "../ci-branch.mjs";
 import { expiresAtFrom } from "../resolve-branch.mjs";
@@ -853,6 +856,7 @@ describe("refreshParent", () => {
     endpoints = ENDPOINTS,
     stdout = "[✓] Changes applied\n",
     snapshotStatus = 201,
+    apiProjectId = "proj-1",
   } = {}) {
     const calls: Call[] = [];
     const order: string[] = [];
@@ -879,6 +883,9 @@ describe("refreshParent", () => {
         };
         listed.push({ default: false, ...branch });
         return jsonResponse({ branch }, 201);
+      }
+      if (parsed.pathname === "/api/v2/projects/proj-1") {
+        return jsonResponse({ project: { id: apiProjectId } });
       }
       if (parsed.pathname.endsWith("/branches")) {
         return jsonResponse({ branches: listed });
@@ -927,6 +934,9 @@ describe("refreshParent", () => {
         spawnImpl,
         now: () => NOW,
         log: (l: string) => lines.push(l),
+        // The fake "proj-1" stands in for wraps-test; the real id never
+        // appears in a test.
+        testProjectIdSha256: projectIdSha256("proj-1"),
       } as any,
       calls,
       connectPg,
@@ -1046,6 +1056,58 @@ describe("refreshParent", () => {
     expect(error).not.toContain("ep-damp-heart");
   });
 
+  it("accepts a long-lived dev branch with an endpoint in the right project", async () => {
+    const h = refreshHarness({
+      branches: [...BRANCHES, { id: "br-dev", name: "dev", default: false }],
+      endpoints: [
+        ...ENDPOINTS,
+        { host: "ep-dev.us-east-2.aws.neon.tech", branch_id: "br-dev" },
+      ],
+    });
+    const result = await refreshParent(refreshEnv, { ...h.io, dryRun: true });
+    h.restore();
+
+    expect(result).toEqual({ exitCode: 0, status: "checked" });
+  });
+
+  it("refuses a NEON_PROJECT_ID whose sha256 is not pinned, before any Neon call and without naming the id", async () => {
+    const h = refreshHarness();
+    const result = await refreshParent(
+      { ...refreshEnv, NEON_PROJECT_ID: "proj-elsewhere" },
+      h.io
+    );
+    h.restore();
+
+    expect(result).toEqual({ exitCode: 1, status: "refused" });
+    expect(h.calls).toEqual([]);
+    const error = h.lines.find((l) => l.startsWith("::error::")) ?? "";
+    expect(error).toContain("not the wraps-test project");
+    expect(error).not.toContain("proj-elsewhere");
+  });
+
+  it("refuses with the real pin when no test hash is passed", async () => {
+    const h = refreshHarness();
+    const { testProjectIdSha256: _, ...io } = h.io;
+    const result = await refreshParent(refreshEnv, io);
+    h.restore();
+
+    expect(result).toEqual({ exitCode: 1, status: "refused" });
+    expect(h.calls).toEqual([]);
+  });
+
+  it("refuses when Neon returns a different project than NEON_PROJECT_ID names", async () => {
+    const h = refreshHarness({ apiProjectId: "proj-other" });
+    const result = await refreshParent(refreshEnv, h.io);
+    h.restore();
+
+    expect(result).toEqual({ exitCode: 1, status: "refused" });
+    expect(h.calls.some((c) => c.path.endsWith("/connection_uri"))).toBe(false);
+    expect(h.connectPg).not.toHaveBeenCalled();
+    const error = h.lines.find((l) => l.startsWith("::error::")) ?? "";
+    expect(error).toContain("do not belong together");
+    expect(error).not.toContain("proj-other");
+  });
+
   it("fails without secrets rather than falling back", async () => {
     const h = refreshHarness();
     const result = await refreshParent({ NEON_API_KEY: "k" }, h.io);
@@ -1055,68 +1117,114 @@ describe("refreshParent", () => {
     expect(h.calls).toEqual([]);
   });
 
+  describe("project identity", () => {
+    it("pins the wraps-test project by the sha256 of its id", () => {
+      // The live `refresh-parent --dry-run` proves this is the right digest;
+      // this pin makes any edit to it a deliberate one.
+      expect(TEST_PROJECT_ID_SHA256).toBe(
+        "d4a06438a4e9133e5d828ababb097beb2d866a815702122b47d7de6b93773a84"
+      );
+    });
+
+    it("hashes a project id to lowercase sha256 hex", () => {
+      expect(projectIdSha256("abc")).toBe(
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+      );
+    });
+
+    it("accepts the id whose hash is expected and refuses any other", () => {
+      const expected = projectIdSha256("proj-1");
+      expect(projectIdentityProblem("proj-1", expected)).toBeNull();
+      expect(projectIdentityProblem("proj-2", expected)).toContain(
+        "not the wraps-test project"
+      );
+    });
+  });
+
   describe("parentTargetProblem", () => {
-    it("accepts a backup-* endpoint beside the parent", () => {
+    const target = (overrides: Record<string, unknown> = {}) => ({
+      projectId: "proj-1",
+      project: { id: "proj-1" },
+      branches: BRANCHES,
+      endpoints: ENDPOINTS,
+      baseHost: PARENT_HOST,
+      ...overrides,
+    });
+
+    it("accepts the default branch named by TEST_DATABASE_URL's pooled host", () => {
       expect(
         parentTargetProblem(
-          [
-            ...BRANCHES,
-            { id: "br-bk", name: "backup-0123456-1", default: false },
-          ],
-          [...ENDPOINTS, { host: "ep-bk.x", branch_id: "br-bk" }],
-          PARENT_HOST
+          target({ baseHost: "ep-parent-pooler.us-east-2.aws.neon.tech" })
         )
       ).toBeNull();
     });
 
-    it("accepts the default branch named by TEST_DATABASE_URL, with only wt-*/ci-* beside it", () => {
+    it.each([
+      ["a backup-* branch", { id: "br-bk", name: "backup-0123456-1" }],
+      ["a long-lived dev branch", { id: "br-dev", name: "dev" }],
+      ["a branch with any other name", { id: "br-x", name: "scratch" }],
+    ])("accepts an endpoint on %s beside the parent", (_case, branch) => {
       expect(
         parentTargetProblem(
-          BRANCHES,
-          ENDPOINTS,
-          "ep-parent-pooler.us-east-2.aws.neon.tech"
+          target({
+            branches: [...BRANCHES, { ...branch, default: false }],
+            endpoints: [
+              ...ENDPOINTS,
+              { host: `ep-${branch.id}.x`, branch_id: branch.id },
+            ],
+          })
         )
       ).toBeNull();
     });
 
     it.each([
       [
+        "a project other than the one requested",
+        { project: { id: "proj-other" } },
+        "different project than NEON_PROJECT_ID",
+      ],
+      [
+        "no project in Neon's answer",
+        { project: undefined },
+        "different project than NEON_PROJECT_ID",
+      ],
+      [
         "a prod endpoint",
-        BRANCHES,
-        [...ENDPOINTS, { host: "ep-autumn-block-9.x", branch_id: "br-wt" }],
-        PARENT_HOST,
+        {
+          endpoints: [
+            ...ENDPOINTS,
+            { host: "ep-autumn-block-9.x", branch_id: "br-wt" },
+          ],
+        },
         "prod or dev endpoint",
       ],
       [
-        "an endpoint on a branch that is neither default nor wt-*/ci-*/backup-*",
-        [...BRANCHES, { id: "br-dev", name: "dev", default: false }],
-        [...ENDPOINTS, { host: "ep-dev.x", branch_id: "br-dev" }],
-        PARENT_HOST,
-        "neither the default branch",
+        "a dev endpoint of the old shared project",
+        {
+          endpoints: [
+            ...ENDPOINTS,
+            { host: "ep-damp-heart-1.x", branch_id: "br-wt" },
+          ],
+        },
+        "prod or dev endpoint",
       ],
       [
         "no default branch",
-        BRANCHES.map((b) => ({ ...b, default: false })),
-        ENDPOINTS,
-        PARENT_HOST,
+        { branches: BRANCHES.map((b) => ({ ...b, default: false })) },
         "0 default branches",
       ],
       [
         "TEST_DATABASE_URL naming a wt-* branch",
-        BRANCHES,
-        ENDPOINTS,
-        "ep-wt.us-east-2.aws.neon.tech",
+        { baseHost: "ep-wt.us-east-2.aws.neon.tech" },
         "other than the project's default branch",
       ],
       [
         "TEST_DATABASE_URL naming no endpoint",
-        BRANCHES,
-        ENDPOINTS,
-        "ep-elsewhere.x",
+        { baseHost: "ep-elsewhere.x" },
         "matches no endpoint",
       ],
-    ])("refuses %s", (_case, branches, endpoints, host, phrase) => {
-      expect(parentTargetProblem(branches, endpoints, host)).toContain(phrase);
+    ])("refuses %s", (_case, overrides, phrase) => {
+      expect(parentTargetProblem(target(overrides))).toContain(phrase);
     });
   });
 });

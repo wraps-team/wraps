@@ -38,8 +38,17 @@ default branch. `.github/workflows/refresh-test-parent.yml` keeps it on main's s
 every push to main that touches `packages/db/src/schema/**`,
 `packages/db/src/migrations/**`, `packages/db/drizzle.config.ts` or
 `packages/db/package.json`, it runs `ci-branch.mjs refresh-parent`, which pushes main's
-schema to the default branch. It refuses unless the project is the test-only one
-and `TEST_DATABASE_URL` names that default branch, and it never gates a deploy.
+schema to the default branch. It never gates a deploy, and it refuses unless:
+
+- `NEON_PROJECT_ID` is `wraps-test`: its sha256 must equal `TEST_PROJECT_ID_SHA256` in
+  `ci-branch.mjs` (a hash, since the repo is public; the comment there says how to
+  recompute it if the project is ever recreated), and Neon must return that same project
+  for `NEON_API_KEY`;
+- the project holds no prod or dev endpoint of the old shared project; and
+- `TEST_DATABASE_URL` names the project's one default branch.
+
+Branch names play no part, so extra branches with endpoints, such as a long-lived `dev`,
+are fine.
 
 Each automatic refresh first snapshots the parent as a `backup-*` branch (7-day expiry).
 If a refresh damaged the parent's data, restore the parent from that branch in the Neon

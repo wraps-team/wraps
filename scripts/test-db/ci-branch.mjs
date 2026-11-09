@@ -29,6 +29,7 @@
 // Never prints a connection string, password or key.
 
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { appendFileSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -68,7 +69,13 @@ const PARENT_PROMPT_ADVICE =
 // Endpoint host prefixes of the prod and dev databases in the old shared
 // project. The test project must hold neither (plan 031, P1).
 const FORBIDDEN_HOST_PREFIXES = ["ep-damp-heart", "ep-autumn-block"];
-const TEST_BRANCH_PREFIXES = ["wt-", "ci-", "backup-"];
+// sha256 (hex) of the wraps-test project's id, the only project
+// `refresh-parent` may push to. A hash, because this repo is public. If the
+// project is ever recreated, recompute it from the new id (1Password:
+// op://Agents/Neon wraps-test API Key/project_id) with no trailing newline:
+//   printf %s "$NEON_PROJECT_ID" | sha256sum
+export const TEST_PROJECT_ID_SHA256 =
+  "d4a06438a4e9133e5d828ababb097beb2d866a815702122b47d7de6b93773a84";
 const BACKUP_TTL_HOURS = 7 * 24;
 const SHA7 = /^[0-9a-f]{7}$/;
 const DIGITS = /^\d+$/;
@@ -78,6 +85,7 @@ const PUSH_LOCK_KEY = 31_031;
 const NOT_FOUND_MEANS = {
   "list branches": "NEON_PROJECT_ID names no project this key can see",
   "list endpoints": "NEON_PROJECT_ID names no project this key can see",
+  "get project": "NEON_PROJECT_ID names no project this key can see",
   "create branch": "the project or the parent branch is gone",
   connection_uri:
     "the branch, or TEST_DATABASE_URL's role or database, does not exist on it",
@@ -100,6 +108,8 @@ const FALLBACK =
  * @property {(pid: number, signal: string) => void} [killImpl]
  * @property {number} [pushTimeoutMs]
  * @property {number} [connectTimeoutMs]
+ * @property {string} [testProjectIdSha256] tests only: replaces
+ *   TEST_PROJECT_ID_SHA256 so a fake project id can pass the identity check
  */
 
 /**
@@ -780,16 +790,61 @@ async function markPushed(client, branchName, log) {
 }
 
 /**
- * Checks that the project is the test-only one and that `parent` is its
- * default branch, the one TEST_DATABASE_URL points at. Returns why not, or
- * null. Never names a host.
+ * sha256 (hex) of a Neon project id, the form TEST_PROJECT_ID_SHA256 pins.
  *
- * @param {{id: string, name: string, default?: boolean}[]} branches
- * @param {{host: string, branch_id: string}[]} endpoints
- * @param {string} baseHost TEST_DATABASE_URL's host
+ * @param {string} projectId
+ * @returns {string}
+ */
+export function projectIdSha256(projectId) {
+  return createHash("sha256").update(projectId).digest("hex");
+}
+
+/**
+ * Why NEON_PROJECT_ID is not the pinned wraps-test project, or null. Pure
+ * and network-free, so `refresh-parent` runs it before any Neon call. The
+ * message names no id.
+ *
+ * @param {string} projectId NEON_PROJECT_ID
+ * @param {string} [expectedSha256] TEST_PROJECT_ID_SHA256 unless a test
+ *   passes its own
  * @returns {string | null}
  */
-export function parentTargetProblem(branches, endpoints, baseHost) {
+export function projectIdentityProblem(
+  projectId,
+  expectedSha256 = TEST_PROJECT_ID_SHA256
+) {
+  if (projectIdSha256(projectId) !== expectedSha256) {
+    return "NEON_PROJECT_ID is not the wraps-test project: its sha256 does not match TEST_PROJECT_ID_SHA256 in scripts/test-db/ci-branch.mjs";
+  }
+  return null;
+}
+
+/**
+ * Checks what Neon returned for NEON_PROJECT_ID: that it is that project
+ * (the key and the id agree), that it holds no prod or dev endpoint, and
+ * that TEST_DATABASE_URL points at its one default branch. Returns why not,
+ * or null. Branch names play no part: extra branches with endpoints (a
+ * long-lived `dev`, say) are fine. Never names a host or an id.
+ *
+ * @param {object} target
+ * @param {string} target.projectId NEON_PROJECT_ID
+ * @param {{id?: string} | undefined} target.project Neon's `project` from
+ *   GET /projects/{projectId}
+ * @param {{id: string, name: string, default?: boolean}[]} target.branches
+ * @param {{host: string, branch_id: string}[]} target.endpoints
+ * @param {string} target.baseHost TEST_DATABASE_URL's host
+ * @returns {string | null}
+ */
+export function parentTargetProblem({
+  projectId,
+  project,
+  branches,
+  endpoints,
+  baseHost,
+}) {
+  if (project?.id !== projectId) {
+    return "Neon answered for a different project than NEON_PROJECT_ID: NEON_API_KEY and NEON_PROJECT_ID do not belong together";
+  }
   const defaults = branches.filter((b) => b.default === true);
   if (defaults.length !== 1) {
     return `the project has ${defaults.length} default branches, expected exactly 1`;
@@ -802,18 +857,6 @@ export function parentTargetProblem(branches, endpoints, baseHost) {
     )
   ) {
     return "the project has a prod or dev endpoint: NEON_PROJECT_ID is not the test-only project";
-  }
-  const byId = new Map(branches.map((b) => [b.id, b]));
-  const stray = endpoints.filter((e) => {
-    const branch = byId.get(e.branch_id);
-    return !(
-      branch &&
-      (branch.id === parent.id ||
-        TEST_BRANCH_PREFIXES.some((p) => branch.name.startsWith(p)))
-    );
-  });
-  if (stray.length > 0) {
-    return `${stray.length} endpoint(s) belong to neither the default branch nor a wt-*/ci-*/backup-* branch: NEON_PROJECT_ID may not be the test-only project`;
   }
 
   const strippedHost = baseHost.replace("-pooler.", ".");
@@ -828,13 +871,23 @@ export function parentTargetProblem(branches, endpoints, baseHost) {
 }
 
 /**
- * Lists the project's branches and endpoints.
+ * Fetches the project itself, then lists its branches and endpoints.
  *
  * @param {import("./resolve-branch.mjs").ResolverOpts} opts
  * @param {string} apiKey
  * @param {string} projectId
  */
 async function projectInventory(opts, apiKey, projectId) {
+  const projectRes = await neonFetch(
+    opts,
+    apiKey,
+    `${NEON_API_BASE}/projects/${projectId}`,
+    { method: "GET" }
+  );
+  if (!projectRes.ok) {
+    throw await NeonApiError.fromResponse("get project", projectRes);
+  }
+  const { project } = await projectRes.json();
   const branches = await listBranches(opts, apiKey, projectId);
   const res = await neonFetch(
     opts,
@@ -846,7 +899,7 @@ async function projectInventory(opts, apiKey, projectId) {
     throw await NeonApiError.fromResponse("list endpoints", res);
   }
   const { endpoints = [] } = await res.json();
-  return { branches, endpoints };
+  return { project, branches, endpoints };
 }
 
 /**
@@ -886,8 +939,10 @@ async function snapshotParent(opts, target) {
  * Pushes the checked-out schema (main's, in refresh-test-parent.yml) to the
  * project's default branch, the parent every wt-* and ci-* branch is cut
  * from, under the same advisory lock and prompt detection as `push`.
- * Refuses unless the project is the test-only one and TEST_DATABASE_URL
- * names its default branch. Before pushing it snapshots the parent as
+ * Refuses unless NEON_PROJECT_ID is the pinned wraps-test project (its
+ * sha256 is TEST_PROJECT_ID_SHA256, checked before any Neon call, and Neon
+ * returns that same project for the key) and TEST_DATABASE_URL names its
+ * default branch. Before pushing it snapshots the parent as
  * `backup-<sha7>-<run_id>` (7-day expiry); no snapshot, no push. No
  * fallback: it gates nothing, so it fails red. `dryRun` resolves and checks
  * the target, prints the planned snapshot name, and stops before the lock.
@@ -919,6 +974,13 @@ export async function refreshParent(env, io = {}) {
 
   const apiKey = env.NEON_API_KEY;
   const projectId = env.NEON_PROJECT_ID;
+  const identityProblem = projectIdentityProblem(
+    projectId,
+    io.testProjectIdSha256
+  );
+  if (identityProblem) {
+    return fail("refused", `refusing to push: ${identityProblem}`);
+  }
   const opts = { fetchImpl: io.fetchImpl };
   const now = io.now ?? (() => new Date());
   let parent;
@@ -926,16 +988,18 @@ export async function refreshParent(env, io = {}) {
   let parsedBase;
   try {
     parsedBase = new URL(env.TEST_DATABASE_URL);
-    const { branches, endpoints } = await projectInventory(
+    const { project, branches, endpoints } = await projectInventory(
       opts,
       apiKey,
       projectId
     );
-    const problem = parentTargetProblem(
+    const problem = parentTargetProblem({
+      projectId,
+      project,
       branches,
       endpoints,
-      parsedBase.hostname
-    );
+      baseHost: parsedBase.hostname,
+    });
     if (problem) {
       return fail("refused", `refusing to push: ${problem}`);
     }

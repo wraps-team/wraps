@@ -136,9 +136,12 @@ run `node scripts/test-db/reap-branches.mjs --self` in each worktree that needs 
 schema. A push stuck past 3 minutes is killed together with its whole process group, so
 no drizzle-kit is left running against the parent.
 
-- It refuses unless the project has no prod or dev endpoint (the P1 host-prefix check),
-  every endpoint belongs to the default branch or a `wt-*`/`ci-*`/`backup-*` branch, and
-  `TEST_DATABASE_URL` names the default branch.
+- It refuses unless `NEON_PROJECT_ID` is `wraps-test` (its sha256 equals
+  `TEST_PROJECT_ID_SHA256` in `ci-branch.mjs`, checked before any Neon call, and
+  `GET /projects/{id}` returns that same project for the key), the project has no prod or
+  dev endpoint (the P1 host-prefix check), and `TEST_DATABASE_URL` names the default
+  branch. Branch names play no part: extra branches with endpoints, like a long-lived
+  `dev`, are allowed.
 - Before pushing, it snapshots the parent: a child branch `backup-<sha7>-<run_id>`, with
   no compute and `expires_at` 7 days out, cut under the lock and waited on until ready.
   No snapshot, no push: if the snapshot fails, the run fails red and the parent is
