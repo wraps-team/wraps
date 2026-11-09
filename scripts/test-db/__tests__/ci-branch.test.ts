@@ -857,6 +857,7 @@ describe("refreshParent", () => {
     stdout = "[✓] Changes applied\n",
     snapshotStatus = 201,
     apiProjectId = "proj-1",
+    projectStatus = 200,
   } = {}) {
     const calls: Call[] = [];
     const order: string[] = [];
@@ -885,6 +886,9 @@ describe("refreshParent", () => {
         return jsonResponse({ branch }, 201);
       }
       if (parsed.pathname === "/api/v2/projects/proj-1") {
+        if (projectStatus !== 200) {
+          return jsonResponse({ message: "not allowed" }, projectStatus);
+        }
         return jsonResponse({ project: { id: apiProjectId } });
       }
       if (parsed.pathname.endsWith("/branches")) {
@@ -1085,6 +1089,44 @@ describe("refreshParent", () => {
     expect(error).not.toContain("proj-elsewhere");
   });
 
+  it("refuses a NEON_PROJECT_ID with a trailing newline rather than trimming it", async () => {
+    const h = refreshHarness();
+    const result = await refreshParent(
+      { ...refreshEnv, NEON_PROJECT_ID: "proj-1\n" },
+      h.io
+    );
+    h.restore();
+
+    expect(result).toEqual({ exitCode: 1, status: "refused" });
+    expect(h.calls).toEqual([]);
+    const error = h.lines.find((l) => l.startsWith("::error::")) ?? "";
+    expect(error).toContain("stray whitespace");
+    expect(error).not.toContain("proj-1");
+  });
+
+  it.each([
+    [404, "names no project this key can see"],
+    [401, "Neon refused the API key on get project"],
+  ])(
+    "fails before any push when GET /projects/{id} answers %i, naming no id",
+    async (projectStatus, phrase) => {
+      const h = refreshHarness({ projectStatus });
+      const result = await refreshParent(refreshEnv, h.io);
+      h.restore();
+
+      expect(result).toEqual({ exitCode: 1, status: "failed" });
+      expect(h.calls.some((c) => c.path.endsWith("/connection_uri"))).toBe(
+        false
+      );
+      expect(h.calls.some((c) => c.method === "POST")).toBe(false);
+      expect(h.connectPg).not.toHaveBeenCalled();
+      expect(h.spawnImpl).not.toHaveBeenCalled();
+      const output = h.lines.join("\n");
+      expect(output).toContain(phrase);
+      expect(output).not.toContain("proj-1");
+    }
+  );
+
   it("refuses with the real pin when no test hash is passed", async () => {
     const h = refreshHarness();
     const { testProjectIdSha256: _, ...io } = h.io;
@@ -1138,6 +1180,15 @@ describe("refreshParent", () => {
       expect(projectIdentityProblem("proj-2", expected)).toContain(
         "not the wraps-test project"
       );
+    });
+
+    it("does not trim: a trailing newline or space fails the pin, with a whitespace hint", () => {
+      const expected = projectIdSha256("proj-1");
+      for (const padded of ["proj-1\n", " proj-1", "proj-1 "]) {
+        expect(projectIdentityProblem(padded, expected)).toContain(
+          "stray whitespace"
+        );
+      }
     });
   });
 

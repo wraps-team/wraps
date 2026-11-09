@@ -814,7 +814,7 @@ export function projectIdentityProblem(
   expectedSha256 = TEST_PROJECT_ID_SHA256
 ) {
   if (projectIdSha256(projectId) !== expectedSha256) {
-    return "NEON_PROJECT_ID is not the wraps-test project: its sha256 does not match TEST_PROJECT_ID_SHA256 in scripts/test-db/ci-branch.mjs";
+    return "NEON_PROJECT_ID is not the wraps-test project: its sha256 does not match TEST_PROJECT_ID_SHA256 in scripts/test-db/ci-branch.mjs (check the value for stray whitespace or a trailing newline)";
   }
   return null;
 }
