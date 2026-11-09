@@ -33,7 +33,7 @@
     "@aws-sdk/util-dynamodb": "catalog:",
     "@neondatabase/serverless": "^1.1.0",
     "@types/pg": "catalog:",
-    "drizzle-kit": "^0.31.11",
+    "drizzle-kit": "0.31.11",
     "tsdown": "catalog:",
     "tsx": "^4.23.1",
     "vitest": "catalog:"

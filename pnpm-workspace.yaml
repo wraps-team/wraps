@@ -164,5 +164,14 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
 
+# drizzle-kit's Postgres introspection has two bugs that make every
+# `drizzle-kit push` (dev DB, test parent, CI branches) drop and recreate
+# message_send_org_recipient_lower_idx and re-add the message_send_diagnostic
+# primary key, although nothing changed. The patch fixes both in bin.cjs:
+#   1. an index column counts as an expression only when it is one
+#      (indkey entry 0), not whenever the index has any expression;
+#   2. constraint columns are read in key order (key_column_usage.ordinal_position).
+# It is keyed to exactly 0.31.11 (packages/db pins that version): any
+# drizzle-kit bump must redo or drop this patch. Drop it once upstream fixes both.
 patchedDependencies:
   drizzle-kit@0.31.11: patches/drizzle-kit@0.31.11.patch
