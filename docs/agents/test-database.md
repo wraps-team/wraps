@@ -76,8 +76,8 @@ schema.
 
 Never refresh the parent from an unmerged PR; the one exception is a real rename that CI
 can't get past: `pnpm test-db:refresh --from-branch` from the PR rebased on main, then
-merge it straight away (`docs/agents/ci-and-deploy.md`). The flag lifts only the main
-check; the rest of the guard still runs.
+merge it straight away (`docs/agents/ci-and-deploy.md`). The flag swaps "HEAD is
+`origin/main`" for "HEAD contains `origin/main`"; the rest of the guard still runs.
 
 ## After a schema change merges: re-cut your branch
 

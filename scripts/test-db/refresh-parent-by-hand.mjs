@@ -9,13 +9,19 @@
 //   pnpm test-db:refresh                 from a checkout of main
 //   pnpm test-db:refresh --dry-run       check the target, push nothing
 //   pnpm test-db:refresh --from-branch   a PR that really renames something:
-//                                        lifts ONLY the main check
+//                                        HEAD need not BE origin/main, but
+//                                        must contain it (rebased on main)
 //
 // Reads NEON_API_KEY, NEON_PROJECT_ID and DATABASE_URL (the parent) from
 // apps/web/.env.test. Names the snapshot backup-<HEAD sha7>-<epoch seconds>,
 // the shape CI's GITHUB_SHA and GITHUB_RUN_ID give it, so the 7-day expiry
 // applies. drizzle-kit runs without --force: at a terminal you answer its
-// prompts. Never prints a connection string, key or project id.
+// prompts.
+//
+// Every line refreshParent logs passes through terminalLog, which masks the
+// .env.test values and every ::add-mask:: value as ***, as a GitHub runner
+// would. drizzle-kit's own output goes straight to the terminal unfiltered,
+// as it did under the old db:push:test.
 
 import { execFileSync, spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -93,8 +99,9 @@ export function handEnv(envText, snapshot) {
 
 /**
  * Why this checkout must not refresh the parent, or null. Fetches main, then
- * requires HEAD to be origin/main (unless `fromBranch`) and no uncommitted
- * schema edits. Makes no Neon call.
+ * requires HEAD to be origin/main, or with `fromBranch` to contain it (a PR
+ * rebased on main: otherwise its schema would drop main's newer columns from
+ * the parent), and no uncommitted schema edits. Makes no Neon call.
  *
  * @param {(args: string[]) => string} git
  * @param {{fromBranch: boolean}} flags
@@ -107,22 +114,28 @@ export function checkoutProblem(git, { fromBranch }) {
   } catch {
     return { problem: "not inside a git checkout" };
   }
-  if (!fromBranch) {
-    let main;
+  let main;
+  try {
+    git(["fetch", "--quiet", "origin", "main"]);
+    main = git(["rev-parse", "origin/main"]).trim();
+  } catch {
+    return {
+      problem:
+        "could not fetch origin/main, so cannot check this checkout against it",
+    };
+  }
+  if (fromBranch) {
     try {
-      git(["fetch", "--quiet", "origin", "main"]);
-      main = git(["rev-parse", "origin/main"]).trim();
+      git(["merge-base", "--is-ancestor", "origin/main", "HEAD"]);
     } catch {
       return {
-        problem:
-          "could not fetch origin/main, so cannot tell whether this checkout is main",
+        problem: `HEAD (${head.slice(0, 7)}) does not contain origin/main (${main.slice(0, 7)}): rebase on origin/main first, or this branch's schema would drop main's newer columns and tables from the parent`,
       };
     }
-    if (head !== main) {
-      return {
-        problem: `HEAD (${head.slice(0, 7)}) is not origin/main (${main.slice(0, 7)}). Every ci-* and wt-* branch is cut from the parent, so only main's schema may reach it: check out main, pull, and re-run. A PR that really renames a column or table uses --from-branch (docs/agents/ci-and-deploy.md)`,
-      };
-    }
+  } else if (head !== main) {
+    return {
+      problem: `HEAD (${head.slice(0, 7)}) is not origin/main (${main.slice(0, 7)}). Every ci-* and wt-* branch is cut from the parent, so only main's schema may reach it: check out main, pull, and re-run. A PR that really renames a column or table uses --from-branch (docs/agents/ci-and-deploy.md)`,
+    };
   }
   let dirty;
   try {
@@ -139,24 +152,65 @@ export function checkoutProblem(git, { fromBranch }) {
 }
 
 /**
- * refreshParent's log, made fit for a terminal: drops `::add-mask::` lines,
- * which carry the connection string and only a GitHub runner swallows, and
- * strips the workflow-command prefix from errors and warnings.
+ * The values to mask from the start: the env's secrets, and the URL's host
+ * (direct and pooled) and password (raw and decoded).
+ *
+ * @param {Record<string, string>} env handEnv's env
+ * @returns {string[]}
+ */
+export function secretsOf(env) {
+  const values = [env.NEON_API_KEY, env.NEON_PROJECT_ID, env.TEST_DATABASE_URL];
+  try {
+    const url = new URL(env.TEST_DATABASE_URL);
+    values.push(url.hostname, url.hostname.replace("-pooler.", "."));
+    if (url.password) {
+      values.push(url.password, decodeURIComponent(url.password));
+    }
+  } catch {
+    // Not a URL: refreshParent refuses it; the raw value is masked above.
+  }
+  return values;
+}
+
+/**
+ * refreshParent's log, made fit for a terminal, emulating a GitHub runner:
+ * an `::add-mask::` line prints nothing and masks its value as *** in every
+ * later line, as do the `seeds` from the start. Strips the workflow-command
+ * prefix from errors and warnings, which go to `err`.
  *
  * @param {(line: string) => void} out
  * @param {(line: string) => void} err
+ * @param {string[]} [seeds]
  * @returns {(line: string) => void}
  */
-export function terminalLog(out, err) {
+export function terminalLog(out, err, seeds = []) {
+  const secrets = new Set();
+  const learn = (value) => {
+    if (value) {
+      secrets.add(value);
+    }
+  };
+  for (const seed of seeds) {
+    learn(seed);
+  }
+  const mask = (line) => {
+    let masked = line;
+    // Longest first, so a URL is masked whole before its host or password.
+    for (const secret of [...secrets].sort((a, b) => b.length - a.length)) {
+      masked = masked.split(secret).join("***");
+    }
+    return masked;
+  };
   return (line) => {
     if (line.startsWith("::add-mask::")) {
+      learn(line.slice("::add-mask::".length));
       return;
     }
     if (WORKFLOW_PREFIX.test(line)) {
-      err(line.replace(WORKFLOW_PREFIX, ""));
+      err(mask(line.replace(WORKFLOW_PREFIX, "")));
       return;
     }
-    out(line);
+    out(mask(line));
   };
 }
 
@@ -238,7 +292,7 @@ export async function run(argv, processEnv, io = {}) {
   const refresh = io.refreshImpl ?? refreshParent;
   const result = await refresh(built.env, {
     ...io.refreshIo,
-    log: terminalLog(out, err),
+    log: terminalLog(out, err, secretsOf(built.env)),
     dryRun: flags.dryRun,
     byHand: true,
   });

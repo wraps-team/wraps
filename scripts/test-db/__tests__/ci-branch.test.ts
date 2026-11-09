@@ -626,7 +626,7 @@ describe("pushSchema", () => {
     h.restore();
 
     expect(result).toEqual({ exitCode: 0, status: "pushed" });
-    expect(h.connectPg).toHaveBeenCalledWith(DIRECT_URI);
+    expect(h.connectPg).toHaveBeenCalledWith(DIRECT_URI, expect.any(Function));
     expect(h.order).toEqual([
       "timeout",
       "lock",
@@ -855,6 +855,8 @@ describe("refreshParent", () => {
     branches = BRANCHES,
     endpoints = ENDPOINTS,
     stdout = "[✓] Changes applied\n",
+    // Per-spawn output, first call first; `stdout` once these run out.
+    stdouts = [] as string[],
     snapshotStatus = 201,
     apiProjectId = "proj-1",
     projectStatus = 200,
@@ -914,15 +916,17 @@ describe("refreshParent", () => {
       }),
     };
     const connectPg = vi.fn(async () => client);
+    const outputs = [...stdouts];
     const spawnImpl = vi.fn((..._args: unknown[]) => {
       order.push("push");
+      const out = outputs.shift() ?? stdout;
       const child = Object.assign(new EventEmitter(), {
         stdout: new EventEmitter(),
         stderr: new EventEmitter(),
         kill: vi.fn(),
       });
       setTimeout(() => {
-        child.stdout.emit("data", stdout);
+        child.stdout.emit("data", out);
         child.emit("close", 0);
       }, 0);
       return child;
@@ -969,7 +973,10 @@ describe("refreshParent", () => {
     const conn = h.calls.find((c) => c.path.endsWith("/connection_uri"));
     expect(conn?.search.get("branch_id")).toBe("br-parent");
     expect(conn?.search.get("pooled")).toBe("false");
-    expect(h.connectPg).toHaveBeenCalledWith(PARENT_DIRECT);
+    expect(h.connectPg).toHaveBeenCalledWith(
+      PARENT_DIRECT,
+      expect.any(Function)
+    );
     const [, , options] = h.spawnImpl.mock.calls[0] as [string, string[], any];
     expect(options.env.DATABASE_URL).toBe(PARENT_DIRECT);
     expect(h.order).toEqual(["lock", "snapshot", "push", "end"]);
@@ -988,6 +995,7 @@ describe("refreshParent", () => {
     const error = h.lines.find((l) => l.startsWith("::error::")) ?? "";
     expect(error).toContain("A rename landed on main");
     expect(error).toContain("pnpm test-db:refresh");
+    expect(error).toContain("which --force does not answer");
   });
 
   it("with --dry-run, checks the target, names the planned snapshot, and stops before the lock", async () => {
@@ -1160,8 +1168,8 @@ describe("refreshParent", () => {
   });
 
   describe("by hand (pnpm test-db:refresh)", () => {
-    function spawned(h: ReturnType<typeof refreshHarness>) {
-      const [, args, options] = h.spawnImpl.mock.calls[0] as [
+    function spawned(h: ReturnType<typeof refreshHarness>, call = 0) {
+      const [, args, options] = h.spawnImpl.mock.calls[call] as [
         string,
         string[],
         any,
@@ -1183,8 +1191,10 @@ describe("refreshParent", () => {
       expect(options.stdio).toEqual(["ignore", "pipe", "pipe"]);
     });
 
-    it("at a terminal, pushes without --force with stdio inherited, after the same snapshot under the lock", async () => {
-      const h = refreshHarness();
+    it("at a terminal, pushes without --force with stdio inherited, then confirms with a piped push, after the same snapshot under the lock", async () => {
+      const h = refreshHarness({
+        stdouts: ["", "[i] No changes detected\n"],
+      });
       const result = await refreshParent(refreshEnv, {
         ...h.io,
         byHand: true,
@@ -1193,11 +1203,39 @@ describe("refreshParent", () => {
       h.restore();
 
       expect(result).toEqual({ exitCode: 0, status: "pushed" });
-      const { args, options } = spawned(h);
-      expect(args).not.toContain("--force");
-      expect(options.stdio).toBe("inherit");
-      expect(options.env.DATABASE_URL).toBe(PARENT_DIRECT);
-      expect(h.order).toEqual(["lock", "snapshot", "push", "end"]);
+      const first = spawned(h, 0);
+      expect(first.args).not.toContain("--force");
+      expect(first.options.stdio).toBe("inherit");
+      expect(first.options.env.DATABASE_URL).toBe(PARENT_DIRECT);
+      const check = spawned(h, 1);
+      expect(check.args).not.toContain("--force");
+      expect(check.options.stdio).toEqual(["ignore", "pipe", "pipe"]);
+      expect(check.options.env.DATABASE_URL).toBe(PARENT_DIRECT);
+      expect(h.order).toEqual(["lock", "snapshot", "push", "push", "end"]);
+    });
+
+    it("at a terminal, an aborted prompt (drizzle-kit exits 0) fails red instead of reporting pushed", async () => {
+      const h = refreshHarness({
+        stdouts: [
+          "[x] All changes were aborted\n",
+          "Error: Interactive prompts require a TTY terminal (process.stdin.isTTY or process.stdout.isTTY is false).\n",
+        ],
+      });
+      const result = await refreshParent(refreshEnv, {
+        ...h.io,
+        byHand: true,
+        interactive: true,
+      });
+      h.restore();
+
+      expect(result).toEqual({ exitCode: 1, status: "failed" });
+      expect(h.spawnImpl).toHaveBeenCalledTimes(2);
+      const error = h.lines.find((l) => l.startsWith("::error::")) ?? "";
+      expect(error).toContain(
+        'If you answered "No, abort", nothing was pushed'
+      );
+      expect(error).not.toContain("--force does not answer");
+      expect(h.lines.join("\n")).not.toContain("schema pushed");
     });
 
     it("with no terminal, pushes without --force and fails red on a rename prompt", async () => {
@@ -1217,7 +1255,10 @@ describe("refreshParent", () => {
       expect(args).not.toContain("--force");
       expect(options.stdio).toEqual(["ignore", "pipe", "pipe"]);
       const error = h.lines.find((l) => l.startsWith("::error::")) ?? "";
-      expect(error).toContain("from a terminal");
+      expect(error).toContain("Re-run the same `pnpm test-db:refresh` command");
+      expect(error).toContain("rename or a data-loss statement");
+      expect(error).not.toContain("--force");
+      expect(error).not.toContain("checkout of main");
     });
 
     it("runs the same guard: refuses an unpinned project before any Neon call", async () => {

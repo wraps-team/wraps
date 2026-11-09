@@ -171,12 +171,17 @@ same `backup-*` snapshot and lock. Differences:
 
 - It reads `NEON_API_KEY`, `NEON_PROJECT_ID` and `DATABASE_URL` (as `TEST_DATABASE_URL`)
   from `apps/web/.env.test`, and names the snapshot `backup-<HEAD sha7>-<epoch seconds>`.
-- It refuses before any Neon call unless HEAD is `origin/main` (it fetches first), with
-  `--from-branch` as the one exception above, and refuses uncommitted changes under
-  `packages/db/src` or `packages/db/drizzle.config.ts`.
+- It refuses before any Neon call unless HEAD is `origin/main` (it fetches first). With
+  `--from-branch`, the one exception above, HEAD must instead contain `origin/main`
+  (rebased on it). Either way it refuses uncommitted changes under `packages/db/src` or
+  `packages/db/drizzle.config.ts`.
 - drizzle-kit runs **without** `--force`, so a hand run never auto-approves a data-loss
   statement: at a terminal you answer its rename and data-loss prompts; with no terminal
-  (an agent's shell, say) a prompt fails it red. CI keeps `--force`.
+  (an agent's shell, say) a prompt fails it red. CI keeps `--force`. drizzle-kit exits 0
+  when you answer "No, abort", so after a terminal run a second, piped push confirms
+  nothing is left to ask; if something is, the run fails red and reaps nothing.
+- At a terminal the push has no timeout and holds the parent's lock until you answer, so
+  a workflow refresh started meanwhile fails after 5 minutes. Ctrl-C releases the lock.
 - After a successful push it runs `reap-branches.mjs --self`. `--dry-run` checks the
   target, prints the planned snapshot name, and stops.
 

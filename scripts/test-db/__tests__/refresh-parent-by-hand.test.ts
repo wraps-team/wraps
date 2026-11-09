@@ -7,6 +7,7 @@ import {
   handEnv,
   parseArgs,
   run,
+  secretsOf,
   terminalLog,
 } from "../refresh-parent-by-hand.mjs";
 
@@ -57,6 +58,8 @@ function fakeGit({
   main = MAIN_SHA,
   dirty = "",
   fetchFails = false,
+  // Whether origin/main is an ancestor of HEAD (a branch rebased on main).
+  ancestor = true,
 } = {}) {
   return vi.fn((args: string[]) => {
     const cmd = args.join(" ");
@@ -71,6 +74,12 @@ function fakeGit({
     }
     if (cmd === "rev-parse origin/main") {
       return `${main}\n`;
+    }
+    if (cmd === "merge-base --is-ancestor origin/main HEAD") {
+      if (!ancestor) {
+        throw new Error("exit 1");
+      }
+      return "";
     }
     if (cmd.startsWith("status --porcelain")) {
       return dirty;
@@ -212,22 +221,44 @@ describe("checkoutProblem", () => {
     });
   });
 
-  it("with --from-branch, skips only the origin/main comparison", () => {
+  it("with --from-branch, accepts a HEAD that contains a freshly fetched origin/main", () => {
     const git = fakeGit({ head: PR_SHA });
     expect(checkoutProblem(git, { fromBranch: true })).toEqual({
       sha: PR_SHA,
     });
-    expect(git).not.toHaveBeenCalledWith([
-      "fetch",
-      "--quiet",
-      "origin",
-      "main",
+    expect(git).toHaveBeenCalledWith(["fetch", "--quiet", "origin", "main"]);
+    expect(git).toHaveBeenCalledWith([
+      "merge-base",
+      "--is-ancestor",
+      "origin/main",
+      "HEAD",
     ]);
     expect(
       checkoutProblem(fakeGit({ head: PR_SHA, dirty: " M x\n" }), {
         fromBranch: true,
       })
     ).toEqual({ problem: expect.stringContaining("uncommitted changes") });
+  });
+});
+
+describe("checkoutProblem with --from-branch", () => {
+  it("refuses a branch not rebased on origin/main", () => {
+    const result = checkoutProblem(fakeGit({ head: PR_SHA, ancestor: false }), {
+      fromBranch: true,
+    });
+    expect(result).toEqual({
+      problem: expect.stringContaining("rebase on origin/main first"),
+    });
+  });
+
+  it("refuses when origin/main cannot be fetched", () => {
+    const result = checkoutProblem(
+      fakeGit({ head: PR_SHA, fetchFails: true }),
+      { fromBranch: true }
+    );
+    expect(result).toEqual({
+      problem: expect.stringContaining("could not fetch origin/main"),
+    });
   });
 });
 
@@ -244,6 +275,42 @@ describe("terminalLog", () => {
     log("[ci-branch] fine");
     expect(out).toEqual(["[ci-branch] fine"]);
     expect(err).toEqual(["[ci-branch] refresh-parent: boom"]);
+  });
+
+  it("masks every ::add-mask:: value and every seed as *** in later lines", () => {
+    const lines: string[] = [];
+    const log = terminalLog(
+      (l) => lines.push(l),
+      (l) => lines.push(l),
+      [API_KEY]
+    );
+    log(`[x] before: ${PARENT_HOST}`);
+    log(`::add-mask::${DIRECT_URI}`);
+    log(`::add-mask::${PARENT_HOST}`);
+    log(`::error::[x] could not lock: ${DIRECT_URI}`);
+    log(`[x] key ${API_KEY}, host ${PARENT_HOST}`);
+    expect(lines).toEqual([
+      `[x] before: ${PARENT_HOST}`,
+      "[x] could not lock: ***",
+      "[x] key ***, host ***",
+    ]);
+  });
+
+  it("seeds from .env.test: key, project id, URL, its host (direct and pooled) and password", () => {
+    const built = handEnv(ENV_TEST, { sha: MAIN_SHA, runId: RUN_ID }) as {
+      env: Record<string, string>;
+    };
+    const seeds = secretsOf(built.env);
+    for (const value of [
+      API_KEY,
+      PROJECT_ID,
+      DATABASE_URL,
+      PARENT_PW,
+      PARENT_HOST,
+      "ep-fake-parent-pooler.us-east-2.aws.neon.tech",
+    ]) {
+      expect(seeds).toContain(value);
+    }
   });
 });
 
@@ -341,6 +408,51 @@ describe("run", () => {
     expect(h.lines.join("\n")).toContain("not the wraps-test project");
   });
 
+  it.each([
+    ["a DNS failure naming the host", `getaddrinfo ENOTFOUND ${PARENT_HOST}`],
+    ["a connection error carrying the URI", `connect failed for ${DIRECT_URI}`],
+    [
+      "an error carrying .env.test's URL",
+      `bad connection string ${DATABASE_URL}`,
+    ],
+  ])(
+    "masks %s in a lock failure, and neither snapshots nor reaps",
+    async (_label, message) => {
+      const h = handHarness();
+      const connectPg = vi.fn(async () => {
+        throw new Error(message);
+      });
+      const code = await run(
+        [],
+        {},
+        {
+          ...h.io,
+          refreshIo: { ...h.io.refreshIo, connectPg },
+        }
+      );
+
+      expect(code).toBe(1);
+      expect(connectPg).toHaveBeenCalled();
+      expect(h.reapImpl).not.toHaveBeenCalled();
+      const output = h.lines.join("\n");
+      expect(output).toContain("could not lock");
+      expect(output).toContain("***");
+      for (const secret of SECRETS) {
+        expect(output).not.toContain(secret);
+      }
+    }
+  );
+
+  it("--from-branch on a branch not rebased on main refuses before reading .env.test or calling Neon", async () => {
+    const h = handHarness(fakeGit({ head: PR_SHA, ancestor: false }));
+    const code = await run(["--dry-run", "--from-branch"], {}, h.io);
+
+    expect(code).toBe(1);
+    expect(h.readEnvTest).not.toHaveBeenCalled();
+    expect(h.fetchImpl).not.toHaveBeenCalled();
+    expect(h.lines.join("\n")).toContain("rebase on origin/main first");
+  });
+
   it("reaps this checkout's branch only after a real push succeeds", async () => {
     const pushed = handHarness();
     expect(
@@ -411,6 +523,24 @@ describe("run", () => {
     const h = handHarness();
     expect(await run(["--yes"], {}, h.io)).toBe(2);
     expect(h.git).not.toHaveBeenCalled();
+  });
+});
+
+describe("packages/db/drizzle.config.ts", () => {
+  it("never lets .env.local override the DATABASE_URL the guard resolved", () => {
+    // drizzle-kit loads .env.local via dotenv inside the push child.
+    // refreshParent and push-worktree hand it the guarded URL in DATABASE_URL;
+    // dotenv keeps a set variable only without `override`. With it, every
+    // hand refresh would push to the dev DB in .env.local.
+    const config = readFileSync(
+      path.resolve(
+        import.meta.dirname,
+        "../../../packages/db/drizzle.config.ts"
+      ),
+      "utf8"
+    );
+    expect(config).toContain("dotenv.config(");
+    expect(config).not.toMatch(/override/);
   });
 });
 

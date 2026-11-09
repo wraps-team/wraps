@@ -69,7 +69,7 @@ const PR_PROMPT_ADVICE =
 const PARENT_PROMPT_ADVICE =
   "A rename landed on main. Refresh the parent once by hand from a checkout of main (`pnpm test-db:refresh`) and answer the prompt; later refreshes see no diff";
 const BY_HAND_PROMPT_ADVICE =
-  "Run `pnpm test-db:refresh` from a terminal, on a checkout of main, and answer it";
+  "Re-run the same `pnpm test-db:refresh` command from a terminal and answer it";
 // Endpoint host prefixes of the prod and dev databases in the old shared
 // project. The test project must hold neither (plan 031, P1).
 const FORBIDDEN_HOST_PREFIXES = ["ep-damp-heart", "ep-autumn-block"];
@@ -108,7 +108,7 @@ const FALLBACK =
  * @property {(file: string, text: string) => void} [appendFile]
  * @property {() => Date} [now]
  * @property {typeof spawn} [spawnImpl]
- * @property {(url: string) => Promise<PgClient>} [connectPg]
+ * @property {(url: string, log?: (line: string) => void) => Promise<PgClient>} [connectPg]
  * @property {(pid: number, signal: string) => void} [killImpl]
  * @property {number} [pushTimeoutMs]
  * @property {number} [connectTimeoutMs]
@@ -541,11 +541,21 @@ function runDrizzlePush(io, directUrl, mode = {}) {
  * @param {number} code
  * @param {string} output
  * @param {string} [promptAdvice] what to do about a rename prompt
+ * @param {boolean} [forced] whether the push ran with --force (CI); without
+ *   it the question may be a data-loss one too
  * @returns {string | null}
  */
-export function pushFailure(code, output, promptAdvice = PR_PROMPT_ADVICE) {
+export function pushFailure(
+  code,
+  output,
+  promptAdvice = PR_PROMPT_ADVICE,
+  forced = true
+) {
   if (INTERACTIVE_PROMPT.test(output)) {
-    return `drizzle-kit asked whether a column or table was renamed, which --force does not answer. ${promptAdvice}`;
+    const question = forced
+      ? "drizzle-kit asked whether a column or table was renamed, which --force does not answer"
+      : "drizzle-kit asked a question (a rename or a data-loss statement) that no one can answer without a terminal";
+    return `${question}. ${promptAdvice}`;
   }
   if (code !== 0) {
     return `exit ${code}`;
@@ -556,8 +566,12 @@ export function pushFailure(code, output, promptAdvice = PR_PROMPT_ADVICE) {
   return null;
 }
 
-/** @param {string} url @returns {Promise<PgClient>} */
-async function connectPgDefault(url) {
+/**
+ * @param {string} url
+ * @param {(line: string) => void} [log]
+ * @returns {Promise<PgClient>}
+ */
+async function connectPgDefault(url, log) {
   // Imported here, not at the top: `ensure` and `delete` run before
   // `pnpm install`, when pg is not there yet.
   const { default: pg } = await import("pg");
@@ -567,10 +581,10 @@ async function connectPgDefault(url) {
   });
   // A dropped connection emits 'error'; unhandled, it would crash the step
   // with a stack trace instead of the message below.
+  // Through `log`, so a local run's terminalLog can mask it.
+  const report = log ?? ((line) => process.stderr.write(`${line}\n`));
   client.on("error", (err) => {
-    process.stderr.write(
-      `[ci-branch] database connection error: ${err.message}\n`
-    );
+    report(`[ci-branch] database connection error: ${err.message}`);
   });
   await client.connect();
   return client;
@@ -657,7 +671,7 @@ async function withPushLock(directUrl, io, label, body) {
   let client;
   try {
     client = await withTimeout(
-      connectPg(directUrl),
+      connectPg(directUrl, log),
       io.connectTimeoutMs ?? CONNECT_TIMEOUT_MS,
       "connecting to the database"
     );
@@ -702,10 +716,9 @@ async function withPushLock(directUrl, io, label, body) {
 async function checkedPush(io, directUrl, report) {
   const { label, consequence, promptAdvice = PR_PROMPT_ADVICE } = report;
   const log = logger(io);
-  const { code, output } = await runDrizzlePush(io, directUrl, {
-    force: report.force ?? true,
-  });
-  const failure = pushFailure(code, output, promptAdvice);
+  const force = report.force ?? true;
+  const { code, output } = await runDrizzlePush(io, directUrl, { force });
+  const failure = pushFailure(code, output, promptAdvice, force);
   if (failure) {
     log(
       `::error::[ci-branch] drizzle-kit push to ${label} failed: ${failure}. ${consequence}`
@@ -1071,6 +1084,11 @@ export async function refreshParent(env, io = {}) {
  * rename prompt. By hand: no `--force`; at a terminal drizzle-kit asks the
  * person directly, otherwise the prompt detection fails it.
  *
+ * drizzle-kit exits 0 when the person answers "No, abort", so an interactive
+ * exit 0 proves nothing. A second, piped push without --force checks it:
+ * after a real push it has nothing left to ask, after an abort it meets the
+ * same question and the prompt detection fails the run.
+ *
  * @param {CiIo & {byHand?: boolean, interactive?: boolean}} io
  * @param {string} directUri
  * @param {string} label
@@ -1100,9 +1118,26 @@ async function parentPush(io, directUri, label) {
     force: false,
     interactive: true,
   });
+  const log = logger(io);
   if (code !== 0) {
-    logger(io)(
+    log(
       `::error::[ci-branch] drizzle-kit push to ${label} exited ${code}. ${consequence}`
+    );
+    return false;
+  }
+  log(
+    "[ci-branch] drizzle-kit exited 0; checking with a second push, without --force, that nothing is left to ask"
+  );
+  const check = await runDrizzlePush(io, directUri, { force: false });
+  const failure = pushFailure(
+    check.code,
+    check.output,
+    BY_HAND_PROMPT_ADVICE,
+    false
+  );
+  if (failure) {
+    log(
+      `::error::[ci-branch] the push to ${label} did not finish: the check push failed (${failure}). If you answered "No, abort", nothing was pushed. ${consequence}`
     );
     return false;
   }
