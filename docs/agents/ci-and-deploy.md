@@ -161,7 +161,9 @@ no drizzle-kit is left running against the parent.
   hits the same prompt and fails. After any other failure, each run's push makes up the
   difference on its own branch.
 - `refresh-parent --dry-run` resolves and checks the target, prints the planned snapshot
-  name, and stops before snapshotting or pushing.
+  name, and stops before snapshotting or pushing. Locally, use `pnpm test-db:refresh
+  --dry-run` instead: the raw command needs `GITHUB_SHA` and `GITHUB_RUN_ID` set by hand,
+  and prints `::add-mask::` lines that carry the connection string.
 
 The hand refresh, `pnpm test-db:refresh` (`scripts/test-db/refresh-parent-by-hand.mjs`),
 runs this same `refreshParent`: the same project, endpoint and default-branch checks, the
@@ -172,8 +174,9 @@ same `backup-*` snapshot and lock. Differences:
 - It refuses before any Neon call unless HEAD is `origin/main` (it fetches first), with
   `--from-branch` as the one exception above, and refuses uncommitted changes under
   `packages/db/src` or `packages/db/drizzle.config.ts`.
-- drizzle-kit runs **without** `--force`: at a terminal you answer its rename and
-  data-loss prompts; with no terminal a prompt fails it red.
+- drizzle-kit runs **without** `--force`, so a hand run never auto-approves a data-loss
+  statement: at a terminal you answer its rename and data-loss prompts; with no terminal
+  (an agent's shell, say) a prompt fails it red. CI keeps `--force`.
 - After a successful push it runs `reap-branches.mjs --self`. `--dry-run` checks the
   target, prints the planned snapshot name, and stops.
 

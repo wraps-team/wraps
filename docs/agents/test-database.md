@@ -57,8 +57,10 @@ console (`docs/agents/ci-and-deploy.md`).
 Refresh the parent by hand (`pnpm test-db:refresh`, from a checkout of **main**) only to
 recover. It runs the same guard and snapshot as the workflow (the pinned project, no prod
 or dev endpoint, the default branch, a `backup-*` snapshot, the lock), reading its inputs
-from `apps/web/.env.test`, and refuses before any Neon call unless HEAD is `origin/main`.
-drizzle-kit runs without `--force`, so at a terminal you answer its prompts. Afterwards it
+from `apps/web/.env.test`. Before any Neon call it refuses unless HEAD is `origin/main`,
+and refuses uncommitted changes under `packages/db/src` or `packages/db/drizzle.config.ts`.
+drizzle-kit runs without `--force`, so a hand run never auto-approves a data-loss statement:
+at a terminal you answer its prompts, and with no terminal a prompt fails it red. Afterwards it
 runs `reap-branches.mjs --self` for this checkout. `pnpm test-db:refresh --dry-run`
 checks the target and prints the snapshot name without pushing. Run it when:
 

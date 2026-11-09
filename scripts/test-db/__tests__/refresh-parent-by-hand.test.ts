@@ -39,8 +39,8 @@ const SECRETS = [
   "fake-auth-secret",
 ];
 // 2026-11-09T12:00:00Z
-const NOW = new Date(1_762_689_600_000);
-const RUN_ID = "1762689600";
+const NOW = new Date(1_794_225_600_000);
+const RUN_ID = "1794225600";
 
 function jsonResponse(body: unknown, status = 200) {
   return {
@@ -368,6 +368,24 @@ describe("run", () => {
     ).toBe(1);
     expect(failed.reapImpl).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["on main", MAIN_SHA, [] as string[]],
+    ["with --from-branch", PR_SHA, ["--from-branch"]],
+  ])(
+    "with uncommitted schema edits, %s, refuses before reading .env.test or calling Neon",
+    async (_label, head, flags) => {
+      const h = handHarness(
+        fakeGit({ head, dirty: " M packages/db/src/schema/x.ts\n" })
+      );
+      const code = await run(["--dry-run", ...flags], {}, h.io);
+
+      expect(code).toBe(1);
+      expect(h.readEnvTest).not.toHaveBeenCalled();
+      expect(h.fetchImpl).not.toHaveBeenCalled();
+      expect(h.lines.join("\n")).toContain("uncommitted changes");
+    }
+  );
 
   it("refuses in CI", async () => {
     const h = handHarness();

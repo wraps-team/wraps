@@ -978,7 +978,7 @@ export async function refreshParent(env, io = {}) {
   if (!backupName) {
     return fail(
       "refused",
-      "GITHUB_SHA and GITHUB_RUN_ID must be set to name the snapshot (set them by hand for a local dry run)"
+      "GITHUB_SHA and GITHUB_RUN_ID must be set to name the snapshot (for a local dry run, use `pnpm test-db:refresh --dry-run`)"
     );
   }
 
