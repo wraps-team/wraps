@@ -76,11 +76,14 @@ named `ci-<sha7>-<run_id>-<run_attempt>` (on a PR, `sha7` is the merge commit).
     from current main the same way.
   - **The run's commit is older than the parent**: a schema change landed on main (and
     the parent) after this commit was cut. Rebase on main, or re-run on a newer commit.
-  - **The PR really renames something.** Refresh the parent from the PR rebased on main,
-    answer the prompt, and merge the PR straight away: until it merges, the parent is
-    ahead of main and every other run sees the rename in reverse.
+  - **The PR really renames something.** From the PR rebased on main, at a terminal, run
+    `pnpm test-db:refresh --from-branch`, answer the prompt, and merge the PR straight
+    away: until it merges, the parent is ahead of main and every other run sees the
+    rename in reverse.
 
   Never refresh the parent from an unmerged PR otherwise: every other run branches from it.
+  `--from-branch` exists for this case only; without it, `pnpm test-db:refresh` refuses
+  unless HEAD is `origin/main`.
 - `delete` runs in `test.yml`'s `cleanup-db-branch` job and in e2e's last step, both
   `always()`. A failed delete only warns, so it can't block the deploy; the 3h expiry
   covers it.
@@ -158,8 +161,21 @@ no drizzle-kit is left running against the parent.
   hits the same prompt and fails. After any other failure, each run's push makes up the
   difference on its own branch.
 - `refresh-parent --dry-run` resolves and checks the target, prints the planned snapshot
-  name, and stops before snapshotting or pushing. Locally it needs `GITHUB_SHA` and
-  `GITHUB_RUN_ID` set by hand.
+  name, and stops before snapshotting or pushing.
+
+The hand refresh, `pnpm test-db:refresh` (`scripts/test-db/refresh-parent-by-hand.mjs`),
+runs this same `refreshParent`: the same project, endpoint and default-branch checks, the
+same `backup-*` snapshot and lock. Differences:
+
+- It reads `NEON_API_KEY`, `NEON_PROJECT_ID` and `DATABASE_URL` (as `TEST_DATABASE_URL`)
+  from `apps/web/.env.test`, and names the snapshot `backup-<HEAD sha7>-<epoch seconds>`.
+- It refuses before any Neon call unless HEAD is `origin/main` (it fetches first), with
+  `--from-branch` as the one exception above, and refuses uncommitted changes under
+  `packages/db/src` or `packages/db/drizzle.config.ts`.
+- drizzle-kit runs **without** `--force`: at a terminal you answer its rename and
+  data-loss prompts; with no terminal a prompt fails it red.
+- After a successful push it runs `reap-branches.mjs --self`. `--dry-run` checks the
+  target, prints the planned snapshot name, and stops.
 
 ## A red `test-api`/`test-web` on the shared database is usually contention
 

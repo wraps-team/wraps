@@ -19,7 +19,6 @@
     "build": "tsdown",
     "test": "vitest run",
     "db:push": "drizzle-kit push",
-    "db:push:test": "dotenv -e ../../apps/web/.env.test -- pnpm --filter=@wraps/db db:push",
     "db:studio": "drizzle-kit studio",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

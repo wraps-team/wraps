@@ -55,7 +55,12 @@ If a refresh damaged the parent's data, restore the parent from that branch in t
 console (`docs/agents/ci-and-deploy.md`).
 
 Refresh the parent by hand (`pnpm test-db:refresh`, from a checkout of **main**) only to
-recover:
+recover. It runs the same guard and snapshot as the workflow (the pinned project, no prod
+or dev endpoint, the default branch, a `backup-*` snapshot, the lock), reading its inputs
+from `apps/web/.env.test`, and refuses before any Neon call unless HEAD is `origin/main`.
+drizzle-kit runs without `--force`, so at a terminal you answer its prompts. Afterwards it
+runs `reap-branches.mjs --self` for this checkout. `pnpm test-db:refresh --dry-run`
+checks the target and prints the snapshot name without pushing. Run it when:
 
 - **The refresh run failed on a rename.** drizzle-kit asks whether a column or table was
   renamed, which no runner can answer. Run it by hand once and answer the prompt; later
@@ -68,7 +73,9 @@ that needs main's schema: a `wt-*` branch cut while a refresh was running keeps 
 schema.
 
 Never refresh the parent from an unmerged PR; the one exception is a real rename that CI
-can't get past, covered in `docs/agents/ci-and-deploy.md`.
+can't get past: `pnpm test-db:refresh --from-branch` from the PR rebased on main, then
+merge it straight away (`docs/agents/ci-and-deploy.md`). The flag lifts only the main
+check; the rest of the guard still runs.
 
 ## After a schema change merges: re-cut your branch
 
@@ -101,11 +108,9 @@ refuses anything that isn't `wt-*` or is the project's default branch, and runs
 renames and data loss, and you answer. With no terminal (an agent's shell, say) a prompt
 fails it red instead. To return to main's schema afterwards, `reap-branches.mjs --self`.
 
-Don't run `pnpm test-db:refresh` or `db:push:test` from a PR: both push to the shared
-parent, putting it ahead of main, and then every other run, main's included, hits
-drizzle-kit's rename prompt and fails.
+Don't refresh the parent from a PR (`pnpm test-db:refresh` refuses off main;
+`--from-branch` is only for a real rename): it puts the parent ahead of main, and then
+every other run, main's included, hits drizzle-kit's rename prompt and fails.
 
-Neither `db:push` nor `db:push:test` reaches the branch your tests read. `db:push`
-targets the dev DB in `.env.local`; `db:push:test` targets the raw `DATABASE_URL` in
-`.env.test`, the shared *parent*. Tests still failing `42703` after either push is this
-gap, not a broken push.
+`db:push` doesn't reach the branch your tests read either: it targets the dev DB in
+`.env.local`. Tests still failing `42703` after it is this gap, not a broken push.

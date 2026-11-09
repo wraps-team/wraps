@@ -12,6 +12,8 @@
 //   node scripts/test-db/ci-branch.mjs refresh-parent [--dry-run]
 //       push main's schema to the project's default branch, the parent every
 //       branch is cut from (refresh-test-parent.yml, on schema changes to main)
+//       (`pnpm test-db:refresh` runs the same function by hand, through
+//       refresh-parent-by-hand.mjs)
 //
 // The branch is `ci-<sha7>-<run_id>-<run_attempt>`. Every DB job of a run
 // computes the same name and runs `ensure` itself, so the jobs converge on one
@@ -63,9 +65,11 @@ const CONNECT_TIMEOUT_MS = 30_000;
 // drizzle-kit needs only DATABASE_URL.
 const CHILD_ENV_STRIPPED = ["NEON_API_KEY", "TEST_DATABASE_URL"];
 const PR_PROMPT_ADVICE =
-  "This branch's schema and the wraps-test parent differ in a way drizzle-kit reads as a possible rename. One of four things: (1) the parent is behind main, because the latest Refresh test parent run failed: refresh it from current main (`pnpm test-db:refresh` on main, or re-run that workflow); (2) the parent is ahead of main, because someone pushed an unmerged schema to it: refresh it from current main the same way; (3) this run's commit is older than a schema change already on main and the parent: rebase on main, or re-run on a newer commit; (4) this PR really renames a column or table: refresh the parent from this PR rebased on main, then merge the PR straight away, since until then the parent is ahead of every other run";
+  "This branch's schema and the wraps-test parent differ in a way drizzle-kit reads as a possible rename. One of four things: (1) the parent is behind main, because the latest Refresh test parent run failed: refresh it from current main (`pnpm test-db:refresh` on main, or re-run that workflow); (2) the parent is ahead of main, because someone pushed an unmerged schema to it: refresh it from current main the same way; (3) this run's commit is older than a schema change already on main and the parent: rebase on main, or re-run on a newer commit; (4) this PR really renames a column or table: from this PR rebased on main, run `pnpm test-db:refresh --from-branch` at a terminal and answer the prompt, then merge the PR straight away, since until then the parent is ahead of every other run";
 const PARENT_PROMPT_ADVICE =
   "A rename landed on main. Refresh the parent once by hand from a checkout of main (`pnpm test-db:refresh`) and answer the prompt; later refreshes see no diff";
+const BY_HAND_PROMPT_ADVICE =
+  "Run `pnpm test-db:refresh` from a terminal, on a checkout of main, and answer it";
 // Endpoint host prefixes of the prod and dev databases in the old shared
 // project. The test project must hold neither (plan 031, P1).
 const FORBIDDEN_HOST_PREFIXES = ["ep-damp-heart", "ep-autumn-block"];
@@ -947,8 +951,14 @@ async function snapshotParent(opts, target) {
  * fallback: it gates nothing, so it fails red. `dryRun` resolves and checks
  * the target, prints the planned snapshot name, and stops before the lock.
  *
+ * `byHand` (`pnpm test-db:refresh`): the same checks, snapshot and lock, but
+ * drizzle-kit runs WITHOUT --force, so a person answers its rename and
+ * data-loss prompts. At a terminal (`interactive`, default: stdin and stdout
+ * are TTYs) the prompts reach them; with no terminal the prompt detection
+ * fails it red, as in CI.
+ *
  * @param {Record<string, string | undefined>} env
- * @param {CiIo & {dryRun?: boolean}} [io]
+ * @param {CiIo & {dryRun?: boolean, byHand?: boolean, interactive?: boolean}} [io]
  * @returns {Promise<{exitCode: number, status: "pushed" | "checked" | "refused" | "failed"}>}
  */
 export async function refreshParent(env, io = {}) {
@@ -1047,18 +1057,56 @@ export async function refreshParent(env, io = {}) {
     log(
       `[ci-branch] snapshot ${backupName} is ready; restore the parent from it in the Neon console if this push goes wrong`
     );
-    const ok = await checkedPush(io, directUri, {
-      label,
-      consequence:
-        "New ci-* branches start from the old schema, and each run's own push makes up the difference until the parent is refreshed",
-      promptAdvice: PARENT_PROMPT_ADVICE,
-    });
+    const ok = await parentPush(io, directUri, label);
     if (!ok) {
       return { exitCode: 1, status: "failed" };
     }
     log(`[ci-branch] schema pushed to ${label}`);
     return { exitCode: 0, status: "pushed" };
   });
+}
+
+/**
+ * The push step of `refreshParent`. In CI: `--force`, output read for the
+ * rename prompt. By hand: no `--force`; at a terminal drizzle-kit asks the
+ * person directly, otherwise the prompt detection fails it.
+ *
+ * @param {CiIo & {byHand?: boolean, interactive?: boolean}} io
+ * @param {string} directUri
+ * @param {string} label
+ * @returns {Promise<boolean>}
+ */
+async function parentPush(io, directUri, label) {
+  const consequence =
+    "New ci-* branches start from the old schema, and each run's own push makes up the difference until the parent is refreshed";
+  if (!io.byHand) {
+    return await checkedPush(io, directUri, {
+      label,
+      consequence,
+      promptAdvice: PARENT_PROMPT_ADVICE,
+    });
+  }
+  const interactive =
+    io.interactive ?? Boolean(process.stdin.isTTY && process.stdout.isTTY);
+  if (!interactive) {
+    return await checkedPush(io, directUri, {
+      label,
+      consequence,
+      promptAdvice: BY_HAND_PROMPT_ADVICE,
+      force: false,
+    });
+  }
+  const { code } = await runDrizzlePush(io, directUri, {
+    force: false,
+    interactive: true,
+  });
+  if (code !== 0) {
+    logger(io)(
+      `::error::[ci-branch] drizzle-kit push to ${label} exited ${code}. ${consequence}`
+    );
+    return false;
+  }
+  return true;
 }
 
 /**

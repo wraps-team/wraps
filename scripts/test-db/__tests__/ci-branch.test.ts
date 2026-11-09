@@ -1159,6 +1159,81 @@ describe("refreshParent", () => {
     expect(h.calls).toEqual([]);
   });
 
+  describe("by hand (pnpm test-db:refresh)", () => {
+    function spawned(h: ReturnType<typeof refreshHarness>) {
+      const [, args, options] = h.spawnImpl.mock.calls[0] as [
+        string,
+        string[],
+        any,
+      ];
+      return { args, options };
+    }
+
+    it("in CI, ignores `interactive`: still --force, output piped and read for the prompt", async () => {
+      const h = refreshHarness();
+      const result = await refreshParent(refreshEnv, {
+        ...h.io,
+        interactive: true,
+      });
+      h.restore();
+
+      expect(result).toEqual({ exitCode: 0, status: "pushed" });
+      const { args, options } = spawned(h);
+      expect(args).toContain("--force");
+      expect(options.stdio).toEqual(["ignore", "pipe", "pipe"]);
+    });
+
+    it("at a terminal, pushes without --force with stdio inherited, after the same snapshot under the lock", async () => {
+      const h = refreshHarness();
+      const result = await refreshParent(refreshEnv, {
+        ...h.io,
+        byHand: true,
+        interactive: true,
+      });
+      h.restore();
+
+      expect(result).toEqual({ exitCode: 0, status: "pushed" });
+      const { args, options } = spawned(h);
+      expect(args).not.toContain("--force");
+      expect(options.stdio).toBe("inherit");
+      expect(options.env.DATABASE_URL).toBe(PARENT_DIRECT);
+      expect(h.order).toEqual(["lock", "snapshot", "push", "end"]);
+    });
+
+    it("with no terminal, pushes without --force and fails red on a rename prompt", async () => {
+      const h = refreshHarness({
+        stdout:
+          "Error: Interactive prompts require a TTY terminal (process.stdin.isTTY or process.stdout.isTTY is false).\n",
+      });
+      const result = await refreshParent(refreshEnv, {
+        ...h.io,
+        byHand: true,
+        interactive: false,
+      });
+      h.restore();
+
+      expect(result).toEqual({ exitCode: 1, status: "failed" });
+      const { args, options } = spawned(h);
+      expect(args).not.toContain("--force");
+      expect(options.stdio).toEqual(["ignore", "pipe", "pipe"]);
+      const error = h.lines.find((l) => l.startsWith("::error::")) ?? "";
+      expect(error).toContain("from a terminal");
+    });
+
+    it("runs the same guard: refuses an unpinned project before any Neon call", async () => {
+      const h = refreshHarness();
+      const result = await refreshParent(
+        { ...refreshEnv, NEON_PROJECT_ID: "proj-elsewhere" },
+        { ...h.io, byHand: true, interactive: true }
+      );
+      h.restore();
+
+      expect(result).toEqual({ exitCode: 1, status: "refused" });
+      expect(h.calls).toEqual([]);
+      expect(h.spawnImpl).not.toHaveBeenCalled();
+    });
+  });
+
   describe("project identity", () => {
     it("pins the wraps-test project by the sha256 of its id", () => {
       // The live `refresh-parent --dry-run` proves this is the right digest;
