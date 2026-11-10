@@ -25,11 +25,15 @@ import {
   type ActiveRuleSetRead,
   addDomainToReceiptRule,
   confirmRuleSetActivation,
+  deactivatedRuleSetName,
   describeInboundReceiptRule,
+  describeRuleSetActivation,
   describeRuleSetDeactivation,
   type ExpectedActiveRuleSet,
   getReceiptRuleDomains,
+  inboundInitRecoveryCommand,
   REPLACE_NO_RULE_SET,
+  type RuleSetActivation,
   readActiveReceiptRuleSet,
   removeDomainFromReceiptRule,
 } from "../../utils/email/receipt-rules.js";
@@ -155,6 +159,8 @@ async function replyInitForSingleDomain(params: {
   parameterArn: string;
   parameterName: string;
   dnsAutoCreated: boolean;
+  /** The active-set read taken before this domain's rule write activated wraps-inbound-rules, or null. */
+  activationRead: ActiveRuleSetRead | null;
 }> {
   const {
     domain,
@@ -248,16 +254,31 @@ async function replyInitForSingleDomain(params: {
   // Register r.mail.{domain} in the catch-all receipt rule.
   const bucketName =
     emailConfig.inbound?.bucketName || `wraps-inbound-${accountId}-${region}`;
+  // The fallback write recreates and activates the set when the rule is
+  // missing. If the active set changed by then, this domain is already saved
+  // and deployed, so a reply init re-run can't reach the activation: the
+  // recovery re-activates through inbound init.
+  const activation: RuleSetActivation = {
+    expected: params.expectedActive,
+    inPlace: `reply threading for ${domain} is saved and its stack deployed (the signing secret is in SSM), and wraps-inbound-rules and its receipt rule (listing r.mail.${domain}) were created but are inactive; DNS records for r.mail.${domain} were not written.`,
+    recovery: inboundInitRecoveryCommand(
+      region,
+      emailConfig.inbound,
+      emailConfig.inboundDomains
+    ),
+    afterRecovery: `Then add the r.mail.${domain} DNS records (MX 10 inbound-smtp.${region}.amazonaws.com, and TXT "v=spf1 include:amazonses.com ~all"); wraps email reply status checks the MX record.`,
+  };
+  let activationRead: ActiveRuleSetRead | null = null;
   await progress.execute(
     `Adding r.mail.${domain} to receipt rule`,
     async () => {
-      await addDomainToReceiptRule(
+      activationRead = await addDomainToReceiptRule(
         region,
         accountId,
         `r.mail.${domain}`,
         bucketName,
         getInboundTrigger(metadata),
-        params.expectedActive
+        activation
       );
     }
   );
@@ -353,6 +374,7 @@ async function replyInitForSingleDomain(params: {
     parameterArn: paramInfo.parameterArn,
     parameterName: paramInfo.parameterName,
     dnsAutoCreated,
+    activationRead,
   };
 }
 
@@ -549,6 +571,7 @@ export async function replyInit(options: EmailReplyInitOptions): Promise<void> {
     parameterArn: string;
     parameterName: string;
     dnsAutoCreated: boolean;
+    activationRead: ActiveRuleSetRead | null;
   }> = [];
   for (const domain of targetDomains) {
     // Reload metadata between domains (the earlier loop iteration saves to
@@ -570,6 +593,15 @@ export async function replyInit(options: EmailReplyInitOptions): Promise<void> {
     results.push({ domain, ...result });
   }
 
+  // At most one domain's write activates the set (the first that finds the
+  // rule missing); the rest find it in place.
+  const activationRead =
+    results.find((r) => r.activationRead !== null)?.activationRead ?? null;
+  const activationNote = describeRuleSetActivation(activationRead);
+  if (activationNote) {
+    clack.log.warn(activationNote);
+  }
+
   if (isJsonMode()) {
     jsonSuccess("email.reply.init", {
       enabled: results.map((r) => ({
@@ -579,6 +611,7 @@ export async function replyInit(options: EmailReplyInitOptions): Promise<void> {
         dnsAutoCreated: r.dnsAutoCreated,
       })),
       region,
+      deactivatedRuleSet: deactivatedRuleSetName(activationRead),
     });
     return;
   }

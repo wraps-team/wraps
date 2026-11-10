@@ -27,10 +27,10 @@ import {
 import * as clack from "@clack/prompts";
 import { INBOUND_LEGACY_PREFIX, INBOUND_MAIL_PREFIX } from "@wraps/core";
 import pc from "picocolors";
-import type { InboundTrigger } from "../../types/index.js";
+import type { InboundDomain, InboundTrigger } from "../../types/index.js";
 import { errors } from "../shared/errors.js";
 import { isJsonMode } from "../shared/json-output.js";
-import { ensureInteractive } from "../shared/prompts.js";
+import { isInteractive } from "../shared/prompts.js";
 import {
   INBOUND_PROCESSOR_FUNCTION_NAME,
   inboundProcessorArn,
@@ -409,6 +409,76 @@ export function wouldDeactivateAnotherRuleSet(
  */
 export type ExpectedActiveRuleSet = ActiveRuleSetRead;
 
+/**
+ * What an activation needs: the set it may replace, plus what to tell the
+ * user if the active set changed before the activation (by then the run has
+ * already deployed, saved or written the rule, so the refusal must say what
+ * is in place and how to be asked again).
+ */
+export type RuleSetActivation = {
+  expected: ExpectedActiveRuleSet;
+  /** What this run already changed by the time it activates. */
+  inPlace: string;
+  /** A command that asks again and keeps the saved inbound config. */
+  recovery: string;
+  /** Anything left to do after the recovery command. */
+  afterRecovery?: string;
+};
+
+/**
+ * `wraps email inbound init` for the saved primary inbound domain: it
+ * re-applies the saved config (the init path merges the saved inbound block)
+ * and activates wraps-inbound-rules over an existing rule, asking first when
+ * another set is active. No `--yes`, so it asks.
+ */
+export function inboundInitRecoveryCommand(
+  region: string,
+  inbound: { subdomain?: string; receivingDomain?: string } | undefined,
+  inboundDomains: InboundDomain[] | undefined
+): string {
+  const subdomain = inbound?.subdomain ?? "";
+  const receivingDomain = inbound?.receivingDomain ?? "";
+  const parent =
+    inboundDomains?.find((d) => d.receivingDomain === receivingDomain)
+      ?.parentDomain ??
+    (subdomain && receivingDomain.startsWith(`${subdomain}.`)
+      ? receivingDomain.slice(subdomain.length + 1)
+      : receivingDomain);
+  const label = subdomain ? `--subdomain ${subdomain}` : "--root";
+  return `wraps email inbound init --domain ${parent} ${label} --region ${region}`;
+}
+
+/**
+ * The set an activation deactivated, from the read taken just before it:
+ * its name, or null when none was (none active, ours, or unreadable).
+ */
+export function deactivatedRuleSetName(
+  before: ActiveRuleSetRead | null
+): string | null {
+  return before?.readable &&
+    before.name !== null &&
+    before.name !== RULE_SET_NAME
+    ? before.name
+    : null;
+}
+
+/**
+ * The line a command prints after activating, or null when it deactivated
+ * nothing (or didn't activate).
+ */
+export function describeRuleSetActivation(
+  before: ActiveRuleSetRead | null
+): string | null {
+  if (!before) {
+    return null;
+  }
+  if (!before.readable) {
+    return `Activated ${RULE_SET_NAME}; the previously active receipt rule set could not be read (${before.error}) and, if there was one, is now inactive.`;
+  }
+  const name = deactivatedRuleSetName(before);
+  return name ? `Deactivated receipt rule set ${name}.` : null;
+}
+
 /** Consent to replace nothing: activation only proceeds if no other set is active. */
 export const REPLACE_NO_RULE_SET: ExpectedActiveRuleSet = {
   readable: true,
@@ -438,8 +508,8 @@ export function activeRuleSetMatchesExpected(
  *
  * - No other set active (none, or ours): nothing to ask.
  * - Another set active, or unreadable: `--replace-active-rule-set` is
- *   consent; otherwise `--yes`/`--json` refuse, and an interactive run asks
- *   (default No). Declining exits without changing anything.
+ *   consent; otherwise `--yes`/`--json` (or no terminal to ask in) refuse,
+ *   naming the set, and an interactive run asks (default No). Declining exits without changing anything.
  */
 export async function confirmRuleSetActivation(params: {
   region: string;
@@ -451,13 +521,10 @@ export async function confirmRuleSetActivation(params: {
   if (!wouldDeactivateAnotherRuleSet(read) || params.replaceActiveRuleSet) {
     return read;
   }
-  if (params.yes || isJsonMode()) {
+  // No prompt possible (--yes, --json, or no TTY): refuse, naming the set.
+  if (params.yes || isJsonMode() || !isInteractive()) {
     throw errors.receiptRuleSetConflict({ region, active: read });
   }
-  ensureInteractive(
-    "Consent to deactivate the active receipt rule set",
-    "--replace-active-rule-set (only after the AWS account owner agrees)"
-  );
   const confirmed = await clack.confirm({
     message: read.readable
       ? `Receipt rule set ${pc.yellow(read.name ?? "")} is active in ${region}. SES allows one active set per region, so activating ${pc.cyan(RULE_SET_NAME)} deactivates it and its rules stop applying to incoming mail. Deactivate it?`
@@ -488,14 +555,15 @@ export function describeRuleSetDeactivation(
 
 /**
  * Set the active receipt rule set, if the set active right now is one the
- * user agreed to replace (`expected`, from the preflight). Re-reads the
- * active set first and refuses, without activating, if it changed.
+ * user agreed to replace (`activation.expected`, from the preflight).
+ * Re-reads the active set first and refuses, without activating, if it
+ * changed; the refusal carries the activation's recovery text.
  * Returns the read taken just before activating.
  */
 export async function setActiveReceiptRuleSet(
   region: string,
   ruleSetName: string,
-  expected: ExpectedActiveRuleSet
+  activation: RuleSetActivation
 ): Promise<ActiveRuleSetRead> {
   const ses = createSESClient(region);
 
@@ -506,11 +574,11 @@ export async function setActiveReceiptRuleSet(
     return current;
   }
 
-  if (!activeRuleSetMatchesExpected(current, expected)) {
+  if (!activeRuleSetMatchesExpected(current, activation.expected)) {
     throw errors.receiptRuleSetConflict({
       region,
       active: current,
-      changedSincePreflight: true,
+      late: activation,
     });
   }
 
@@ -583,7 +651,9 @@ export async function deleteReceiptRuleSet(region: string): Promise<void> {
  * Add a domain to the existing receipt rule's Recipients list, keeping its
  * actions. If the rule or rule set doesn't exist, creates them with this
  * domain and the actions for `trigger` (the mode the most recent deploy used),
- * and activates the set if the active one matches `expectedActive`.
+ * and activates the set if the active one matches `activation.expected`.
+ * Returns the read taken just before activating, or null when it didn't
+ * activate (the rule was already there).
  */
 export async function addDomainToReceiptRule(
   region: string,
@@ -591,8 +661,8 @@ export async function addDomainToReceiptRule(
   domain: string,
   s3BucketName: string,
   trigger: InboundTrigger,
-  expectedActive: ExpectedActiveRuleSet
-): Promise<void> {
+  activation: RuleSetActivation
+): Promise<ActiveRuleSetRead | null> {
   const described = await describeInboundReceiptRule(region);
 
   if (!described) {
@@ -600,13 +670,12 @@ export async function addDomainToReceiptRule(
     // a set the user agreed to replace (plan 048).
     await createReceiptRuleSet(region);
     await createReceiptRule(region, accountId, domain, s3BucketName, trigger);
-    await setActiveReceiptRuleSet(region, RULE_SET_NAME, expectedActive);
-    return;
+    return await setActiveReceiptRuleSet(region, RULE_SET_NAME, activation);
   }
 
   const existingRecipients = described.Recipients ?? [];
   if (existingRecipients.includes(domain)) {
-    return; // Already present
+    return null; // Already present
   }
 
   await sendRuleUpdate(
@@ -615,6 +684,7 @@ export async function addDomainToReceiptRule(
       Recipients: [...existingRecipients, domain],
     })
   );
+  return null;
 }
 
 /**

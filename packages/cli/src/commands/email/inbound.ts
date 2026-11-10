@@ -34,14 +34,18 @@ import {
   confirmRuleSetActivation,
   createReceiptRule,
   createReceiptRuleSet,
+  deactivatedRuleSetName,
   deleteReceiptRule,
   deleteReceiptRuleSet,
   describeInboundReceiptRule,
+  describeRuleSetActivation,
   describeRuleSetDeactivation,
   getActiveReceiptRuleSet,
+  inboundInitRecoveryCommand,
   REPLACE_NO_RULE_SET,
   RULE_NAME,
   RULE_SET_NAME,
+  type RuleSetActivation,
   readActiveReceiptRuleSet,
   removeDomainFromReceiptRule,
   setActiveReceiptRuleSet,
@@ -566,6 +570,7 @@ export async function inboundInit(
   });
 
   // 15. Create SES Receipt Rules via AWS SDK
+  let activationRead: ActiveRuleSetRead | null = null;
   await progress.execute("Creating SES receipt rules", async () => {
     await createReceiptRuleSet(region);
     await createReceiptRule(
@@ -577,22 +582,24 @@ export async function inboundInit(
     );
 
     // Activate rule set, only over the set agreed to at step 10b: it
-    // re-reads the active set and refuses if that changed.
-    const previousActive = await setActiveReceiptRuleSet(
-      region,
-      RULE_SET_NAME,
-      expectedActive
-    );
-    if (!previousActive.readable) {
-      clack.log.warn(
-        `Activated ${pc.cyan(RULE_SET_NAME)}; the previously active receipt rule set could not be read (${previousActive.error}) and, if there was one, is now inactive.`
-      );
-    } else if (previousActive.name && previousActive.name !== RULE_SET_NAME) {
-      clack.log.warn(
-        `Deactivated previous receipt rule set: ${pc.yellow(previousActive.name)}`
-      );
-    }
+    // re-reads the active set and refuses if that changed. The 14b save
+    // already holds this run's inbound config, so the recovery re-runs init
+    // with it.
+    const savedConfig = metadata.services.email?.config;
+    activationRead = await setActiveReceiptRuleSet(region, RULE_SET_NAME, {
+      expected: expectedActive,
+      inPlace: `the inbound stack is deployed and its configuration saved, and wraps-inbound-rules holds the receipt rule for ${receivingDomain} but is inactive. DNS records were not written.`,
+      recovery: inboundInitRecoveryCommand(
+        region,
+        savedConfig?.inbound,
+        savedConfig?.inboundDomains
+      ),
+    });
   });
+  const activationNote = describeRuleSetActivation(activationRead);
+  if (activationNote) {
+    clack.log.warn(activationNote);
+  }
 
   // 15. DNS Configuration - auto-create or show manual records
   let dnsAutoCreated = false;
@@ -784,6 +791,7 @@ export async function inboundInit(
       dnsAutoCreated,
       region,
       trigger: finalTrigger,
+      deactivatedRuleSet: deactivatedRuleSetName(activationRead),
     });
     return;
   }
@@ -1969,29 +1977,48 @@ export async function inboundAdd(
     }
   }
 
+  // Only the rule write that recreates the rule activates the set; if the
+  // active set changed by then, nothing of this add is saved yet, so the
+  // recovery re-activates through init and then re-runs this add.
+  const activation: RuleSetActivation = {
+    expected: expectedActive,
+    inPlace: `wraps-inbound-rules and its receipt rule (listing ${receivingDomain}) were created but are inactive; ${receivingDomain} was not saved and its DNS records were not written.`,
+    recovery: inboundInitRecoveryCommand(
+      region,
+      emailConfig.inbound,
+      emailConfig.inboundDomains
+    ),
+    afterRecovery: `Then finish adding ${receivingDomain}:\n  wraps email inbound add --domain ${parentDomain} ${subdomain ? `--subdomain ${subdomain}` : "--root"} --region ${region}`,
+  };
+  let activationRead: ActiveRuleSetRead | null = null;
   await progress.execute("Updating SES receipt rule", async () => {
-    await addDomainToReceiptRule(
+    activationRead = await addDomainToReceiptRule(
       region,
       identity.accountId,
       receivingDomain,
       bucketName,
       getInboundTrigger(metadata),
-      expectedActive
+      activation
     );
     // If reply-threading is enabled globally, also register r.mail.{parent}
     // as a catch-all recipient so signed-reply addresses route into the same
     // Lambda pipeline.
     if (replyThreadingEnabled) {
-      await addDomainToReceiptRule(
-        region,
-        identity.accountId,
-        `r.mail.${parentDomain}`,
-        bucketName,
-        getInboundTrigger(metadata),
-        expectedActive
-      );
+      activationRead =
+        (await addDomainToReceiptRule(
+          region,
+          identity.accountId,
+          `r.mail.${parentDomain}`,
+          bucketName,
+          getInboundTrigger(metadata),
+          activation
+        )) ?? activationRead;
     }
   });
+  const activationNote = describeRuleSetActivation(activationRead);
+  if (activationNote) {
+    clack.log.warn(activationNote);
+  }
 
   // 10. DNS automation
   let dnsAutoCreated = false;
@@ -2189,6 +2216,7 @@ export async function inboundAdd(
       dnsAutoCreated,
       region,
       trigger: getInboundTrigger(metadata),
+      deactivatedRuleSet: deactivatedRuleSetName(activationRead),
     });
     return;
   }
