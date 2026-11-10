@@ -73,6 +73,9 @@ export function createInboundRouter(config: ServerConfig): Router {
               attachmentCount: parsed.attachments?.length || 0,
               spamVerdict: parsed.spamVerdict,
               virusVerdict: parsed.virusVerdict,
+              envelopeRecipients: Array.isArray(parsed.envelopeRecipients)
+                ? parsed.envelopeRecipients
+                : undefined,
             };
           } catch {
             // Skip malformed entries

@@ -117,6 +117,7 @@ wraps email check [domain]    Deliverability audit (DKIM, SPF, DMARC, blacklists
 wraps email verify            Verify domain DNS records
 wraps email config            Apply CLI updates to infrastructure
 wraps email upgrade           Add features (tracking, history, archiving)
+wraps email upgrade --action redeploy   Redeploy the saved configuration with the current CLI; also performs a pending inbound trigger switch (skips the CLI's DNS steps; works with --yes; --preview first)
 wraps email restore           Restore from saved metadata
 wraps email destroy           Remove all email infrastructure
 ```
@@ -135,9 +136,11 @@ wraps email domains remove    Remove domain from SES
 
 ```
 wraps email inbound init      Enable inbound email receiving
-wraps email inbound status    Show inbound status
+wraps email inbound status    Show inbound status and trigger mode; flags trigger mismatches (with the redeploy repair command where a redeploy fixes them), warns when another receipt rule set is active, and shows the dead-letter queue depth (with the reprocess command when it is not zero)
+wraps email inbound add       Add a receiving domain (--preview shows changes without applying)
 wraps email inbound verify    Verify inbound DNS records
 wraps email inbound test      Send test and verify receipt
+wraps email inbound reprocess Replay emails from the inbound dead-letter queue [--dry-run] [--max <n>] [--yes] [--json]
 wraps email inbound destroy   Remove inbound infrastructure
 ```
 
@@ -251,6 +254,7 @@ Commands that send email, make a live change or delete data refuse to run withou
 - `workflows trigger`, `workflows enable`, `workflows retry`, `workflows cancel`
 - `email agent approvals approve`, `email agent approvals reject`
 - `brand-kits delete`
+- `email inbound reprocess` prompts when interactive, and needs `--yes` in a non-interactive shell or with `--json` (not with `--dry-run`)
 
 Exceptions. `email templates pull` fetches without `--yes`, but refuses to overwrite existing local files unless `--yes` is given. `contacts export --output` and `audit-logs export --output` also refuse to overwrite an existing file unless `--yes` is given. `workflows disable` needs no `--yes` because it only stops future runs. `broadcasts duplicate` and `broadcasts update` are not destructive and need no `--yes`.
 
@@ -327,7 +331,7 @@ Flags for `email logs` are not covered in this section.
 Reads the emails that each connected AWS account's SES inbound bucket has received. Wraps stores nothing: the emails are read live from the customer's account. Attachments are listed as metadata only, and their contents cannot be downloaded.
 
 - `wraps email inbound list [--account <id>] [--limit <n>] [--cursor <c>]`. Lists one page. `--limit` is 1-100 (default 20). Results come in S3 key order, not received time, so the newest email is not necessarily first. A page can be empty, or hold fewer than `--limit` entries, while `nextCursor` is still set. Keep going until it is null. The cursor is opaque. `--account` takes the Wraps account id that `wraps email health` lists. The REST route also returns `deniedAccountIds` and `unreachableAccountIds`; when either is not empty, the listing is incomplete.
-- `wraps email inbound get <emailId> [--account <id>] [--json]`. Shows one email: headers, text body, HTML body and attachment metadata. Without `--account`, every account is tried in order and the first match is returned. `htmlTruncated` is true when the HTML body was longer than 200 KB and was cut, so read `text` as well. `html` is null when the email has no HTML part.
+- `wraps email inbound get <emailId> [--account <id>] [--json]`. Shows one email: headers, text body, HTML body and attachment metadata. Without `--account`, every account is tried in order and the first match is returned. `htmlTruncated` is true when the HTML body was longer than 200 KB and was cut, so read `text` as well. `html` is null when the email has no HTML part. `envelopeRecipients` (lowercased SMTP envelope recipients, Bcc included) is present on mail received after `wraps email upgrade` and absent before it; absent means unknown.
 
 ### Broadcasts
 
@@ -468,8 +472,8 @@ Every segments route needs the Pro plan, reads included. A Free organization get
 
 ### Inbound email
 
-- `GET /v1/email/inbound`: one page of parsed inbound emails, read live from the inbound bucket in each connected AWS account. Query `awsAccountId` (one account only; 404 when it is not in the organization), `limit` (1-100, default 20) and `cursor`. Pass `nextCursor` back unchanged as `cursor`; it is null on the last page. A page can hold fewer than `limit` entries, or none, while `nextCursor` is set. Results are in S3 key order, not received time. `deniedAccountIds` lists accounts that refused access and `unreachableAccountIds` lists accounts that could not be read; the listing is incomplete when either is not empty. Attachments are metadata only. Requires authentication only.
-- `GET /v1/email/inbound/{emailId}`: one parsed inbound email. Query `awsAccountId`. Without it, every account is tried in account id order and the first match is returned. Returns 404 when no account read has the email, or when `awsAccountId` is not in the organization. `htmlTruncated: true` means the HTML body was cut to a 200 KB prefix when it was received, so `html` may be incomplete markup. `html` is null when the email has no HTML part. No endpoint downloads attachment contents. Requires authentication only.
+- `GET /v1/email/inbound`: one page of parsed inbound emails, read live from the inbound bucket in each connected AWS account. Query `awsAccountId` (one account only; 404 when it is not in the organization), `limit` (1-100, default 20) and `cursor`. Pass `nextCursor` back unchanged as `cursor`; it is null on the last page. A page can hold fewer than `limit` entries, or none, while `nextCursor` is set. Results are in S3 key order, not received time. `deniedAccountIds` lists accounts that refused access and `unreachableAccountIds` lists accounts that could not be read; the listing is incomplete when either is not empty. Attachments are metadata only. Each entry carries `envelopeRecipients` when stored; absent means unknown. Requires authentication only.
+- `GET /v1/email/inbound/{emailId}`: one parsed inbound email. Query `awsAccountId`. Without it, every account is tried in account id order and the first match is returned. Returns 404 when no account read has the email, or when `awsAccountId` is not in the organization. `htmlTruncated: true` means the HTML body was cut to a 200 KB prefix when it was received, so `html` may be incomplete markup. `html` is null when the email has no HTML part. `envelopeRecipients` (lowercased SMTP envelope recipients, Bcc included) is present on mail received after `wraps email upgrade` and absent before it; absent means unknown. No endpoint downloads attachment contents. Requires authentication only.
 
 ### Brand kits
 
@@ -1118,11 +1122,17 @@ Wraps supports receiving and processing inbound email via SES receipt rules and 
 
 ```bash
 wraps email inbound init      # Deploy inbound email infrastructure
-wraps email inbound status    # Check inbound status
+wraps email inbound status    # Check inbound status and trigger mode
+wraps email inbound add       # Add a receiving domain (--preview shows changes without applying)
 wraps email inbound verify    # Verify MX DNS records
 wraps email inbound test      # Send test and verify receipt
+wraps email inbound reprocess # Replay emails that failed every retry (dead-letter queue); --dry-run lists them first
 wraps email inbound destroy   # Remove inbound infrastructure
 ```
+
+`inbound init`, `inbound add` and `email upgrade` move a deployment that still uses the old trigger to the new one. Deploy with this CLI version or later everywhere. An older CLI that deploys the stack after the upgrade removes the `wraps-inbound-ses-invoke` permission and narrows the bucket policy to `raw/*`, while the receipt rule still sends new mail to `mail/`. New inbound mail then stops being processed, and may not be stored. `wraps email inbound status` flags the mismatch, and `wraps email upgrade --action redeploy` with the new CLI repairs it (`inbound status` prints the exact command). New mail is stored under `mail/`: if your own code reads `raw/` by prefix, read `rawS3Key` from the parsed JSON or the event instead.
+
+The `email.received` EventBridge event and the parsed email JSON carry `envelopeRecipients`: the lowercased SMTP envelope recipients SES delivered to, Bcc included, limited to addresses this deployment receives for. Use it to route on Bcc recipients, forwards and aliases. In a trimmed event `from`, `to`, `cc` and `attachments` can be empty or missing: read the full parsed email at `parsedS3Key`, or guard with `?? []`. It is absent on mail received before `wraps email upgrade`, so treat absent as unknown, not empty. `envelopeRecipients` is kept whole when an event is trimmed, including the last-resort form (which also keeps `emailId`, `rawS3Key`, `parsedS3Key`, `receivedAt`, `replyToken` and `autoReply`), as long as it has 100 addresses or fewer. With more than 100, the event keeps the first 100, adds `envelopeRecipientCount` with the full count, and adds `"envelopeRecipients"` to `truncatedFields`; the full list is in the parsed JSON at `parsedS3Key`. Events are delivered at least once: deduplicate on `emailId`. The dashboard, the local console and `wraps email inbound get` show it as "Delivered to" only when it adds an address not already in To or Cc; `--json` and the API return it whenever present.
 
 ```typescript
 const email = new WrapsEmail({ inboxBucketName: 'my-inbox-bucket' });

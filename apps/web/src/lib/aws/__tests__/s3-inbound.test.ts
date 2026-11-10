@@ -162,6 +162,40 @@ describe("s3-inbound", () => {
       expect(result.nextToken).toBe("next-token-abc");
     });
 
+    it("should carry envelopeRecipients when stored and leave it undefined when absent", async () => {
+      mockFindFirst.mockResolvedValue(MOCK_ACCOUNT);
+
+      mockS3Send.mockResolvedValueOnce({
+        Contents: [
+          { Key: "parsed/email-001.json", LastModified: new Date(), Size: 500 },
+          { Key: "parsed/email-002.json", LastModified: new Date(), Size: 300 },
+        ],
+      });
+      mockS3Send
+        .mockResolvedValueOnce(
+          mockS3Body(
+            makeParsedEmailJson({
+              emailId: "email-001",
+              envelopeRecipients: ["a@example.com", "bcc@example.com"],
+            })
+          )
+        )
+        .mockResolvedValueOnce(
+          mockS3Body(makeParsedEmailJson({ emailId: "email-002" }))
+        );
+
+      const result = await listInboundEmails({
+        awsAccountId: "acc-1",
+        limit: 10,
+      });
+
+      expect(result.emails[0].envelopeRecipients).toEqual([
+        "a@example.com",
+        "bcc@example.com",
+      ]);
+      expect(result.emails[1].envelopeRecipients).toBeUndefined();
+    });
+
     it("should filter out non-JSON files from S3 listing", async () => {
       mockFindFirst.mockResolvedValue(MOCK_ACCOUNT);
 
@@ -286,6 +320,34 @@ describe("s3-inbound", () => {
       const getCommand = mockS3Send.mock.calls[0][0];
       expect(getCommand.input.Key).toBe("parsed/email-001.json");
       expect(getCommand.input.Bucket).toBe("my-inbound-bucket");
+    });
+
+    it("should return envelopeRecipients on the detail when stored", async () => {
+      mockFindFirst.mockResolvedValue(MOCK_ACCOUNT);
+      mockS3Send.mockResolvedValueOnce(
+        mockS3Body(
+          makeParsedEmailJson({ envelopeRecipients: ["bcc@example.com"] })
+        )
+      );
+
+      const result = await getInboundEmail({
+        awsAccountId: "acc-1",
+        emailId: "email-001",
+      });
+
+      expect(result?.envelopeRecipients).toEqual(["bcc@example.com"]);
+    });
+
+    it("should leave envelopeRecipients undefined on the detail for legacy mail", async () => {
+      mockFindFirst.mockResolvedValue(MOCK_ACCOUNT);
+      mockS3Send.mockResolvedValueOnce(mockS3Body(makeParsedEmailJson()));
+
+      const result = await getInboundEmail({
+        awsAccountId: "acc-1",
+        emailId: "email-001",
+      });
+
+      expect(result).not.toHaveProperty("envelopeRecipients");
     });
 
     it("should return null for NoSuchKey errors", async () => {

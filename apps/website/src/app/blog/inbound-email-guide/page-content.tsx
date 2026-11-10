@@ -350,13 +350,17 @@ await email.inbox.forward('inb_a1b2c3d4', {
 export const handler = async (event) => {
   const email = event.detail;
 
-  // Route based on recipient
-  if (email.to[0].address.startsWith('support@')) {
+  // Route on who SES delivered to (covers Bcc and forwards).
+  // Mail from before the upgrade has no envelopeRecipients.
+  const recipients =
+    email.envelopeRecipients ??
+    (email.to ?? []).map((t) => t.address.toLowerCase());
+  if (recipients.some((r) => r.startsWith('support@'))) {
     await createSupportTicket(email);
   }
 
   // Process attachments
-  if (email.attachments.length > 0) {
+  if (email.attachments?.length) {
     await processAttachments(email);
   }
 

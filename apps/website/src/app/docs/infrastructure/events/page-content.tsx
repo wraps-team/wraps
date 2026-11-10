@@ -366,9 +366,11 @@ const inboundPayload = `{
   "region": "us-east-1",
   "resources": [],
   "detail": {
+    "emailId": "inb_a1b2c3d4",
     "messageId": "abcdef12-3456-7890-abcd-ef1234567890",
-    "from": "sender@external.com",
-    "to": ["inbox@yourapp.com"],
+    "from": { "name": "", "address": "sender@external.com" },
+    "to": [{ "name": "", "address": "inbox@yourapp.com" }],
+    "envelopeRecipients": ["inbox@yourapp.com"],
     "subject": "Re: Your recent order",
     "date": "2025-01-15T14:00:00.000Z",
     "receivedAt": "2025-01-15T14:00:00.500Z",
@@ -1539,7 +1541,7 @@ export default function InfrastructureEventsPageContent() {
                             </code>
                           </td>
                           <td className="p-3 text-muted-foreground">
-                            Sender email address
+                            Sender: an object with address and name
                           </td>
                         </tr>
                         <tr className="border-b">
@@ -1549,7 +1551,25 @@ export default function InfrastructureEventsPageContent() {
                             </code>
                           </td>
                           <td className="p-3 text-muted-foreground">
-                            Array of recipient addresses
+                            Array of recipient objects, each with address and
+                            name
+                          </td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-3">
+                            <code className="rounded bg-muted px-1 py-0.5">
+                              detail.envelopeRecipients
+                            </code>
+                          </td>
+                          <td className="p-3 text-muted-foreground">
+                            Lowercased SMTP envelope recipients SES delivered
+                            to, Bcc included, limited to addresses this
+                            deployment receives for. Absent on mail received
+                            before{" "}
+                            <code className="rounded bg-muted px-1 py-0.5">
+                              wraps email upgrade
+                            </code>
+                            , so treat absent as unknown, not empty
                           </td>
                         </tr>
                         <tr className="border-b">
@@ -1674,12 +1694,48 @@ export default function InfrastructureEventsPageContent() {
                 ,{" "}
                 <code className="rounded bg-muted px-1.5 py-0.5">
                   replyToken
-                </code>{" "}
-                and{" "}
+                </code>
+                ,{" "}
                 <code className="rounded bg-muted px-1.5 py-0.5">
                   autoReply
+                </code>{" "}
+                and, when the event has it,{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  envelopeRecipients
                 </code>
                 .
+              </p>
+              <p className="text-muted-foreground text-sm">
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  envelopeRecipients
+                </code>{" "}
+                is kept whole at every earlier stage, and at the last resort
+                when it has 100 addresses or fewer. With more than 100, the
+                event keeps the first 100, adds{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  envelopeRecipientCount
+                </code>{" "}
+                with the full count, and adds{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  &quot;envelopeRecipients&quot;
+                </code>{" "}
+                to{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  truncatedFields
+                </code>
+                . The full list is in the parsed JSON at{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  parsedS3Key
+                </code>
+                .
+              </p>
+              <p className="text-muted-foreground text-sm">
+                EventBridge delivers events at least once, so the same{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  email.received
+                </code>{" "}
+                event can arrive more than once. Deduplicate on{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">emailId</code>.
               </p>
               <p className="text-muted-foreground text-sm">
                 When replying to a signed message,{" "}
