@@ -445,7 +445,10 @@ export function inboundInitRecoveryCommand(
       ? receivingDomain.slice(subdomain.length + 1)
       : receivingDomain);
   const label = subdomain ? `--subdomain ${subdomain}` : "--root";
-  return `wraps email inbound init --domain ${parent} ${label} --region ${region}`;
+  // No parent derivable: leave --domain out, so init picks the single tracked
+  // domain or asks, rather than printing an empty --domain.
+  const domainFlag = parent ? `--domain ${parent} ` : "";
+  return `wraps email inbound init ${domainFlag}${label} --region ${region}`;
 }
 
 /**
@@ -460,6 +463,17 @@ export function deactivatedRuleSetName(
     before.name !== RULE_SET_NAME
     ? before.name
     : null;
+}
+
+/**
+ * For --json next to deactivatedRuleSet: the read error when the set active
+ * before the activation couldn't be read (so one may have been deactivated),
+ * else null.
+ */
+export function previousRuleSetUnreadable(
+  before: ActiveRuleSetRead | null
+): string | null {
+  return before && !before.readable ? before.error : null;
 }
 
 /**
@@ -549,8 +563,8 @@ export function describeRuleSetDeactivation(
     return null;
   }
   return read.readable
-    ? `Applying would deactivate the active receipt rule set ${read.name}; its rules would stop applying to incoming mail. The run asks first (with --yes or --json it needs --replace-active-rule-set).`
-    : `Could not read the active receipt rule set (${read.error}); applying may deactivate another set. The run asks first (with --yes or --json it needs --replace-active-rule-set).`;
+    ? `Applying would deactivate the active receipt rule set ${read.name}; its rules would stop applying to incoming mail. The run asks first; where it can't ask (--yes, --json, or no terminal) it needs --replace-active-rule-set.`
+    : `Could not read the active receipt rule set (${read.error}); applying may deactivate another set. The run asks first; where it can't ask (--yes, --json, or no terminal) it needs --replace-active-rule-set.`;
 }
 
 /**

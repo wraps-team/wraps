@@ -3,6 +3,7 @@ import { MANAGED_DEDICATED_IP_POOL_NAME } from "@wraps/core";
 import pc from "picocolors";
 import { trackError } from "../../telemetry/events.js";
 import { SES_RECEIVING_REGIONS } from "../../types/email.js";
+import { RULE_SET_NAME } from "../email/inbound-names.js";
 import { isJsonMode, jsonError } from "./json-output.js";
 
 /**
@@ -1301,7 +1302,11 @@ export const errors = {
         : `Could not read the active receipt rule set in ${region} (${active.error}); activating wraps-inbound-rules may deactivate another set`;
     } else if (!active.readable) {
       message = `Could not read the active receipt rule set in ${region} (${active.error}) just before activating wraps-inbound-rules, so it was not activated`;
-    } else if (late.expected.readable && late.expected.name === null) {
+    } else if (
+      late.expected.readable &&
+      (late.expected.name === null || late.expected.name === RULE_SET_NAME)
+    ) {
+      // The run agreed to replace nothing: none was active, or ours was.
       message = `Receipt rule set ${activeName} became active in ${region} during this run, so wraps-inbound-rules was not activated`;
     } else if (late.expected.readable) {
       message = `Receipt rule set ${activeName} is active in ${region}, not ${late.expected.name}, the set you agreed to replace, so wraps-inbound-rules was not activated`;
@@ -1314,7 +1319,7 @@ export const errors = {
       ? [
           meaning,
           `Already in place: ${late.inPlace} Until wraps-inbound-rules is active, no mail reaches Wraps.`,
-          `To be asked again, keeping the saved inbound configuration, run:\n  ${late.recovery}`,
+          `To be asked again, keeping the saved inbound configuration, run this from a terminal (it re-deploys the inbound stack):\n  ${late.recovery}\nAn unattended run needs --yes --replace-active-rule-set added, ${consent}`,
           ...(late.afterRecovery ? [late.afterRecovery] : []),
           `Answer yes, or pass --replace-active-rule-set, ${consent}`,
         ].join("\n\n")

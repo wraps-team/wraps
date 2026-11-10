@@ -32,6 +32,7 @@ import {
   type ExpectedActiveRuleSet,
   getReceiptRuleDomains,
   inboundInitRecoveryCommand,
+  previousRuleSetUnreadable,
   REPLACE_NO_RULE_SET,
   type RuleSetActivation,
   readActiveReceiptRuleSet,
@@ -155,6 +156,8 @@ async function replyInitForSingleDomain(params: {
   progress: DeploymentProgress;
   /** What the receipt-rule fallback may deactivate, agreed in replyInit's preflight. */
   expectedActive: ExpectedActiveRuleSet;
+  /** Target domains after this one (`--all`), not started if this one's activation refuses. */
+  laterDomains: string[];
 }): Promise<{
   parameterArn: string;
   parameterName: string;
@@ -260,13 +263,20 @@ async function replyInitForSingleDomain(params: {
   // recovery re-activates through inbound init.
   const activation: RuleSetActivation = {
     expected: params.expectedActive,
-    inPlace: `reply threading for ${domain} is saved and its stack deployed (the signing secret is in SSM), and wraps-inbound-rules and its receipt rule (listing r.mail.${domain}) were created but are inactive; DNS records for r.mail.${domain} were not written.`,
+    inPlace: `reply threading for ${domain} is saved and its stack deployed (the signing secret is in SSM), and wraps-inbound-rules and its receipt rule (listing r.mail.${domain}) exist but are inactive; DNS records for r.mail.${domain} were not written.${params.laterDomains.length > 0 ? ` Reply threading was not started for ${params.laterDomains.join(", ")}.` : ""}`,
     recovery: inboundInitRecoveryCommand(
       region,
       emailConfig.inbound,
       emailConfig.inboundDomains
     ),
-    afterRecovery: `Then add the r.mail.${domain} DNS records (MX 10 inbound-smtp.${region}.amazonaws.com, and TXT "v=spf1 include:amazonses.com ~all"); wraps email reply status checks the MX record.`,
+    afterRecovery: [
+      `Then add the r.mail.${domain} DNS records (MX 10 inbound-smtp.${region}.amazonaws.com, and TXT "v=spf1 include:amazonses.com ~all"); wraps email reply status checks the MX record.`,
+      ...(params.laterDomains.length > 0
+        ? [
+            `Then run wraps email reply init --all --region ${region} to enable reply threading for ${params.laterDomains.join(", ")}.`,
+          ]
+        : []),
+    ].join("\n"),
   };
   let activationRead: ActiveRuleSetRead | null = null;
   await progress.execute(
@@ -573,7 +583,7 @@ export async function replyInit(options: EmailReplyInitOptions): Promise<void> {
     dnsAutoCreated: boolean;
     activationRead: ActiveRuleSetRead | null;
   }> = [];
-  for (const domain of targetDomains) {
+  for (const [index, domain] of targetDomains.entries()) {
     // Reload metadata between domains (the earlier loop iteration saves to
     // disk) so we preserve the write-history of each per-domain init.
     const fresh = await loadConnectionMetadata(identity.accountId, region);
@@ -589,6 +599,7 @@ export async function replyInit(options: EmailReplyInitOptions): Promise<void> {
       autoConfirm: options.yes,
       progress,
       expectedActive,
+      laterDomains: targetDomains.slice(index + 1),
     });
     results.push({ domain, ...result });
   }
@@ -612,6 +623,7 @@ export async function replyInit(options: EmailReplyInitOptions): Promise<void> {
       })),
       region,
       deactivatedRuleSet: deactivatedRuleSetName(activationRead),
+      previousRuleSetUnreadable: previousRuleSetUnreadable(activationRead),
     });
     return;
   }

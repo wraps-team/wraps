@@ -42,6 +42,7 @@ import {
   describeRuleSetDeactivation,
   getActiveReceiptRuleSet,
   inboundInitRecoveryCommand,
+  previousRuleSetUnreadable,
   REPLACE_NO_RULE_SET,
   RULE_NAME,
   RULE_SET_NAME,
@@ -792,6 +793,7 @@ export async function inboundInit(
       region,
       trigger: finalTrigger,
       deactivatedRuleSet: deactivatedRuleSetName(activationRead),
+      previousRuleSetUnreadable: previousRuleSetUnreadable(activationRead),
     });
     return;
   }
@@ -1982,7 +1984,7 @@ export async function inboundAdd(
   // recovery re-activates through init and then re-runs this add.
   const activation: RuleSetActivation = {
     expected: expectedActive,
-    inPlace: `wraps-inbound-rules and its receipt rule (listing ${receivingDomain}) were created but are inactive; ${receivingDomain} was not saved and its DNS records were not written.`,
+    inPlace: `wraps-inbound-rules and its receipt rule (listing ${receivingDomain}) exist but are inactive; ${receivingDomain} was not saved and its DNS records were not written.`,
     recovery: inboundInitRecoveryCommand(
       region,
       emailConfig.inbound,
@@ -2217,6 +2219,7 @@ export async function inboundAdd(
       region,
       trigger: getInboundTrigger(metadata),
       deactivatedRuleSet: deactivatedRuleSetName(activationRead),
+      previousRuleSetUnreadable: previousRuleSetUnreadable(activationRead),
     });
     return;
   }
