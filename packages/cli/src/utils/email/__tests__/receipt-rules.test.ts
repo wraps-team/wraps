@@ -12,15 +12,20 @@ import {
 import { mockClient } from "aws-sdk-client-mock";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  activeRuleSetMatchesExpected,
   addDomainToReceiptRule,
   createReceiptRule,
+  describeRuleSetDeactivation,
   inboundRuleActions,
   RECEIPT_RULE_RETRY_DELAYS_MS,
+  REPLACE_NO_RULE_SET,
   readActiveReceiptRuleSet,
   receiptRuleRetryHooks,
   receiptRuleTriggerOf,
   removeDomainFromReceiptRule,
+  setActiveReceiptRuleSet,
   syncReceiptRuleTrigger,
+  wouldDeactivateAnotherRuleSet,
 } from "../receipt-rules.js";
 
 const ses = mockClient(SESClient);
@@ -368,7 +373,8 @@ describe("addDomainToReceiptRule", () => {
       ACCOUNT,
       "support.example.com",
       BUCKET,
-      "ses-lambda-action"
+      "ses-lambda-action",
+      REPLACE_NO_RULE_SET
     );
 
     const creates = ses.commandCalls(CreateReceiptRuleCommand);
@@ -428,5 +434,171 @@ describe("readActiveReceiptRuleSet", () => {
       readable: false,
       error: "AccessDenied",
     });
+  });
+});
+
+describe("plan 048: activating wraps-inbound-rules only over a consented set", () => {
+  const OURS = { readable: true, name: "wraps-inbound-rules" } as const;
+  const NONE = { readable: true, name: null } as const;
+  const CUSTOMER = { readable: true, name: "customer-rules" } as const;
+  const OTHER = { readable: true, name: "other-rules" } as const;
+  const UNREADABLE = { readable: false, error: "AccessDenied" } as const;
+
+  it("wouldDeactivateAnotherRuleSet: another set or unreadable, never none or ours", () => {
+    expect(wouldDeactivateAnotherRuleSet(NONE)).toBe(false);
+    expect(wouldDeactivateAnotherRuleSet(OURS)).toBe(false);
+    expect(wouldDeactivateAnotherRuleSet(CUSTOMER)).toBe(true);
+    expect(wouldDeactivateAnotherRuleSet(UNREADABLE)).toBe(true);
+  });
+
+  it.each([
+    // [current, expected, allowed]
+    [NONE, NONE, true],
+    [NONE, CUSTOMER, true],
+    [OURS, NONE, true],
+    [OURS, UNREADABLE, true],
+    [CUSTOMER, CUSTOMER, true],
+    [CUSTOMER, NONE, false],
+    [CUSTOMER, OURS, false],
+    [OTHER, CUSTOMER, false],
+    [CUSTOMER, UNREADABLE, false],
+    [UNREADABLE, UNREADABLE, true],
+    [UNREADABLE, NONE, false],
+    [UNREADABLE, CUSTOMER, false],
+  ] as const)(
+    "activeRuleSetMatchesExpected(current %o, expected %o) is %s",
+    (current, expected, allowed) => {
+      expect(activeRuleSetMatchesExpected(current, expected)).toBe(allowed);
+    }
+  );
+
+  it("activates over the consented set, reading it with DescribeActiveReceiptRuleSet first", async () => {
+    ses
+      .on(DescribeActiveReceiptRuleSetCommand)
+      .resolves({ Metadata: { Name: "customer-rules" } });
+    ses.on(SetActiveReceiptRuleSetCommand).resolves({});
+
+    const before = await setActiveReceiptRuleSet(
+      REGION,
+      "wraps-inbound-rules",
+      CUSTOMER
+    );
+
+    expect(before).toEqual(CUSTOMER);
+    expect(
+      ses.commandCalls(SetActiveReceiptRuleSetCommand)[0].args[0].input
+    ).toEqual({ RuleSetName: "wraps-inbound-rules" });
+  });
+
+  it("refuses without activating when another set became active after the preflight saw none", async () => {
+    ses
+      .on(DescribeActiveReceiptRuleSetCommand)
+      .resolves({ Metadata: { Name: "customer-rules" } });
+    ses.on(SetActiveReceiptRuleSetCommand).resolves({});
+
+    await expect(
+      setActiveReceiptRuleSet(REGION, "wraps-inbound-rules", NONE)
+    ).rejects.toMatchObject({
+      code: "RECEIPT_RULE_SET_CONFLICT",
+      message: expect.stringContaining("customer-rules"),
+      suggestion: expect.stringContaining("--replace-active-rule-set"),
+    });
+    expect(ses.commandCalls(SetActiveReceiptRuleSetCommand)).toHaveLength(0);
+  });
+
+  it("refuses when the active set changed from the one the user agreed to replace", async () => {
+    ses
+      .on(DescribeActiveReceiptRuleSetCommand)
+      .resolves({ Metadata: { Name: "other-rules" } });
+
+    await expect(
+      setActiveReceiptRuleSet(REGION, "wraps-inbound-rules", CUSTOMER)
+    ).rejects.toMatchObject({
+      code: "RECEIPT_RULE_SET_CONFLICT",
+      message: expect.stringContaining("not the set you agreed to replace"),
+    });
+    expect(ses.commandCalls(SetActiveReceiptRuleSetCommand)).toHaveLength(0);
+  });
+
+  it("an unreadable active set at activation refuses unless the consent was also given unread", async () => {
+    ses
+      .on(DescribeActiveReceiptRuleSetCommand)
+      .rejects(sesError("AccessDenied"));
+    ses.on(SetActiveReceiptRuleSetCommand).resolves({});
+
+    await expect(
+      setActiveReceiptRuleSet(REGION, "wraps-inbound-rules", NONE)
+    ).rejects.toMatchObject({
+      code: "RECEIPT_RULE_SET_CONFLICT",
+      message: expect.stringContaining("AccessDenied"),
+    });
+    expect(ses.commandCalls(SetActiveReceiptRuleSetCommand)).toHaveLength(0);
+
+    const before = await setActiveReceiptRuleSet(
+      REGION,
+      "wraps-inbound-rules",
+      UNREADABLE
+    );
+    expect(before).toEqual(UNREADABLE);
+    expect(ses.commandCalls(SetActiveReceiptRuleSetCommand)).toHaveLength(1);
+  });
+
+  it("no set active, or ours: unchanged (activates silently, or not at all when ours already is)", async () => {
+    ses
+      .on(DescribeActiveReceiptRuleSetCommand)
+      .resolvesOnce({})
+      .resolvesOnce({ Metadata: { Name: "wraps-inbound-rules" } });
+    ses.on(SetActiveReceiptRuleSetCommand).resolves({});
+
+    expect(
+      await setActiveReceiptRuleSet(REGION, "wraps-inbound-rules", NONE)
+    ).toEqual(NONE);
+    expect(ses.commandCalls(SetActiveReceiptRuleSetCommand)).toHaveLength(1);
+
+    expect(
+      await setActiveReceiptRuleSet(REGION, "wraps-inbound-rules", NONE)
+    ).toEqual(OURS);
+    expect(ses.commandCalls(SetActiveReceiptRuleSetCommand)).toHaveLength(1);
+  });
+
+  it("addDomainToReceiptRule's create fallback refuses to activate over a set nobody agreed to replace", async () => {
+    ses.on(DescribeReceiptRuleCommand).rejects(notFound());
+    ses.on(CreateReceiptRuleSetCommand).resolves({});
+    ses.on(CreateReceiptRuleCommand).resolves({});
+    ses
+      .on(DescribeActiveReceiptRuleSetCommand)
+      .resolves({ Metadata: { Name: "customer-rules" } });
+    ses.on(SetActiveReceiptRuleSetCommand).resolves({});
+
+    await expect(
+      addDomainToReceiptRule(
+        REGION,
+        ACCOUNT,
+        "support.example.com",
+        BUCKET,
+        "ses-lambda-action",
+        REPLACE_NO_RULE_SET
+      )
+    ).rejects.toMatchObject({ code: "RECEIPT_RULE_SET_CONFLICT" });
+    expect(ses.commandCalls(SetActiveReceiptRuleSetCommand)).toHaveLength(0);
+
+    await addDomainToReceiptRule(
+      REGION,
+      ACCOUNT,
+      "support.example.com",
+      BUCKET,
+      "ses-lambda-action",
+      CUSTOMER
+    );
+    expect(ses.commandCalls(SetActiveReceiptRuleSetCommand)).toHaveLength(1);
+  });
+
+  it("describeRuleSetDeactivation names the set, or the read error, for --preview", () => {
+    expect(describeRuleSetDeactivation(NONE)).toBeNull();
+    expect(describeRuleSetDeactivation(OURS)).toBeNull();
+    expect(describeRuleSetDeactivation(CUSTOMER)).toContain(
+      "would deactivate the active receipt rule set customer-rules"
+    );
+    expect(describeRuleSetDeactivation(UNREADABLE)).toContain("AccessDenied");
   });
 });

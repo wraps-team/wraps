@@ -341,3 +341,24 @@ describe("parseCliArgs — negative numeric values", () => {
     }
   );
 });
+
+describe("parseCliArgs — --replace-active-rule-set (plan 048)", () => {
+  it("is a boolean that does not swallow the next flag's value", () => {
+    const { flags, sub } = parseCliArgs([
+      "node",
+      "wraps",
+      "email",
+      "inbound",
+      "init",
+      "--replace-active-rule-set",
+      "--subdomain",
+      "support",
+      "--yes",
+    ]);
+
+    expect(flags.replaceActiveRuleSet).toBe(true);
+    expect(flags.subdomain).toBe("support");
+    expect(flags.yes).toBe(true);
+    expect(sub).toEqual(["email", "inbound", "init"]);
+  });
+});

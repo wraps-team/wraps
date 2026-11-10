@@ -7,7 +7,7 @@ import {
 } from "@aws-sdk/client-ssm";
 import { encodeReplyToken } from "@wraps/core";
 import { mockClient } from "aws-sdk-client-mock";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setJsonMode } from "../../utils/shared/json-output.js";
 import {
   deployHooks,
@@ -540,6 +540,105 @@ describe("replyInit", () => {
     expect(vi.mocked(log.warn)).toHaveBeenCalledWith(
       "add include:amazonses.com to your existing SPF record"
     );
+  });
+
+  describe("plan 048: rule-set activation consent", () => {
+    const CUSTOMER = { readable: true, name: "customer-rules" } as const;
+
+    async function setup(read: unknown, ruleMissing = true) {
+      const { loadConnectionMetadata } = await import(
+        "../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(cloneMetadata());
+      const rules = await import("../../utils/email/receipt-rules.js");
+      vi.mocked(rules.readActiveReceiptRuleSet).mockResolvedValue(
+        read as never
+      );
+      vi.mocked(rules.describeInboundReceiptRule).mockResolvedValue(
+        (ruleMissing
+          ? null
+          : { Name: "wraps-inbound-catch-all", Recipients: [] }) as never
+      );
+      return rules;
+    }
+
+    afterEach(async () => {
+      const rules = await import("../../utils/email/receipt-rules.js");
+      vi.mocked(rules.readActiveReceiptRuleSet).mockResolvedValue({
+        readable: true,
+        name: "wraps-inbound-rules",
+      });
+      vi.mocked(rules.describeInboundReceiptRule).mockResolvedValue(null);
+    });
+
+    it("--yes with another set active and the rule missing refuses before any save, deploy or rule call", async () => {
+      const rules = await setup(CUSTOMER);
+      const { saveConnectionMetadata } = await import(
+        "../../utils/shared/metadata.js"
+      );
+
+      await expect(
+        replyInit({ domain: "support.foo.com", yes: true })
+      ).rejects.toMatchObject({
+        code: "RECEIPT_RULE_SET_CONFLICT",
+        message: expect.stringContaining("customer-rules"),
+        suggestion: expect.stringContaining("Nothing was deployed or changed"),
+      });
+
+      expect(saveConnectionMetadata).not.toHaveBeenCalled();
+      expect(deployHooks.deploy).not.toHaveBeenCalled();
+      expect(rules.addDomainToReceiptRule).not.toHaveBeenCalled();
+    });
+
+    it("--json refuses the same way; an unreadable set counts as another set", async () => {
+      const rules = await setup({ readable: false, error: "AccessDenied" });
+      setJsonMode(true);
+
+      await expect(
+        replyInit({ domain: "support.foo.com", json: true })
+      ).rejects.toMatchObject({
+        code: "RECEIPT_RULE_SET_CONFLICT",
+        message: expect.stringContaining("AccessDenied"),
+      });
+      expect(deployHooks.deploy).not.toHaveBeenCalled();
+      expect(rules.addDomainToReceiptRule).not.toHaveBeenCalled();
+    });
+
+    it("--yes --replace-active-rule-set proceeds and the fallback rule write gets the consented set", async () => {
+      const rules = await setup(CUSTOMER);
+
+      await replyInit({
+        domain: "support.foo.com",
+        yes: true,
+        replaceActiveRuleSet: true,
+      });
+
+      expect(deployHooks.deploy).toHaveBeenCalledTimes(1);
+      expect(rules.addDomainToReceiptRule).toHaveBeenCalledWith(
+        "us-east-1",
+        "123456789012",
+        "r.mail.support.foo.com",
+        "wraps-inbound-123456789012-us-east-1",
+        "s3-notification",
+        CUSTOMER
+      );
+    });
+
+    it("rule in place: no read, no refusal, and the rule write may replace no set", async () => {
+      const rules = await setup(CUSTOMER, false);
+
+      await replyInit({ domain: "support.foo.com", yes: true });
+
+      expect(rules.readActiveReceiptRuleSet).not.toHaveBeenCalled();
+      expect(rules.addDomainToReceiptRule).toHaveBeenCalledWith(
+        "us-east-1",
+        "123456789012",
+        "r.mail.support.foo.com",
+        "wraps-inbound-123456789012-us-east-1",
+        "s3-notification",
+        { readable: true, name: null }
+      );
+    });
   });
 });
 

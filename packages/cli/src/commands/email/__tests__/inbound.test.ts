@@ -2325,4 +2325,416 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
       expect(saved.at(-1)?.trigger).toBeUndefined();
     });
   });
+
+  describe("plan 048: rule-set activation consent", () => {
+    const CUSTOMER = { readable: true, name: "customer-rules" } as const;
+    const UNREADABLE = { readable: false, error: "AccessDenied" } as const;
+    const NO_REPLACEMENT = { readable: true, name: null } as const;
+
+    async function withTTY<T>(fn: () => Promise<T>): Promise<T> {
+      const stdin = process.stdin.isTTY;
+      const stdout = process.stdout.isTTY;
+      Object.defineProperty(process.stdin, "isTTY", {
+        value: true,
+        configurable: true,
+      });
+      Object.defineProperty(process.stdout, "isTTY", {
+        value: true,
+        configurable: true,
+      });
+      try {
+        return await fn();
+      } finally {
+        Object.defineProperty(process.stdin, "isTTY", {
+          value: stdin,
+          configurable: true,
+        });
+        Object.defineProperty(process.stdout, "isTTY", {
+          value: stdout,
+          configurable: true,
+        });
+      }
+    }
+
+    async function setActiveRead(read: unknown) {
+      const rules = await import("../../../utils/email/receipt-rules.js");
+      vi.mocked(rules.readActiveReceiptRuleSet).mockResolvedValue(
+        read as never
+      );
+      return rules;
+    }
+
+    async function freshInitMetadata() {
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(
+        cloneMetadata((m) => {
+          (m.services.email.config as { inbound?: unknown }).inbound =
+            undefined;
+          (
+            m.services.email.config as { inboundDomains?: unknown }
+          ).inboundDomains = undefined;
+        })
+      );
+    }
+
+    async function addMetadata() {
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(cloneMetadata());
+    }
+
+    function consentPrompt() {
+      return expect.objectContaining({
+        message: expect.stringContaining("rules stop applying"),
+        initialValue: false,
+      });
+    }
+
+    afterEach(async () => {
+      // Back to the file default (ours active) for the tests that follow.
+      await setActiveRead({ readable: true, name: "wraps-inbound-rules" });
+    });
+
+    describe("inbound init", () => {
+      it("interactive, another set active: asks (default No) naming the set; yes activates over that set", async () => {
+        await freshInitMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+        const clack = await import("@clack/prompts");
+
+        await withTTY(() =>
+          inboundInit({ domain: "example.com", subdomain: "in" })
+        );
+
+        expect(vi.mocked(clack.confirm)).toHaveBeenCalledWith(consentPrompt());
+        expect(vi.mocked(clack.confirm)).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: expect.stringContaining("customer-rules"),
+          })
+        );
+        expect(rules.setActiveReceiptRuleSet).toHaveBeenCalledWith(
+          "us-east-1",
+          "wraps-inbound-rules",
+          CUSTOMER
+        );
+        expect(events[0]).toBe("command-up");
+      });
+
+      it("interactive, another set active: no exits before any deploy, rule write or save", async () => {
+        await freshInitMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+        const clack = await import("@clack/prompts");
+        // Every other prompt says yes; the deactivation prompt says no.
+        vi.mocked(clack.confirm).mockImplementation(
+          async (opts: { message: string }) =>
+            !opts.message.includes("rules stop applying")
+        );
+
+        await expect(
+          withTTY(() => inboundInit({ domain: "example.com", subdomain: "in" }))
+        ).rejects.toThrow("process.exit(0)");
+
+        expect(vi.mocked(clack.confirm)).toHaveBeenLastCalledWith(
+          consentPrompt()
+        );
+        expect(events).toEqual([]);
+        expect(rules.createReceiptRule).not.toHaveBeenCalled();
+        expect(rules.setActiveReceiptRuleSet).not.toHaveBeenCalled();
+        vi.mocked(clack.confirm).mockReset();
+        vi.mocked(clack.confirm).mockResolvedValue(true);
+      });
+
+      it("--yes with another set active refuses: no deploy, no rule call, no metadata save", async () => {
+        await freshInitMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+        const pulumi = await import("@pulumi/pulumi");
+
+        await expect(
+          inboundInit({ domain: "example.com", subdomain: "in", yes: true })
+        ).rejects.toMatchObject({
+          code: "RECEIPT_RULE_SET_CONFLICT",
+          message: expect.stringContaining("customer-rules"),
+          suggestion: expect.stringContaining("--replace-active-rule-set"),
+        });
+
+        expect(events).toEqual([]);
+        expect(
+          pulumi.automation.LocalWorkspace.createOrSelectStack
+        ).not.toHaveBeenCalled();
+        expect(rules.createReceiptRuleSet).not.toHaveBeenCalled();
+        expect(rules.createReceiptRule).not.toHaveBeenCalled();
+        expect(rules.setActiveReceiptRuleSet).not.toHaveBeenCalled();
+      });
+
+      it("--yes --replace-active-rule-set proceeds and passes the consented set to the activation", async () => {
+        await freshInitMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+        const clack = await import("@clack/prompts");
+
+        await inboundInit({
+          domain: "example.com",
+          subdomain: "in",
+          yes: true,
+          replaceActiveRuleSet: true,
+        });
+
+        expect(vi.mocked(clack.confirm)).not.toHaveBeenCalled();
+        expect(rules.setActiveReceiptRuleSet).toHaveBeenCalledWith(
+          "us-east-1",
+          "wraps-inbound-rules",
+          CUSTOMER
+        );
+      });
+
+      // Init's deploy confirmation already needs --yes in JSON mode, so
+      // --json --yes is the only JSON run that reaches the guard.
+      it("--json --yes refuses without the flag and proceeds with it", async () => {
+        await freshInitMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+        setJsonMode(true);
+
+        await expect(
+          inboundInit({
+            domain: "example.com",
+            subdomain: "in",
+            json: true,
+            yes: true,
+          })
+        ).rejects.toMatchObject({ code: "RECEIPT_RULE_SET_CONFLICT" });
+        expect(events).toEqual([]);
+
+        await inboundInit({
+          domain: "example.com",
+          subdomain: "in",
+          json: true,
+          yes: true,
+          replaceActiveRuleSet: true,
+        });
+        expect(rules.setActiveReceiptRuleSet).toHaveBeenCalledWith(
+          "us-east-1",
+          "wraps-inbound-rules",
+          CUSTOMER
+        );
+        expect(jsonOutput("email.inbound.init")?.success).toBe(true);
+      });
+
+      it("an unreadable active set (AccessDenied) is treated like another set: --yes refuses, interactive asks", async () => {
+        await freshInitMetadata();
+        const rules = await setActiveRead(UNREADABLE);
+        const clack = await import("@clack/prompts");
+
+        await expect(
+          inboundInit({ domain: "example.com", subdomain: "in", yes: true })
+        ).rejects.toMatchObject({
+          code: "RECEIPT_RULE_SET_CONFLICT",
+          message: expect.stringContaining("AccessDenied"),
+        });
+        expect(events).toEqual([]);
+
+        await withTTY(() =>
+          inboundInit({ domain: "example.com", subdomain: "in" })
+        );
+        expect(vi.mocked(clack.confirm)).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: expect.stringContaining(
+              "Could not read the active receipt rule set in us-east-1 (AccessDenied)"
+            ),
+            initialValue: false,
+          })
+        );
+        expect(rules.setActiveReceiptRuleSet).toHaveBeenCalledWith(
+          "us-east-1",
+          "wraps-inbound-rules",
+          UNREADABLE
+        );
+      });
+
+      it("--preview names the set applying would deactivate, without asking or refusing", async () => {
+        await freshInitMetadata();
+        await setActiveRead(CUSTOMER);
+        const clack = await import("@clack/prompts");
+        const { previewWithResourceChanges } = await import(
+          "../../../utils/shared/pulumi.js"
+        );
+        vi.mocked(previewWithResourceChanges).mockResolvedValueOnce({
+          changeSummary: {},
+          resourceChanges: [],
+        } as never);
+
+        await inboundInit({
+          domain: "example.com",
+          subdomain: "in",
+          preview: true,
+          yes: true,
+        });
+
+        expect(vi.mocked(clack.log.warn)).toHaveBeenCalledWith(
+          expect.stringContaining(
+            "would deactivate the active receipt rule set customer-rules"
+          )
+        );
+        expect(vi.mocked(clack.confirm)).not.toHaveBeenCalled();
+        expect(events).toEqual([]);
+      });
+
+      it("no set active: unchanged, activates without asking", async () => {
+        await freshInitMetadata();
+        const rules = await setActiveRead(NO_REPLACEMENT);
+        const clack = await import("@clack/prompts");
+
+        await inboundInit({
+          domain: "example.com",
+          subdomain: "in",
+          yes: true,
+        });
+
+        expect(vi.mocked(clack.confirm)).not.toHaveBeenCalled();
+        expect(rules.setActiveReceiptRuleSet).toHaveBeenCalledWith(
+          "us-east-1",
+          "wraps-inbound-rules",
+          NO_REPLACEMENT
+        );
+      });
+
+      it("ours already active: unchanged, no prompt", async () => {
+        await freshInitMetadata();
+        const ours = { readable: true, name: "wraps-inbound-rules" };
+        const rules = await setActiveRead(ours);
+        const clack = await import("@clack/prompts");
+
+        await withTTY(() =>
+          inboundInit({ domain: "example.com", subdomain: "in" })
+        );
+
+        expect(vi.mocked(clack.confirm)).not.toHaveBeenCalledWith(
+          consentPrompt()
+        );
+        expect(rules.setActiveReceiptRuleSet).toHaveBeenCalledWith(
+          "us-east-1",
+          "wraps-inbound-rules",
+          ours
+        );
+      });
+    });
+
+    describe("inbound add", () => {
+      it("rule missing, another set active, --yes: refuses before the rule write, DNS or save", async () => {
+        rule = null;
+        await addMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+
+        await expect(
+          inboundAdd({ domain: "example.com", subdomain: "support", yes: true })
+        ).rejects.toMatchObject({
+          code: "RECEIPT_RULE_SET_CONFLICT",
+          message: expect.stringContaining("customer-rules"),
+        });
+
+        expect(rules.addDomainToReceiptRule).not.toHaveBeenCalled();
+        expect(events).toEqual([]);
+      });
+
+      it("rule missing, --yes --replace-active-rule-set: the rule write gets the consented set", async () => {
+        rule = null;
+        await addMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+
+        await inboundAdd({
+          domain: "example.com",
+          subdomain: "support",
+          yes: true,
+          replaceActiveRuleSet: true,
+        });
+
+        expect(rules.addDomainToReceiptRule).toHaveBeenCalledWith(
+          "us-east-1",
+          "123456789012",
+          "support.example.com",
+          BUCKET,
+          "ses-lambda-action",
+          CUSTOMER
+        );
+      });
+
+      it("rule missing, --json: refuses without the flag", async () => {
+        rule = null;
+        await addMetadata();
+        const rules = await setActiveRead(UNREADABLE);
+        setJsonMode(true);
+
+        await expect(
+          inboundAdd({
+            domain: "example.com",
+            subdomain: "support",
+            json: true,
+          })
+        ).rejects.toMatchObject({
+          code: "RECEIPT_RULE_SET_CONFLICT",
+          message: expect.stringContaining("AccessDenied"),
+        });
+        expect(rules.addDomainToReceiptRule).not.toHaveBeenCalled();
+      });
+
+      it("rule missing, interactive: no exits before any write", async () => {
+        rule = null;
+        await addMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+        const clack = await import("@clack/prompts");
+        vi.mocked(clack.confirm).mockResolvedValueOnce(false);
+
+        await expect(
+          withTTY(() =>
+            inboundAdd({ domain: "example.com", subdomain: "support" })
+          )
+        ).rejects.toThrow("process.exit(0)");
+
+        expect(vi.mocked(clack.confirm)).toHaveBeenCalledWith(consentPrompt());
+        expect(rules.addDomainToReceiptRule).not.toHaveBeenCalled();
+        expect(events).toEqual([]);
+      });
+
+      it("rule in place: nothing is activated, so no read, no prompt, and the write may replace no set", async () => {
+        rule = { Recipients: ["in.example.com"], Actions: NEW_ACTIONS };
+        await addMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+
+        await inboundAdd({
+          domain: "example.com",
+          subdomain: "support",
+          yes: true,
+        });
+
+        expect(rules.readActiveReceiptRuleSet).not.toHaveBeenCalled();
+        expect(rules.addDomainToReceiptRule).toHaveBeenCalledWith(
+          "us-east-1",
+          "123456789012",
+          "support.example.com",
+          BUCKET,
+          "ses-lambda-action",
+          NO_REPLACEMENT
+        );
+      });
+
+      it("--preview --json reports wouldDeactivateRuleSet", async () => {
+        rule = null;
+        await addMetadata();
+        await setActiveRead(CUSTOMER);
+        setJsonMode(true);
+
+        await inboundAdd({
+          domain: "example.com",
+          subdomain: "support",
+          preview: true,
+          json: true,
+        });
+
+        const data = jsonOutput("email.inbound.add")?.data;
+        expect(data.wouldDeactivateRuleSet).toBe("customer-rules");
+        expect(data.activeRuleSetUnreadable).toBeNull();
+        expect(events).toEqual([]);
+      });
+    });
+  });
 });
