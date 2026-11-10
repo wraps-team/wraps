@@ -232,6 +232,7 @@ describe("s3-inbound", () => {
 
       const result = await listInboundEmails({
         awsAccountId: "acc-1",
+        organizationId: "org-1",
         limit: 10,
       });
 
@@ -413,6 +414,7 @@ describe("s3-inbound", () => {
 
       const result = await getInboundEmail({
         awsAccountId: "acc-1",
+        organizationId: "org-1",
         emailId: "email-001",
       });
 
@@ -425,6 +427,7 @@ describe("s3-inbound", () => {
 
       const result = await getInboundEmail({
         awsAccountId: "acc-1",
+        organizationId: "org-1",
         emailId: "email-001",
       });
 
