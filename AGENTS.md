@@ -13,6 +13,9 @@ you are working in.
 ## Invariants
 
 1. **Non-destructive**: create new AWS resources and leave the customer's existing ones untouched.
+   One exception: SES allows one active receipt rule set per region, so activating
+   `wraps-inbound-rules` deactivates the customer's set; do that only with their explicit
+   consent (invariant 5).
 2. **Namespaced**: prefix every resource `wraps-{service}-` (e.g. `wraps-email-`, `wraps-sms-`).
 3. **IaC parity**: `packages/cdk` and `packages/pulumi` deploy the same infrastructure and
    share types from `packages/core`. Change a default in one, change it in both.
