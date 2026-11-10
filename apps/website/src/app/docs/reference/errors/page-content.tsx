@@ -501,7 +501,8 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
       {
         code: "INBOUND_REGION_NOT_SUPPORTED",
         message: "SES email receiving is not supported in <region>",
-        solution: "Deploy in us-east-1, us-west-2, or eu-west-1",
+        solution:
+          "Deploy in a region with an SES email receiving endpoint, such as us-east-1, eu-west-1, or eu-central-1",
       },
       {
         code: "INBOUND_REQUIRES_OUTBOUND",

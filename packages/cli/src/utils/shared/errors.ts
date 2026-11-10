@@ -2,6 +2,7 @@ import * as clack from "@clack/prompts";
 import { MANAGED_DEDICATED_IP_POOL_NAME } from "@wraps/core";
 import pc from "picocolors";
 import { trackError } from "../../telemetry/events.js";
+import { SES_RECEIVING_REGIONS } from "../../types/email.js";
 import { isJsonMode, jsonError } from "./json-output.js";
 
 /**
@@ -1232,7 +1233,7 @@ export const errors = {
     new WrapsError(
       `SES email receiving is not supported in ${region}`,
       "INBOUND_REGION_NOT_SUPPORTED",
-      "SES receipt rules are only available in:\n  us-east-1 (N. Virginia)\n  us-west-2 (Oregon)\n  eu-west-1 (Ireland)\n\nDeploy email infrastructure in one of these regions to enable inbound email.",
+      `SES receipt rules are only available in:\n  ${SES_RECEIVING_REGIONS.join("\n  ")}\n\nDeploy email infrastructure in one of these regions to enable inbound email.`,
       "https://docs.aws.amazon.com/ses/latest/dg/regions.html#region-receive-email"
     ),
 
