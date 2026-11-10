@@ -62,13 +62,20 @@ export type InboundEmailDetail = {
  */
 export async function listInboundEmails(params: {
   awsAccountId: string;
+  organizationId: string;
   limit?: number;
   continuationToken?: string;
 }): Promise<{ emails: InboundEmailSummary[]; nextToken?: string }> {
-  const { awsAccountId, limit = 50, continuationToken } = params;
+  const {
+    awsAccountId,
+    organizationId,
+    limit = 50,
+    continuationToken,
+  } = params;
 
   const account = await db.query.awsAccount.findFirst({
-    where: (a, { eq }) => eq(a.id, awsAccountId),
+    where: (a, { and, eq }) =>
+      and(eq(a.id, awsAccountId), eq(a.organizationId, organizationId)),
   });
 
   if (!account) {
@@ -170,12 +177,14 @@ export async function listInboundEmails(params: {
  */
 export async function getInboundEmail(params: {
   awsAccountId: string;
+  organizationId: string;
   emailId: string;
 }): Promise<InboundEmailDetail | null> {
-  const { awsAccountId, emailId } = params;
+  const { awsAccountId, organizationId, emailId } = params;
 
   const account = await db.query.awsAccount.findFirst({
-    where: (a, { eq }) => eq(a.id, awsAccountId),
+    where: (a, { and, eq }) =>
+      and(eq(a.id, awsAccountId), eq(a.organizationId, organizationId)),
   });
 
   if (!account) {

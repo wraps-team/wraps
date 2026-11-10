@@ -86,6 +86,30 @@ function makeParsedEmailJson(overrides: Record<string, unknown> = {}) {
   };
 }
 
+type WhereCallback = (
+  columns: { id: string; organizationId: string },
+  operators: {
+    eq: (column: string, value: string) => unknown;
+    and: (...conditions: unknown[]) => unknown;
+  }
+) => unknown;
+
+/**
+ * Evaluate the `where` callback the helper passed to `findFirst` with stub
+ * columns and recording operators, so the test sees which columns the real
+ * query compares (the mocked `findFirst` never evaluates it).
+ */
+function evaluateAccountWhere(): unknown {
+  const { where } = mockFindFirst.mock.calls[0][0] as { where: WhereCallback };
+  return where(
+    { id: "col:id", organizationId: "col:org" },
+    {
+      eq: (column, value) => ["eq", column, value],
+      and: (...conditions) => ["and", ...conditions],
+    }
+  );
+}
+
 function mockS3Body(data: unknown) {
   return {
     Body: {
@@ -101,11 +125,29 @@ describe("s3-inbound", () => {
   });
 
   describe("listInboundEmails", () => {
+    it("scopes the account lookup by id and organization", async () => {
+      mockFindFirst.mockResolvedValue(null);
+
+      await expect(
+        listInboundEmails({ awsAccountId: "acc-1", organizationId: "org-1" })
+      ).rejects.toThrow("AWS account not found");
+
+      expect(mockFindFirst).toHaveBeenCalledTimes(1);
+      expect(evaluateAccountWhere()).toEqual([
+        "and",
+        ["eq", "col:id", "acc-1"],
+        ["eq", "col:org", "org-1"],
+      ]);
+    });
+
     it("should throw when account is not found", async () => {
       mockFindFirst.mockResolvedValue(null);
 
       await expect(
-        listInboundEmails({ awsAccountId: "nonexistent" })
+        listInboundEmails({
+          awsAccountId: "nonexistent",
+          organizationId: "org-1",
+        })
       ).rejects.toThrow("AWS account not found");
     });
 
@@ -115,7 +157,10 @@ describe("s3-inbound", () => {
         features: { email: {} },
       });
 
-      const result = await listInboundEmails({ awsAccountId: "acc-1" });
+      const result = await listInboundEmails({
+        awsAccountId: "acc-1",
+        organizationId: "org-1",
+      });
       expect(result.emails).toEqual([]);
     });
 
@@ -148,6 +193,7 @@ describe("s3-inbound", () => {
 
       const result = await listInboundEmails({
         awsAccountId: "acc-1",
+        organizationId: "org-1",
         limit: 10,
       });
 
@@ -214,7 +260,10 @@ describe("s3-inbound", () => {
       const email1 = makeParsedEmailJson();
       mockS3Send.mockResolvedValueOnce(mockS3Body(email1));
 
-      const result = await listInboundEmails({ awsAccountId: "acc-1" });
+      const result = await listInboundEmails({
+        awsAccountId: "acc-1",
+        organizationId: "org-1",
+      });
 
       // Only the .json file should be fetched
       expect(result.emails).toHaveLength(1);
@@ -241,7 +290,10 @@ describe("s3-inbound", () => {
         .mockResolvedValueOnce(mockS3Body(goodEmail))
         .mockRejectedValueOnce(new Error("S3 read error"));
 
-      const result = await listInboundEmails({ awsAccountId: "acc-1" });
+      const result = await listInboundEmails({
+        awsAccountId: "acc-1",
+        organizationId: "org-1",
+      });
 
       // Only the successful email should be in results
       expect(result.emails).toHaveLength(1);
@@ -255,7 +307,10 @@ describe("s3-inbound", () => {
       error.name = "NoSuchBucket";
       mockS3Send.mockRejectedValueOnce(error);
 
-      const result = await listInboundEmails({ awsAccountId: "acc-1" });
+      const result = await listInboundEmails({
+        awsAccountId: "acc-1",
+        organizationId: "org-1",
+      });
       expect(result.emails).toEqual([]);
     });
 
@@ -266,6 +321,7 @@ describe("s3-inbound", () => {
 
       await listInboundEmails({
         awsAccountId: "acc-1",
+        organizationId: "org-1",
         limit: 25,
         continuationToken: "token-xyz",
       });
@@ -278,11 +334,34 @@ describe("s3-inbound", () => {
   });
 
   describe("getInboundEmail", () => {
+    it("scopes the account lookup by id and organization", async () => {
+      mockFindFirst.mockResolvedValue(null);
+
+      await expect(
+        getInboundEmail({
+          awsAccountId: "acc-1",
+          organizationId: "org-1",
+          emailId: "email-001",
+        })
+      ).rejects.toThrow("AWS account not found");
+
+      expect(mockFindFirst).toHaveBeenCalledTimes(1);
+      expect(evaluateAccountWhere()).toEqual([
+        "and",
+        ["eq", "col:id", "acc-1"],
+        ["eq", "col:org", "org-1"],
+      ]);
+    });
+
     it("should throw when account is not found", async () => {
       mockFindFirst.mockResolvedValue(null);
 
       await expect(
-        getInboundEmail({ awsAccountId: "nonexistent", emailId: "email-001" })
+        getInboundEmail({
+          awsAccountId: "nonexistent",
+          organizationId: "org-1",
+          emailId: "email-001",
+        })
       ).rejects.toThrow("AWS account not found");
     });
 
@@ -294,6 +373,7 @@ describe("s3-inbound", () => {
 
       const result = await getInboundEmail({
         awsAccountId: "acc-1",
+        organizationId: "org-1",
         emailId: "email-001",
       });
       expect(result).toBeNull();
@@ -307,6 +387,7 @@ describe("s3-inbound", () => {
 
       const result = await getInboundEmail({
         awsAccountId: "acc-1",
+        organizationId: "org-1",
         emailId: "email-001",
       });
 
@@ -359,6 +440,7 @@ describe("s3-inbound", () => {
 
       const result = await getInboundEmail({
         awsAccountId: "acc-1",
+        organizationId: "org-1",
         emailId: "nonexistent-email",
       });
       expect(result).toBeNull();
@@ -372,7 +454,11 @@ describe("s3-inbound", () => {
       mockS3Send.mockRejectedValueOnce(error);
 
       await expect(
-        getInboundEmail({ awsAccountId: "acc-1", emailId: "email-001" })
+        getInboundEmail({
+          awsAccountId: "acc-1",
+          organizationId: "org-1",
+          emailId: "email-001",
+        })
       ).rejects.toThrow("Access Denied");
     });
 
@@ -384,6 +470,7 @@ describe("s3-inbound", () => {
 
       await getInboundEmail({
         awsAccountId: "acc-1",
+        organizationId: "org-1",
         emailId: "email-001",
       });
 
