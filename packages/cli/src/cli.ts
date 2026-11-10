@@ -214,7 +214,7 @@ import {
 import { getTelemetryClient } from "./telemetry/client.js";
 import { telemetryCommandName } from "./telemetry/command-name.js";
 import { trackCommand, trackCommandFallback } from "./telemetry/events.js";
-import { parseCliArgs } from "./utils/shared/arg-parser.js";
+import { parseCliArgs, resolveValuedFlag } from "./utils/shared/arg-parser.js";
 import {
   printCompletionScript,
   setupTabCompletion,
@@ -745,6 +745,9 @@ function showHelp() {
   );
   console.log(`  ${pc.cyan("destroy")}      Remove deployed infrastructure`);
   console.log(`  ${pc.cyan("permissions")} Show required AWS IAM permissions`);
+  console.log(
+    `  ${pc.cyan("permissions --policy-dir <dir>")} Write the IAM policies to attach (wraps-deployer-<n>.json)`
+  );
   console.log(`  ${pc.cyan("completion")}   Generate shell completion script`);
   console.log(
     `  ${pc.cyan("telemetry")}    Manage anonymous telemetry settings`
@@ -3213,6 +3216,7 @@ async function run() {
             | "enterprise"
             | undefined,
           service: flags.service as "email" | "sms" | "cdn" | undefined,
+          policyDir: resolveValuedFlag(flags.policyDir, "--policy-dir"),
         });
         break;
 

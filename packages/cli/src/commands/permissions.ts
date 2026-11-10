@@ -6,6 +6,12 @@
 import * as clack from "@clack/prompts";
 import pc from "picocolors";
 import { trackCommand } from "../telemetry/events.js";
+import { errors } from "../utils/shared/errors.js";
+import {
+  type PolicyDirResult,
+  splitPolicy,
+  writePolicyDir,
+} from "../utils/shared/iam-policy-split.js";
 import { isJsonMode, jsonSuccess } from "../utils/shared/json-output.js";
 
 /**
@@ -18,6 +24,12 @@ export type PermissionsOptions = {
   preset?: "starter" | "production" | "enterprise";
   /** Service to show permissions for */
   service?: "email" | "sms" | "cdn";
+  /**
+   * Folder to write the policy into as `wraps-deployer-<n>.json` files, each
+   * small enough for one IAM managed policy. `""` means the flag was passed
+   * with no value.
+   */
+  policyDir?: string;
 };
 
 /**
@@ -670,12 +682,15 @@ function getSMSStatements(): IAMStatement[] {
 }
 
 /**
- * Build IAM policy based on service and preset
+ * Every statement the service and preset need, in policy order, before
+ * deduplication. Email and SMS both add the DynamoDB and Lambda statements;
+ * `buildPolicy` keeps the first of each `Sid`. Exported for the test that
+ * checks the copies it drops are identical to the ones it keeps.
  */
-function buildPolicy(
+export function collectPolicyStatements(
   service?: "email" | "sms" | "cdn",
   preset?: "starter" | "production" | "enterprise"
-): IAMPolicy {
+): IAMStatement[] {
   const statements: IAMStatement[] = [
     ...getBaseStatements(),
     ...getS3StateStatements(),
@@ -725,6 +740,19 @@ function buildPolicy(
     statements.push(...getRoute53Statements());
   }
 
+  return statements;
+}
+
+/**
+ * Build IAM policy based on service and preset. Exported for the
+ * `--policy-dir` split tests; the command file's one command is `permissions`.
+ */
+export function buildPolicy(
+  service?: "email" | "sms" | "cdn",
+  preset?: "starter" | "production" | "enterprise"
+): IAMPolicy {
+  const statements = collectPolicyStatements(service, preset);
+
   // Deduplicate statements by Sid
   const uniqueStatements = statements.reduce((acc, stmt) => {
     if (!acc.find((s) => s.Sid === stmt.Sid)) {
@@ -737,6 +765,84 @@ function buildPolicy(
     Version: "2012-10-17",
     Statement: uniqueStatements,
   };
+}
+
+/** Default folder the hints suggest for `--policy-dir`. */
+const DEFAULT_POLICY_DIR = "./wraps-policy";
+
+/** `wraps permissions [--service s] [--preset p] --policy-dir ./wraps-policy` */
+function policyDirCommand(
+  service?: "email" | "sms" | "cdn",
+  preset?: "starter" | "production" | "enterprise"
+): string {
+  const flags = [
+    service ? `--service ${service}` : undefined,
+    preset ? `--preset ${preset}` : undefined,
+    `--policy-dir ${DEFAULT_POLICY_DIR}`,
+  ].filter(Boolean);
+  return `wraps permissions ${flags.join(" ")}`;
+}
+
+/** Print how to create, attach and update the managed policies. */
+function printAttachSteps(): void {
+  console.log(pc.bold("Attach them in AWS:\n"));
+  console.log(
+    "1. For each file: IAM > Policies > Create policy > JSON, paste the file,"
+  );
+  console.log(
+    `   and name the policy after the file ${pc.dim("(wraps-deployer-1, wraps-deployer-2, ...)")}`
+  );
+  console.log(
+    "2. Attach every wraps-deployer-<n> policy to the IAM user or role that runs wraps"
+  );
+  console.log(
+    pc.dim(
+      "   A user takes 10 managed policies by default (a role 20, a group 10), including ones already attached\n"
+    )
+  );
+  console.log(pc.bold("When you update Wraps:\n"));
+  console.log(
+    "- Re-run this command and paste each file over its policy (Edit policy > JSON)."
+  );
+  console.log(
+    pc.dim(
+      "  IAM keeps 5 versions of a policy; the console asks you to delete an old one."
+    )
+  );
+  console.log(
+    "- Create or delete wraps-deployer-<n> policies when the number of files changes."
+  );
+  console.log(
+    "- If you attached a single WrapsDeploymentPolicy before, detach it once these are attached.\n"
+  );
+}
+
+/** Human output for `--policy-dir`: the files and the attach steps. */
+function displayPolicyDirResult(result: PolicyDirResult): void {
+  clack.intro(pc.bold("Wraps IAM Policies"));
+  const count = result.written.length;
+  console.log(
+    `\nWrote ${count} IAM ${count === 1 ? "policy" : "policies"} to ${pc.cyan(result.dir)}:`
+  );
+  for (const path of result.written) {
+    console.log(`  ${pc.green("+")} ${path}`);
+  }
+  if (result.removed.length > 0) {
+    console.log("\nRemoved stale files:");
+    for (const path of result.removed) {
+      console.log(`  ${pc.red("-")} ${path}`);
+    }
+    console.log(
+      pc.yellow(
+        "  Detach and delete the IAM policies named after these files; they are no longer needed."
+      )
+    );
+  }
+  console.log("");
+  printAttachSteps();
+  clack.outro(
+    pc.green("Each file fits one IAM managed policy (6,144 characters)")
+  );
 }
 
 /**
@@ -817,8 +923,11 @@ function displaySummary(
     );
   }
 
-  console.log(`\n${pc.dim("Get full IAM policy JSON:")}`);
-  console.log(`  ${pc.cyan("wraps permissions --json")}`);
+  console.log(`\n${pc.dim("Write the IAM policies to attach:")}`);
+  console.log(`  ${pc.cyan(policyDirCommand(service, preset))}`);
+  console.log(
+    `${pc.dim("JSON for scripts and agents (not a policy to paste):")} ${pc.cyan("wraps permissions --json")}`
+  );
 
   if (service) {
     console.log(`\n${pc.dim("Get permissions for all services:")}`);
@@ -837,28 +946,50 @@ function displaySummary(
 export async function permissions(options: PermissionsOptions): Promise<void> {
   const startTime = Date.now();
 
+  if (options.policyDir !== undefined && options.policyDir.trim() === "") {
+    throw errors.invalidFlagUsage(
+      "--policy-dir needs a directory",
+      `Pass the folder to write the policies to: ${policyDirCommand(options.service, options.preset)}`
+    );
+  }
+
   const policy = buildPolicy(options.service, options.preset);
+  // Each part fits one managed policy (6,144 characters, whitespace not
+  // counted). `policy` itself only fits an inline role policy (10,240).
+  const policies = splitPolicy(policy);
+  const written =
+    options.policyDir === undefined
+      ? undefined
+      : writePolicyDir(options.policyDir, policies);
 
   if (isJsonMode()) {
     jsonSuccess("permissions", {
       policy: policy as unknown as Record<string, unknown>,
+      policies,
+      ...(written && { written: written.written, removed: written.removed }),
     });
+  } else if (written) {
+    displayPolicyDirResult(written);
   } else {
     // Display human-readable summary
     displaySummary(options.service, options.preset);
 
-    // Show how to create the policy
+    // Show how to create the policies
     console.log(pc.bold("Quick Setup:\n"));
-    console.log("1. Copy the IAM policy:");
+    console.log("1. Write the IAM policies (one file per managed policy):");
     console.log(
-      `   ${pc.cyan("wraps permissions --json > wraps-policy.json")}\n`
+      `   ${pc.cyan(policyDirCommand(options.service, options.preset))}\n`
     );
-    console.log("2. Create the policy in AWS Console:");
-    console.log("   IAM > Policies > Create Policy > JSON\n");
-    console.log("3. Attach to your IAM user/role\n");
+    console.log("2. Create one policy per file in AWS Console:");
+    console.log(
+      "   IAM > Policies > Create Policy > JSON, named after the file\n"
+    );
+    console.log("3. Attach all of them to your IAM user/role\n");
 
     clack.outro(
-      pc.green("Run with --json to get the full IAM policy document")
+      pc.green(
+        "Run with --policy-dir <dir> to write the IAM policy files to attach"
+      )
     );
   }
 
@@ -872,5 +1003,8 @@ export async function permissions(options: PermissionsOptions): Promise<void> {
     json: options.json,
     preset: options.preset,
     service: options.service,
+    // Never the path: it can carry a home-directory user name.
+    policy_dir: options.policyDir !== undefined,
+    policy_count: policies.length,
   });
 }
