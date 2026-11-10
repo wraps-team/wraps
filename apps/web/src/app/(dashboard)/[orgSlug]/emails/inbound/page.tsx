@@ -53,6 +53,7 @@ async function fetchInboundEmails(
         try {
           const result = await listInboundEmails({
             awsAccountId: account.id,
+            organizationId,
             limit: 100,
           });
 
