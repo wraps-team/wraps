@@ -1481,9 +1481,9 @@ export default function CLIReferenceEmailPageContent() {
             metadata. Pass the emailId from{" "}
             <code>wraps email inbound list</code>. When the email has{" "}
             <code>envelopeRecipients</code> (the addresses SES delivered to, Bcc
-            included), a &quot;Delivered to&quot; line shows the ones To and Cc
-            do not; <code>--json</code> returns the field whenever it is
-            present.
+            included), a &quot;Delivered to&quot; line lists them when the list
+            holds an address To and Cc do not show; <code>--json</code> returns
+            the field whenever it is present.
           </p>
           <Card className="mb-4">
             <CardHeader>

@@ -1562,8 +1562,10 @@ export default function InfrastructureEventsPageContent() {
                           <td className="p-3 text-muted-foreground">
                             Lowercased SMTP envelope recipients SES delivered
                             to, Bcc included. Absent on mail received before{" "}
-                            <code>wraps email upgrade</code>, so treat absent as
-                            unknown, not empty
+                            <code className="rounded bg-muted px-1 py-0.5">
+                              wraps email upgrade
+                            </code>
+                            , so treat absent as unknown, not empty
                           </td>
                         </tr>
                         <tr className="border-b">
@@ -1710,7 +1712,10 @@ export default function InfrastructureEventsPageContent() {
                   envelopeRecipientCount
                 </code>{" "}
                 with the full count, and adds{" "}
-                <code>&quot;envelopeRecipients&quot;</code> to{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  &quot;envelopeRecipients&quot;
+                </code>{" "}
+                to{" "}
                 <code className="rounded bg-muted px-1.5 py-0.5">
                   truncatedFields
                 </code>
