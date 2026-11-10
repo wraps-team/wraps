@@ -379,11 +379,12 @@ TTL: 3600`}
               code={`// EventBridge event detail structure
 {
   "source": "wraps.inbound",
-  "detail-type": "Email Received",
+  "detail-type": "email.received",
   "detail": {
     "emailId": "inb_a1b2c3d4",
     "from": { "address": "customer@example.com" },
     "to": [{ "address": "support@yourapp.com" }],
+    "envelopeRecipients": ["support@yourapp.com"],
     "subject": "Order Question",
     "spamVerdict": "PASS",
     "virusVerdict": "PASS"
@@ -391,6 +392,14 @@ TTL: 3600`}
 }`}
               title="EventBridge Event"
             />
+
+            <p className="mt-4 mb-6 text-foreground/80 leading-relaxed">
+              Route on <code>envelopeRecipients</code>, not <code>to</code>: it
+              lists the addresses SES delivered to, so Bcc and forwarded mail
+              still reach the right handler. Mail received before{" "}
+              <code>wraps email upgrade</code> does not have it, so fall back to{" "}
+              <code>to</code>.
+            </p>
 
             <h3 className="mt-8 mb-4 font-semibold text-xl">
               Example: Route to Different Handlers

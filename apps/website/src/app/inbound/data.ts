@@ -110,7 +110,7 @@ await hubspot.contacts.create({
     iconName: "MessageSquare" as const,
     title: "Document Processing",
     description:
-      "Extract attachments, process PDFs, and trigger document workflows with S3 events.",
+      "Extract attachments, process PDFs, and trigger document workflows from the email.received event.",
     code: `// Presigned URL per attachment
 for (const att of inbound.attachments) {
   const url = await email.inbox
@@ -206,10 +206,13 @@ await email.inbox.forward('inb_a1b2c3d4e5f6', {
 export const handler = async (event: EventBridgeEvent) => {
   const email = event.detail;
 
-  // Route based on recipient
-  if (email.to[0].address.startsWith('support@')) {
+  // Route on who SES delivered to (covers Bcc and forwards).
+  // Mail from before the upgrade has no envelopeRecipients.
+  const recipients =
+    email.envelopeRecipients ?? email.to.map((t) => t.address.toLowerCase());
+  if (recipients.some((r) => r.startsWith('support@'))) {
     await createSupportTicket(email);
-  } else if (email.to[0].address.startsWith('sales@')) {
+  } else if (recipients.some((r) => r.startsWith('sales@'))) {
     await notifySalesTeam(email);
   }
 
