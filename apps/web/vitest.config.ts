@@ -3,18 +3,22 @@ import { loadEnv, type UserConfig } from "vite";
 import { defineConfig } from "vitest/config";
 import { resolveTestDatabaseUrl } from "../../scripts/test-db/resolve-branch.mjs";
 
-// The ten files that import the *fixed*-id fixtures from
-// `src/app/api/__tests__/setup.ts` (`test-onboarding-org-1`, slug
-// `onboarding-test-org`, …). Every other DB-touching suite namespaces its
-// fixtures per file — `setupPermissionFixtures` appends a random suffix,
-// `__tests__/fixtures/real-db.ts` prefixes every id — so only these ten can
-// delete each other's rows mid-test. They get their own serial project; the
-// rest of the suite runs in parallel. Migrating this setup to a per-file
-// prefix would let the group fold into the parallel project.
+// Any file that imports `src/app/api/__tests__/setup.ts`, by any path
+// (`./setup`, `@/app/api/__tests__/setup`), must be listed here: that file's
+// fixtures use fixed ids (`test-onboarding-org-1`, slug `onboarding-test-org`,
+// user `test-onboarding-user-1`) and its `afterAll` deletes those rows, so a
+// parallel importer would lose them mid-test. The other listed files are here
+// for historical reasons; the list is not every fixed-id file. Every other
+// DB-touching suite namespaces its fixtures per file (`setupPermissionFixtures`
+// appends a random suffix, `__tests__/fixtures/real-db.ts` prefixes every id).
+// The listed files get their own serial project; the rest runs in parallel.
+// Migrating `setup.ts` to a per-file prefix would let the group fold into the
+// parallel project.
 const SHARED_FIXTURE_FILES = [
   "src/app/api/__tests__/activation-status.test.ts",
   "src/app/api/__tests__/ai-generate-code-vision.test.ts",
   "src/app/api/__tests__/aws-connect-rbac-db.test.ts",
+  "src/app/api/__tests__/aws-setup-method-db.test.ts",
   "src/app/api/__tests__/aws-validate.test.ts",
   "src/app/api/__tests__/brand-kits.test.ts",
   "src/app/api/__tests__/onboarding.test.ts",
@@ -22,7 +26,20 @@ const SHARED_FIXTURE_FILES = [
   "src/app/api/__tests__/save-source.test.ts",
   "src/app/api/__tests__/send-test-unsubscribe.test.ts",
   "src/app/api/__tests__/templates.test.ts",
+  "src/lib/usage/__tests__/ai-usage-cached-tokens.test.ts",
+  "src/lib/usage/__tests__/ai-usage.test.ts",
 ];
+
+// Observed on local Node 24.21 and 26: Node's experimental webstorage global
+// shadows jsdom's `localStorage` (it is `undefined` without
+// `--localstorage-file`), so component tests die with "Cannot read properties
+// of undefined (reading 'clear')". CI's Node 24.22 passes either way. Passing
+// the flag lets jsdom's win; it is only passed when this Node knows it, since
+// an older Node rejects unknown flags in `execArgv`.
+const WEBSTORAGE_OFF = "--no-experimental-webstorage";
+const workerExecArgv = process.allowedNodeEnvironmentFlags.has(WEBSTORAGE_OFF)
+  ? [WEBSTORAGE_OFF]
+  : [];
 
 export default defineConfig(async () => {
   // Load .env.test file
@@ -42,6 +59,10 @@ export default defineConfig(async () => {
     // writes — creating an org, seeding rows, then asserting — lands just past
     // the 5s default. Matches apps/api and packages/auth.
     testTimeout: 30_000,
+    // The default `forks` pool spawns a child process per worker, so Node
+    // flags in `execArgv` take effect there (a `threads` pool would not).
+    pool: "forks" as const,
+    execArgv: workerExecArgv,
     hookTimeout: 30_000,
     // Load environment variables from .env.test
     env,

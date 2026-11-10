@@ -6,6 +6,10 @@ packages:
   - "!packages/video"
   - wraps
 
+# A --filter that matches no package exits non-zero instead of silently doing
+# nothing (a typo'd name used to pass). Opt out per call: --no-fail-if-no-match.
+failIfNoMatch: true
+
 # Our own packages — the release-age gate exists to catch a compromised
 # upstream publish, and we are the upstream.
 # github.com/byo-oss/notifications, github.com/byo-oss/mailer, github.com/wraps-team/better-auth-wraps

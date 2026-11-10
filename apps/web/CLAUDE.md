@@ -203,9 +203,11 @@ create it) and needs a working `DATABASE_URL`. Without it, tests fail with
 opaque connection/query errors, not a helpful message.
 
 - The suite runs as **two vitest projects**. `parallel` holds everything and
-  runs files concurrently; `shared-fixtures` holds the ten files that import the
-  fixed-id fixtures in `src/app/api/__tests__/setup.ts` and runs serially,
-  because those ten can delete each other's rows. Isolation everywhere else
+  runs files concurrently; `shared-fixtures` holds the thirteen files in
+  `SHARED_FIXTURE_FILES` and runs serially. Any file that imports
+  `src/app/api/__tests__/setup.ts`, by any path, must be listed, because that
+  file's `afterAll` deletes the shared fixture rows; the other listed files are
+  there for historical reasons. Isolation everywhere else
   comes from per-file fixture prefixes (`setupPermissionFixtures`,
   `__tests__/fixtures/real-db.ts`) — **any new DB-touching test must namespace
   its fixtures the same way**, or it will collide under parallelism.
@@ -229,3 +231,6 @@ Vercel Security Review (wraps team, Agent settings) reviews each push to this pr
 live in the team's Vulnerabilities dashboard, never in public PRs; read them with
 `vercel security vulnerabilities`. Verify each one against the code, then fix it through a normal
 plan and review. Don't use "Fix with Vercel Agent".
+
+Each review compares the push against the previous deployment, so it covers that diff, not the
+whole app. "No findings" on a push says nothing about code it did not touch.

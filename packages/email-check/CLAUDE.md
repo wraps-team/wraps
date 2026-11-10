@@ -109,6 +109,6 @@ When DKIM selectors aren't found, SPF records are checked for provider hints to 
 ## Commands
 
 ```bash
-pnpm --filter @wraps/email-check build   # Build
-pnpm --filter @wraps/email-check test    # Run tests
+pnpm --filter @wraps.dev/email-check build   # Build
+pnpm --filter @wraps.dev/email-check test    # Run tests
 ```

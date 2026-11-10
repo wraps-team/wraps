@@ -14,6 +14,26 @@ ports, so `localhost:3000` is not listening:
 Run the CLI against them with `pnpm cli:dev`. Plain `pnpm cli` uses the CLI's own
 defaults (`http://localhost:3001` / `:3000`), which portless leaves unserved.
 
+## Running the dashboard locally
+
+`apps/web/.env.local` (gitignored; `scripts/setup-worktree.sh` symlinks it into each
+worktree) is the dashboard's local config:
+
+- `DATABASE_URL` is the long-lived `dev` branch of the test-only Neon project `wraps-test`:
+  test data, not production. Tests don't read it (see `test-database.md`).
+- `NEXT_PUBLIC_APP_URL` and `BETTER_AUTH_URL` are `https://web.wraps.localhost`. The auth
+  client sends sign-up and sign-in there, so a plain `next dev -p <port>` renders the pages
+  but every auth request 404s. Run auth flows through `pnpm --filter @wraps/web dev`.
+- The Turnstile keys are Cloudflare's always-pass test pair, so local sign-up needs no real
+  challenge. The real keys live in Vercel.
+
+## Stopping a server you started
+
+Note its PID when you start it, stop it with `kill <pid>`, then check the port is free with
+`ss -ltn | grep ':<port> '`. Never `pkill -f <pattern>`: the pattern matches the shell
+running the command, which kills itself (exit 144), and `next dev` or `next-server` also
+matches your own `pnpm dev` and other sessions' servers.
+
 ## Test environment: `apps/web/.env.test`
 
 Every vitest config (`apps/web`, `apps/api`, `packages/auth`, `packages/db`) loads
@@ -33,6 +53,14 @@ rather than empty: several auth tests skip when it is undefined but try to conne
 is `""`. See `docs/agents/test-database.md` for how it becomes a per-checkout branch.
 
 If you keep the keys in `.env.local` instead, `vitest` does not read that file for tests.
+
+Observed on local Node 24.21 and 26: Node's experimental webstorage global shadows
+jsdom's `localStorage`, so component tests failed with `Cannot read properties of
+undefined (reading 'clear')`. CI's Node 24.22 passes either way.
+`apps/web/vitest.config.ts` starts its workers with `--no-experimental-webstorage`, only
+when the running Node knows the flag; nothing to do locally. A `pnpm --filter <name>` that matches no package now
+exits non-zero (`failIfNoMatch` in `pnpm-workspace.yaml`); pass `--no-fail-if-no-match`
+where an empty match is legitimate.
 
 ## `pnpm check:changed`: the diff-only gate
 

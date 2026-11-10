@@ -9,7 +9,9 @@ VERBOSE=false
 [[ "${1:-}" == "--verbose" ]] && VERBOSE=true
 
 LOGDIR=$(mktemp -d)
-trap 'rm -rf "$LOGDIR"' EXIT
+# Kept when a step fails, so its full output can be read after the run.
+KEEP_LOGS=false
+trap '$KEEP_LOGS || rm -rf "$LOGDIR"' EXIT
 
 # Force turbo to use streaming output (TUI mode hangs when stdout is redirected)
 export TURBO_UI=stream
@@ -83,6 +85,11 @@ echo ""
 echo "--- check:all summary ---"
 for r in "${RESULTS[@]}"; do
   echo "  $r"
+done
+# The loop stops at the first failure: name the steps it never reached, so
+# they are not mistaken for passes.
+for s in "${STEPS[@]:${#RESULTS[@]}}"; do
+  echo "  NOT RUN $s"
 done
 
 if [[ $FAIL -gt 0 ]]; then
@@ -188,6 +195,8 @@ if [[ $FAIL -gt 0 ]]; then
   echo ""
   echo "--- end $FAILED_STEP output ---"
   echo "Re-run with: $FAILED_CMD"
+  KEEP_LOGS=true
+  echo "Full log: $clean_log"
   exit 1
 fi
 

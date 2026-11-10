@@ -28,6 +28,8 @@ type IAMStatement = {
   Effect: "Allow" | "Deny";
   Action: string[];
   Resource: string | string[];
+  /** IAM condition block, copied as-is into the policy JSON */
+  Condition?: Record<string, Record<string, string | string[]>>;
 };
 
 /**
@@ -137,6 +139,108 @@ function getEventBridgeStatements(): IAMStatement[] {
         "events:UntagResource",
       ],
       Resource: ["arn:aws:events:*:*:rule/wraps-*"],
+    },
+  ];
+}
+
+/**
+ * Get EventBridge connection and API destination statements for webhooks.
+ *
+ * The event-tracking webhooks (platform, user, self-hosted) and the inbound
+ * webhook each create an `aws.cloudwatch.EventConnection` and
+ * `EventApiDestination` named `wraps-*-connection` / `wraps-*-destination`.
+ *
+ * EventBridge stores a connection's auth parameters in a Secrets Manager
+ * secret it creates under `events!connection/<name>/...`, using the caller's
+ * permissions. The five Secrets Manager actions are the ones AWS grants for
+ * this in AmazonEventBridgeFullAccess (v7, Sid
+ * SecretsManagerAccessForApiDestinations), narrowed from `secret:events!*` to
+ * our connections.
+ *
+ * The first CreateConnection in an account also creates the API-destinations
+ * service-linked role. That statement is copied from the same managed policy
+ * (Sid IAMCreateServiceLinkedRoleForApiDestinations), condition included.
+ */
+function getEventBridgeWebhookStatements(): IAMStatement[] {
+  return [
+    {
+      Sid: "EventBridgeWebhookDestinations",
+      Effect: "Allow",
+      Action: [
+        "events:CreateConnection",
+        "events:DescribeConnection",
+        "events:UpdateConnection",
+        "events:DeleteConnection",
+        "events:CreateApiDestination",
+        "events:DescribeApiDestination",
+        "events:UpdateApiDestination",
+        "events:DeleteApiDestination",
+      ],
+      Resource: [
+        "arn:aws:events:*:*:connection/wraps-*",
+        "arn:aws:events:*:*:api-destination/wraps-*",
+      ],
+    },
+    {
+      Sid: "EventBridgeConnectionSecrets",
+      Effect: "Allow",
+      Action: [
+        "secretsmanager:CreateSecret",
+        "secretsmanager:UpdateSecret",
+        "secretsmanager:DeleteSecret",
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:PutSecretValue",
+      ],
+      Resource: ["arn:aws:secretsmanager:*:*:secret:events!connection/wraps-*"],
+    },
+    {
+      Sid: "EventBridgeApiDestinationsServiceRole",
+      Effect: "Allow",
+      Action: ["iam:CreateServiceLinkedRole"],
+      Resource:
+        "arn:aws:iam::*:role/aws-service-role/apidestinations.events.amazonaws.com/AWSServiceRoleForAmazonEventBridgeApiDestinations",
+      Condition: {
+        StringEquals: {
+          "iam:AWSServiceName": "apidestinations.events.amazonaws.com",
+        },
+      },
+    },
+  ];
+}
+
+/**
+ * Get statements for the reply-threading signing secret, an SSM SecureString
+ * at `/wraps/email/reply-secret/{domain}` (`resources/reply-secret.ts`).
+ *
+ * Pulumi's `aws.ssm.Parameter` (terraform-provider-aws `aws_ssm_parameter`)
+ * calls PutParameter, GetParameter, DescribeParameters, DeleteParameter and
+ * the tag APIs; `wraps email reply` calls GetParameter and PutParameter.
+ * DescribeParameters has no resource type in the AWS service reference, so it
+ * sits alone on `*`. It returns parameter metadata only, never values.
+ *
+ * The parameter uses the AWS managed key `alias/aws/ssm`. Its key policy
+ * already lets account principals use it through SSM, so no KMS grant here.
+ */
+function getReplyThreadingStatements(): IAMStatement[] {
+  return [
+    {
+      Sid: "ReplyThreadingSecret",
+      Effect: "Allow",
+      Action: [
+        "ssm:PutParameter",
+        "ssm:GetParameter",
+        "ssm:DeleteParameter",
+        "ssm:AddTagsToResource",
+        "ssm:RemoveTagsFromResource",
+        "ssm:ListTagsForResource",
+      ],
+      Resource: ["arn:aws:ssm:*:*:parameter/wraps/email/reply-secret/*"],
+    },
+    {
+      Sid: "ReplyThreadingSecretDescribe",
+      Effect: "Allow",
+      Action: ["ssm:DescribeParameters"],
+      Resource: "*",
     },
   ];
 }
@@ -584,6 +688,10 @@ function buildPolicy(
     // Event tracking (Production and Enterprise)
     if (!preset || preset === "production" || preset === "enterprise") {
       statements.push(...getEventBridgeStatements());
+      // Webhook connections and reply threading need event tracking or
+      // inbound, which starter lacks
+      statements.push(...getEventBridgeWebhookStatements());
+      statements.push(...getReplyThreadingStatements());
       statements.push(...getSQSStatements());
       statements.push(...getDynamoDBStatements());
       statements.push(...getLambdaStatements());
