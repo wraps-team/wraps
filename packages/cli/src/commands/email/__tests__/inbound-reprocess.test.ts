@@ -301,8 +301,16 @@ describe("inbound reprocess (replay)", () => {
     expect(err).toMatchObject({ code: "SQS_PERMISSION_DENIED" });
     expect(err.message).toContain("sqs:DeleteMessage");
     expect(err.message).toContain("Stopped after 1 message handed off");
-    expect(err.message).toContain("do not replay");
     expect(err.message).toContain("still queued");
+    expect(err.message).toContain("id: m1");
+    expect(err.message).toContain(
+      "would take it from the queue and replay it again"
+    );
+    expect(err.message).toContain("SQS console");
+    expect(err.message).toContain("any run before then replays it");
+    expect(err.message).not.toContain("do not replay");
+    expect(err.suggestion).toContain("before you run reprocess again");
+    expect(err.suggestion).toContain("delivers them twice");
     expect(err.data).toEqual({
       handedOff: ["m1"],
       handedOffNotDeleted: ["m1"],

@@ -160,7 +160,8 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
       {
         code: "LAMBDA_PERMISSION_DENIED",
         message: "Lambda permission denied",
-        solution: "Needs CreateFunction, UpdateFunctionCode, DeleteFunction",
+        solution:
+          "Needs CreateFunction, UpdateFunctionCode, DeleteFunction, or, for inbound reprocess, InvokeFunction on wraps-inbound-email-processor",
       },
       {
         code: "EVENTBRIDGE_PERMISSION_DENIED",
@@ -170,7 +171,8 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
       {
         code: "SQS_PERMISSION_DENIED",
         message: "SQS permission denied",
-        solution: "Needs CreateQueue, DeleteQueue, GetQueueAttributes",
+        solution:
+          "Needs CreateQueue, DeleteQueue, GetQueueAttributes, or, for inbound reprocess, ReceiveMessage and DeleteMessage on wraps-inbound-events-dlq",
       },
       {
         code: "CLOUDWATCH_LOGS_PERMISSION_DENIED",
@@ -558,7 +560,7 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
         message:
           "Inbound trigger switch did not finish. Stopped at step <n> (<state>). Cause: <message>",
         solution:
-          "Fix the cause, then run wraps email upgrade --action redeploy to finish the switch. Mail keeps one live trigger at every step, and what the command saved before the switch stays saved.",
+          "Fix the cause, then run wraps email upgrade --action redeploy --region <region> --yes to finish the switch (add --preview first to see the stack changes). Mail keeps one live trigger at every step, and what the command saved before the switch stays saved.",
       },
       {
         code: "RECEIPT_RULE_DELETE_FAILED",

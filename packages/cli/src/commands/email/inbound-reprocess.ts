@@ -99,7 +99,7 @@ function sqsDeleteDenied(): WrapsError {
   return new WrapsError(
     `Not allowed to delete messages from the dead-letter queue ${INBOUND_DLQ_NAME} (sqs:DeleteMessage)`,
     "SQS_PERMISSION_DENIED",
-    "Re-apply the Wraps IAM policy, which now includes the InboundReprocess statement: wraps permissions --service email --json",
+    "Re-apply the Wraps IAM policy, which now includes the InboundReprocess statement: wraps permissions --service email --json. Delete the messages the processor already took (their ids are in this error) before you run reprocess again, or the next run delivers them twice.",
     "https://wraps.dev/docs/guides/aws-setup/permissions"
   );
 }
@@ -294,9 +294,11 @@ function stoppedError(cause: WrapsError, results: ReplayReport[]): WrapsError {
   const handedOff = results.filter((r) => r.outcome !== "failed");
   const kept = results.filter((r) => r.outcome === "replayed-not-deleted");
   const n = handedOff.length;
+  const k = kept.length;
+  const it = k === 1 ? "it" : "them";
   const keptNote =
-    kept.length > 0
-      ? ` ${kept.length} of them ${kept.length === 1 ? "is" : "are"} still queued although the processor took ${kept.length === 1 ? "it" : "them"}; do not replay ${kept.length === 1 ? "it" : "them"} (ids in the --json data, or leave ${kept.length === 1 ? "it" : "them"} to expire after 14 days).`
+    k > 0
+      ? ` ${k} of them ${k === 1 ? "is" : "are"} still queued although the processor took ${it} (id${k === 1 ? "" : "s"}: ${kept.map((r) => r.messageId).join(", ")}). The next reprocess run would take ${it} from the queue and replay ${it} again, delivering the email twice. Delete ${it} from the SQS console (${INBOUND_DLQ_NAME}, Send and receive messages, poll, find the id) before running reprocess again, or leave ${it} to expire: the queue keeps messages 14 days, and any run before then replays ${it}.`
       : "";
   // Reuse the cause: its code is a literal where it was built, which the
   // error-code parity test relies on.

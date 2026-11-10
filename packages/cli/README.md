@@ -223,7 +223,7 @@ wraps email init --provider vercel --region us-east-1 --domain myapp.com --prese
 | `wraps email check` | Check email deliverability for a domain |
 | `wraps email config` | Apply CLI config updates to infrastructure (alias: `sync`) |
 | `wraps email status` | Show email infrastructure details |
-| `wraps email upgrade` | Add features incrementally (presets, tracking domain, SMTP, managed dedicated IPs, etc.) |
+| `wraps email upgrade` | Add features incrementally (presets, tracking domain, SMTP, managed dedicated IPs, etc.), or re-apply the saved configuration with `--action redeploy` (finishes an inbound trigger switch) |
 | `wraps email verify` | Verify domain DNS records (DKIM, SPF, DMARC) |
 | `wraps email restore` | Restore infrastructure from saved metadata |
 | `wraps email destroy` | Remove all email infrastructure |
@@ -246,6 +246,7 @@ wraps email init --provider vercel --region us-east-1 --domain myapp.com --prese
 | `wraps email inbound status` | Show inbound email configuration |
 | `wraps email inbound verify` | Verify inbound DNS records |
 | `wraps email inbound test` | Send a test inbound email |
+| `wraps email inbound reprocess` | Replay the inbound dead-letter queue through the processor (`--dry-run` first) |
 | `wraps email inbound destroy` | Remove inbound email infrastructure |
 
 #### Template Commands

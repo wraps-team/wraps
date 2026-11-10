@@ -14,7 +14,12 @@ export class WrapsError extends Error {
     public code: string,
     public suggestion?: string,
     public docsUrl?: string,
-    /** Values a failed command still hands back in `--json` (as the envelope's `data`). */
+    /**
+     * Values a failed command still hands back in `--json` (as the envelope's
+     * `data`). Ids and counts only: never credentials, secrets, message bodies
+     * or file contents. It is written to stdout, which CI logs and agent
+     * transcripts keep.
+     */
     public data?: Record<string, unknown>
   ) {
     super(message);
