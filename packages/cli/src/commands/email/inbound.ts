@@ -21,6 +21,7 @@ import {
   createReceiptRuleSet,
   deleteReceiptRule,
   deleteReceiptRuleSet,
+  deleteReceiptTopic,
   getActiveReceiptRuleSet,
   RULE_SET_NAME,
   removeDomainFromReceiptRule,
@@ -810,6 +811,7 @@ export async function inboundDestroy(
   await progress.execute("Removing SES receipt rules", async () => {
     await deleteReceiptRule(region);
     await deleteReceiptRuleSet(region);
+    await deleteReceiptTopic(region, identity.accountId);
   });
 
   // 8. Ensure Pulumi work directory

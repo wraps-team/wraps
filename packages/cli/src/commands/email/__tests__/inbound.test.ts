@@ -60,6 +60,7 @@ vi.mock("../../../utils/email/receipt-rules.js", async (importOriginal) => {
     getReceiptRuleDomains: vi.fn().mockResolvedValue([]),
     deleteReceiptRule: vi.fn().mockResolvedValue(undefined),
     deleteReceiptRuleSet: vi.fn().mockResolvedValue(undefined),
+    deleteReceiptTopic: vi.fn().mockResolvedValue(undefined),
     // Only reached by inboundInit's deploy path (step 14, "Creating SES
     // receipt rules") — mocked so its non-interactive-guard success test
     // doesn't fall through to the real AWS SDK client.

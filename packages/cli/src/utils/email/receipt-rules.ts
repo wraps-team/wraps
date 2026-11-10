@@ -3,6 +3,13 @@
  *
  * Uses SES v1 API (classic receipt rules) because SES v2 does not support receipt rules.
  * These must be managed via the AWS SDK rather than Pulumi (limited Pulumi support).
+ *
+ * The rule's S3 action also names an SNS topic. SES publishes its receipt
+ * notification there for every stored message: the SMTP envelope
+ * (`receipt.recipients`, `mail.source`), the spam/virus/SPF/DKIM/DMARC
+ * verdicts and the S3 object key. The envelope exists nowhere else — the raw
+ * MIME in S3 does not carry Bcc or forwarded recipients — so consumers that
+ * need it subscribe to the topic.
  */
 
 import {
@@ -16,9 +23,16 @@ import {
   SetActiveReceiptRuleSetCommand,
   UpdateReceiptRuleCommand,
 } from "@aws-sdk/client-ses";
+import {
+  CreateTopicCommand,
+  DeleteTopicCommand,
+  SetTopicAttributesCommand,
+  SNSClient,
+} from "@aws-sdk/client-sns";
 
 const RULE_SET_NAME = "wraps-inbound-rules";
 const RULE_NAME = "wraps-inbound-catch-all";
+const RECEIPT_TOPIC_NAME = "wraps-inbound-receipts";
 
 /**
  * Create SES client for a specific region
@@ -49,7 +63,80 @@ export async function createReceiptRuleSet(region: string): Promise<void> {
 }
 
 /**
- * Create a catch-all receipt rule that stores emails in S3
+ * ARN of the SNS topic SES publishes inbound receipt notifications to
+ */
+export function getReceiptTopicArn(region: string, accountId: string): string {
+  return `arn:aws:sns:${region}:${accountId}:${RECEIPT_TOPIC_NAME}`;
+}
+
+/**
+ * Create the receipt notification topic (idempotent) and let SES publish to
+ * it from this account's wraps-inbound-rules rule set only.
+ * Returns the topic ARN.
+ */
+export async function ensureReceiptTopic(region: string): Promise<string> {
+  const sns = new SNSClient({ region });
+
+  const { TopicArn } = await sns.send(
+    new CreateTopicCommand({
+      Name: RECEIPT_TOPIC_NAME,
+      Tags: [
+        { Key: "ManagedBy", Value: "wraps-cli" },
+        { Key: "Service", Value: "email-inbound" },
+      ],
+    })
+  );
+  if (!TopicArn) {
+    throw new Error("SNS did not return an ARN for the receipt topic");
+  }
+
+  const accountId = TopicArn.split(":")[4];
+  await sns.send(
+    new SetTopicAttributesCommand({
+      TopicArn,
+      AttributeName: "Policy",
+      AttributeValue: JSON.stringify({
+        Version: "2012-10-17",
+        Statement: [
+          {
+            Sid: "AllowSESReceiptPublish",
+            Effect: "Allow",
+            Principal: { Service: "ses.amazonaws.com" },
+            Action: "SNS:Publish",
+            Resource: TopicArn,
+            Condition: {
+              StringEquals: { "AWS:SourceAccount": accountId },
+              ArnLike: {
+                "AWS:SourceArn": `arn:aws:ses:${region}:${accountId}:receipt-rule-set/${RULE_SET_NAME}:receipt-rule/*`,
+              },
+            },
+          },
+        ],
+      }),
+    })
+  );
+
+  return TopicArn;
+}
+
+/**
+ * Delete the receipt notification topic (cleanup). Subscriptions go with it.
+ */
+export async function deleteReceiptTopic(
+  region: string,
+  accountId: string
+): Promise<void> {
+  const sns = new SNSClient({ region });
+
+  // DeleteTopic is idempotent: a topic that does not exist is not an error.
+  await sns.send(
+    new DeleteTopicCommand({ TopicArn: getReceiptTopicArn(region, accountId) })
+  );
+}
+
+/**
+ * Create a catch-all receipt rule that stores emails in S3 and publishes the
+ * receipt notification to SNS
  */
 export async function createReceiptRule(
   region: string,
@@ -83,6 +170,8 @@ export async function createReceiptRule(
     }
   }
 
+  const topicArn = await ensureReceiptTopic(region);
+
   await ses.send(
     new CreateReceiptRuleCommand({
       RuleSetName: RULE_SET_NAME,
@@ -96,6 +185,7 @@ export async function createReceiptRule(
             S3Action: {
               BucketName: s3BucketName,
               ObjectKeyPrefix: "raw/",
+              TopicArn: topicArn,
             },
           },
         ],
@@ -337,4 +427,4 @@ export async function getReceiptRuleDomains(region: string): Promise<string[]> {
   }
 }
 
-export { RULE_NAME, RULE_SET_NAME };
+export { RECEIPT_TOPIC_NAME, RULE_NAME, RULE_SET_NAME };
