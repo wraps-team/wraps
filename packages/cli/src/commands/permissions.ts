@@ -231,6 +231,83 @@ function getLambdaStatements(): IAMStatement[] {
 }
 
 /**
+ * Get inbound email statements (receipt rules and the inbound bucket).
+ *
+ * Receipt-rule actions take no resource ARN: the AWS service reference
+ * (https://servicereference.us-east-1.amazonaws.com/v1/ses/ses.json) lists no
+ * resource type for any of them, so an ARN-scoped statement would deny them.
+ * The bucket statement covers what the CLI and Pulumi's bucket resources call
+ * on `wraps-inbound-*`, including the reads Pulumi's bucket refresh makes.
+ */
+function getInboundStatements(): IAMStatement[] {
+  return [
+    {
+      Sid: "InboundReceiptRules",
+      Effect: "Allow",
+      Action: [
+        "ses:CreateReceiptRuleSet",
+        "ses:DeleteReceiptRuleSet",
+        "ses:DescribeReceiptRuleSet",
+        "ses:CreateReceiptRule",
+        "ses:UpdateReceiptRule",
+        "ses:DescribeReceiptRule",
+        "ses:DeleteReceiptRule",
+        "ses:DescribeActiveReceiptRuleSet",
+        "ses:SetActiveReceiptRuleSet",
+      ],
+      Resource: "*",
+    },
+    {
+      Sid: "InboundBucket",
+      Effect: "Allow",
+      Action: [
+        "s3:CreateBucket",
+        "s3:DeleteBucket",
+        "s3:PutBucketPublicAccessBlock",
+        "s3:GetBucketPublicAccessBlock",
+        "s3:PutEncryptionConfiguration",
+        "s3:GetEncryptionConfiguration",
+        "s3:PutLifecycleConfiguration",
+        "s3:GetLifecycleConfiguration",
+        "s3:PutBucketTagging",
+        "s3:GetBucketTagging",
+        "s3:PutBucketPolicy",
+        "s3:GetBucketPolicy",
+        "s3:DeleteBucketPolicy",
+        "s3:PutBucketNotification",
+        "s3:GetBucketNotification",
+        "s3:ListBucket",
+        "s3:ListBucketVersions",
+        // Read by Pulumi's bucket resource on create and refresh (the
+        // provider fails on AccessDenied for each of these).
+        "s3:GetBucketAcl",
+        "s3:GetBucketCORS",
+        "s3:GetBucketWebsite",
+        "s3:GetBucketVersioning",
+        "s3:GetAccelerateConfiguration",
+        "s3:GetBucketRequestPayment",
+        "s3:GetBucketLogging",
+        "s3:GetReplicationConfiguration",
+        "s3:GetBucketObjectLockConfiguration",
+      ],
+      Resource: ["arn:aws:s3:::wraps-inbound-*"],
+    },
+    {
+      Sid: "InboundBucketObjects",
+      Effect: "Allow",
+      Action: [
+        // Pulumi forceDestroy empties the bucket before deleting it.
+        "s3:DeleteObject",
+        "s3:DeleteObjectVersion",
+        // `wraps email inbound test` reads the parsed message back.
+        "s3:GetObject",
+      ],
+      Resource: ["arn:aws:s3:::wraps-inbound-*/*"],
+    },
+  ];
+}
+
+/**
  * Get Route53 statements for automatic DNS management (optional)
  */
 function getRoute53Statements(): IAMStatement[] {
@@ -486,6 +563,8 @@ function buildPolicy(
       statements.push(...getSQSStatements());
       statements.push(...getDynamoDBStatements());
       statements.push(...getLambdaStatements());
+      // Inbound needs Lambda, which starter lacks
+      statements.push(...getInboundStatements());
     }
 
     // SMTP credentials and advanced features
@@ -573,6 +652,9 @@ function displaySummary(
       );
       console.log(
         `  ${pc.green("+")} ${pc.bold("DynamoDB")} - Email history (Production+)`
+      );
+      console.log(
+        `  ${pc.green("+")} ${pc.bold("SES receipt rules + S3")} - Inbound email ${pc.dim("(wraps-inbound-* buckets)")} (Production+)`
       );
     }
 
