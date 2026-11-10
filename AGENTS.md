@@ -18,7 +18,7 @@ you are working in.
    share types from `packages/core`. Change a default in one, change it in both.
 4. **Org-scoped**: scope every DB query by `organizationId` from `authContext`, including lookups by ID.
 5. **Destructive commands need the user**: run `wraps destroy`, `wraps <service> destroy`,
-   or any `--force` flag only after the user explicitly confirms.
+   any `--force` flag, or `--replace-active-rule-set` only after the user explicitly confirms.
 
 ## Read when
 
