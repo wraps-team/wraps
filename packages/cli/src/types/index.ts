@@ -40,6 +40,7 @@ export type {
   EmailInboundDestroyOptions,
   EmailInboundInitOptions,
   EmailInboundRemoveOptions,
+  EmailInboundReprocessOptions,
   EmailInboundStatusOptions,
   EmailInboundTestOptions,
   EmailInboundVerifyOptions,

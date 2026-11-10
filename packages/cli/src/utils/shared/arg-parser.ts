@@ -99,6 +99,8 @@ export type CliFlags = {
   // Email logs
   status?: string;
   limit?: string;
+  /** `email inbound reprocess --max`: most DLQ messages to handle in one run. */
+  max?: string;
   cursor?: string;
   reason?: string;
   acknowledgeComplaint?: boolean;
@@ -274,6 +276,7 @@ const STRING_FLAGS = [
   "app-url",
   "status",
   "limit",
+  "max",
   "reason",
   "cursor",
   "set",

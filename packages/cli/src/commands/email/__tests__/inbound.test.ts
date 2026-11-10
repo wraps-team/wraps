@@ -1,6 +1,11 @@
 import { LambdaClient } from "@aws-sdk/client-lambda";
 import { S3Client } from "@aws-sdk/client-s3";
 import { SESClient } from "@aws-sdk/client-ses";
+import {
+  GetQueueAttributesCommand,
+  GetQueueUrlCommand,
+  SQSClient,
+} from "@aws-sdk/client-sqs";
 import { mockClient } from "aws-sdk-client-mock";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildInboundDNSRecords } from "../../../utils/dns/create-records.js";
@@ -237,6 +242,8 @@ import {
 mockClient(SESClient);
 const lambdaBackstop = mockClient(LambdaClient);
 const s3Backstop = mockClient(S3Client);
+// `inbound status` reads the DLQ depth through SQS.
+const sqsBackstop = mockClient(SQSClient);
 
 const baseMetadata = {
   version: "1.0.0",
@@ -2099,6 +2106,102 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
       expect(vi.mocked(clack.log.warn)).toHaveBeenCalledWith(
         "The processor has no wraps-inbound-ses-invoke permission"
       );
+    });
+  });
+
+  describe("inbound status DLQ depth (plan 044)", () => {
+    const QUEUE_URL =
+      "https://sqs.us-east-1.amazonaws.com/123456789012/wraps-inbound-events-dlq";
+
+    async function arrange() {
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(cloneMetadata());
+      const check = await import(
+        "../../../utils/email/inbound-trigger-check.js"
+      );
+      vi.mocked(check.checkInboundTrigger).mockResolvedValue({
+        savedTrigger: "ses-lambda-action",
+        ruleTrigger: "ses-lambda-action",
+        ruleEnabled: true,
+        activeRuleSet: "wraps-inbound-rules",
+        activeRuleSetReadable: true,
+        ruleSetInactive: false,
+        sesInvokePermission: true,
+        bucketPolicyCoversMail: true,
+        mismatches: [],
+        warnings: [],
+      });
+    }
+
+    function stubDepth(depth: string) {
+      sqsBackstop.reset();
+      sqsBackstop.on(GetQueueUrlCommand).resolves({ QueueUrl: QUEUE_URL });
+      sqsBackstop.on(GetQueueAttributesCommand).resolves({
+        Attributes: { ApproximateNumberOfMessages: depth },
+      });
+    }
+
+    it("shows the depth and the reprocess hint when it is non-zero", async () => {
+      await arrange();
+      stubDepth("3");
+      const clack = await import("@clack/prompts");
+
+      await inboundStatus({});
+
+      const printed = vi
+        .mocked(console.log)
+        .mock.calls.map((c) => String(c[0]))
+        .join("\n");
+      expect(printed).toContain("Dead-letter queue:");
+      expect(printed).toContain("3 messages");
+      expect(vi.mocked(clack.log.warn)).toHaveBeenCalledWith(
+        expect.stringContaining("wraps email inbound reprocess")
+      );
+      expect(
+        sqsBackstop.commandCalls(GetQueueAttributesCommand)[0].args[0].input
+      ).toEqual({
+        QueueUrl: QUEUE_URL,
+        AttributeNames: ["ApproximateNumberOfMessages"],
+      });
+    });
+
+    it("says empty and gives no hint at depth zero", async () => {
+      await arrange();
+      stubDepth("0");
+      const clack = await import("@clack/prompts");
+
+      await inboundStatus({});
+
+      const printed = vi
+        .mocked(console.log)
+        .mock.calls.map((c) => String(c[0]))
+        .join("\n");
+      expect(printed).toContain("empty");
+      expect(vi.mocked(clack.log.warn)).not.toHaveBeenCalledWith(
+        expect.stringContaining("reprocess")
+      );
+    });
+
+    it("puts the depth in --json, and null when the queue can't be read", async () => {
+      await arrange();
+      stubDepth("2");
+      setJsonMode(true);
+      await inboundStatus({});
+      expect(jsonOutput("email.inbound.status")?.data.dlq).toEqual({
+        name: "wraps-inbound-events-dlq",
+        depth: 2,
+        reprocessCommand: "wraps email inbound reprocess",
+      });
+
+      vi.mocked(console.log).mockClear();
+      sqsBackstop.reset();
+      sqsBackstop
+        .on(GetQueueUrlCommand)
+        .rejects(new Error("AccessDenied: sqs:GetQueueUrl"));
+      await inboundStatus({});
+      expect(jsonOutput("email.inbound.status")?.data.dlq.depth).toBeNull();
     });
   });
 

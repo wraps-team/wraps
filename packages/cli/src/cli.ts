@@ -100,6 +100,7 @@ import {
   inboundEmailsGet,
   inboundEmailsList,
 } from "./commands/email/inbound-emails.js";
+import { inboundReprocess } from "./commands/email/inbound-reprocess.js";
 import { init } from "./commands/email/init.js";
 import { emailLogsGet, emailLogsList } from "./commands/email/logs.js";
 import { emailMetrics } from "./commands/email/metrics.js";
@@ -348,6 +349,9 @@ function showHelp() {
   );
   console.log(
     `  ${pc.cyan("email inbound destroy")}   Remove inbound email infrastructure`
+  );
+  console.log(
+    `  ${pc.cyan("email inbound reprocess")} Replay the inbound dead-letter queue through the processor (--dry-run lists without changing; --max <n>, default 100; --yes skips the prompt and --json needs it)`
   );
   console.log(
     `  ${pc.cyan("email inbound list")}      List inbound emails (--account, --limit, --cursor). S3 key order, not received time; a page can be empty while more follow`
@@ -1228,6 +1232,16 @@ async function run() {
               });
               break;
 
+            case "reprocess":
+              await inboundReprocess({
+                region: flags.region,
+                dryRun: flags.dryRun,
+                yes: flags.yes,
+                max: flags.max,
+                json: flags.json,
+              });
+              break;
+
             case "status":
               await inboundStatus({
                 region: flags.region,
@@ -1276,7 +1290,7 @@ async function run() {
               throw errors.unknownCommand(
                 "inbound command",
                 inboundSubCommand,
-                "Available commands: init, destroy, status, verify, test, add, remove, list, get"
+                "Available commands: init, destroy, status, verify, test, add, remove, list, get, reprocess"
               );
           }
           break;

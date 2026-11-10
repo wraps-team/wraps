@@ -405,7 +405,7 @@ const EXPECTED_REJECTIONS = [
   'invalidFlagUsage(`Unrecognized argument${extraPositionals.length > 1 ? "s" : ""}: ${extraPositionals.join(" ")}`, "A boolean flag (such as --root or --json) takes no value, so a value after it is discarded. Check the flags before these arguments, or run the command with --help.")',
   'missingInput("--domain", "wraps email verify --domain yourapp.com")',
   'missingInput("<email-id>", "wraps email inbound get <email-id>")',
-  'unknownCommand("inbound command", inboundSubCommand, "Available commands: init, destroy, status, verify, test, add, remove, list, get")',
+  'unknownCommand("inbound command", inboundSubCommand, "Available commands: init, destroy, status, verify, test, add, remove, list, get, reprocess")',
   'unknownCommand("agent approvals command", approvalsSubCommand, "Available commands: list, approve, reject")',
   'unknownCommand("agent command", agentSubCommand, "Available commands: create, list, kill, policy, approvals")',
   'unknownCommand("reply command", replySubCommand, "Available commands: init, rotate, status, destroy, decode")',

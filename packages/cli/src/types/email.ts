@@ -578,6 +578,18 @@ export type EmailInboundDestroyOptions = {
 };
 
 /**
+ * Command options for email inbound reprocess
+ */
+export type EmailInboundReprocessOptions = {
+  region?: string;
+  json?: boolean;
+  dryRun?: boolean;
+  yes?: boolean;
+  /** Raw `--max` value; validated by the command. */
+  max?: string;
+};
+
+/**
  * Command options for email inbound status
  */
 export type EmailInboundStatusOptions = {

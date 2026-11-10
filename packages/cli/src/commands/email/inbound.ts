@@ -17,6 +17,11 @@ import type {
 } from "../../types/index.js";
 import { SES_RECEIVING_REGIONS } from "../../types/index.js";
 import { runEmailStackPreview } from "../../utils/email/email-stack-deploy.js";
+import {
+  getInboundDlqDepth,
+  INBOUND_REPROCESS_COMMAND,
+} from "../../utils/email/inbound-dlq.js";
+import { INBOUND_DLQ_NAME } from "../../utils/email/inbound-names.js";
 import { checkInboundTrigger } from "../../utils/email/inbound-trigger-check.js";
 import {
   exitOnSwitchFailure,
@@ -1066,6 +1071,9 @@ export async function inboundStatus(
     activeRuleSetRead,
   });
 
+  // 4c. Dead-letter queue depth (null = couldn't read it; never fails status)
+  const dlqDepth = await getInboundDlqDepth(region);
+
   // Build domain list — prefer inboundDomains, fallback to single domain
   const domainList =
     inboundDomains.length > 0
@@ -1104,6 +1112,11 @@ export async function inboundStatus(
         bucketPolicyCoversMail: triggerCheck.bucketPolicyCoversMail,
         mismatches: triggerCheck.mismatches,
         warnings: triggerCheck.warnings,
+      },
+      dlq: {
+        name: INBOUND_DLQ_NAME,
+        depth: dlqDepth,
+        reprocessCommand: INBOUND_REPROCESS_COMMAND,
       },
     });
     return;
@@ -1150,7 +1163,21 @@ export async function inboundStatus(
   console.log(
     `  ${pc.dim("Trigger:")}           ${pc.cyan(describeTrigger(triggerCheck.savedTrigger))}`
   );
+  console.log(
+    `  ${pc.dim("Dead-letter queue:")} ${
+      dlqDepth === null
+        ? pc.dim("unknown (couldn't read the queue)")
+        : dlqDepth > 0
+          ? pc.yellow(`${dlqDepth} message${dlqDepth === 1 ? "" : "s"}`)
+          : pc.cyan("empty")
+    }`
+  );
   console.log();
+  if (dlqDepth !== null && dlqDepth > 0) {
+    clack.log.warn(
+      `${dlqDepth} inbound event${dlqDepth === 1 ? "" : "s"} failed every retry and wait${dlqDepth === 1 ? "s" : ""} in the dead-letter queue. Run ${pc.cyan(`${INBOUND_REPROCESS_COMMAND} --dry-run`)} to see them, then ${pc.cyan(INBOUND_REPROCESS_COMMAND)} to replay.`
+    );
+  }
   if (triggerCheck.savedTrigger === "s3-notification") {
     clack.log.info(
       `Run ${pc.cyan(repairCommand)} to switch to the SES Lambda action and start recording envelope recipients.`

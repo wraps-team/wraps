@@ -310,6 +310,24 @@ function getInboundStatements(): IAMStatement[] {
       Action: ["s3:GetObject"],
       Resource: ["arn:aws:s3:::wraps-inbound-*/parsed/*"],
     },
+    {
+      // `wraps email inbound reprocess` replays the processor's dead-letter
+      // queue: receive and delete its messages, and hand each event back to
+      // the processor as an async invoke. `sqs:GetQueueAttributes` and
+      // `GetQueueUrl` (status depth line, queue lookup) are already in
+      // SQSManagement.
+      Sid: "InboundReprocess",
+      Effect: "Allow",
+      Action: [
+        "sqs:ReceiveMessage",
+        "sqs:DeleteMessage",
+        "lambda:InvokeFunction",
+      ],
+      Resource: [
+        "arn:aws:sqs:*:*:wraps-inbound-events-dlq",
+        "arn:aws:lambda:*:*:function:wraps-inbound-email-processor",
+      ],
+    },
   ];
 }
 

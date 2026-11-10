@@ -10,6 +10,9 @@ export const RULE_NAME = "wraps-inbound-catch-all";
 /** Name of the inbound processor Lambda function. */
 export const INBOUND_PROCESSOR_FUNCTION_NAME = "wraps-inbound-email-processor";
 
+/** Name of the dead-letter queue the processor's failed async invocations land in. */
+export const INBOUND_DLQ_NAME = "wraps-inbound-events-dlq";
+
 /**
  * Pulumi name and Lambda policy statement id of the permission that lets SES
  * invoke the processor from the receipt rule's Lambda action.

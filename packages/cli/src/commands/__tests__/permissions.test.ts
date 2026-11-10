@@ -113,6 +113,29 @@ describe("permissions: inbound statements (plan 041)", () => {
     expect(rules?.Action).not.toContain("ses:DescribeReceiptRuleSet");
   });
 
+  it.each(["production", "enterprise"] as const)(
+    "%s grants the DLQ replay: receive and delete on the DLQ, invoke on the processor, nothing wider",
+    async (preset) => {
+      const stmt = (await policyFor(preset)).find(
+        (s) => s.Sid === "InboundReprocess"
+      );
+      expect(stmt?.Action).toEqual([
+        "sqs:ReceiveMessage",
+        "sqs:DeleteMessage",
+        "lambda:InvokeFunction",
+      ]);
+      expect(stmt?.Resource).toEqual([
+        "arn:aws:sqs:*:*:wraps-inbound-events-dlq",
+        "arn:aws:lambda:*:*:function:wraps-inbound-email-processor",
+      ]);
+    }
+  );
+
+  it("starter has no DLQ replay grant", async () => {
+    const sids = (await policyFor("starter")).map((s) => s.Sid);
+    expect(sids).not.toContain("InboundReprocess");
+  });
+
   it("every Sid in the email policy is unique (buildPolicy drops repeats silently)", async () => {
     const sids = (await policyFor("enterprise")).map((s) => s.Sid);
     expect(new Set(sids).size).toBe(sids.length);
