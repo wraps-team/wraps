@@ -32,6 +32,8 @@ export type InboundEmailSummary = {
   attachmentCount: number;
   spamVerdict: string | null;
   virusVerdict: string | null;
+  /** Lowercased envelope recipients (Bcc included). Absent = mail received before the upgrade. */
+  envelopeRecipients?: string[];
 };
 
 export type InboundEmailDetail = {
@@ -51,6 +53,8 @@ export type InboundEmailDetail = {
   virusVerdict: string | null;
   rawS3Key: string;
   receivedAt: string;
+  /** Lowercased envelope recipients (Bcc included). Absent = mail received before the upgrade. */
+  envelopeRecipients?: string[];
 };
 
 /**
@@ -131,6 +135,9 @@ export async function listInboundEmails(params: {
             attachmentCount: parsed.attachments?.length || 0,
             spamVerdict: parsed.spamVerdict,
             virusVerdict: parsed.virusVerdict,
+            envelopeRecipients: Array.isArray(parsed.envelopeRecipients)
+              ? parsed.envelopeRecipients
+              : undefined,
           } as InboundEmailSummary;
         } catch {
           return null;

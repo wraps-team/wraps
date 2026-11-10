@@ -45,6 +45,8 @@ export type InboundEmailSummary = {
   attachmentCount: number;
   spamVerdict: string | null;
   virusVerdict: string | null;
+  /** Lowercased SMTP envelope recipients SES delivered to (Bcc included). Absent = unknown (mail received before the upgrade). */
+  envelopeRecipients?: string[];
 };
 
 export type InboundAttachment = {
@@ -75,6 +77,8 @@ export type InboundEmailDetail = {
   virusVerdict: string | null;
   rawS3Key: string;
   receivedAt: string;
+  /** Lowercased SMTP envelope recipients SES delivered to (Bcc included). Absent = unknown (mail received before the upgrade). */
+  envelopeRecipients?: string[];
 };
 
 /** Stable account order: plain code-unit comparison of the ids. */
@@ -140,6 +144,18 @@ function toAttachment(value: unknown): InboundAttachment {
   };
 }
 
+function toEnvelopeRecipients(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) {
+    return;
+  }
+  return value.filter((v): v is string => typeof v === "string");
+}
+
+function envelopeField(value: unknown): { envelopeRecipients?: string[] } {
+  const list = toEnvelopeRecipients(value);
+  return list ? { envelopeRecipients: list } : {};
+}
+
 function toSummary(
   parsed: Record<string, unknown>,
   awsAccountId: string
@@ -161,6 +177,7 @@ function toSummary(
     attachmentCount: attachments.length,
     spamVerdict: strOrNull(parsed.spamVerdict),
     virusVerdict: strOrNull(parsed.virusVerdict),
+    ...envelopeField(parsed.envelopeRecipients),
   };
 }
 
@@ -191,6 +208,7 @@ function toDetail(
     virusVerdict: strOrNull(parsed.virusVerdict),
     rawS3Key: str(parsed.rawS3Key),
     receivedAt: str(parsed.receivedAt),
+    ...envelopeField(parsed.envelopeRecipients),
   };
 }
 

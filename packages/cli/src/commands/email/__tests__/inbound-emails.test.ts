@@ -182,6 +182,26 @@ describe("wraps email inbound", () => {
       expect(rows[0].attachmentCount).toBe(2);
     });
 
+    it("--json carries envelopeRecipients when the API sent it and omits the key when it did not", async () => {
+      fetchMock.mockResolvedValue(
+        res(200, {
+          data: [
+            { ...SUMMARY, envelopeRecipients: ["bcc@example.com"] },
+            { ...SUMMARY, emailId: "em_2" },
+          ],
+          nextCursor: null,
+          deniedAccountIds: [],
+          unreachableAccountIds: [],
+        })
+      );
+
+      await inboundEmailsList({ json: true });
+
+      const rows = envelope(logSpy).data?.data as Record<string, unknown>[];
+      expect(rows[0].envelopeRecipients).toEqual(["bcc@example.com"]);
+      expect(rows[1]).not.toHaveProperty("envelopeRecipients");
+    });
+
     it("calls GET /v1/email/inbound with no query when no flags are given", async () => {
       fetchMock.mockResolvedValue(
         res(200, {
@@ -445,6 +465,41 @@ describe("wraps email inbound", () => {
       });
 
       expect(resolveApiTarget).toHaveBeenCalledWith({ token: "wraps_flag" });
+    });
+
+    it("--json carries envelopeRecipients when present and omits the key when absent", async () => {
+      fetchMock.mockResolvedValueOnce(
+        res(200, { ...DETAIL, envelopeRecipients: ["bcc@example.com"] })
+      );
+      await inboundEmailsGet({ emailId: "em_1", json: true });
+      expect(envelope(logSpy).data?.envelopeRecipients).toEqual([
+        "bcc@example.com",
+      ]);
+
+      logSpy.mockClear();
+      fetchMock.mockResolvedValueOnce(res(200, DETAIL));
+      await inboundEmailsGet({ emailId: "em_1", json: true });
+      expect(envelope(logSpy).data).not.toHaveProperty("envelopeRecipients");
+    });
+
+    it("human output prints a Delivered to line only when envelopeRecipients is present", async () => {
+      setJsonMode(false);
+      fetchMock.mockResolvedValueOnce(
+        res(200, { ...DETAIL, envelopeRecipients: ["bcc@example.com"] })
+      );
+      await inboundEmailsGet({ emailId: "em_1" });
+      expect(note).toHaveBeenCalledWith(
+        expect.stringContaining("bcc@example.com"),
+        "Inbound email — Hello there"
+      );
+
+      vi.mocked(note).mockClear();
+      fetchMock.mockResolvedValueOnce(res(200, DETAIL));
+      await inboundEmailsGet({ emailId: "em_1" });
+      expect(note).not.toHaveBeenCalledWith(
+        expect.stringContaining("Delivered to:"),
+        expect.anything()
+      );
     });
 
     it("human output prints a visible htmlTruncated warning and the headers note", async () => {

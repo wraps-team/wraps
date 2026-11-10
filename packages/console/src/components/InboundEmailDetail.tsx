@@ -62,7 +62,23 @@ type InboundEmail = {
   virusVerdict: string | null;
   rawS3Key: string;
   receivedAt: string;
+  /** Lowercased envelope recipients (Bcc included). Absent = mail received before the upgrade. */
+  envelopeRecipients?: string[];
 };
+
+/** Whole envelope list, only when it holds an address To and Cc do not show. */
+function getDeliveredTo(email: InboundEmail): string[] {
+  const envelope = email.envelopeRecipients;
+  if (!envelope || envelope.length === 0) {
+    return [];
+  }
+  const shown = new Set(
+    [...email.to, ...email.cc].map((addr) => addr.address.toLowerCase())
+  );
+  return envelope.some((addr) => !shown.has(addr.toLowerCase()))
+    ? envelope
+    : [];
+}
 
 function formatAddress(addr: InboundEmailAddress): string {
   return addr.name ? `${addr.name} <${addr.address}>` : addr.address;
@@ -281,6 +297,19 @@ export function InboundEmailDetail() {
                 }
               />
             </InputGroup>
+            {getDeliveredTo(email).length > 0 && (
+              <InputGroup className="w-full cursor-text! sm:w-auto sm:min-w-[518px]">
+                <InputGroupAddon align="inline-start">
+                  <InputGroupText>Delivered to</InputGroupText>
+                </InputGroupAddon>
+                <InputGroupInput
+                  className="min-w-0 cursor-text! truncate font-mono text-sm"
+                  disabled
+                  readOnly
+                  value={getDeliveredTo(email).join(", ")}
+                />
+              </InputGroup>
+            )}
             {email.cc.length > 0 && (
               <InputGroup className="w-full cursor-text! sm:w-auto sm:min-w-[518px]">
                 <InputGroupAddon align="inline-start">

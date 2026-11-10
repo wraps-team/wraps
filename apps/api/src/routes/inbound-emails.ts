@@ -49,6 +49,7 @@ const summarySchema = t.Object({
   attachmentCount: t.Number(),
   spamVerdict: nullableString,
   virusVerdict: nullableString,
+  envelopeRecipients: t.Optional(t.Array(t.String())),
 });
 
 const listResponseSchema = t.Object({
@@ -86,6 +87,7 @@ const detailSchema = t.Object({
   virusVerdict: nullableString,
   rawS3Key: t.String(),
   receivedAt: t.String(),
+  envelopeRecipients: t.Optional(t.Array(t.String())),
 });
 
 export const inboundEmailsRoutes = createAuthenticatedRoutes(

@@ -92,4 +92,49 @@ describe("EmailPreview", () => {
     expect(screen.getByText("No message body")).toBeInTheDocument();
     expect(screen.queryByTitle("Email content")).not.toBeInTheDocument();
   });
+
+  it("shows a 'Delivered to' row when the envelope holds an address not in To or Cc", () => {
+    render(
+      <EmailPreview
+        email={makeEmail({
+          envelopeRecipients: ["support@acme.test", "bcc@acme.test"],
+        })}
+        orgSlug="acme"
+      />
+    );
+
+    expect(screen.getByText("Delivered to")).toBeInTheDocument();
+    expect(
+      screen.getByText("support@acme.test, bcc@acme.test")
+    ).toBeInTheDocument();
+  });
+
+  it("hides the row when every envelope address is in To or Cc, ignoring case", () => {
+    render(
+      <EmailPreview
+        email={makeEmail({
+          cc: [{ address: "Team@Acme.test", name: "" }],
+          envelopeRecipients: ["support@acme.test", "team@acme.test"],
+        })}
+        orgSlug="acme"
+      />
+    );
+
+    expect(screen.queryByText("Delivered to")).not.toBeInTheDocument();
+  });
+
+  it("hides the row when envelopeRecipients is absent or empty", () => {
+    const { rerender } = render(
+      <EmailPreview email={makeEmail()} orgSlug="acme" />
+    );
+    expect(screen.queryByText("Delivered to")).not.toBeInTheDocument();
+
+    rerender(
+      <EmailPreview
+        email={makeEmail({ envelopeRecipients: [] })}
+        orgSlug="acme"
+      />
+    );
+    expect(screen.queryByText("Delivered to")).not.toBeInTheDocument();
+  });
 });

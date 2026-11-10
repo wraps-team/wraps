@@ -68,6 +68,8 @@ type InboundSummary = {
   attachmentCount: number;
   spamVerdict: string | null;
   virusVerdict: string | null;
+  /** Absent = unknown (mail received before the upgrade). */
+  envelopeRecipients?: string[];
 };
 
 type InboundAttachment = {
@@ -98,6 +100,8 @@ type InboundDetail = {
   virusVerdict: string | null;
   rawS3Key: string;
   receivedAt: string;
+  /** Absent = unknown (mail received before the upgrade). */
+  envelopeRecipients?: string[];
 };
 
 const LIST_COMMAND = "email.inbound.list";
@@ -337,6 +341,13 @@ async function callApi(
 
 // Fixed output shapes. Explicit field lists keep the JSON keys stable even if
 // the route later adds fields.
+/** Omitted, not null, when the API sent none: absent means unknown. */
+function envelopeJson(
+  recipients: string[] | undefined
+): { envelopeRecipients?: string[] } {
+  return Array.isArray(recipients) ? { envelopeRecipients: recipients } : {};
+}
+
 function summaryJson(email: InboundSummary): Record<string, unknown> {
   return {
     awsAccountId: email.awsAccountId,
@@ -349,6 +360,7 @@ function summaryJson(email: InboundSummary): Record<string, unknown> {
     attachmentCount: email.attachmentCount,
     spamVerdict: email.spamVerdict,
     virusVerdict: email.virusVerdict,
+    ...envelopeJson(email.envelopeRecipients),
   };
 }
 
@@ -383,6 +395,7 @@ function detailJson(email: InboundDetail): Record<string, unknown> {
     spamVerdict: email.spamVerdict,
     virusVerdict: email.virusVerdict,
     rawS3Key: email.rawS3Key,
+    ...envelopeJson(email.envelopeRecipients),
   };
 }
 
@@ -502,6 +515,9 @@ function printDetailHuman(email: InboundDetail): void {
     kv("To:", formatAddresses(email.to ?? [])),
     ...((email.cc ?? []).length > 0
       ? [kv("Cc:", formatAddresses(email.cc))]
+      : []),
+    ...((email.envelopeRecipients ?? []).length > 0
+      ? [kv("Delivered to:", (email.envelopeRecipients ?? []).join(", "))]
       : []),
     kv("Subject:", email.subject || pc.dim("—")),
     kv("Date:", email.date || pc.dim("—")),

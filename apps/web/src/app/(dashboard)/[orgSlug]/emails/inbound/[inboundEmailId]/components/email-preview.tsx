@@ -30,6 +30,24 @@ function formatAddress(addr: { address: string; name: string }): string {
   return addr.name ? `${addr.name} <${addr.address}>` : addr.address;
 }
 
+/**
+ * Envelope recipients to show as "Delivered to": the whole list, but only when
+ * it holds an address that To and Cc do not already show (Bcc, forwards,
+ * aliases). Absent field = mail received before the upgrade = no row.
+ */
+function getDeliveredTo(email: InboundEmailDetail): string[] {
+  const envelope = email.envelopeRecipients;
+  if (!envelope || envelope.length === 0) {
+    return [];
+  }
+  const shown = new Set(
+    [...email.to, ...email.cc].map((addr) => addr.address.toLowerCase())
+  );
+  return envelope.some((addr) => !shown.has(addr.toLowerCase()))
+    ? envelope
+    : [];
+}
+
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) {
     return `${bytes} B`;
@@ -66,6 +84,7 @@ function VerdictBadge({
 export function EmailPreview({ email, orgSlug }: EmailPreviewProps) {
   const router = useRouter();
   const [headersOpen, setHeadersOpen] = useState(false);
+  const deliveredTo = getDeliveredTo(email);
 
   return (
     <div className="space-y-6">
@@ -122,22 +141,30 @@ export function EmailPreview({ email, orgSlug }: EmailPreviewProps) {
           {/* From / To / CC */}
           <div className="space-y-2 text-sm">
             <div className="flex gap-2">
-              <span className="w-12 shrink-0 font-medium text-muted-foreground">
+              <span className="w-24 shrink-0 font-medium text-muted-foreground">
                 From
               </span>
               <span className="font-mono">{formatAddress(email.from)}</span>
             </div>
             <div className="flex gap-2">
-              <span className="w-12 shrink-0 font-medium text-muted-foreground">
+              <span className="w-24 shrink-0 font-medium text-muted-foreground">
                 To
               </span>
               <span className="font-mono">
                 {email.to.map(formatAddress).join(", ") || "(no recipients)"}
               </span>
             </div>
+            {deliveredTo.length > 0 && (
+              <div className="flex gap-2">
+                <span className="w-24 shrink-0 font-medium text-muted-foreground">
+                  Delivered to
+                </span>
+                <span className="font-mono">{deliveredTo.join(", ")}</span>
+              </div>
+            )}
             {email.cc.length > 0 && (
               <div className="flex gap-2">
-                <span className="w-12 shrink-0 font-medium text-muted-foreground">
+                <span className="w-24 shrink-0 font-medium text-muted-foreground">
                   CC
                 </span>
                 <span className="font-mono">
@@ -146,7 +173,7 @@ export function EmailPreview({ email, orgSlug }: EmailPreviewProps) {
               </div>
             )}
             <div className="flex gap-2">
-              <span className="w-12 shrink-0 font-medium text-muted-foreground">
+              <span className="w-24 shrink-0 font-medium text-muted-foreground">
                 Date
               </span>
               <span>{new Date(email.receivedAt).toLocaleString()}</span>

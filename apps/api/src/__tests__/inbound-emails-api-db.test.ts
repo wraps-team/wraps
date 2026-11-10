@@ -205,7 +205,12 @@ function seedBuckets() {
           htmlTruncated: true,
         }),
       ],
-      ["parsed/inb_a1_003.json", parsedEmail("inb_a1_003")],
+      [
+        "parsed/inb_a1_003.json",
+        parsedEmail("inb_a1_003", {
+          envelopeRecipients: ["inbox@example.test", "bcc@example.test"],
+        }),
+      ],
     ])
   );
   state.buckets.set(
@@ -379,6 +384,18 @@ describe("list: GET /v1/email/inbound", () => {
     );
   });
 
+  it("passes envelopeRecipients through when stored, and omits the key when absent", async () => {
+    const { body } = await send(appA(), "/v1/email/inbound");
+    const data = body.data as Array<Record<string, unknown>>;
+    const byId = (id: string) => data.find((row) => row.emailId === id);
+
+    expect(byId("inb_a1_003")?.envelopeRecipients).toEqual([
+      "inbox@example.test",
+      "bcc@example.test",
+    ]);
+    expect(byId("inb_a1_001")).not.toHaveProperty("envelopeRecipients");
+  });
+
   it("filters to one account when awsAccountId is given", async () => {
     const { status, body } = await send(
       appA(),
@@ -501,6 +518,19 @@ describe("get: GET /v1/email/inbound/:emailId", () => {
       },
     ]);
     expect(body).not.toHaveProperty("replyToken");
+  });
+
+  it("returns envelopeRecipients when stored, and omits the key for legacy mail", async () => {
+    const present = await send(appA(), "/v1/email/inbound/inb_a1_003");
+    expect(present.status).toBe(200);
+    expect(present.body.envelopeRecipients).toEqual([
+      "inbox@example.test",
+      "bcc@example.test",
+    ]);
+
+    const absent = await send(appA(), "/v1/email/inbound/inb_a1_001");
+    expect(absent.status).toBe(200);
+    expect(absent.body).not.toHaveProperty("envelopeRecipients");
   });
 
   it("returns htmlTruncated true when the stored HTML was cut at receipt", async () => {
