@@ -121,7 +121,7 @@ function capturedParsedObject(): { key: string; body: string } {
   };
 }
 
-async function runHandler(event: S3Event = singleS3Event()) {
+async function runHandler(event: S3Event | SESEvent = singleS3Event()) {
   const { handler } = await import("./index.ts");
   await handler(event, makeCtx());
 }
@@ -971,7 +971,7 @@ describe("inbound-processor — SES Lambda action event", () => {
         messageId: "msg42",
         timestamp: "2026-03-04T05:06:07.890Z",
         recipients: ["Inbox@Support.Foo.com", "other@support.foo.com"],
-      }) as unknown as S3Event
+      })
     );
 
     const get = s3Mock.commandCalls(GetObjectCommand)[0].args[0].input;
@@ -992,7 +992,7 @@ describe("inbound-processor — SES Lambda action event", () => {
     const ids: unknown[] = [];
     for (let i = 0; i < 2; i++) {
       parsedState.queue = [{ from: { address: "a@external.com" } }];
-      await runHandler(sesEvent({ messageId: "same" }) as unknown as S3Event);
+      await runHandler(sesEvent({ messageId: "same" }));
       ids.push(JSON.parse(capturedParsedObject().body).emailId);
       s3Mock.resetHistory();
     }
@@ -1007,9 +1007,7 @@ describe("inbound-processor — SES Lambda action event", () => {
       },
     ];
 
-    await runHandler(
-      sesEvent({ recipients: ["Bcc@Support.Foo.com"] }) as unknown as S3Event
-    );
+    await runHandler(sesEvent({ recipients: ["Bcc@Support.Foo.com"] }));
 
     const ev = await capturedPut();
     expect(ev.detail.receivingDomain).toBe("support.foo.com");
@@ -1041,7 +1039,7 @@ describe("inbound-processor — SES Lambda action event", () => {
     await runHandler(
       sesEvent({
         recipients: [`${token}@r.mail.support.foo.com`],
-      }) as unknown as S3Event
+      })
     );
 
     const ev = await capturedPut();
@@ -1070,7 +1068,7 @@ describe("inbound-processor — SES Lambda action event", () => {
     await runHandler(
       sesEvent({
         recipients: [`${token}@R.Mail.Support.Foo.com`],
-      }) as unknown as S3Event
+      })
     );
 
     const ev = await capturedPut();
@@ -1078,6 +1076,53 @@ describe("inbound-processor — SES Lambda action event", () => {
     expect(ev.detail.envelopeRecipients).toEqual([
       `${token.toLowerCase()}@r.mail.support.foo.com`,
     ]);
+  });
+
+  it("lets the envelope win the reply-token lookup over a header naming another r.mail.* address", async () => {
+    const secret = Buffer.alloc(32, 0x5a);
+    process.env.REPLY_SECRET_PARAMETER_PREFIX = "/wraps/email/reply-secret/";
+    ssmMock.on(GetParameterCommand).resolves({
+      Parameter: {
+        Value: JSON.stringify({ kid: 1, current: secret.toString("base64") }),
+      },
+    });
+    const envToken = encodeReplyToken({
+      kid: 1,
+      convId: Buffer.alloc(8, 0x01),
+      sendId: Buffer.alloc(8, 0x02),
+      exp: 0,
+      secret,
+    });
+    const headerToken = encodeReplyToken({
+      kid: 1,
+      convId: Buffer.alloc(8, 0x03),
+      sendId: Buffer.alloc(8, 0x04),
+      exp: 0,
+      secret,
+    });
+    parsedState.queue = [
+      {
+        from: { address: "s@external.com" },
+        to: [{ address: `${headerToken}@r.mail.other.example.com` }],
+        headers: [["x-original-to", `${headerToken}@r.mail.other.example.com`]],
+      },
+    ];
+
+    await runHandler(
+      sesEvent({ recipients: [`${envToken}@r.mail.support.foo.com`] })
+    );
+
+    const ev = await capturedPut();
+    const rt = ev.detail.replyToken as { status: string; sendId: string };
+    expect(rt.status).toBe("valid");
+    expect(ev.detail.receivingDomain).toBe("r.mail.support.foo.com");
+    // Only the envelope's sending domain was looked up.
+    const names = ssmMock
+      .commandCalls(GetParameterCommand)
+      .map((c) => c.args[0].input.Name);
+    expect(names).toHaveLength(1);
+    expect(names[0]).toContain("support.foo.com");
+    expect(names[0]).not.toContain("other.example.com");
   });
 
   it("strips the mail/ prefix in the messageId fallback", async () => {
@@ -1096,9 +1141,9 @@ describe("inbound-processor — SES Lambda action event", () => {
     s3Mock.on(GetObjectCommand).rejects(new Error("AccessDenied"));
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
-      await expect(
-        runHandler(sesEvent({ messageId: "gone" }) as unknown as S3Event)
-      ).rejects.toThrow("AccessDenied");
+      await expect(runHandler(sesEvent({ messageId: "gone" }))).rejects.toThrow(
+        "AccessDenied"
+      );
       const lines = errSpy.mock.calls.map((c) => String(c[0]));
       const line = lines.find((l) => l.includes("raw object not readable"));
       expect(line).toContain(PARSED_BUCKET);
@@ -1134,7 +1179,7 @@ describe("inbound-processor — S3 event after the SES Lambda action change", ()
     parsedState.queue = [{ from: { address: "a@external.com" } }];
 
     await runHandler(
-      multiS3Event(["mail/AMAZON_SES_SETUP_NOTIFICATION", "raw/real"])
+      multiS3Event(["raw/AMAZON_SES_SETUP_NOTIFICATION", "raw/real"])
     );
 
     const keys = s3Mock
@@ -1267,6 +1312,26 @@ describe("buildEventDetail — envelopeRecipients", () => {
     );
     expect(parsed.truncatedFields).toEqual(truncatedFields);
     expect(parsed.truncated).toBe(true);
+  });
+
+  it("keeps exactly 100 addresses at the last resort: no cut, no count, no label", async () => {
+    const { buildEventDetail } = await import("./index.ts");
+    const envelopeRecipients = addrs(100);
+    const { detail, truncatedFields } = buildEventDetail(
+      {
+        ...base,
+        envelopeRecipients,
+        from: { address: "a@x.com", name: "n".repeat(20_000) },
+      },
+      "parsed/inb_1.json",
+      "wraps.inbound",
+      8000
+    );
+    const parsed = JSON.parse(detail);
+    expect(truncatedFields.at(-1)).toBe("envelope");
+    expect(truncatedFields).not.toContain("envelopeRecipients");
+    expect(parsed.envelopeRecipients).toEqual(envelopeRecipients);
+    expect(parsed.envelopeRecipientCount).toBeUndefined();
   });
 
   it("omits the field when the email has none", async () => {

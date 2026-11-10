@@ -62,6 +62,8 @@ Exception: The inbound processor re-throws errors to trigger Lambda retry/DLQ.
 | `RESOURCE_PREFIX` | `"wraps-email"` |
 | `ALL_EVENT_TYPES` | All 10 SES event types |
 | `DEFAULT_EVENT_TYPES` | Common subset |
+| `INBOUND_LEGACY_PREFIX` | `"raw/"` (S3-notification trigger) |
+| `INBOUND_MAIL_PREFIX` | `"mail/"` (SES Lambda-action trigger) |
 | `DEFAULT_CONFIG_SET_NAME` | Default SES config set name |
 | `DEFAULT_HISTORY_RETENTION` | Default retention period |
 | `VERCEL_OIDC_URL` | Vercel OIDC provider URL |

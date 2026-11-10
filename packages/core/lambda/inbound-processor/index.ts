@@ -713,8 +713,8 @@ export async function handler(event: S3Event | SESEvent, context: Context) {
           }
         : { address: "", name: "" };
 
-      // Prefer X-Original-To for recipient derivation (SES envelope),
-      // then fall back to scanning To + CC for r.mail.* recipients.
+      // Check the SES envelope recipients first (SES event only), then
+      // X-Original-To, then scan To + CC for r.mail.* recipients.
       const replyRecipient = findReplyRecipient(
         headers,
         toAddresses,
