@@ -1396,12 +1396,13 @@ export async function inboundVerify(
   if (activeRuleSet === RULE_SET_NAME) {
     clack.log.success(`Receipt rule set: ${pc.green("active")}`);
   } else {
-    // Init asks before deactivating another set, or with --yes/--json needs
-    // --replace-active-rule-set (plan 048).
+    // Init asks before deactivating another set, or with --yes needs
+    // --replace-active-rule-set (plan 048); --json alone stops earlier with
+    // NON_INTERACTIVE_INPUT.
     clack.log.error(
       activeRuleSet
-        ? `Receipt rule set: ${pc.red("inactive")}; ${pc.yellow(activeRuleSet)} is active instead. ${pc.cyan("wraps email inbound init")} reactivates it, which deactivates ${activeRuleSet}: init asks first, and with --yes or --json needs ${pc.cyan("--replace-active-rule-set")}.`
-        : `Receipt rule set: ${pc.red("inactive")}. Run ${pc.cyan("wraps email inbound init")} to reactivate (if another set is active, init asks first, and with --yes or --json needs ${pc.cyan("--replace-active-rule-set")}).`
+        ? `Receipt rule set: ${pc.red("inactive")}; ${pc.yellow(activeRuleSet)} is active instead. ${pc.cyan("wraps email inbound init")} reactivates it, which deactivates ${activeRuleSet}: init asks first, and with --yes needs ${pc.cyan("--replace-active-rule-set")}.`
+        : `Receipt rule set: ${pc.red("inactive")}. Run ${pc.cyan("wraps email inbound init")} to reactivate (if another set is active, init asks first, and with --yes needs ${pc.cyan("--replace-active-rule-set")}).`
     );
     allPassed = false;
   }

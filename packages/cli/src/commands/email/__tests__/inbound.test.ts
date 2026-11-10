@@ -1,3 +1,4 @@
+import { promises as dnsPromises } from "node:dns";
 import { LambdaClient } from "@aws-sdk/client-lambda";
 import { S3Client } from "@aws-sdk/client-s3";
 import {
@@ -241,6 +242,7 @@ import {
   inboundRemove,
   inboundRepairCommand,
   inboundStatus,
+  inboundVerify,
 } from "../inbound.js";
 
 // Backstop: if a receipt-rule or trigger-check export is ever left unmocked,
@@ -2601,6 +2603,11 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
             "would deactivate the active receipt rule set customer-rules"
           )
         );
+        expect(vi.mocked(clack.log.warn)).toHaveBeenCalledWith(
+          expect.stringContaining(
+            "where inbound init stops with NON_INTERACTIVE_INPUT unless --yes is passed too"
+          )
+        );
         expect(vi.mocked(clack.confirm)).not.toHaveBeenCalled();
         expect(events).toEqual([]);
       });
@@ -2735,6 +2742,42 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
           "wraps-inbound-rules",
           expect.objectContaining({ expected: ours })
         );
+      });
+    });
+
+    describe("inbound verify", () => {
+      it("another set active: the hint says init asks first and needs --replace-active-rule-set with --yes (not --json)", async () => {
+        await addMetadata();
+        const rules = await import("../../../utils/email/receipt-rules.js");
+        vi.mocked(rules.getActiveReceiptRuleSet).mockResolvedValueOnce(
+          "customer-rules"
+        );
+        const notFound = Object.assign(new Error("not found"), {
+          code: "ENOTFOUND",
+        });
+        const mx = vi
+          .spyOn(dnsPromises, "resolveMx")
+          .mockRejectedValue(notFound);
+        const txt = vi
+          .spyOn(dnsPromises, "resolveTxt")
+          .mockRejectedValue(notFound);
+        const clack = await import("@clack/prompts");
+
+        try {
+          await inboundVerify({});
+        } finally {
+          mx.mockRestore();
+          txt.mockRestore();
+        }
+
+        const hint = vi
+          .mocked(clack.log.error)
+          .mock.calls.map((c) => String(c[0]))
+          .find((m) => m.includes("Receipt rule set"));
+        expect(hint).toContain("customer-rules");
+        expect(hint).toContain("init asks first, and with --yes needs");
+        expect(hint).toContain("--replace-active-rule-set");
+        expect(hint).not.toContain("--json");
       });
     });
 
@@ -2921,6 +2964,9 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
           "Then finish adding support.example.com:\n  wraps email inbound add --domain example.com --subdomain support --region us-east-1"
         );
         expect(error.suggestion).not.toContain("Re-run the command");
+        expect(error.suggestion).toContain(
+          "Run unattended, inbound init needs both --yes and --replace-active-rule-set"
+        );
         expect(events).toEqual([]);
       });
 

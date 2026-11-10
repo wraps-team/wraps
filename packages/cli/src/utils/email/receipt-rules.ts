@@ -563,8 +563,8 @@ export function describeRuleSetDeactivation(
     return null;
   }
   return read.readable
-    ? `Applying would deactivate the active receipt rule set ${read.name}; its rules would stop applying to incoming mail. The run asks first; where it can't ask (--yes, --json, or no terminal) it needs --replace-active-rule-set.`
-    : `Could not read the active receipt rule set (${read.error}); applying may deactivate another set. The run asks first; where it can't ask (--yes, --json, or no terminal) it needs --replace-active-rule-set.`;
+    ? `Applying would deactivate the active receipt rule set ${read.name}; its rules would stop applying to incoming mail. The run asks first. With --yes it needs --replace-active-rule-set; inbound add and reply init also need it under --json or with no terminal, where inbound init stops with NON_INTERACTIVE_INPUT unless --yes is passed too.`
+    : `Could not read the active receipt rule set (${read.error}); applying may deactivate another set. The run asks first. With --yes it needs --replace-active-rule-set; inbound add and reply init also need it under --json or with no terminal, where inbound init stops with NON_INTERACTIVE_INPUT unless --yes is passed too.`;
 }
 
 /**

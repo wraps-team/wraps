@@ -1319,7 +1319,7 @@ export const errors = {
       ? [
           meaning,
           `Already in place: ${late.inPlace} Until wraps-inbound-rules is active, no mail reaches Wraps.`,
-          `To be asked again, keeping the saved inbound configuration, run this from a terminal (it re-deploys the inbound stack):\n  ${late.recovery}\nAn unattended run needs --yes --replace-active-rule-set added, ${consent}`,
+          `To be asked again, keeping the saved inbound configuration, run this from a terminal (it re-deploys the inbound stack):\n  ${late.recovery}\nRun unattended, inbound init needs both --yes and --replace-active-rule-set, ${consent}`,
           ...(late.afterRecovery ? [late.afterRecovery] : []),
           `Answer yes, or pass --replace-active-rule-set, ${consent}`,
         ].join("\n\n")

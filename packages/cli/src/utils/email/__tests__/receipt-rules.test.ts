@@ -625,7 +625,7 @@ describe("plan 048: activating wraps-inbound-rules only over a consented set", (
       "Already in place: IN-PLACE. Until wraps-inbound-rules is active, no mail reaches Wraps."
     );
     expect(error.suggestion).toContain(
-      `To be asked again, keeping the saved inbound configuration, run this from a terminal (it re-deploys the inbound stack):\n  ${RECOVERY}\nAn unattended run needs --yes --replace-active-rule-set added, only after the AWS account owner agrees`
+      `To be asked again, keeping the saved inbound configuration, run this from a terminal (it re-deploys the inbound stack):\n  ${RECOVERY}\nRun unattended, inbound init needs both --yes and --replace-active-rule-set, only after the AWS account owner agrees`
     );
     expect(error.suggestion).toContain("AFTER.");
     expect(error.suggestion).not.toContain("Nothing was deployed");
@@ -762,7 +762,7 @@ describe("plan 048: activating wraps-inbound-rules only over a consented set", (
     );
     expect(describeRuleSetDeactivation(UNREADABLE)).toContain("AccessDenied");
     expect(describeRuleSetDeactivation(CUSTOMER)).toContain(
-      "where it can't ask (--yes, --json, or no terminal) it needs --replace-active-rule-set"
+      "The run asks first. With --yes it needs --replace-active-rule-set; inbound add and reply init also need it under --json or with no terminal, where inbound init stops with NON_INTERACTIVE_INPUT unless --yes is passed too."
     );
   });
 });
