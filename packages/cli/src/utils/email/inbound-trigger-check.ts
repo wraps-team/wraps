@@ -170,7 +170,7 @@ export function compareInboundTrigger(
     mismatches.push("rule-set-inactive");
     warnings.push(
       check.activeRuleSet
-        ? `The active receipt rule set in this region is ${check.activeRuleSet}, not ${RULE_SET_NAME}, so no inbound mail reaches Wraps. Wraps leaves it that way; note that \`wraps email inbound init\` (and \`inbound add\` when it has to recreate the rule) activates ${RULE_SET_NAME}, which deactivates ${check.activeRuleSet}.`
+        ? `The active receipt rule set in this region is ${check.activeRuleSet}, not ${RULE_SET_NAME}, so no inbound mail reaches Wraps. Wraps leaves it that way; note that \`wraps email inbound init\` (and \`inbound add\` when it has to recreate the rule) activates ${RULE_SET_NAME}, which deactivates ${check.activeRuleSet}. They ask first; with --yes (or, for inbound add, --json) they need --replace-active-rule-set, which only the account owner should agree to.`
         : `No receipt rule set is active in this region, so no inbound mail reaches Wraps. Check the SES console (Email receiving) before activating ${RULE_SET_NAME}.`
     );
   }

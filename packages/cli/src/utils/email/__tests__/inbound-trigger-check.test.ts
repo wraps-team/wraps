@@ -242,6 +242,10 @@ describe("compareInboundTrigger", () => {
     expect(result.mismatches).toContain("rule-set-inactive");
     const inactive = result.warnings[0];
     expect(inactive).toContain("customer-rules");
+    // plan 048: init and add ask first, and need the flag where they can't
+    expect(inactive).toContain(
+      "They ask first; with --yes (or, for inbound add, --json) they need --replace-active-rule-set"
+    );
     // no warning tells the user to run a command that activates our set
     for (const w of result.warnings) {
       expect(w).not.toMatch(/Run `wraps email inbound (init|add)/);
