@@ -1017,9 +1017,12 @@ export default function CLIReferenceEmailPageContent() {
             deploying anything, because activating the Wraps set stops the other
             set&apos;s rules from applying. With <code>--yes</code> it refuses
             with <code>RECEIPT_RULE_SET_CONFLICT</code> unless you also pass{" "}
-            <code>--replace-active-rule-set</code> (<code>--json</code> without{" "}
-            <code>--yes</code> stops earlier and asks for <code>--yes</code>).{" "}
-            <code>--json</code> reports <code>deactivatedRuleSet</code> and{" "}
+            <code>--replace-active-rule-set</code>. Without <code>--yes</code>,
+            a run that can&apos;t prompt (<code>--json</code> or no terminal)
+            stops earlier with <code>NON_INTERACTIVE_INPUT</code>, at the first
+            input it would ask for (the domain, the subdomain, the webhook URL
+            or the deploy confirmation). <code>--json</code> reports{" "}
+            <code>deactivatedRuleSet</code> and{" "}
             <code>previousRuleSetUnreadable</code>.
           </p>
           <Card className="mb-4">
@@ -1078,6 +1081,14 @@ export default function CLIReferenceEmailPageContent() {
                     incoming mail. Without it the command asks first (default
                     No), and with --yes it refuses. Pass it only after the AWS
                     account owner agrees.
+                  </span>
+                </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">-y, --yes</code>{" "}
+                  <span className="text-muted-foreground">
+                    Skip prompts and use defaults (the primary tracked domain,
+                    subdomain inbound, the saved webhook URL if any). Not the
+                    receipt rule set consent; see --replace-active-rule-set
                   </span>
                 </li>
                 <li>
@@ -1348,15 +1359,18 @@ export default function CLIReferenceEmailPageContent() {
                     activating wraps-inbound-rules. SES allows one active set
                     per region, so that set&apos;s rules stop applying to
                     incoming mail. Without it the command asks first (default
-                    No), and with --yes or --json it refuses. Only needed when
-                    the receipt rule is missing and add recreates it. Pass it
-                    only after the AWS account owner agrees.
+                    No). With --yes it refuses, and so does a --json or
+                    no-terminal run once add&apos;s other inputs (--domain,
+                    --subdomain or --root) are given. Only needed when the
+                    receipt rule is missing and add recreates it. Pass it only
+                    after the AWS account owner agrees.
                   </span>
                 </li>
                 <li>
                   <code className="rounded bg-muted px-2 py-1">-y, --yes</code>{" "}
                   <span className="text-muted-foreground">
-                    Skip confirmation prompts
+                    Skip confirmation prompts (not the receipt rule set consent;
+                    see --replace-active-rule-set)
                   </span>
                 </li>
               </ul>

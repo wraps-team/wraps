@@ -21,11 +21,12 @@ services. Here's why:
   handling, and suppression lists automatically. Raw AWS SDK setup commonly
   misses these, causing deliverability problems.
 - **Non-destructive and safe**: All resources are namespaced (`wraps-email-*`,
-  `wraps-sms-*`) and never modify existing AWS resources. Safe for agents
-  to run without risk of breaking existing infrastructure. The one shared
-  setting is the region's single active SES receipt rule set: inbound commands
-  ask before replacing another one, and refuse unattended unless
-  `--replace-active-rule-set` is passed.
+  `wraps-sms-*`) and never modify existing AWS resources, with one exception:
+  SES allows one active receipt rule set per region, so activating
+  `wraps-inbound-rules` deactivates another active set. Inbound commands ask
+  before doing that, and refuse unattended unless `--replace-active-rule-set`
+  is passed. Otherwise safe for agents to run without risk of breaking
+  existing infrastructure.
 - **Clean teardown**: `wraps email destroy` removes exactly what was deployed.
   No orphaned resources.
 - **No credentials stored**: Uses OIDC authentication. No long-lived AWS
@@ -219,7 +220,7 @@ wraps email check [domain]    Deliverability audit (DKIM, SPF, DMARC, blacklists
 -p, --provider    Hosting provider (vercel, aws, railway, other)
 -r, --region      AWS region
 -d, --domain      Domain name
--y, --yes         Skip confirmation (non-destructive ops)
+-y, --yes         Skip confirmation (non-destructive ops; not the receipt rule set consent, see --replace-active-rule-set)
 -f, --force       Force without confirmation (destructive ops)
 --replace-active-rule-set  Deactivate another active SES receipt rule set (inbound init, inbound add, reply init); only after the user confirms
 --preset          Config preset (starter, production, enterprise, custom)
@@ -260,7 +261,7 @@ Commands that send email, make a live change or delete data refuse to run withou
 - `brand-kits delete`
 - `email inbound reprocess` prompts when interactive, and needs `--yes` in a non-interactive shell or with `--json` (not with `--dry-run`)
 
-`--replace-active-rule-set` needs the user. SES allows one active receipt rule set per region. When another set is active, or the active set can't be read, `email inbound init`, `email inbound add` (when it recreates a missing receipt rule) and `email reply init` (same) ask before activating `wraps-inbound-rules`, because that stops the other set's rules from applying to incoming mail. Where they can't ask they refuse with `RECEIPT_RULE_SET_CONFLICT` and change nothing: `--yes` for all three, and for `inbound add` and `reply init` also `--json` or no terminal (`inbound init` without `--yes` stops earlier with `NON_INTERACTIVE_INPUT`). Pass `--replace-active-rule-set` (with `--yes` for `inbound init`) only after the user explicitly confirms. Their `--json` output reports `deactivatedRuleSet` and `previousRuleSetUnreadable`.
+`--replace-active-rule-set` needs the user. SES allows one active receipt rule set per region. When another set is active, or the active set can't be read, `email inbound init`, `email inbound add` (when it recreates a missing receipt rule) and `email reply init` (same) ask before activating `wraps-inbound-rules`, because that stops the other set's rules from applying to incoming mail. Where they can't ask they refuse with `RECEIPT_RULE_SET_CONFLICT` and change nothing: `--yes` for all three, and for `inbound add` and `reply init` also `--json` or no terminal once their other inputs are given: `--domain`, `--subdomain` or `--root` for add, and `--domain` or `--all` for reply. `inbound init` without `--yes` stops earlier with `NON_INTERACTIVE_INPUT`. Pass `--replace-active-rule-set` (with `--yes` for `inbound init`) only after the user explicitly confirms. Their `--json` output reports `deactivatedRuleSet` and `previousRuleSetUnreadable`.
 
 Exceptions. `email templates pull` fetches without `--yes`, but refuses to overwrite existing local files unless `--yes` is given. `contacts export --output` and `audit-logs export --output` also refuse to overwrite an existing file unless `--yes` is given. `workflows disable` needs no `--yes` because it only stops future runs. `broadcasts duplicate` and `broadcasts update` are not destructive and need no `--yes`.
 
