@@ -182,6 +182,9 @@ function getEventBridgeWebhookStatements(): IAMStatement[] {
       ],
     },
     {
+      // Invariant 2 exception: EventBridge names and owns these secrets
+      // (`events!connection/...`), so they can't carry `wraps-`. Scoped to our
+      // connections' names, the narrowest ARN AWS allows.
       Sid: "EventBridgeConnectionSecrets",
       Effect: "Allow",
       Action: [
@@ -194,6 +197,8 @@ function getEventBridgeWebhookStatements(): IAMStatement[] {
       Resource: ["arn:aws:secretsmanager:*:*:secret:events!connection/wraps-*"],
     },
     {
+      // Invariant 2 exception: AWS fixes this role's name. Scoped to that one
+      // role ARN plus AWS's iam:AWSServiceName condition.
       Sid: "EventBridgeApiDestinationsServiceRole",
       Effect: "Allow",
       Action: ["iam:CreateServiceLinkedRole"],
