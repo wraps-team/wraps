@@ -3,6 +3,7 @@ import { MANAGED_DEDICATED_IP_POOL_NAME } from "@wraps/core";
 import pc from "picocolors";
 import { trackError } from "../../telemetry/events.js";
 import { SES_RECEIVING_REGIONS } from "../../types/email.js";
+import { RULE_SET_NAME } from "../email/inbound-names.js";
 import { isJsonMode, jsonError } from "./json-output.js";
 
 /**
@@ -1287,13 +1288,66 @@ export const errors = {
       "https://wraps.dev/docs/quickstart/email"
     ),
 
-  receiptRuleSetConflict: (activeRuleSet: string) =>
-    new WrapsError(
-      `Another receipt rule set is active: ${activeRuleSet}`,
+  /**
+   * Activating wraps-inbound-rules would deactivate another receipt rule set
+   * (or one that couldn't be read), and the run has no consent: `--yes`,
+   * `--json` or no terminal, without `--replace-active-rule-set`. Or (`late`)
+   * the active set changed between the preflight and the activation; by then
+   * the run has deployed, saved or written the rule, so the suggestion says
+   * what is in place and the command that asks again.
+   */
+  receiptRuleSetConflict: (params: {
+    region: string;
+    active:
+      | { readable: true; name: string | null }
+      | { readable: false; error: string };
+    late?: {
+      expected:
+        | { readable: true; name: string | null }
+        | { readable: false; error: string };
+      inPlace: string;
+      recovery: string;
+      afterRecovery?: string;
+    };
+  }) => {
+    const { region, active, late } = params;
+    const activeName = active.readable ? active.name : null;
+    let message: string;
+    if (!late) {
+      message = active.readable
+        ? `Receipt rule set ${activeName} is active in ${region}; activating wraps-inbound-rules would deactivate it`
+        : `Could not read the active receipt rule set in ${region} (${active.error}); activating wraps-inbound-rules may deactivate another set`;
+    } else if (!active.readable) {
+      message = `Could not read the active receipt rule set in ${region} (${active.error}) just before activating wraps-inbound-rules, so it was not activated`;
+    } else if (
+      late.expected.readable &&
+      (late.expected.name === null || late.expected.name === RULE_SET_NAME)
+    ) {
+      // The run agreed to replace nothing: none was active, or ours was.
+      message = `Receipt rule set ${activeName} became active in ${region} during this run, so wraps-inbound-rules was not activated`;
+    } else if (late.expected.readable) {
+      message = `Receipt rule set ${activeName} is active in ${region}, not ${late.expected.name}, the set you agreed to replace, so wraps-inbound-rules was not activated`;
+    } else {
+      message = `Receipt rule set ${activeName} is active in ${region}; you agreed while the active set could not be read, so wraps-inbound-rules was not activated`;
+    }
+    const meaning = `SES allows one active receipt rule set per region. Activating wraps-inbound-rules deactivates ${activeName ?? "the active set"}, and its rules stop applying to incoming mail (whatever they store, forward or invoke stops).`;
+    const consent = "only after the AWS account owner agrees to deactivate it.";
+    const suggestion = late
+      ? [
+          meaning,
+          `Already in place: ${late.inPlace} Until wraps-inbound-rules is active, no mail reaches Wraps.`,
+          `To be asked again, keeping the saved inbound configuration, run this from a terminal (it re-deploys the inbound stack):\n  ${late.recovery}\nRun unattended, inbound init needs both --yes and --replace-active-rule-set, ${consent}`,
+          ...(late.afterRecovery ? [late.afterRecovery] : []),
+          `Answer yes, or pass --replace-active-rule-set, ${consent}`,
+        ].join("\n\n")
+      : `${meaning}\n\nNothing was deployed or changed.\n\nRun interactively to be asked, or pass --replace-active-rule-set, ${consent}`;
+    return new WrapsError(
+      message,
       "RECEIPT_RULE_SET_CONFLICT",
-      `SES only allows one active receipt rule set at a time.\nCurrently active: "${activeRuleSet}"\n\nWraps will activate "wraps-inbound-rules" which will deactivate the current set.\nYou may need to merge your existing rules into the wraps rule set.`,
+      suggestion,
       "https://docs.aws.amazon.com/ses/latest/dg/receiving-email-concepts.html"
-    ),
+    );
+  },
 
   s3StateAccessDenied: () =>
     new WrapsError(

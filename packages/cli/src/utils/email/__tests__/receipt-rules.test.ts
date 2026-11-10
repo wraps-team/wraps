@@ -12,15 +12,24 @@ import {
 import { mockClient } from "aws-sdk-client-mock";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  activeRuleSetMatchesExpected,
   addDomainToReceiptRule,
   createReceiptRule,
+  deactivatedRuleSetName,
+  describeRuleSetActivation,
+  describeRuleSetDeactivation,
+  inboundInitRecoveryCommand,
   inboundRuleActions,
+  previousRuleSetUnreadable,
   RECEIPT_RULE_RETRY_DELAYS_MS,
+  REPLACE_NO_RULE_SET,
   readActiveReceiptRuleSet,
   receiptRuleRetryHooks,
   receiptRuleTriggerOf,
   removeDomainFromReceiptRule,
+  setActiveReceiptRuleSet,
   syncReceiptRuleTrigger,
+  wouldDeactivateAnotherRuleSet,
 } from "../receipt-rules.js";
 
 const ses = mockClient(SESClient);
@@ -65,6 +74,14 @@ function sesError(name: string) {
 
 function updateInputs() {
   return ses.commandCalls(UpdateReceiptRuleCommand).map((c) => c.args[0].input);
+}
+
+const RECOVERY =
+  "wraps email inbound init --domain example.com --subdomain in --region us-east-1";
+
+/** A plan-048 activation over `expected`, with fixed refusal text. */
+function act(expected: Parameters<typeof activeRuleSetMatchesExpected>[1]) {
+  return { expected, inPlace: "IN-PLACE.", recovery: RECOVERY };
 }
 
 const sleeps: number[] = [];
@@ -368,7 +385,8 @@ describe("addDomainToReceiptRule", () => {
       ACCOUNT,
       "support.example.com",
       BUCKET,
-      "ses-lambda-action"
+      "ses-lambda-action",
+      act(REPLACE_NO_RULE_SET)
     );
 
     const creates = ses.commandCalls(CreateReceiptRuleCommand);
@@ -428,5 +446,323 @@ describe("readActiveReceiptRuleSet", () => {
       readable: false,
       error: "AccessDenied",
     });
+  });
+});
+
+describe("plan 048: activating wraps-inbound-rules only over a consented set", () => {
+  const OURS = { readable: true, name: "wraps-inbound-rules" } as const;
+  const NONE = { readable: true, name: null } as const;
+  const CUSTOMER = { readable: true, name: "customer-rules" } as const;
+  const OTHER = { readable: true, name: "other-rules" } as const;
+  const UNREADABLE = { readable: false, error: "AccessDenied" } as const;
+
+  it("wouldDeactivateAnotherRuleSet: another set or unreadable, never none or ours", () => {
+    expect(wouldDeactivateAnotherRuleSet(NONE)).toBe(false);
+    expect(wouldDeactivateAnotherRuleSet(OURS)).toBe(false);
+    expect(wouldDeactivateAnotherRuleSet(CUSTOMER)).toBe(true);
+    expect(wouldDeactivateAnotherRuleSet(UNREADABLE)).toBe(true);
+  });
+
+  it.each([
+    // [current, expected, allowed]
+    [NONE, NONE, true],
+    [NONE, CUSTOMER, true],
+    [OURS, NONE, true],
+    [OURS, UNREADABLE, true],
+    [CUSTOMER, CUSTOMER, true],
+    [CUSTOMER, NONE, false],
+    [CUSTOMER, OURS, false],
+    [OTHER, CUSTOMER, false],
+    [CUSTOMER, UNREADABLE, false],
+    [UNREADABLE, UNREADABLE, true],
+    [UNREADABLE, NONE, false],
+    [UNREADABLE, CUSTOMER, false],
+  ] as const)(
+    "activeRuleSetMatchesExpected(current %o, expected %o) is %s",
+    (current, expected, allowed) => {
+      expect(activeRuleSetMatchesExpected(current, expected)).toBe(allowed);
+    }
+  );
+
+  it("activates over the consented set, reading it with DescribeActiveReceiptRuleSet first", async () => {
+    ses
+      .on(DescribeActiveReceiptRuleSetCommand)
+      .resolves({ Metadata: { Name: "customer-rules" } });
+    ses.on(SetActiveReceiptRuleSetCommand).resolves({});
+
+    const before = await setActiveReceiptRuleSet(
+      REGION,
+      "wraps-inbound-rules",
+      act(CUSTOMER)
+    );
+
+    expect(before).toEqual(CUSTOMER);
+    expect(
+      ses.commandCalls(SetActiveReceiptRuleSetCommand)[0].args[0].input
+    ).toEqual({ RuleSetName: "wraps-inbound-rules" });
+  });
+
+  it("refuses without activating when another set became active after the preflight saw none", async () => {
+    ses
+      .on(DescribeActiveReceiptRuleSetCommand)
+      .resolves({ Metadata: { Name: "customer-rules" } });
+    ses.on(SetActiveReceiptRuleSetCommand).resolves({});
+
+    await expect(
+      setActiveReceiptRuleSet(REGION, "wraps-inbound-rules", act(NONE))
+    ).rejects.toMatchObject({
+      code: "RECEIPT_RULE_SET_CONFLICT",
+      message: expect.stringContaining("customer-rules"),
+      suggestion: expect.stringContaining("--replace-active-rule-set"),
+    });
+    expect(ses.commandCalls(SetActiveReceiptRuleSetCommand)).toHaveLength(0);
+  });
+
+  it("refuses when the active set changed from the one the user agreed to replace", async () => {
+    ses
+      .on(DescribeActiveReceiptRuleSetCommand)
+      .resolves({ Metadata: { Name: "other-rules" } });
+
+    await expect(
+      setActiveReceiptRuleSet(REGION, "wraps-inbound-rules", act(CUSTOMER))
+    ).rejects.toMatchObject({
+      code: "RECEIPT_RULE_SET_CONFLICT",
+      message: expect.stringContaining(
+        "not customer-rules, the set you agreed to replace"
+      ),
+    });
+    expect(ses.commandCalls(SetActiveReceiptRuleSetCommand)).toHaveLength(0);
+  });
+
+  it("an unreadable active set at activation refuses unless the consent was also given unread", async () => {
+    ses
+      .on(DescribeActiveReceiptRuleSetCommand)
+      .rejects(sesError("AccessDenied"));
+    ses.on(SetActiveReceiptRuleSetCommand).resolves({});
+
+    await expect(
+      setActiveReceiptRuleSet(REGION, "wraps-inbound-rules", act(NONE))
+    ).rejects.toMatchObject({
+      code: "RECEIPT_RULE_SET_CONFLICT",
+      message: expect.stringContaining("AccessDenied"),
+    });
+    expect(ses.commandCalls(SetActiveReceiptRuleSetCommand)).toHaveLength(0);
+
+    const before = await setActiveReceiptRuleSet(
+      REGION,
+      "wraps-inbound-rules",
+      act(UNREADABLE)
+    );
+    expect(before).toEqual(UNREADABLE);
+    expect(ses.commandCalls(SetActiveReceiptRuleSetCommand)).toHaveLength(1);
+  });
+
+  it("no set active, or ours: unchanged (activates silently, or not at all when ours already is)", async () => {
+    ses
+      .on(DescribeActiveReceiptRuleSetCommand)
+      .resolvesOnce({})
+      .resolvesOnce({ Metadata: { Name: "wraps-inbound-rules" } });
+    ses.on(SetActiveReceiptRuleSetCommand).resolves({});
+
+    expect(
+      await setActiveReceiptRuleSet(REGION, "wraps-inbound-rules", act(NONE))
+    ).toEqual(NONE);
+    expect(ses.commandCalls(SetActiveReceiptRuleSetCommand)).toHaveLength(1);
+
+    expect(
+      await setActiveReceiptRuleSet(REGION, "wraps-inbound-rules", act(NONE))
+    ).toEqual(OURS);
+    expect(ses.commandCalls(SetActiveReceiptRuleSetCommand)).toHaveLength(1);
+  });
+
+  it("addDomainToReceiptRule's create fallback refuses to activate over a set nobody agreed to replace", async () => {
+    ses.on(DescribeReceiptRuleCommand).rejects(notFound());
+    ses.on(CreateReceiptRuleSetCommand).resolves({});
+    ses.on(CreateReceiptRuleCommand).resolves({});
+    ses
+      .on(DescribeActiveReceiptRuleSetCommand)
+      .resolves({ Metadata: { Name: "customer-rules" } });
+    ses.on(SetActiveReceiptRuleSetCommand).resolves({});
+
+    await expect(
+      addDomainToReceiptRule(
+        REGION,
+        ACCOUNT,
+        "support.example.com",
+        BUCKET,
+        "ses-lambda-action",
+        act(REPLACE_NO_RULE_SET)
+      )
+    ).rejects.toMatchObject({ code: "RECEIPT_RULE_SET_CONFLICT" });
+    expect(ses.commandCalls(SetActiveReceiptRuleSetCommand)).toHaveLength(0);
+
+    await addDomainToReceiptRule(
+      REGION,
+      ACCOUNT,
+      "support.example.com",
+      BUCKET,
+      "ses-lambda-action",
+      act(CUSTOMER)
+    );
+    expect(ses.commandCalls(SetActiveReceiptRuleSetCommand)).toHaveLength(1);
+  });
+
+  it("a late refusal says what is in place and the command that asks again; it never claims consent nobody gave", async () => {
+    ses
+      .on(DescribeActiveReceiptRuleSetCommand)
+      .resolves({ Metadata: { Name: "customer-rules" } });
+
+    const error = await setActiveReceiptRuleSet(REGION, "wraps-inbound-rules", {
+      ...act(NONE),
+      afterRecovery: "AFTER.",
+    }).catch((e: unknown) => e as { message: string; suggestion: string });
+
+    expect(error.message).toBe(
+      "Receipt rule set customer-rules became active in us-east-1 during this run, so wraps-inbound-rules was not activated"
+    );
+    expect(error.message).not.toContain("agreed");
+    expect(error.suggestion).toContain(
+      "Already in place: IN-PLACE. Until wraps-inbound-rules is active, no mail reaches Wraps."
+    );
+    expect(error.suggestion).toContain(
+      `To be asked again, keeping the saved inbound configuration, run this from a terminal (it re-deploys the inbound stack):\n  ${RECOVERY}\nRun unattended, inbound init needs both --yes and --replace-active-rule-set, only after the AWS account owner agrees`
+    );
+    expect(error.suggestion).toContain("AFTER.");
+    expect(error.suggestion).not.toContain("Nothing was deployed");
+    expect(error.suggestion).not.toContain("Re-run the command");
+  });
+
+  it("ours active at the preflight, another set by activation: 'became active during this run', never 'agreed to replace'", async () => {
+    ses
+      .on(DescribeActiveReceiptRuleSetCommand)
+      .resolves({ Metadata: { Name: "other-rules" } });
+    ses.on(SetActiveReceiptRuleSetCommand).resolves({});
+
+    const error = await setActiveReceiptRuleSet(
+      REGION,
+      "wraps-inbound-rules",
+      act(OURS)
+    ).catch((e: unknown) => e as { code: string; message: string });
+
+    expect(error.code).toBe("RECEIPT_RULE_SET_CONFLICT");
+    expect(error.message).toBe(
+      "Receipt rule set other-rules became active in us-east-1 during this run, so wraps-inbound-rules was not activated"
+    );
+    expect(error.message).not.toContain("agreed");
+    expect(ses.commandCalls(SetActiveReceiptRuleSetCommand)).toHaveLength(0);
+  });
+
+  it("inboundInitRecoveryCommand leaves --domain out when no parent can be derived", () => {
+    expect(
+      inboundInitRecoveryCommand(REGION, { subdomain: "inbound" }, undefined)
+    ).toBe("wraps email inbound init --subdomain inbound --region us-east-1");
+    expect(inboundInitRecoveryCommand(REGION, undefined, [])).toBe(
+      "wraps email inbound init --root --region us-east-1"
+    );
+  });
+
+  it("previousRuleSetUnreadable gives the read error only for an unreadable previous set", () => {
+    expect(previousRuleSetUnreadable(null)).toBeNull();
+    expect(previousRuleSetUnreadable(CUSTOMER)).toBeNull();
+    expect(previousRuleSetUnreadable(NONE)).toBeNull();
+    expect(previousRuleSetUnreadable(UNREADABLE)).toBe("AccessDenied");
+  });
+
+  it("inboundInitRecoveryCommand keeps the saved parent and label, or --root", () => {
+    expect(
+      inboundInitRecoveryCommand(
+        REGION,
+        { subdomain: "in", receivingDomain: "in.example.com" },
+        [
+          {
+            subdomain: "in",
+            receivingDomain: "in.example.com",
+            parentDomain: "example.com",
+            addedAt: "2024-01-01T00:00:00.000Z",
+          },
+        ]
+      )
+    ).toBe(
+      "wraps email inbound init --domain example.com --subdomain in --region us-east-1"
+    );
+    expect(
+      inboundInitRecoveryCommand(
+        REGION,
+        { subdomain: "", receivingDomain: "example.com" },
+        undefined
+      )
+    ).toBe(
+      "wraps email inbound init --domain example.com --root --region us-east-1"
+    );
+    expect(
+      inboundInitRecoveryCommand(
+        "eu-west-1",
+        { subdomain: "support", receivingDomain: "support.acme.io" },
+        []
+      )
+    ).toBe(
+      "wraps email inbound init --domain acme.io --subdomain support --region eu-west-1"
+    );
+  });
+
+  it("deactivatedRuleSetName / describeRuleSetActivation report what an activation switched off", () => {
+    expect(deactivatedRuleSetName(null)).toBeNull();
+    expect(deactivatedRuleSetName(NONE)).toBeNull();
+    expect(deactivatedRuleSetName(OURS)).toBeNull();
+    expect(deactivatedRuleSetName(UNREADABLE)).toBeNull();
+    expect(deactivatedRuleSetName(CUSTOMER)).toBe("customer-rules");
+    expect(describeRuleSetActivation(null)).toBeNull();
+    expect(describeRuleSetActivation(NONE)).toBeNull();
+    expect(describeRuleSetActivation(CUSTOMER)).toBe(
+      "Deactivated receipt rule set customer-rules."
+    );
+    expect(describeRuleSetActivation(UNREADABLE)).toContain("AccessDenied");
+  });
+
+  it("addDomainToReceiptRule returns the pre-activation read when it activated, null when the rule was there", async () => {
+    ses
+      .on(DescribeReceiptRuleCommand)
+      .rejectsOnce(notFound())
+      .resolves({ Rule: existingRule({ Actions: NEW_ACTIONS }) });
+    ses.on(CreateReceiptRuleSetCommand).resolves({});
+    ses.on(CreateReceiptRuleCommand).resolves({});
+    ses
+      .on(DescribeActiveReceiptRuleSetCommand)
+      .resolves({ Metadata: { Name: "customer-rules" } });
+    ses.on(SetActiveReceiptRuleSetCommand).resolves({});
+    ses.on(UpdateReceiptRuleCommand).resolves({});
+
+    expect(
+      await addDomainToReceiptRule(
+        REGION,
+        ACCOUNT,
+        "support.example.com",
+        BUCKET,
+        "ses-lambda-action",
+        act(CUSTOMER)
+      )
+    ).toEqual(CUSTOMER);
+    expect(
+      await addDomainToReceiptRule(
+        REGION,
+        ACCOUNT,
+        "sales.example.com",
+        BUCKET,
+        "ses-lambda-action",
+        act(CUSTOMER)
+      )
+    ).toBeNull();
+  });
+
+  it("describeRuleSetDeactivation names the set, or the read error, for --preview", () => {
+    expect(describeRuleSetDeactivation(NONE)).toBeNull();
+    expect(describeRuleSetDeactivation(OURS)).toBeNull();
+    expect(describeRuleSetDeactivation(CUSTOMER)).toContain(
+      "would deactivate the active receipt rule set customer-rules"
+    );
+    expect(describeRuleSetDeactivation(UNREADABLE)).toContain("AccessDenied");
+    expect(describeRuleSetDeactivation(CUSTOMER)).toContain(
+      "The run asks first. With --yes it needs --replace-active-rule-set; inbound add and reply init also need it under --json or with no terminal, where inbound init stops with NON_INTERACTIVE_INPUT unless --yes is passed too."
+    );
   });
 });

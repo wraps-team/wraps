@@ -565,6 +565,11 @@ export type EmailInboundInitOptions = {
   preview?: boolean;
   json?: boolean;
   unexpectedArg?: string;
+  /**
+   * Consent to deactivate another active receipt rule set when activating
+   * wraps-inbound-rules (required with --yes/--json when one is active).
+   */
+  replaceActiveRuleSet?: boolean;
 };
 
 /**
@@ -618,6 +623,11 @@ export type EmailInboundAddOptions = {
   preview?: boolean;
   json?: boolean;
   unexpectedArg?: string;
+  /**
+   * Consent to deactivate another active receipt rule set when activating
+   * wraps-inbound-rules (required with --yes/--json when one is active).
+   */
+  replaceActiveRuleSet?: boolean;
 };
 
 /**
@@ -678,6 +688,11 @@ export type EmailReplyInitOptions = {
   yes?: boolean;
   preview?: boolean;
   json?: boolean;
+  /**
+   * Consent to deactivate another active receipt rule set when activating
+   * wraps-inbound-rules (required with --yes/--json when one is active).
+   */
+  replaceActiveRuleSet?: boolean;
 };
 
 /**
