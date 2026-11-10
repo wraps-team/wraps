@@ -12,8 +12,8 @@ export type SQSInboundResources = {
  * Create SQS queues for inbound email event processing (DLQ for Lambda failures)
  *
  * Architecture:
- * S3 -> Lambda (inbound-processor) -> EventBridge
- *            ↓ (on failure)
+ * SES Lambda action (or, legacy, S3 notification) -> Lambda (inbound-processor) -> EventBridge
+ *            ↓ (on failure, after Lambda's async retries)
  *           DLQ
  */
 export function createSQSInboundResources(): SQSInboundResources {

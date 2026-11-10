@@ -1,5 +1,9 @@
 import * as aws from "@pulumi/aws";
-import { retentionToDays } from "@wraps/core";
+import {
+  INBOUND_LEGACY_PREFIX,
+  INBOUND_MAIL_PREFIX,
+  retentionToDays,
+} from "@wraps/core";
 import type { ArchiveRetention } from "../../types/index.js";
 
 /**
@@ -23,7 +27,9 @@ export type S3InboundResources = {
  * Create S3 bucket for inbound email storage
  *
  * Structure:
- *   raw/{messageId}         - Raw MIME from SES Receipt Rule
+ *   mail/{messageId}        - Raw MIME from the SES receipt rule ("ses-lambda-action" mode)
+ *   raw/{messageId}         - Raw MIME from the SES receipt rule (legacy "s3-notification"
+ *                             mode, and all mail received before a deployment switched)
  *   parsed/{emailId}.json   - Parsed email JSON from Lambda
  *   attachments/{emailId}/  - Extracted attachments
  */
@@ -85,7 +91,9 @@ export async function createS3InboundResources(
     }
   }
 
-  // Bucket policy allowing SES to write raw emails
+  // Bucket policy allowing SES to write raw emails. Covers both prefixes in
+  // both trigger modes, so the switch can move the rule from raw/ to mail/
+  // without a policy change in between.
   const identity = await aws.getCallerIdentity();
   new aws.s3.BucketPolicy("wraps-inbound-bucket-policy", {
     bucket: bucket.id,
@@ -100,7 +108,10 @@ export async function createS3InboundResources(
               Service: "ses.amazonaws.com",
             },
             Action: "s3:PutObject",
-            Resource: `${arn}/raw/*`,
+            Resource: [
+              `${arn}/${INBOUND_LEGACY_PREFIX}*`,
+              `${arn}/${INBOUND_MAIL_PREFIX}*`,
+            ],
             Condition: {
               StringEquals: {
                 "aws:SourceAccount": identity.accountId,
