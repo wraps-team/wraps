@@ -3,18 +3,17 @@ import { loadEnv, type UserConfig } from "vite";
 import { defineConfig } from "vitest/config";
 import { resolveTestDatabaseUrl } from "../../scripts/test-db/resolve-branch.mjs";
 
-// Suites that insert rows under fixed, hand-written ids and delete them in
-// their own hooks. Two kinds: files that import the shared fixtures from
-// `src/app/api/__tests__/setup.ts` (`test-onboarding-org-1`, slug
-// `onboarding-test-org`, user `test-onboarding-user-1` — whose `afterAll`
-// deletes those rows), and files that declare their own fixed ids (e.g.
-// `brand-kits`). Every other DB-touching suite namespaces its fixtures per
-// file — `setupPermissionFixtures` appends a random suffix,
-// `__tests__/fixtures/real-db.ts` prefixes every id — so only these can delete
-// each other's rows mid-test. They get their own serial project; the rest of
-// the suite runs in parallel. Add any new file that imports `setup.ts` (grep
-// both `./setup` and `@/app/api/__tests__/setup`). Migrating this setup to a
-// per-file prefix would let the group fold into the parallel project.
+// Any file that imports `src/app/api/__tests__/setup.ts`, by any path
+// (`./setup`, `@/app/api/__tests__/setup`), must be listed here: that file's
+// fixtures use fixed ids (`test-onboarding-org-1`, slug `onboarding-test-org`,
+// user `test-onboarding-user-1`) and its `afterAll` deletes those rows, so a
+// parallel importer would lose them mid-test. The other listed files are here
+// for historical reasons; the list is not every fixed-id file. Every other
+// DB-touching suite namespaces its fixtures per file (`setupPermissionFixtures`
+// appends a random suffix, `__tests__/fixtures/real-db.ts` prefixes every id).
+// The listed files get their own serial project; the rest runs in parallel.
+// Migrating `setup.ts` to a per-file prefix would let the group fold into the
+// parallel project.
 const SHARED_FIXTURE_FILES = [
   "src/app/api/__tests__/activation-status.test.ts",
   "src/app/api/__tests__/ai-generate-code-vision.test.ts",
@@ -31,12 +30,12 @@ const SHARED_FIXTURE_FILES = [
   "src/lib/usage/__tests__/ai-usage.test.ts",
 ];
 
-// Node 25+ turns its webstorage global on by default (24 can too, behind a
-// flag). With no `--localstorage-file`, `localStorage` is then a getter that
-// returns undefined, shadowing the one jsdom installs, so component tests die
-// with "Cannot read properties of undefined (reading 'clear')". Starting the
-// worker with the feature off lets jsdom's win. Only pass the flag where this
-// Node knows it; an older Node rejects unknown flags in `execArgv` outright.
+// Observed on local Node 24.21 and 26: Node's experimental webstorage global
+// shadows jsdom's `localStorage` (it is `undefined` without
+// `--localstorage-file`), so component tests die with "Cannot read properties
+// of undefined (reading 'clear')". CI's Node 24.22 passes either way. Passing
+// the flag lets jsdom's win; it is only passed when this Node knows it, since
+// an older Node rejects unknown flags in `execArgv`.
 const WEBSTORAGE_OFF = "--no-experimental-webstorage";
 const workerExecArgv = process.allowedNodeEnvironmentFlags.has(WEBSTORAGE_OFF)
   ? [WEBSTORAGE_OFF]

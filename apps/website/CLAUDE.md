@@ -200,9 +200,9 @@ Generated at `app/sitemap.ts` and `app/robots.ts`.
 ## Commands
 
 ```bash
-pnpm --filter @wraps/website dev         # Dev server
-pnpm --filter @wraps/website build       # Production build
-pnpm --filter @wraps/website typecheck   # Type check
+pnpm --filter wraps-website dev         # Dev server
+pnpm --filter wraps-website build       # Production build
+pnpm --filter wraps-website typecheck   # Type check
 ```
 
 ## Security findings
