@@ -247,7 +247,6 @@ function getInboundStatements(): IAMStatement[] {
       Action: [
         "ses:CreateReceiptRuleSet",
         "ses:DeleteReceiptRuleSet",
-        "ses:DescribeReceiptRuleSet",
         "ses:CreateReceiptRule",
         "ses:UpdateReceiptRule",
         "ses:DescribeReceiptRule",
@@ -299,10 +298,17 @@ function getInboundStatements(): IAMStatement[] {
         // Pulumi forceDestroy empties the bucket before deleting it.
         "s3:DeleteObject",
         "s3:DeleteObjectVersion",
-        // `wraps email inbound test` reads the parsed message back.
-        "s3:GetObject",
       ],
       Resource: ["arn:aws:s3:::wraps-inbound-*/*"],
+    },
+    {
+      // `wraps email inbound test` and the local console read parsed
+      // messages back. Raw MIME (raw/, mail/) and attachments/ stay out of
+      // the deployer's reach.
+      Sid: "InboundParsedRead",
+      Effect: "Allow",
+      Action: ["s3:GetObject"],
+      Resource: ["arn:aws:s3:::wraps-inbound-*/parsed/*"],
     },
   ];
 }

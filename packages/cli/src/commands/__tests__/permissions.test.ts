@@ -34,7 +34,7 @@ afterEach(() => {
 
 describe("permissions: inbound statements (plan 041)", () => {
   it.each(["production", "enterprise"] as const)(
-    "%s includes InboundReceiptRules, InboundBucket and InboundBucketObjects",
+    "%s includes the four inbound statements",
     async (preset) => {
       const sids = (await policyFor(preset)).map((s) => s.Sid);
       expect(sids).toEqual(
@@ -42,6 +42,7 @@ describe("permissions: inbound statements (plan 041)", () => {
           "InboundReceiptRules",
           "InboundBucket",
           "InboundBucketObjects",
+          "InboundParsedRead",
         ])
       );
     }
@@ -52,6 +53,7 @@ describe("permissions: inbound statements (plan 041)", () => {
     expect(sids).not.toContain("InboundReceiptRules");
     expect(sids).not.toContain("InboundBucket");
     expect(sids).not.toContain("InboundBucketObjects");
+    expect(sids).not.toContain("InboundParsedRead");
   });
 
   it("receipt-rule actions are on Resource * (they take no resource ARN)", async () => {
@@ -89,9 +91,26 @@ describe("permissions: inbound statements (plan 041)", () => {
       ])
     );
     expect(objects?.Resource).toEqual(["arn:aws:s3:::wraps-inbound-*/*"]);
-    expect(objects?.Action).toEqual(
-      expect.arrayContaining(["s3:DeleteObject", "s3:DeleteObjectVersion"])
-    );
+    expect(objects?.Action).toEqual([
+      "s3:DeleteObject",
+      "s3:DeleteObjectVersion",
+    ]);
+  });
+
+  it("the deployer reads only parsed/ objects (never raw MIME or attachments), and no unused receipt-rule action", async () => {
+    const statements = await policyFor("production");
+    const read = statements.find((s) => s.Sid === "InboundParsedRead");
+    expect(read?.Action).toEqual(["s3:GetObject"]);
+    expect(read?.Resource).toEqual(["arn:aws:s3:::wraps-inbound-*/parsed/*"]);
+    const inbound = statements.filter((s) => s.Sid.startsWith("Inbound"));
+    const getObjectResources = inbound
+      .filter((s) => s.Action.includes("s3:GetObject"))
+      .flatMap((s) => (Array.isArray(s.Resource) ? s.Resource : [s.Resource]));
+    expect(getObjectResources).toEqual([
+      "arn:aws:s3:::wraps-inbound-*/parsed/*",
+    ]);
+    const rules = statements.find((s) => s.Sid === "InboundReceiptRules");
+    expect(rules?.Action).not.toContain("ses:DescribeReceiptRuleSet");
   });
 
   it("every Sid in the email policy is unique (buildPolicy drops repeats silently)", async () => {
