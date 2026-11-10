@@ -195,7 +195,7 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
         code: "POLICY_DIR_WRITE_FAILED",
         message: "Could not write <dir>/wraps-deployer-<n>.json: <detail>",
         solution:
-          "Raised by wraps permissions --policy-dir when the folder can't be created or written, or a wraps-deployer-<n>.json in it is a symlink. Old wraps-deployer-<n>.json files are removed only after every new one is written, so a failed run removes nothing. Fix the folder and re-run.",
+          "Raised by wraps permissions --policy-dir when the folder can't be created or written, or a wraps-deployer-<n>.json in it is a symlink. Old wraps-deployer-<n>.json files are removed only after every new one is written, so a failed write removes nothing. If removing an old file fails, the message names it: delete it yourself and don't create an IAM policy from it. Otherwise fix the folder and re-run.",
       },
     ],
   },
