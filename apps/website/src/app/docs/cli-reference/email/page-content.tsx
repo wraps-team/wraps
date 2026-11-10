@@ -1101,7 +1101,9 @@ export default function CLIReferenceEmailPageContent() {
             </code>
             ), and it warns when a different receipt rule set is active in the
             region, because <code>inbound init</code> and{" "}
-            <code>inbound add</code> would deactivate it.
+            <code>inbound add</code> would deactivate it. It also shows the
+            inbound dead-letter queue depth and, when it is not zero, the{" "}
+            <code>inbound reprocess</code> command.
           </p>
           <Card>
             <CardHeader>
@@ -1519,6 +1521,68 @@ export default function CLIReferenceEmailPageContent() {
                   <code className="rounded bg-muted px-2 py-1">--json</code>{" "}
                   <span className="text-muted-foreground">
                     Print the JSON envelope. Use it to read the html field
+                  </span>
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* inbound reprocess */}
+        <div className="mb-8 ml-4">
+          <h3 className="mb-3 font-semibold text-xl">
+            wraps email inbound reprocess
+          </h3>
+          <p className="mb-4 text-muted-foreground text-sm">
+            Replay inbound emails that failed every Lambda retry and landed in
+            the dead-letter queue (<code>wraps-inbound-events-dlq</code>, kept
+            14 days). Each message is handed back to the processor and deleted
+            from the queue once Lambda accepts it. A message Lambda does not
+            accept stays queued. If a replay is accepted but the delete fails,
+            it is reported as &quot;replayed, not deleted&quot;: do not replay
+            it again.
+          </p>
+          <Card className="mb-4">
+            <CardHeader>
+              <CardTitle className="text-lg">Usage</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CLICommand command="npx @wraps.dev/cli email inbound reprocess [options]" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Options</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">--dry-run</code>{" "}
+                  <span className="text-muted-foreground">
+                    List what would be replayed (time, key, envelope recipient
+                    count); changes nothing
+                  </span>
+                </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">
+                    --max &lt;n&gt;
+                  </code>{" "}
+                  <span className="text-muted-foreground">
+                    Most messages to handle in one run (default 100)
+                  </span>
+                </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">-y, --yes</code>{" "}
+                  <span className="text-muted-foreground">
+                    Skip the confirmation prompt. Required in non-interactive
+                    shells and with --json, not with --dry-run
+                  </span>
+                </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">--json</code>{" "}
+                  <span className="text-muted-foreground">
+                    Machine-readable output with the counts replayed,
+                    replayedNotDeleted and failed
                   </span>
                 </li>
               </ul>

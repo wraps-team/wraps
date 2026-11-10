@@ -136,10 +136,11 @@ wraps email domains remove    Remove domain from SES
 
 ```
 wraps email inbound init      Enable inbound email receiving
-wraps email inbound status    Show inbound status and trigger mode; flags a mismatch with the repair command and warns when another receipt rule set is active
+wraps email inbound status    Show inbound status and trigger mode; flags a mismatch with the repair command and warns when another receipt rule set is active; shows the dead-letter queue depth and, when it is not zero, the reprocess command
 wraps email inbound add       Add a receiving domain (--preview shows changes without applying)
 wraps email inbound verify    Verify inbound DNS records
 wraps email inbound test      Send test and verify receipt
+wraps email inbound reprocess Replay emails from the inbound dead-letter queue [--dry-run] [--max <n>] [--yes] [--json]
 wraps email inbound destroy   Remove inbound infrastructure
 ```
 
@@ -250,6 +251,7 @@ Commands that send email, make a live change or delete data refuse to run withou
 - `workflows trigger`, `workflows enable`, `workflows retry`, `workflows cancel`
 - `email agent approvals approve`, `email agent approvals reject`
 - `brand-kits delete`
+- `email inbound reprocess` prompts when interactive, and needs `--yes` in a non-interactive shell or with `--json` (not with `--dry-run`)
 
 Exceptions. `email templates pull` fetches without `--yes`, but refuses to overwrite existing local files unless `--yes` is given. `contacts export --output` and `audit-logs export --output` also refuse to overwrite an existing file unless `--yes` is given. `workflows disable` needs no `--yes` because it only stops future runs. `broadcasts duplicate` and `broadcasts update` are not destructive and need no `--yes`.
 
@@ -1121,6 +1123,7 @@ wraps email inbound status    # Check inbound status and trigger mode
 wraps email inbound add       # Add a receiving domain (--preview shows changes without applying)
 wraps email inbound verify    # Verify MX DNS records
 wraps email inbound test      # Send test and verify receipt
+wraps email inbound reprocess # Replay emails that failed every retry (dead-letter queue); --dry-run lists them first
 wraps email inbound destroy   # Remove inbound infrastructure
 ```
 

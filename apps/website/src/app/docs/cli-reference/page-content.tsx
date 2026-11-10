@@ -843,7 +843,9 @@ export default function CLIReferencePageContent() {
               send, broadcasts resume, broadcasts cancel, workflows trigger,
               workflows enable, workflows retry, workflows cancel, email agent
               approvals approve, email agent approvals reject, api-keys revoke,
-              and brand-kits delete.
+              and brand-kits delete. email inbound reprocess prompts when run
+              interactively and needs --yes in a non-interactive shell or with
+              --json (not with --dry-run).
             </p>
             <p className="text-muted-foreground text-sm">
               email templates pull fetches without --yes, but it refuses to
