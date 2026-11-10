@@ -780,7 +780,7 @@ These permissions enhance functionality but are not required:
    - Name it after the file: `wraps-deployer-1`
    - Repeat for each file
 
-   IAM policy names are unique per account. If different users or roles in one account need different scopes, add a suffix, such as `wraps-deployer-email-1`.
+   IAM policy names are unique per account. If different users or roles in one account need different scopes, add the scope before the file number, such as `wraps-deployer-email-1` for that scope's `wraps-deployer-1.json`. Keep the number so each policy still matches its file, and read `wraps-deployer-<n>` in the steps below as `wraps-deployer-email-<n>`.
 
 3. Attach all of them to your IAM user or role:
    - Go to IAM > Users (or Roles)

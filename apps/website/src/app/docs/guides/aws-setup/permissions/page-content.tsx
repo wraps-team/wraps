@@ -614,10 +614,23 @@ export default function PermissionsPageContent() {
                   </p>
                   <p className="mt-1 text-muted-foreground text-sm">
                     IAM policy names are unique per account. If different users
-                    or roles in one account need different scopes, add a suffix,
-                    such as{" "}
+                    or roles in one account need different scopes, add the scope
+                    before the file number, such as{" "}
                     <code className="rounded bg-muted px-1.5 py-0.5">
                       wraps-deployer-email-1
+                    </code>{" "}
+                    for that scope&apos;s{" "}
+                    <code className="rounded bg-muted px-1.5 py-0.5">
+                      wraps-deployer-1.json
+                    </code>
+                    . Keep the number so each policy still matches its file, and
+                    read{" "}
+                    <code className="rounded bg-muted px-1.5 py-0.5">
+                      wraps-deployer-&lt;n&gt;
+                    </code>{" "}
+                    in the steps below as{" "}
+                    <code className="rounded bg-muted px-1.5 py-0.5">
+                      wraps-deployer-email-&lt;n&gt;
                     </code>
                     .
                   </p>
