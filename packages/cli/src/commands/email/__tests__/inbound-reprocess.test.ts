@@ -96,6 +96,7 @@ function printed(): string {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   sqs.reset();
   lambda.reset();
   sqs.on(GetQueueUrlCommand).resolves({ QueueUrl: QUEUE_URL });
@@ -251,6 +252,97 @@ describe("inbound reprocess (replay)", () => {
     });
   });
 
+  it("an accepted invoke whose delete fails is its own outcome, not a failure, and the advice does not say to re-run", async () => {
+    sqs.on(DeleteMessageCommand).rejects(new Error("delete throttled"));
+    sqs
+      .on(ReceiveMessageCommand)
+      .resolvesOnce({ Messages: [msg("m1", sesBody("abc"))] })
+      .resolves({});
+    await inboundReprocess({ yes: true });
+
+    expect(lambda.commandCalls(InvokeCommand)).toHaveLength(1);
+    const warned = vi
+      .mocked(clack.log.warn)
+      .mock.calls.map((c) => String(c[0]))
+      .join("\n");
+    expect(warned).toContain("already took it");
+    expect(warned).toContain("do not run reprocess again");
+    expect(warned).not.toContain("could not be handed to the processor");
+    expect(String(vi.mocked(clack.log.info).mock.calls[0][0])).toContain(
+      "1 replayed but not deleted, 0 failed"
+    );
+  });
+
+  it("reports replayed-not-deleted separately in --json", async () => {
+    sqs.on(DeleteMessageCommand).rejects(new Error("delete throttled"));
+    sqs
+      .on(ReceiveMessageCommand)
+      .resolvesOnce({ Messages: [msg("m1", sesBody("abc"))] })
+      .resolves({});
+    setJsonMode(true);
+    await inboundReprocess({ yes: true });
+    const data = jsonOut();
+    expect(data).toMatchObject({
+      found: 1,
+      replayed: 0,
+      replayedNotDeleted: 1,
+      failed: 0,
+    });
+    expect(data.messages[0]).toMatchObject({
+      outcome: "replayed-not-deleted",
+      error: "delete throttled",
+    });
+    expect(lambda.commandCalls(InvokeCommand)).toHaveLength(1);
+  });
+
+  it("stops at the first missing-processor error instead of failing every message", async () => {
+    lambda.on(InvokeCommand).rejects(
+      Object.assign(new Error("not found"), {
+        name: "ResourceNotFoundException",
+      })
+    );
+    sqs.on(ReceiveMessageCommand).resolves({
+      Messages: [
+        msg("m1", sesBody("a")),
+        msg("m2", sesBody("b")),
+        msg("m3", sesBody("c")),
+      ],
+    });
+    await expect(inboundReprocess({ yes: true })).rejects.toMatchObject({
+      code: "INBOUND_NOT_DEPLOYED",
+      message: expect.stringContaining("wraps-inbound-email-processor"),
+    });
+    expect(lambda.commandCalls(InvokeCommand)).toHaveLength(1);
+    expect(sqs.commandCalls(DeleteMessageCommand)).toHaveLength(0);
+  });
+
+  it("stops at the first lambda:InvokeFunction denial with one message naming the action", async () => {
+    lambda
+      .on(InvokeCommand)
+      .rejects(
+        Object.assign(new Error("denied"), { name: "AccessDeniedException" })
+      );
+    sqs.on(ReceiveMessageCommand).resolves({
+      Messages: [msg("m1", sesBody("a")), msg("m2", sesBody("b"))],
+    });
+    await expect(inboundReprocess({ yes: true })).rejects.toMatchObject({
+      code: "LAMBDA_PERMISSION_DENIED",
+      message: expect.stringContaining("lambda:InvokeFunction"),
+    });
+    expect(lambda.commandCalls(InvokeCommand)).toHaveLength(1);
+    expect(sqs.commandCalls(DeleteMessageCommand)).toHaveLength(0);
+  });
+
+  it("an SQS access denial on receive stops the run with SQS_PERMISSION_DENIED", async () => {
+    sqs
+      .on(ReceiveMessageCommand)
+      .rejects(Object.assign(new Error("denied"), { name: "AccessDenied" }));
+    await expect(inboundReprocess({ yes: true })).rejects.toMatchObject({
+      code: "SQS_PERMISSION_DENIED",
+    });
+    expect(lambda.commandCalls(InvokeCommand)).toHaveLength(0);
+  });
+
   it("a non-202 invoke keeps the message", async () => {
     lambda.on(InvokeCommand).resolves({ StatusCode: 200 });
     sqs
@@ -330,7 +422,7 @@ describe("inbound reprocess flags", () => {
   it("--json without --yes errors before touching AWS", async () => {
     setJsonMode(true);
     await expect(inboundReprocess({})).rejects.toMatchObject({
-      code: "INVALID_FLAG_USAGE",
+      code: "CONFIRMATION_REQUIRED",
       message: expect.stringContaining("--yes"),
     });
     expect(sqs.calls()).toHaveLength(0);
@@ -348,8 +440,8 @@ describe("inbound reprocess flags", () => {
     const err = Object.assign(new Error("gone"), { name: "QueueDoesNotExist" });
     sqs.on(GetQueueUrlCommand).rejects(err);
     await expect(inboundReprocess({ yes: true })).rejects.toMatchObject({
-      code: "INVALID_FLAG_USAGE",
-      message: expect.stringContaining("wraps-inbound-events-dlq"),
+      code: "INBOUND_NOT_DEPLOYED",
+      message: expect.stringContaining("us-east-1"),
     });
   });
 });

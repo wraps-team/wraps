@@ -120,13 +120,18 @@ export async function getInboundDlqUrl(client: SQSClient): Promise<string> {
   return QueueUrl;
 }
 
+export type InboundDlqDepth =
+  | { depth: number; error?: undefined }
+  | { depth: null; error: "not-found" | "access-denied" | "unreadable" };
+
 /**
- * Approximate number of messages waiting in the DLQ, or null when it can't
- * be read (missing queue, no permission). Status must not fail on this.
+ * Approximate number of messages waiting in the DLQ. When it can't be read
+ * the result says why (missing queue, no permission, anything else) instead
+ * of throwing: status must not fail on this.
  */
 export async function getInboundDlqDepth(
   region: string
-): Promise<number | null> {
+): Promise<InboundDlqDepth> {
   try {
     const client = new SQSClient({ region });
     const queueUrl = await getInboundDlqUrl(client);
@@ -137,8 +142,20 @@ export async function getInboundDlqDepth(
       })
     );
     const depth = Number(Attributes?.ApproximateNumberOfMessages);
-    return Number.isFinite(depth) ? depth : null;
-  } catch {
-    return null;
+    return Number.isFinite(depth)
+      ? { depth }
+      : { depth: null, error: "unreadable" };
+  } catch (error) {
+    const name = (error as { name?: string } | null)?.name ?? "";
+    if (
+      name === "QueueDoesNotExist" ||
+      name === "AWS.SimpleQueueService.NonExistentQueue"
+    ) {
+      return { depth: null, error: "not-found" };
+    }
+    if (name === "AccessDenied" || name === "AccessDeniedException") {
+      return { depth: null, error: "access-denied" };
+    }
+    return { depth: null, error: "unreadable" };
   }
 }

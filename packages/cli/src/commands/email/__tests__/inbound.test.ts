@@ -2201,7 +2201,44 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
         .on(GetQueueUrlCommand)
         .rejects(new Error("AccessDenied: sqs:GetQueueUrl"));
       await inboundStatus({});
-      expect(jsonOutput("email.inbound.status")?.data.dlq.depth).toBeNull();
+      const dlq = jsonOutput("email.inbound.status")?.data.dlq;
+      expect(dlq.depth).toBeNull();
+      expect(dlq.error).toBe("unreadable");
+    });
+
+    it("tells a missing queue from an access denial, in text and in --json", async () => {
+      await arrange();
+      sqsBackstop.reset();
+      sqsBackstop
+        .on(GetQueueUrlCommand)
+        .rejects(
+          Object.assign(new Error("nope"), { name: "QueueDoesNotExist" })
+        );
+      await inboundStatus({});
+      let printed = vi
+        .mocked(console.log)
+        .mock.calls.map((c) => String(c[0]))
+        .join("\n");
+      expect(printed).toContain("not found");
+
+      vi.mocked(console.log).mockClear();
+      sqsBackstop.reset();
+      sqsBackstop
+        .on(GetQueueUrlCommand)
+        .rejects(Object.assign(new Error("no"), { name: "AccessDenied" }));
+      await inboundStatus({});
+      printed = vi
+        .mocked(console.log)
+        .mock.calls.map((c) => String(c[0]))
+        .join("\n");
+      expect(printed).toContain("access denied");
+
+      vi.mocked(console.log).mockClear();
+      setJsonMode(true);
+      await inboundStatus({});
+      expect(jsonOutput("email.inbound.status")?.data.dlq.error).toBe(
+        "access-denied"
+      );
     });
   });
 

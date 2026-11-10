@@ -22,7 +22,7 @@ import {
   getAWSRegion,
   validateAWSCredentials,
 } from "../../utils/shared/aws.js";
-import { errors } from "../../utils/shared/errors.js";
+import { errors, WrapsError } from "../../utils/shared/errors.js";
 import { isJsonMode, jsonSuccess } from "../../utils/shared/json-output.js";
 import { ensureInteractive } from "../../utils/shared/prompts.js";
 
@@ -44,10 +44,60 @@ type MessageReport = {
 };
 
 type ReplayReport = MessageReport & {
-  outcome: "replayed" | "failed";
-  /** Why a message stayed in the DLQ. Present only when it failed. */
+  /**
+   * replayed: the processor accepted it and the message was deleted.
+   * replayed-not-deleted: the processor accepted it but the delete failed, so
+   * the message is still queued and a later run would replay it again.
+   * failed: the hand-off was not accepted; the message stays queued.
+   */
+  outcome: "replayed" | "replayed-not-deleted" | "failed";
+  /** Why the message is still queued. Absent when it was deleted. */
   error?: string;
 };
+
+/** An error that would repeat for every message; the run stops on it. */
+class RunStopped extends Error {
+  readonly cause: WrapsError;
+  constructor(cause: WrapsError) {
+    super(cause.message);
+    this.cause = cause;
+  }
+}
+
+function errorName(error: unknown): string {
+  return (error as { name?: string } | null)?.name ?? "";
+}
+
+function isAccessDenied(error: unknown): boolean {
+  const name = errorName(error);
+  return name === "AccessDeniedException" || name === "AccessDenied";
+}
+
+function missingProcessor(region: string): WrapsError {
+  return new WrapsError(
+    `The inbound processor ${INBOUND_PROCESSOR_FUNCTION_NAME} was not found in ${region}`,
+    "INBOUND_NOT_DEPLOYED",
+    `Run wraps email inbound init in ${region}, or pass --region for the region where inbound is deployed.`
+  );
+}
+
+function lambdaDenied(): WrapsError {
+  return new WrapsError(
+    `Not allowed to invoke ${INBOUND_PROCESSOR_FUNCTION_NAME} (lambda:InvokeFunction)`,
+    "LAMBDA_PERMISSION_DENIED",
+    "Re-apply the Wraps IAM policy, which now includes the InboundReprocess statement: wraps permissions --service email --json",
+    "https://wraps.dev/docs/guides/aws-setup/permissions"
+  );
+}
+
+function sqsDenied(): WrapsError {
+  return new WrapsError(
+    `Not allowed to read the dead-letter queue ${INBOUND_DLQ_NAME} (sqs:GetQueueUrl, ReceiveMessage, DeleteMessage)`,
+    "SQS_PERMISSION_DENIED",
+    "Re-apply the Wraps IAM policy, which now includes the InboundReprocess statement: wraps permissions --service email --json",
+    "https://wraps.dev/docs/guides/aws-setup/permissions"
+  );
+}
 
 function parseMax(raw: string | undefined): number {
   if (raw === undefined) {
@@ -100,15 +150,19 @@ async function receive(
   maxMessages: number,
   visibilityTimeout: number
 ): Promise<Message[]> {
-  const response = await sqs.send(
-    new ReceiveMessageCommand({
-      QueueUrl: queueUrl,
-      MaxNumberOfMessages: Math.min(BATCH_SIZE, maxMessages),
-      VisibilityTimeout: visibilityTimeout,
-      WaitTimeSeconds: WAIT_SECONDS,
-    })
-  );
-  return response?.Messages ?? [];
+  try {
+    const response = await sqs.send(
+      new ReceiveMessageCommand({
+        QueueUrl: queueUrl,
+        MaxNumberOfMessages: Math.min(BATCH_SIZE, maxMessages),
+        VisibilityTimeout: visibilityTimeout,
+        WaitTimeSeconds: WAIT_SECONDS,
+      })
+    );
+    return response?.Messages ?? [];
+  } catch (error) {
+    throw isAccessDenied(error) ? sqsDenied() : error;
+  }
 }
 
 /**
@@ -151,13 +205,19 @@ async function replayOne(
   sqs: SQSClient,
   lambda: LambdaClient,
   queueUrl: string,
-  message: Message
+  message: Message,
+  region: string
 ): Promise<ReplayReport> {
   const base = report(message);
+  if (!(message.Body && message.ReceiptHandle)) {
+    return {
+      ...base,
+      outcome: "failed",
+      error: "the message has no body or receipt handle",
+    };
+  }
+
   try {
-    if (!(message.Body && message.ReceiptHandle)) {
-      throw new Error("the message has no body or receipt handle");
-    }
     const invoked = await lambda.send(
       new InvokeCommand({
         FunctionName: INBOUND_PROCESSOR_FUNCTION_NAME,
@@ -166,20 +226,40 @@ async function replayOne(
       })
     );
     if (invoked?.StatusCode !== 202) {
-      throw new Error(
-        `Lambda returned status ${invoked?.StatusCode ?? "none"}, not 202`
-      );
+      return {
+        ...base,
+        outcome: "failed",
+        error: `Lambda returned status ${invoked?.StatusCode ?? "none"}, not 202`,
+      };
     }
+  } catch (error) {
+    // These repeat for every message, so stop instead of failing each one.
+    if (errorName(error) === "ResourceNotFoundException") {
+      throw new RunStopped(missingProcessor(region));
+    }
+    if (isAccessDenied(error)) {
+      throw new RunStopped(lambdaDenied());
+    }
+    return { ...base, outcome: "failed", error: errorText(error) };
+  }
+
+  // Lambda has the event. A delete error from here on must not read as a
+  // failed hand-off: replaying again would deliver the email twice.
+  try {
     await sqs.send(
       new DeleteMessageCommand({
         QueueUrl: queueUrl,
         ReceiptHandle: message.ReceiptHandle,
       })
     );
-    return { ...base, outcome: "replayed" };
   } catch (error) {
-    return { ...base, outcome: "failed", error: errorText(error) };
+    return {
+      ...base,
+      outcome: "replayed-not-deleted",
+      error: errorText(error),
+    };
   }
+  return { ...base, outcome: "replayed" };
 }
 
 /**
@@ -198,9 +278,11 @@ export async function inboundReprocess(
   // Flag checks first: nothing below should run on a bad invocation.
   const max = parseMax(options.max);
   if (json && !dryRun && !options.yes) {
-    throw errors.invalidFlagUsage(
+    throw new WrapsError(
       "--yes is required with --json to replay and delete DLQ messages",
-      `Add --yes (or preview with --dry-run): ${INBOUND_REPROCESS_COMMAND} --json --yes`
+      "CONFIRMATION_REQUIRED",
+      `Add --yes (or preview with --dry-run): ${INBOUND_REPROCESS_COMMAND} --json --yes`,
+      "https://wraps.dev/docs/cli-reference"
     );
   }
 
@@ -219,12 +301,13 @@ export async function inboundReprocess(
     queueUrl = await getInboundDlqUrl(sqs);
   } catch (error) {
     if (isQueueMissing(error)) {
-      throw errors.invalidFlagUsage(
-        `The dead-letter queue ${INBOUND_DLQ_NAME} does not exist in ${region}`,
-        "Inbound email isn't deployed in this region. Check --region, or enable it with: wraps email inbound init"
+      throw new WrapsError(
+        `Inbound email is not deployed in ${region}: the dead-letter queue ${INBOUND_DLQ_NAME} does not exist`,
+        "INBOUND_NOT_DEPLOYED",
+        "Run wraps email inbound init in that region, or pass --region for the region where inbound is deployed."
       );
     }
-    throw error;
+    throw isAccessDenied(error) ? sqsDenied() : error;
   }
 
   if (dryRun) {
@@ -292,13 +375,29 @@ export async function inboundReprocess(
       }
       handled.add(id);
       progressed = true;
-      const result = await replayOne(sqs, lambda, queueUrl, message);
+      let result: ReplayReport;
+      try {
+        result = await replayOne(sqs, lambda, queueUrl, message, region);
+      } catch (error) {
+        if (error instanceof RunStopped) {
+          const done = results.filter((r) => r.outcome !== "failed").length;
+          const cause = error.cause;
+          throw new WrapsError(
+            `${cause.message}. Stopped after ${done} message${done === 1 ? "" : "s"} handed off; every other message is still in the queue.`,
+            cause.code,
+            cause.suggestion,
+            cause.docsUrl
+          );
+        }
+        throw error;
+      }
       results.push(result);
       if (!json) {
-        const mark =
-          result.outcome === "replayed"
-            ? pc.green("replayed")
-            : pc.red("failed  ");
+        const mark = {
+          replayed: pc.green("replayed        "),
+          "replayed-not-deleted": pc.yellow("replayed, kept  "),
+          failed: pc.red("failed          "),
+        }[result.outcome];
         console.log(
           `  ${mark} ${describeLine(result)}${result.error ? pc.dim(`  (${result.error})`) : ""}`
         );
@@ -312,7 +411,10 @@ export async function inboundReprocess(
   }
 
   const replayed = results.filter((r) => r.outcome === "replayed").length;
-  const failed = results.length - replayed;
+  const notDeleted = results.filter(
+    (r) => r.outcome === "replayed-not-deleted"
+  ).length;
+  const failed = results.length - replayed - notDeleted;
 
   if (json) {
     jsonSuccess("email.inbound.reprocess", {
@@ -321,6 +423,7 @@ export async function inboundReprocess(
       max,
       found: results.length,
       replayed,
+      replayedNotDeleted: notDeleted,
       failed,
       stoppedAtMax: capped,
       messages: results,
@@ -333,12 +436,22 @@ export async function inboundReprocess(
     clack.log.success("The dead-letter queue is empty. Nothing to replay.");
     return;
   }
+  const parts = [`${replayed} replayed`];
+  if (notDeleted > 0) {
+    parts.push(`${notDeleted} replayed but not deleted`);
+  }
+  parts.push(`${failed} failed`);
   clack.log.info(
-    `${results.length} handled: ${replayed} replayed, ${failed} failed${capped ? ` (stopped at --max ${max}; the queue may hold more)` : ""}.`
+    `${results.length} handled: ${parts.join(", ")}${capped ? ` (stopped at --max ${max}; the queue may hold more)` : ""}.`
   );
+  if (notDeleted > 0) {
+    clack.log.warn(
+      `${notDeleted} message${notDeleted === 1 ? " was" : "s were"} accepted by the processor but could not be deleted from the queue, so ${notDeleted === 1 ? "it is" : "they are"} still there. The processor already took ${notDeleted === 1 ? "it" : "them"}: do not run reprocess again for ${notDeleted === 1 ? "it" : "them"}, or the email is processed twice. Delete ${notDeleted === 1 ? "it" : "them"} in the SQS console or with aws sqs delete-message (the delete needs sqs:DeleteMessage on ${INBOUND_DLQ_NAME}), or let the 14-day retention expire.`
+    );
+  }
   if (failed > 0) {
     clack.log.warn(
-      `Failed messages stay in the queue. A replay that fails again re-enters it as a new message after Lambda's retries, so check ${pc.cyan(`aws logs tail /aws/lambda/${INBOUND_PROCESSOR_FUNCTION_NAME}`)} before running this again.`
+      `${failed} message${failed === 1 ? "" : "s"} could not be handed to the processor and ${failed === 1 ? "is" : "are"} still in the queue; a later run can retry ${failed === 1 ? "it" : "them"}. A replay the processor accepts but fails again comes back later as a new message, so check ${pc.cyan(`aws logs tail /aws/lambda/${INBOUND_PROCESSOR_FUNCTION_NAME}`)} before replaying more.`
     );
   }
 }

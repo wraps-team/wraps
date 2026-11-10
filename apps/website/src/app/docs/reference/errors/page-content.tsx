@@ -499,6 +499,12 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
           "Also raised for an unexpected argument, such as a value after a flag that takes none (--root wraps.dev). Use --domain for the parent domain or --subdomain <label> for the label.",
       },
       {
+        code: "INBOUND_NOT_DEPLOYED",
+        message: "Inbound email is not deployed in <region>",
+        solution:
+          "Raised by wraps email inbound reprocess when the dead-letter queue or the processor Lambda is missing. Run wraps email inbound init in that region, or pass --region for the region where inbound is deployed.",
+      },
+      {
         code: "INBOUND_REGION_NOT_SUPPORTED",
         message: "SES email receiving is not supported in <region>",
         solution:

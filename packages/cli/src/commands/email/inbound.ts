@@ -1072,7 +1072,8 @@ export async function inboundStatus(
   });
 
   // 4c. Dead-letter queue depth (null = couldn't read it; never fails status)
-  const dlqDepth = await getInboundDlqDepth(region);
+  const dlq = await getInboundDlqDepth(region);
+  const dlqDepth = dlq.depth;
 
   // Build domain list — prefer inboundDomains, fallback to single domain
   const domainList =
@@ -1116,6 +1117,7 @@ export async function inboundStatus(
       dlq: {
         name: INBOUND_DLQ_NAME,
         depth: dlqDepth,
+        ...(dlq.error ? { error: dlq.error } : {}),
         reprocessCommand: INBOUND_REPROCESS_COMMAND,
       },
     });
@@ -1166,7 +1168,13 @@ export async function inboundStatus(
   console.log(
     `  ${pc.dim("Dead-letter queue:")} ${
       dlqDepth === null
-        ? pc.dim("unknown (couldn't read the queue)")
+        ? pc.dim(
+            dlq.error === "not-found"
+              ? "not found (the queue doesn't exist in this region)"
+              : dlq.error === "access-denied"
+                ? "access denied (re-apply the IAM policy: wraps permissions --service email)"
+                : "unknown (couldn't read the queue)"
+          )
         : dlqDepth > 0
           ? pc.yellow(`${dlqDepth} message${dlqDepth === 1 ? "" : "s"}`)
           : pc.cyan("empty")
