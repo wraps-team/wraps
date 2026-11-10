@@ -782,6 +782,26 @@ describe("error factory functions", () => {
       expect(error.code).toBe("IAM_PERMISSION_DENIED");
       expect(error.suggestion).toContain("ses:SendEmail");
     });
+
+    it("points at --json as a list to read, not a policy to paste (plan 049)", () => {
+      const error = errors.iamPermissionDenied("ses:SendEmail", "x", "y");
+      expect(error.suggestion).toContain(
+        "List the permissions Wraps needs (JSON to read, not a policy to paste):\n  wraps permissions --json"
+      );
+      expect(errors.sesPermissionDenied("SendEmail").suggestion).toContain(
+        "List the SES permissions Wraps needs (JSON to read, not a policy to paste):\n  wraps permissions --service email --json"
+      );
+      for (const make of [
+        errors.dynamoDBPermissionDenied,
+        errors.lambdaPermissionDenied,
+        errors.eventBridgePermissionDenied,
+        errors.sqsPermissionDenied,
+      ]) {
+        expect(make().suggestion).toContain(
+          "List the permissions Wraps needs (JSON to read, not a policy to paste):\n  wraps permissions --json"
+        );
+      }
+    });
   });
 
   describe("sesPermissionDenied", () => {
@@ -1391,6 +1411,22 @@ describe("user-input errors render without crash furniture", () => {
       expect(envelope.error.suggestion).toContain(
         "Available commands: email, sms, cdn"
       );
+    });
+
+    it("hands back a WrapsError's data in the envelope, and adds no data key without it", () => {
+      handleCLIError(
+        new WrapsError("stopped", "SOME_CODE", "fix it", undefined, {
+          handedOff: ["m1"],
+        })
+      );
+      const withData = JSON.parse(consoleLogSpy.mock.calls[0][0]);
+      expect(withData.success).toBe(false);
+      expect(withData.data).toEqual({ handedOff: ["m1"] });
+
+      consoleLogSpy.mockClear();
+      handleCLIError(new WrapsError("plain", "SOME_CODE"));
+      const plain = JSON.parse(consoleLogSpy.mock.calls[0][0]);
+      expect("data" in plain).toBe(false);
     });
   });
 });

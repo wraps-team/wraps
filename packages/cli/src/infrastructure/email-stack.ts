@@ -1,8 +1,13 @@
 import * as aws from "@pulumi/aws";
 import * as pulumi from "@pulumi/pulumi";
-import { DEFAULT_SUPPRESSION_REASONS, retentionToDays } from "@wraps/core";
+import {
+  DEFAULT_SUPPRESSION_REASONS,
+  INBOUND_LEGACY_PREFIX,
+  retentionToDays,
+} from "@wraps/core";
 import type { EmailStackConfig, StackOutputs } from "../types/index.js";
 import { domainToConfigSetName } from "../utils/email/config-set-slug.js";
+import { inboundTriggerOf } from "../utils/shared/metadata.js";
 import { createAlertingResources } from "./resources/alerting.js";
 import { createManagedDedicatedIpPool } from "./resources/dedicated-ip-pool.js";
 import { createDynamoDBTables } from "./resources/dynamodb.js";
@@ -360,6 +365,7 @@ export async function deployEmailStack(
     const { deployInboundLambda } = await import(
       "./resources/lambda-inbound.js"
     );
+    const inboundTrigger = inboundTriggerOf(emailConfig);
     const lambdaInbound = await deployInboundLambda({
       bucketName: s3Inbound.bucketName,
       bucketArn: s3Inbound.bucket.arn,
@@ -367,24 +373,29 @@ export async function deployEmailStack(
       region: config.region,
       dlqArn: sqsInbound.dlq.arn,
       replyThreadingEnabled,
+      trigger: inboundTrigger,
     });
 
-    // S3 bucket notification to trigger Lambda on raw/ uploads
+    // Legacy trigger only: S3 bucket notification invokes the Lambda on raw/
+    // uploads. In "ses-lambda-action" mode the receipt rule invokes it and
+    // nothing watches the bucket, so no message reaches both triggers.
     // Must depend on the Lambda permission so S3 can validate the destination
-    new aws.s3.BucketNotification(
-      "wraps-inbound-s3-notification",
-      {
-        bucket: s3Inbound.bucket.id,
-        lambdaFunctions: [
-          {
-            lambdaFunctionArn: lambdaInbound.lambdaFunction.arn,
-            events: ["s3:ObjectCreated:*"],
-            filterPrefix: "raw/",
-          },
-        ],
-      },
-      { dependsOn: [lambdaInbound.s3InvokePermission] }
-    );
+    if (lambdaInbound.s3InvokePermission) {
+      new aws.s3.BucketNotification(
+        "wraps-inbound-s3-notification",
+        {
+          bucket: s3Inbound.bucket.id,
+          lambdaFunctions: [
+            {
+              lambdaFunctionArn: lambdaInbound.lambdaFunction.arn,
+              events: ["s3:ObjectCreated:*"],
+              filterPrefix: INBOUND_LEGACY_PREFIX,
+            },
+          ],
+        },
+        { dependsOn: [lambdaInbound.s3InvokePermission] }
+      );
+    }
 
     // EventBridge rule + optional webhook
     if (emailConfig.inbound.webhookUrl) {

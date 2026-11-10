@@ -174,6 +174,9 @@ wraps status                  Overview of all services
 wraps destroy                 Remove all infrastructure
 wraps console                 Start local web dashboard
 wraps permissions             Show required IAM permissions
+wraps permissions --policy-dir <dir>
+                              Write the IAM policies to attach (wraps-deployer-<n>.json, each <= 6,144 chars)
+wraps permissions --json      JSON envelope: data.policies is the split; data.policy (merged) can exceed 6,144 chars and fits only as a role's inline policy (10,240 chars across all of that role's inline policies)
 wraps platform connect        Connect to Wraps Platform
 ```
 

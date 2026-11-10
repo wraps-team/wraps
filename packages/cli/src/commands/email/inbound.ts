@@ -13,16 +13,32 @@ import type {
   EmailInboundTestOptions,
   EmailInboundVerifyOptions,
   InboundDomain,
+  InboundTrigger,
 } from "../../types/index.js";
 import { SES_RECEIVING_REGIONS } from "../../types/index.js";
+import { runEmailStackPreview } from "../../utils/email/email-stack-deploy.js";
+import {
+  getInboundDlqDepth,
+  INBOUND_REPROCESS_COMMAND,
+} from "../../utils/email/inbound-dlq.js";
+import { INBOUND_DLQ_NAME } from "../../utils/email/inbound-names.js";
+import { checkInboundTrigger } from "../../utils/email/inbound-trigger-check.js";
+import {
+  exitOnSwitchFailure,
+  redeployCommand,
+  switchInboundTrigger,
+} from "../../utils/email/inbound-trigger-switch.js";
 import {
   addDomainToReceiptRule,
   createReceiptRule,
   createReceiptRuleSet,
   deleteReceiptRule,
   deleteReceiptRuleSet,
+  describeInboundReceiptRule,
   getActiveReceiptRuleSet,
+  RULE_NAME,
   RULE_SET_NAME,
+  readActiveReceiptRuleSet,
   removeDomainFromReceiptRule,
   setActiveReceiptRuleSet,
 } from "../../utils/email/receipt-rules.js";
@@ -41,6 +57,8 @@ import {
   buildEmailStackConfig,
   type ConnectionMetadata,
   getAllTrackedDomains,
+  getInboundTrigger,
+  inboundTriggerOf,
   loadConnectionMetadata,
   removeInboundDomainFromMetadata,
   saveConnectionMetadata,
@@ -174,16 +192,40 @@ function reportInboundDNSCleanup(
   }
 }
 
+/**
+ * The command `inbound status` names to bring the trigger back in line: an
+ * `email upgrade` that re-applies the saved configuration with this CLI
+ * version (restoring the SES invoke permission and the mail/* bucket policy,
+ * and switching a deployment still on the S3 trigger). It never writes DNS or
+ * changes which rule set is active. Same string as the switch's suggestion.
+ */
+export function inboundRepairCommand(region: string): string {
+  return redeployCommand(region);
+}
+
+/** Human label for an inbound trigger mode. */
+function describeTrigger(trigger: InboundTrigger): string {
+  return trigger === "ses-lambda-action"
+    ? "SES Lambda action (records envelope recipients)"
+    : "S3 notification (legacy; no envelope recipients)";
+}
+
 // Fail fast on flag misuse, before any AWS call.
 function assertValidInboundFlags(options: {
   unexpectedArg?: string;
   root?: boolean;
   subdomain?: string;
+  preview?: boolean;
 }): void {
   if (options.unexpectedArg) {
+    // A stray positional is almost always a value given to a boolean flag;
+    // name the flag that was actually passed.
+    const flag = options.root ? "--root" : options.preview ? "--preview" : null;
     throw errors.invalidFlagUsage(
       `Unexpected argument: ${options.unexpectedArg}`,
-      `--root takes no value: "--root ${options.unexpectedArg}" (or "--root=${options.unexpectedArg}") sets --root and discards "${options.unexpectedArg}". To name the parent domain use --domain <domain>; to pick the label use --subdomain <label>.`
+      flag
+        ? `${flag} takes no value: "${flag} ${options.unexpectedArg}" (or "${flag}=${options.unexpectedArg}") sets ${flag} and discards "${options.unexpectedArg}". To name the parent domain use --domain <domain>; to pick the label use --subdomain <label>.`
+        : `Remove "${options.unexpectedArg}". To name the parent domain use --domain <domain>; to pick the label use --subdomain <label>.`
     );
   }
   if (options.root && options.subdomain) {
@@ -314,12 +356,19 @@ export async function inboundInit(
     );
   }
 
-  // 7. Prompt for webhook URL
+  // 7. Resolve the webhook URL once: flag, else prompt, else the saved one.
+  // The save, the --json output and the printed note all read these locals.
+  const savedInbound = emailConfig.inbound;
   const webhookUrl =
-    options.webhookUrl || (options.yes ? undefined : await promptWebhookUrl());
+    options.webhookUrl ||
+    (options.yes ? undefined : await promptWebhookUrl()) ||
+    savedInbound?.webhookUrl;
 
-  // 8. Generate webhook secret
-  const webhookSecret = randomBytes(32).toString("hex");
+  // 8. Webhook secret: keep the saved one (rotating it would break the
+  // receiver), else generate one.
+  const webhookSecretGenerated = !savedInbound?.webhookSecret;
+  const webhookSecret =
+    savedInbound?.webhookSecret ?? randomBytes(32).toString("hex");
 
   // 9. Show cost estimate
   clack.log.info(
@@ -352,25 +401,46 @@ export async function inboundInit(
   const stackName =
     emailService.pulumiStackName || `wraps-${identity.accountId}-${region}`;
 
-  // 12. Update email config with inbound settings
+  // 12. Fresh = no receipt rule: no mail is flowing, so deploy straight into
+  // the SES Lambda-action trigger. Otherwise keep the saved trigger and switch
+  // after the final save (plan 041 R1).
+  const existingRule = await describeInboundReceiptRule(region);
+  const fresh = existingRule === null;
+  const trigger: InboundTrigger | undefined = fresh
+    ? "ses-lambda-action"
+    : savedInbound?.trigger;
+
+  // Merge into the saved inbound config instead of rebuilding it: trigger and
+  // retention always come from the saved block (or the fresh mode above).
+  const savedInboundDomains = emailConfig.inboundDomains ?? [];
+  const inboundDomains = savedInboundDomains.some(
+    (d) => d.receivingDomain === receivingDomain
+  )
+    ? savedInboundDomains
+    : [
+        ...savedInboundDomains,
+        {
+          subdomain,
+          receivingDomain,
+          parentDomain: domain,
+          addedAt: new Date().toISOString(),
+        },
+      ];
+
   const updatedEmailConfig = {
     ...emailConfig,
     inbound: {
+      ...savedInbound,
       enabled: true,
       subdomain,
       receivingDomain,
       bucketName: `wraps-inbound-${identity.accountId}-${region}`,
       webhookUrl,
       webhookSecret,
+      retention: savedInbound?.retention,
+      trigger,
     },
-    inboundDomains: [
-      {
-        subdomain,
-        receivingDomain,
-        parentDomain: domain,
-        addedAt: new Date().toISOString(),
-      },
-    ],
+    inboundDomains,
   };
 
   const stackConfig = buildEmailStackConfig(metadata, region, {
@@ -412,6 +482,11 @@ export async function inboundInit(
     clack.log.info(
       `Not covered by the preview: the SES receipt rule for ${pc.cyan(receivingDomain)} and its DNS records.`
     );
+    if (inboundTriggerOf(updatedEmailConfig) === "s3-notification") {
+      clack.log.info(
+        "Not covered either: this deployment still uses the S3-notification trigger, so init would then switch it to the SES Lambda action (receipt rule update and a second deploy that removes the S3 notification)."
+      );
+    }
     clack.outro(pc.green("Preview complete. Run without --preview to deploy."));
     return;
   }
@@ -444,13 +519,28 @@ export async function inboundInit(
     );
   });
 
+  // 14b. Save the inbound block (enabled, trigger) as soon as the stack is
+  // deployed with it, before the rule write: the rule writer below reads the
+  // trigger the most recent deploy used from saved metadata (plan 041 R2).
+  await progress.execute("Saving inbound configuration", async () => {
+    metadata.services.email = {
+      ...emailService,
+      config: updatedEmailConfig,
+      deployedAt: new Date().toISOString(),
+    };
+    metadata.timestamp = new Date().toISOString();
+    await saveConnectionMetadata(metadata);
+  });
+
   // 15. Create SES Receipt Rules via AWS SDK
   await progress.execute("Creating SES receipt rules", async () => {
     await createReceiptRuleSet(region);
     await createReceiptRule(
       region,
+      identity.accountId,
       receivingDomain,
-      `wraps-inbound-${identity.accountId}-${region}`
+      `wraps-inbound-${identity.accountId}-${region}`,
+      getInboundTrigger(metadata)
     );
 
     // Activate rule set (warn if another is active)
@@ -600,6 +690,46 @@ export async function inboundInit(
     await saveConnectionMetadata(metadata);
   });
 
+  // 16b. Switch an existing S3-notification deployment to the SES Lambda
+  // action: the command's last mutating step, after its own save (plan 041
+  // R1). Init's deploy above was step 1. Runs in --json mode too.
+  if (getInboundTrigger(metadata) === "s3-notification") {
+    try {
+      await switchInboundTrigger({
+        metadata,
+        accountId: identity.accountId,
+        region,
+        stackName,
+        autoConfirm: options.yes,
+        skipInitialDeploy: true,
+        progress,
+      });
+    } catch (error) {
+      // A webhook secret generated in this run was saved but never shown;
+      // don't let the failed switch swallow it (the finisher never prints it).
+      const showSecret = Boolean(webhookUrl) && webhookSecretGenerated;
+      if (showSecret && !isJsonMode()) {
+        clack.note(
+          [
+            "Inbound is deployed and saved; only the trigger switch failed.",
+            "Verify webhook POSTs with this header:",
+            `  ${pc.bold("X-Wraps-Inbound-Key")}: ${pc.yellow(webhookSecret)}`,
+            `Retrieve it later with: ${pc.cyan("wraps email inbound status --reveal-secret")}`,
+          ].join("\n"),
+          "Webhook secret"
+        );
+      }
+      exitOnSwitchFailure(
+        "email.inbound.init",
+        error,
+        showSecret
+          ? { webhookSecret, webhookHeader: "X-Wraps-Inbound-Key" }
+          : undefined
+      );
+    }
+  }
+  const finalTrigger = getInboundTrigger(metadata);
+
   // 17. Display success
   if (isJsonMode()) {
     jsonSuccess("email.inbound.init", {
@@ -611,6 +741,7 @@ export async function inboundInit(
       webhookHeader: webhookUrl ? "X-Wraps-Inbound-Key" : null,
       dnsAutoCreated,
       region,
+      trigger: finalTrigger,
     });
     return;
   }
@@ -621,6 +752,9 @@ export async function inboundInit(
   console.log(`  ${pc.dim("Receiving domain:")} ${pc.cyan(receivingDomain)}`);
   console.log(
     `  ${pc.dim("S3 bucket:")}        ${pc.cyan(`wraps-inbound-${identity.accountId}-${region}`)}`
+  );
+  console.log(
+    `  ${pc.dim("Trigger:")}          ${pc.cyan(describeTrigger(finalTrigger))}`
   );
   if (webhookUrl) {
     console.log(`  ${pc.dim("Webhook URL:")}      ${pc.cyan(webhookUrl)}`);
@@ -918,8 +1052,28 @@ export async function inboundStatus(
   const inbound = emailConfig.inbound!;
   const inboundDomains = emailConfig.inboundDomains ?? [];
 
-  // 4. Check receipt rule status
-  const activeRuleSet = await getActiveReceiptRuleSet(region);
+  // 4. Check receipt rule status ("none active" and "couldn't read" differ)
+  const activeRuleSetRead = await readActiveReceiptRuleSet(region);
+  const activeRuleSet = activeRuleSetRead.readable
+    ? activeRuleSetRead.name
+    : null;
+
+  // 4b. Trigger mode, and whether the rule, metadata, SES invoke permission
+  // and bucket policy agree (read-only).
+  const bucketName =
+    inbound.bucketName || `wraps-inbound-${identity.accountId}-${region}`;
+  const repairCommand = inboundRepairCommand(region);
+  const triggerCheck = await checkInboundTrigger({
+    region,
+    bucketName,
+    savedTrigger: getInboundTrigger(metadata),
+    repairCommand,
+    activeRuleSetRead,
+  });
+
+  // 4c. Dead-letter queue depth (null = couldn't read it; never fails status)
+  const dlq = await getInboundDlqDepth(region);
+  const dlqDepth = dlq.depth;
 
   // Build domain list — prefer inboundDomains, fallback to single domain
   const domainList =
@@ -947,6 +1101,25 @@ export async function inboundStatus(
           : null,
       receiptRuleSetActive: activeRuleSet === RULE_SET_NAME,
       retention: inbound.retention || null,
+      trigger: triggerCheck.savedTrigger,
+      activeRuleSet: triggerCheck.activeRuleSet,
+      activeRuleSetReadable: triggerCheck.activeRuleSetReadable,
+      triggerCheck: {
+        repairCommand,
+        ruleSetInactive: triggerCheck.ruleSetInactive,
+        ruleEnabled: triggerCheck.ruleEnabled,
+        ruleTrigger: triggerCheck.ruleTrigger,
+        sesInvokePermission: triggerCheck.sesInvokePermission,
+        bucketPolicyCoversMail: triggerCheck.bucketPolicyCoversMail,
+        mismatches: triggerCheck.mismatches,
+        warnings: triggerCheck.warnings,
+      },
+      dlq: {
+        name: INBOUND_DLQ_NAME,
+        depth: dlqDepth,
+        ...(dlq.error ? { error: dlq.error } : {}),
+        reprocessCommand: INBOUND_REPROCESS_COMMAND,
+      },
     });
     return;
   }
@@ -984,12 +1157,58 @@ export async function inboundStatus(
     }
   }
   console.log(
-    `  ${pc.dim("Receipt rule set:")}  ${activeRuleSet === RULE_SET_NAME ? pc.green("active") : pc.yellow("inactive")}`
+    `  ${pc.dim("Receipt rule set:")}  ${activeRuleSet === RULE_SET_NAME ? pc.green("active") : activeRuleSetRead.readable ? pc.yellow(activeRuleSet ? `inactive (active set: ${activeRuleSet})` : "inactive (no set is active)") : pc.dim("unknown (couldn't read the active set)")}`
   );
   console.log(
     `  ${pc.dim("Retention:")}         ${inbound.retention ? pc.cyan(inbound.retention) : pc.dim("indefinite")}`
   );
+  console.log(
+    `  ${pc.dim("Trigger:")}           ${pc.cyan(describeTrigger(triggerCheck.savedTrigger))}`
+  );
+  console.log(
+    `  ${pc.dim("Dead-letter queue:")} ${
+      dlqDepth === null
+        ? pc.dim(
+            dlq.error === "not-found"
+              ? "not found (the queue doesn't exist in this region)"
+              : dlq.error === "access-denied"
+                ? "access denied (re-apply the IAM policy: re-run `wraps permissions --policy-dir ./wraps-policy` with the same `--service`/`--preset` you used before, then update every `wraps-deployer-*` policy)"
+                : "unknown (couldn't read the queue)"
+          )
+        : dlqDepth > 0
+          ? pc.yellow(`${dlqDepth} message${dlqDepth === 1 ? "" : "s"}`)
+          : pc.cyan("empty")
+    }`
+  );
   console.log();
+  if (dlqDepth !== null && dlqDepth > 0) {
+    clack.log.warn(
+      `${dlqDepth} inbound event${dlqDepth === 1 ? "" : "s"} failed every retry and wait${dlqDepth === 1 ? "s" : ""} in the dead-letter queue. Run ${pc.cyan(`${INBOUND_REPROCESS_COMMAND} --dry-run`)} to see them, then ${pc.cyan(INBOUND_REPROCESS_COMMAND)} to replay.`
+    );
+  }
+  if (triggerCheck.savedTrigger === "s3-notification") {
+    clack.log.info(
+      `Run ${pc.cyan(repairCommand)} to switch to the SES Lambda action and start recording envelope recipients.`
+    );
+  }
+  for (const warning of triggerCheck.warnings) {
+    clack.log.warn(warning);
+  }
+  const unchecked = [
+    triggerCheck.ruleTrigger === null ? "the receipt rule" : null,
+    triggerCheck.sesInvokePermission === null
+      ? "the processor's SES invoke permission"
+      : null,
+    triggerCheck.bucketPolicyCoversMail === null ? "the bucket policy" : null,
+    triggerCheck.activeRuleSetReadable
+      ? null
+      : "the region's active receipt rule set",
+  ].filter((x): x is string => x !== null);
+  if (unchecked.length > 0) {
+    clack.log.info(
+      pc.dim(`Couldn't read ${unchecked.join(", ")} to check the trigger.`)
+    );
+  }
 }
 
 /**
@@ -1244,7 +1463,7 @@ export function mapInboundTestSendError(
     return new WrapsError(
       `IAM permission denied: ses:SendEmail in ${ctx.region}`,
       "INBOUND_TEST_PERMISSION_DENIED",
-      `Your AWS credentials lack the "ses:SendEmail" permission in region ${ctx.region}.\n\nView required SES permissions:\n  wraps permissions --service email --json`,
+      `Your AWS credentials lack the "ses:SendEmail" permission in region ${ctx.region}.\n\nList the SES permissions Wraps needs (JSON to read, not a policy to paste):\n  wraps permissions --service email --json`,
       "https://wraps.dev/docs/guides/aws-setup/permissions"
     );
   }
@@ -1563,16 +1782,134 @@ export async function inboundAdd(
     emailConfig.replyThreading?.enabled === true &&
     (emailConfig.replyThreading?.domains?.length ?? 0) > 0;
 
+  // A deployment still on the S3-notification trigger is switched to the SES
+  // Lambda action after this command's own rule write and save (plan 041 R1).
+  const needsSwitch = getInboundTrigger(metadata) === "s3-notification";
+  const stackName =
+    metadata.services.email.pulumiStackName ||
+    `wraps-${identity.accountId}-${region}`;
+
+  if (needsSwitch) {
+    await progress.execute("Checking prerequisites", async () =>
+      ensurePulumiInstalled()
+    );
+  }
+
+  // 8b. Preview: show what would change, including the trigger switch, and
+  // apply nothing (no rule write, DNS write, deploy or metadata save).
+  if (options.preview) {
+    const ruleDomains = [
+      receivingDomain,
+      ...(replyThreadingEnabled ? [`r.mail.${parentDomain}`] : []),
+    ];
+    const { buildInboundDNSRecords: buildRecordsForPreview } = await import(
+      "../../utils/dns/index.js"
+    );
+    const dnsRecords = buildRecordsForPreview(receivingDomain, region);
+
+    let previewResult:
+      | Awaited<ReturnType<typeof runEmailStackPreview>>
+      | undefined;
+    if (needsSwitch) {
+      const previewMetadata = structuredClone(metadata);
+      if (previewMetadata.services.email?.config.inbound) {
+        previewMetadata.services.email.config.inbound.trigger =
+          "ses-lambda-action";
+      }
+      previewResult = await progress.execute(
+        "Generating trigger switch preview",
+        async () =>
+          runEmailStackPreview({
+            accountId: identity.accountId,
+            region,
+            stackName,
+            stackConfig: buildEmailStackConfig(previewMetadata, region),
+          })
+      );
+    }
+
+    if (isJsonMode()) {
+      jsonSuccess("email.inbound.add", {
+        preview: true,
+        receivingDomain,
+        subdomain,
+        parentDomain,
+        receiptRuleDomains: ruleDomains,
+        dnsRecords: dnsRecords.map((r) => ({
+          type: r.type,
+          name: r.name,
+          value: r.value,
+          priority: r.priority ?? null,
+        })),
+        triggerSwitch: needsSwitch,
+        trigger: getInboundTrigger(metadata),
+        region,
+      });
+      return;
+    }
+
+    clack.log.info(
+      `Would add ${ruleDomains.map((d) => pc.cyan(d)).join(" and ")} to receipt rule ${pc.cyan(RULE_NAME)}.`
+    );
+    if (dnsRecords.length > 0) {
+      clack.log.info(pc.bold("DNS records that would be created:"));
+      for (const record of dnsRecords) {
+        const value = record.priority
+          ? `${record.priority} ${record.value}`
+          : record.value;
+        clack.log.info(pc.dim(`  ${record.type} ${record.name} → ${value}`));
+      }
+    }
+    if (previewResult) {
+      clack.log.info(
+        `Would switch the inbound trigger to the SES Lambda action: deploy the new processor and SES invoke permission, move the receipt rule to ${pc.cyan("mail/")} + Lambda action, save, then deploy again to remove the S3 notification. Net stack change:`
+      );
+      displayPreview({
+        changeSummary: previewResult.changeSummary,
+        resourceChanges: previewResult.resourceChanges,
+        commandName: "wraps email inbound add",
+      });
+    } else {
+      clack.log.info(
+        `Trigger: already ${describeTrigger("ses-lambda-action")}; no stack change.`
+      );
+    }
+    clack.outro(pc.green("Preview complete. Run without --preview to apply."));
+    return;
+  }
+
+  // The switch adds two stack deploys this command never ran before; ask
+  // first, before any write (skipped with --yes or --json).
+  if (needsSwitch && !options.yes && !isJsonMode()) {
+    ensureInteractive("Trigger switch confirmation", "--yes");
+    const confirmed = await clack.confirm({
+      message: `This deployment still uses the S3 trigger, so adding a domain also switches it to the SES Lambda action (two stack deploys; ${pc.cyan("--preview")} shows the changes). Continue?`,
+      initialValue: true,
+    });
+    if (clack.isCancel(confirmed) || !confirmed) {
+      clack.cancel("Operation cancelled.");
+      process.exit(0);
+    }
+  }
+
   await progress.execute("Updating SES receipt rule", async () => {
-    await addDomainToReceiptRule(region, receivingDomain, bucketName);
+    await addDomainToReceiptRule(
+      region,
+      identity.accountId,
+      receivingDomain,
+      bucketName,
+      getInboundTrigger(metadata)
+    );
     // If reply-threading is enabled globally, also register r.mail.{parent}
     // as a catch-all recipient so signed-reply addresses route into the same
     // Lambda pipeline.
     if (replyThreadingEnabled) {
       await addDomainToReceiptRule(
         region,
+        identity.accountId,
         `r.mail.${parentDomain}`,
-        bucketName
+        bucketName,
+        getInboundTrigger(metadata)
       );
     }
   });
@@ -1748,6 +2085,23 @@ export async function inboundAdd(
     await saveConnectionMetadata(metadata);
   });
 
+  // 12. Switch the trigger: last mutating step, after the rule write and the
+  // save above (plan 041 R1).
+  if (needsSwitch) {
+    try {
+      await switchInboundTrigger({
+        metadata,
+        accountId: identity.accountId,
+        region,
+        stackName,
+        autoConfirm: options.yes,
+        progress,
+      });
+    } catch (error) {
+      exitOnSwitchFailure("email.inbound.add", error);
+    }
+  }
+
   if (isJsonMode()) {
     jsonSuccess("email.inbound.add", {
       receivingDomain,
@@ -1755,6 +2109,7 @@ export async function inboundAdd(
       parentDomain,
       dnsAutoCreated,
       region,
+      trigger: getInboundTrigger(metadata),
     });
     return;
   }

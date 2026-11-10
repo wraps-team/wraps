@@ -224,7 +224,9 @@ export function formatDeniedActions(actions: string[]): string {
   }
 
   lines.push("");
-  lines.push("Run `wraps permissions --json` to see the full policy document.");
+  lines.push(
+    "Write the IAM policies to attach: `wraps permissions --policy-dir ./wraps-policy`"
+  );
 
   return lines.join("\n");
 }

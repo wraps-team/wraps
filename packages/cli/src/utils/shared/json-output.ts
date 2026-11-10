@@ -48,8 +48,15 @@ export function jsonError(
     message: string;
     suggestion?: string;
     docsUrl?: string;
-  }
+  },
+  /** Values a failed command must still hand back (e.g. a newly generated secret). */
+  data?: Record<string, unknown>
 ): void {
-  const output: JsonOutput = { success: false, command, error };
+  const output: JsonOutput = {
+    success: false,
+    command,
+    error,
+    ...(data ? { data } : {}),
+  };
   console.log(JSON.stringify(output));
 }

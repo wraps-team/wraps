@@ -100,6 +100,7 @@ import {
   inboundEmailsGet,
   inboundEmailsList,
 } from "./commands/email/inbound-emails.js";
+import { inboundReprocess } from "./commands/email/inbound-reprocess.js";
 import { init } from "./commands/email/init.js";
 import { emailLogsGet, emailLogsList } from "./commands/email/logs.js";
 import { emailMetrics } from "./commands/email/metrics.js";
@@ -213,7 +214,7 @@ import {
 import { getTelemetryClient } from "./telemetry/client.js";
 import { telemetryCommandName } from "./telemetry/command-name.js";
 import { trackCommand, trackCommandFallback } from "./telemetry/events.js";
-import { parseCliArgs } from "./utils/shared/arg-parser.js";
+import { parseCliArgs, resolveValuedFlag } from "./utils/shared/arg-parser.js";
 import {
   printCompletionScript,
   setupTabCompletion,
@@ -305,6 +306,9 @@ function showHelp() {
   );
   console.log(`  ${pc.cyan("email upgrade")}           Add features`);
   console.log(
+    `  ${pc.cyan("email upgrade --action redeploy")}  Re-apply the saved configuration with this CLI version (finishes or repairs the inbound trigger switch; --preview first)`
+  );
+  console.log(
     `  ${pc.cyan("email restore")}           Restore original configuration`
   );
   console.log(
@@ -338,13 +342,16 @@ function showHelp() {
     `  ${pc.cyan("email inbound test")}      Send test email and verify receipt`
   );
   console.log(
-    `  ${pc.cyan("email inbound add")}       Add an inbound receiving domain`
+    `  ${pc.cyan("email inbound add")}       Add an inbound receiving domain (--preview: show what would change, including the trigger switch, without applying it)`
   );
   console.log(
     `  ${pc.cyan("email inbound remove")}    Remove an inbound receiving domain`
   );
   console.log(
     `  ${pc.cyan("email inbound destroy")}   Remove inbound email infrastructure`
+  );
+  console.log(
+    `  ${pc.cyan("email inbound reprocess")} Replay the inbound dead-letter queue through the processor (--dry-run lists without changing; --max <n>, default 100; --yes skips the prompt and --json needs it)`
   );
   console.log(
     `  ${pc.cyan("email inbound list")}      List inbound emails (--account, --limit, --cursor). S3 key order, not received time; a page can be empty while more follow`
@@ -738,6 +745,9 @@ function showHelp() {
   );
   console.log(`  ${pc.cyan("destroy")}      Remove deployed infrastructure`);
   console.log(`  ${pc.cyan("permissions")} Show required AWS IAM permissions`);
+  console.log(
+    `  ${pc.cyan("permissions --policy-dir <dir>")} Write the IAM policies to attach (wraps-deployer-<n>.json)`
+  );
   console.log(`  ${pc.cyan("completion")}   Generate shell completion script`);
   console.log(
     `  ${pc.cyan("telemetry")}    Manage anonymous telemetry settings`
@@ -1225,6 +1235,16 @@ async function run() {
               });
               break;
 
+            case "reprocess":
+              await inboundReprocess({
+                region: flags.region,
+                dryRun: flags.dryRun,
+                yes: flags.yes,
+                max: flags.max,
+                json: flags.json,
+              });
+              break;
+
             case "status":
               await inboundStatus({
                 region: flags.region,
@@ -1254,6 +1274,7 @@ async function run() {
                 root: flags.root,
                 domain: flags.domain,
                 yes: flags.yes,
+                preview: flags.preview,
                 json: flags.json,
                 unexpectedArg: sub[3],
               });
@@ -1272,7 +1293,7 @@ async function run() {
               throw errors.unknownCommand(
                 "inbound command",
                 inboundSubCommand,
-                "Available commands: init, destroy, status, verify, test, add, remove, list, get"
+                "Available commands: init, destroy, status, verify, test, add, remove, list, get, reprocess"
               );
           }
           break;
@@ -3195,6 +3216,7 @@ async function run() {
             | "enterprise"
             | undefined,
           service: flags.service as "email" | "sms" | "cdn" | undefined,
+          policyDir: resolveValuedFlag(flags.policyDir, "--policy-dir"),
         });
         break;
 

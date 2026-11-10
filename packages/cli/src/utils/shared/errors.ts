@@ -13,7 +13,14 @@ export class WrapsError extends Error {
     message: string,
     public code: string,
     public suggestion?: string,
-    public docsUrl?: string
+    public docsUrl?: string,
+    /**
+     * Values a failed command still hands back in `--json` (as the envelope's
+     * `data`). Ids and counts only: never credentials, secrets, message bodies
+     * or file contents. It is written to stdout, which CI logs and agent
+     * transcripts keep.
+     */
+    public data?: Record<string, unknown>
   ) {
     super(message);
     this.name = "WrapsError";
@@ -377,9 +384,11 @@ export function handleCLIError(error: unknown, command?: string): void {
     let message = "An unexpected error occurred";
     let suggestion: string | undefined;
     let docsUrl: string | undefined;
+    let data: Record<string, unknown> | undefined;
 
     if (error instanceof WrapsError) {
       trackError(error.code, cmdContext);
+      data = error.data;
       code = error.code;
       message = error.message;
       suggestion = error.suggestion;
@@ -429,7 +438,11 @@ export function handleCLIError(error: unknown, command?: string): void {
         error instanceof Error ? error.message : String(error || message);
     }
 
-    jsonError(cmdContext, { code, message, suggestion, docsUrl });
+    if (data) {
+      jsonError(cmdContext, { code, message, suggestion, docsUrl }, data);
+    } else {
+      jsonError(cmdContext, { code, message, suggestion, docsUrl });
+    }
     // `process.exitCode`, not `process.exit`, so cli.ts's finally block still
     // flushes telemetry. The `return` is load-bearing: without it execution
     // falls out of this block into the human chain and prints the error twice.
@@ -815,6 +828,23 @@ export const errors = {
       "https://wraps.dev/docs/cli-reference"
     ),
 
+  policyDirWriteFailed: (message: string, suggestion?: string) =>
+    new WrapsError(
+      message,
+      "POLICY_DIR_WRITE_FAILED",
+      suggestion ??
+        "Check that --policy-dir is a folder you can write to, then re-run. Stale policy files are only removed after every new one is written, so nothing was removed.",
+      "https://wraps.dev/docs/guides/aws-setup/permissions"
+    ),
+
+  policySplitFailed: (message: string) =>
+    new WrapsError(
+      message,
+      "POLICY_SPLIT_FAILED",
+      "This is a bug in the Wraps CLI's deployer policy, not in your setup. Report it with the command you ran: wraps support",
+      "https://wraps.dev/docs/reference/errors#iam-permissions"
+    ),
+
   pulumiError: (message: string) =>
     new WrapsError(
       `Infrastructure deployment failed: ${message}`,
@@ -987,7 +1017,7 @@ export const errors = {
     new WrapsError(
       `Permission denied: ${action} on ${resource}`,
       "IAM_PERMISSION_DENIED",
-      `Your AWS credentials lack the "${action}" permission.\n\n${suggestion}\n\nView required permissions:\n  wraps permissions --json`,
+      `Your AWS credentials lack the "${action}" permission.\n\n${suggestion}\n\nList the permissions Wraps needs (JSON to read, not a policy to paste):\n  wraps permissions --json`,
       "https://wraps.dev/docs/guides/aws-setup/permissions"
     ),
 
@@ -995,7 +1025,7 @@ export const errors = {
     new WrapsError(
       `SES permission denied: ${action}`,
       "SES_PERMISSION_DENIED",
-      `Your IAM user/role needs the "ses:${action}" permission.\n\nView required SES permissions:\n  wraps permissions --service email --json`,
+      `Your IAM user/role needs the "ses:${action}" permission.\n\nList the SES permissions Wraps needs (JSON to read, not a policy to paste):\n  wraps permissions --service email --json`,
       "https://wraps.dev/docs/guides/aws-setup/permissions"
     ),
 
@@ -1140,7 +1170,7 @@ export const errors = {
     new WrapsError(
       "DynamoDB permission denied",
       "DYNAMODB_PERMISSION_DENIED",
-      "Your IAM user/role needs DynamoDB permissions.\nRequired actions: CreateTable, DeleteTable, DescribeTable, UpdateTable\n\nView required permissions:\n  wraps permissions --json",
+      "Your IAM user/role needs DynamoDB permissions.\nRequired actions: CreateTable, DeleteTable, DescribeTable, UpdateTable\n\nList the permissions Wraps needs (JSON to read, not a policy to paste):\n  wraps permissions --json",
       "https://wraps.dev/docs/guides/aws-setup/permissions"
     ),
 
@@ -1148,7 +1178,7 @@ export const errors = {
     new WrapsError(
       "Lambda permission denied",
       "LAMBDA_PERMISSION_DENIED",
-      "Your IAM user/role needs Lambda permissions.\nRequired actions: CreateFunction, UpdateFunctionCode, DeleteFunction\n\nView required permissions:\n  wraps permissions --json",
+      "Your IAM user/role needs Lambda permissions.\nRequired actions: CreateFunction, UpdateFunctionCode, DeleteFunction\n\nList the permissions Wraps needs (JSON to read, not a policy to paste):\n  wraps permissions --json",
       "https://wraps.dev/docs/guides/aws-setup/permissions"
     ),
 
@@ -1156,7 +1186,7 @@ export const errors = {
     new WrapsError(
       "EventBridge permission denied",
       "EVENTBRIDGE_PERMISSION_DENIED",
-      "Your IAM user/role needs EventBridge permissions.\nRequired actions: PutRule, PutTargets, DeleteRule\n\nView required permissions:\n  wraps permissions --json",
+      "Your IAM user/role needs EventBridge permissions.\nRequired actions: PutRule, PutTargets, DeleteRule\n\nList the permissions Wraps needs (JSON to read, not a policy to paste):\n  wraps permissions --json",
       "https://wraps.dev/docs/guides/aws-setup/permissions"
     ),
 
@@ -1164,7 +1194,7 @@ export const errors = {
     new WrapsError(
       "SQS permission denied",
       "SQS_PERMISSION_DENIED",
-      "Your IAM user/role needs SQS permissions.\nRequired actions: CreateQueue, DeleteQueue, GetQueueAttributes\n\nView required permissions:\n  wraps permissions --json",
+      "Your IAM user/role needs SQS permissions.\nRequired actions: CreateQueue, DeleteQueue, GetQueueAttributes\n\nList the permissions Wraps needs (JSON to read, not a policy to paste):\n  wraps permissions --json",
       "https://wraps.dev/docs/guides/aws-setup/permissions"
     ),
 
@@ -1172,7 +1202,7 @@ export const errors = {
     new WrapsError(
       "CloudWatch Logs permission denied",
       "CLOUDWATCH_LOGS_PERMISSION_DENIED",
-      `Your IAM user/role is not allowed to call ${action}.\nRequired actions: logs:DescribeLogGroups, logs:FilterLogEvents, logs:StartLiveTail\n\nView required permissions:\n  wraps permissions --json`,
+      `Your IAM user/role is not allowed to call ${action}.\nRequired actions: logs:DescribeLogGroups, logs:FilterLogEvents, logs:StartLiveTail\n\nList the permissions Wraps needs (JSON to read, not a policy to paste):\n  wraps permissions --json`,
       "https://wraps.dev/docs/guides/aws-setup/permissions"
     ),
 

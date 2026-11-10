@@ -223,7 +223,7 @@ wraps email init --provider vercel --region us-east-1 --domain myapp.com --prese
 | `wraps email check` | Check email deliverability for a domain |
 | `wraps email config` | Apply CLI config updates to infrastructure (alias: `sync`) |
 | `wraps email status` | Show email infrastructure details |
-| `wraps email upgrade` | Add features incrementally (presets, tracking domain, SMTP, managed dedicated IPs, etc.) |
+| `wraps email upgrade` | Add features incrementally (presets, tracking domain, SMTP, managed dedicated IPs, etc.), or re-apply the saved configuration with `--action redeploy` (finishes an inbound trigger switch) |
 | `wraps email verify` | Verify domain DNS records (DKIM, SPF, DMARC) |
 | `wraps email restore` | Restore infrastructure from saved metadata |
 | `wraps email destroy` | Remove all email infrastructure |
@@ -246,6 +246,7 @@ wraps email init --provider vercel --region us-east-1 --domain myapp.com --prese
 | `wraps email inbound status` | Show inbound email configuration |
 | `wraps email inbound verify` | Verify inbound DNS records |
 | `wraps email inbound test` | Send a test inbound email |
+| `wraps email inbound reprocess` | Replay the inbound dead-letter queue through the processor (`--dry-run` first) |
 | `wraps email inbound destroy` | Remove inbound email infrastructure |
 
 #### Template Commands
@@ -393,7 +394,7 @@ These commands work across all services:
 | `wraps destroy` | Remove all deployed infrastructure |
 | `wraps push` | Push templates to SES and dashboard (alias for `email templates push`) |
 | `wraps completion` | Generate shell completion script |
-| `wraps permissions` | Show required AWS IAM permissions (`--json` for policy output) |
+| `wraps permissions` | Show required AWS IAM permissions (`--policy-dir <dir>` writes the IAM policies to attach; `--json` for scripts) |
 | `wraps news` | Show recent Wraps updates |
 | `wraps support` | Get help and support contact info |
 
@@ -724,15 +725,20 @@ Wraps needs specific IAM permissions to deploy and manage infrastructure in your
 # Show permissions summary
 wraps permissions
 
-# Get full IAM policy JSON
+# Write the IAM policies to attach (wraps-deployer-1.json, wraps-deployer-2.json, ...)
+wraps permissions --policy-dir ./wraps-policy
+
+# For a specific preset or service
+wraps permissions --preset production --policy-dir ./wraps-policy
+wraps permissions --service email --policy-dir ./wraps-policy
+
+# JSON envelope for scripts and agents (not a policy to paste)
 wraps permissions --json
-
-# Get permissions for specific preset
-wraps permissions --preset production --json
-
-# Get permissions for specific service
-wraps permissions --service email --json
 ```
+
+IAM caps a managed policy at 6,144 characters (whitespace not counted), and the full Wraps policy is larger. `--policy-dir` splits it into files that each fit one managed policy. It creates the folder if needed, and removes older `wraps-deployer-<n>.json` files numbered above the new count; it touches nothing else in the folder.
+
+`--json` prints `{ "success", "command", "data" }`. `data.policies` is the split: one `{ name, policy }` per `wraps-deployer-<n>`. `data.policy` is the merged document; it can exceed 6,144 characters, so it only fits as a role's inline policy (10,240 characters across all of that role's inline policies). With `--policy-dir`, `data.written` and `data.removed` list the absolute paths of the files written and removed.
 
 ### Minimum Permissions by Preset
 
@@ -760,24 +766,38 @@ These permissions enhance functionality but are not required:
 - **Route53** - Automatic DNS record management (can add records manually instead)
 - **IAM OIDC Provider** - Only needed for Vercel deployments
 
-### Creating an IAM Policy
+### Creating the IAM Policies
 
-1. Generate the policy JSON:
+1. Write the policy files:
    ```bash
-   wraps permissions --json > wraps-policy.json
+   wraps permissions --policy-dir ./wraps-policy
    ```
 
-2. Create the policy in AWS Console:
+2. Create one managed policy per file in the AWS Console:
    - Go to IAM > Policies > Create Policy
    - Select "JSON" tab
-   - Paste the policy content
-   - Name it "WrapsDeploymentPolicy"
+   - Paste the contents of one file, such as `wraps-deployer-1.json`
+   - Name it after the file: `wraps-deployer-1`
+   - Repeat for each file
 
-3. Attach to your IAM user or role:
+   IAM policy names are unique per account. If different users or roles in one account need different scopes, add the scope before the file number, such as `wraps-deployer-email-1` for that scope's `wraps-deployer-1.json`. Keep the number so each policy still matches its file, and read `wraps-deployer-<n>` in the steps below as `wraps-deployer-email-<n>`.
+
+3. Attach all of them to your IAM user or role:
    - Go to IAM > Users (or Roles)
    - Select your user/role
    - Add permissions > Attach policies
-   - Select "WrapsDeploymentPolicy"
+   - Select every `wraps-deployer-<n>` policy
+
+Each user takes up to 10 managed policies by default (20 per role, 10 per group), and the policies already attached count toward that. Wraps splits its policy into 3 files or fewer.
+
+### Updating the IAM Policies
+
+A new Wraps version can add permissions or move a statement to a different file. When it does:
+
+1. Re-run `wraps permissions --policy-dir ./wraps-policy` into the same folder as last time, with the same `--service` and `--preset` you used before.
+2. Update every `wraps-deployer-<n>` policy: Edit > JSON, paste its file. IAM keeps up to 5 versions of a managed policy; when you save a sixth, the console asks you to delete an old one.
+3. Create and attach a policy for each new file. The CLI lists the files it removed from the folder: detach and delete the policies named after them. If you used a new folder, delete any `wraps-deployer-<n>` policy numbered above the new file count.
+4. If you attached a single `WrapsDeploymentPolicy` before, attach the `wraps-deployer-<n>` policies, then detach it.
 
 ### Using AWS Organizations / Permission Boundaries
 
@@ -827,12 +847,12 @@ aws sso login --profile your-profile
 
 If you see permission errors during deployment:
 
-1. Check required permissions:
+1. Regenerate the policies and update each `wraps-deployer-<n>` policy from its file:
    ```bash
-   wraps permissions --json
+   wraps permissions --policy-dir ./wraps-policy
    ```
 
-2. Verify your IAM user/role has the policy attached
+2. Verify your IAM user/role has every `wraps-deployer-<n>` policy attached
 
 3. Check for organization-level restrictions (SCPs)
 

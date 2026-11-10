@@ -137,3 +137,16 @@ export const CONSOLE_ACCESS_ROLE_NAME = "wraps-console-access-role";
  */
 export const SELFHOST_CONSOLE_ACCESS_ROLE_NAME =
   "wraps-selfhost-console-access-role";
+
+/**
+ * S3 key prefix for raw inbound mail in the legacy `s3-notification` trigger
+ * mode: the bucket notification on this prefix invokes the inbound processor.
+ */
+export const INBOUND_LEGACY_PREFIX = "raw/";
+
+/**
+ * S3 key prefix for raw inbound mail in the `ses-lambda-action` trigger mode.
+ * No bucket notification watches it; SES invokes the processor directly, so no
+ * message is processed by both triggers.
+ */
+export const INBOUND_MAIL_PREFIX = "mail/";

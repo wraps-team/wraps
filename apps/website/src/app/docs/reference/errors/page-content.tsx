@@ -145,12 +145,13 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
         code: "IAM_PERMISSION_DENIED",
         message: "Permission denied: <action> on <resource>",
         solution:
-          "Your credentials lack the permission. View required permissions: wraps permissions --json",
+          "Your credentials lack the permission. List the permissions Wraps needs (JSON to read, not a policy to paste): wraps permissions --json",
       },
       {
         code: "SES_PERMISSION_DENIED",
         message: "SES permission denied: <action>",
-        solution: "wraps permissions --service email --json",
+        solution:
+          "Your IAM user/role needs the ses:<action> permission. List the SES permissions Wraps needs (JSON to read, not a policy to paste): wraps permissions --service email --json",
       },
       {
         code: "DYNAMODB_PERMISSION_DENIED",
@@ -160,7 +161,8 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
       {
         code: "LAMBDA_PERMISSION_DENIED",
         message: "Lambda permission denied",
-        solution: "Needs CreateFunction, UpdateFunctionCode, DeleteFunction",
+        solution:
+          "Needs CreateFunction, UpdateFunctionCode, DeleteFunction, or, for inbound reprocess, InvokeFunction on wraps-inbound-email-processor",
       },
       {
         code: "EVENTBRIDGE_PERMISSION_DENIED",
@@ -170,7 +172,8 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
       {
         code: "SQS_PERMISSION_DENIED",
         message: "SQS permission denied",
-        solution: "Needs CreateQueue, DeleteQueue, GetQueueAttributes",
+        solution:
+          "Needs CreateQueue, DeleteQueue, GetQueueAttributes, or, for inbound reprocess, ReceiveMessage and DeleteMessage on wraps-inbound-events-dlq",
       },
       {
         code: "CLOUDWATCH_LOGS_PERMISSION_DENIED",
@@ -188,6 +191,19 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
         code: "IAM_ENTITY_NOT_FOUND",
         message: "IAM entity not found",
         solution: "Run wraps platform connect",
+      },
+      {
+        code: "POLICY_DIR_WRITE_FAILED",
+        message: "Could not write <dir>/wraps-deployer-<n>.json: <detail>",
+        solution:
+          "Raised by wraps permissions --policy-dir when the folder can't be created, written or listed, a wraps-deployer-<n>.json in it is a symlink, or an old file can't be checked or removed. Old wraps-deployer-<n>.json files are removed only after every new one is written, so a failed write removes nothing. After the writes, every old file is attempted: if any can't be checked or removed, the message names each one it couldn't remove and each one it removed. Delete the ones it couldn't remove yourself, don't create IAM policies from them, and detach and delete the IAM policies named after every file the message lists. If the folder can't be listed, the message names no files: delete any wraps-deployer-<n>.json numbered above the new count yourself, and detach and delete any IAM policies named after them. Otherwise fix the folder and re-run.",
+      },
+      {
+        code: "POLICY_SPLIT_FAILED",
+        message:
+          'Duplicate IAM statement Sid "<sid>", or IAM statement "<sid>" alone is over the 6144-character managed policy limit',
+        solution:
+          "Raised by wraps permissions when the CLI's own deployer policy can't be split into managed policies. It's a bug in the CLI, not in your setup: report it with the command you ran (wraps support).",
       },
     ],
   },
@@ -499,6 +515,12 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
           "Also raised for an unexpected argument, such as a value after a flag that takes none (--root wraps.dev). Use --domain for the parent domain or --subdomain <label> for the label.",
       },
       {
+        code: "INBOUND_NOT_DEPLOYED",
+        message: "Inbound email is not deployed in <region>",
+        solution:
+          "Raised by wraps email inbound reprocess when the dead-letter queue or the processor Lambda is missing. Run wraps email inbound init in that region, or pass --region for the region where inbound is deployed.",
+      },
+      {
         code: "INBOUND_REGION_NOT_SUPPORTED",
         message: "SES email receiving is not supported in <region>",
         solution:
@@ -546,6 +568,20 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
         code: "INBOUND_TEST_PERMISSION_DENIED",
         message: "IAM permission denied: ses:SendEmail in <region>",
         solution: "wraps permissions --service email --json",
+      },
+      {
+        code: "INBOUND_TRIGGER_SWITCH_FAILED",
+        message:
+          "Inbound trigger switch did not finish. Stopped at step <n> (<state>). Cause: <message>",
+        solution:
+          "Fix the cause, then run wraps email upgrade --action redeploy --region <region> --yes to finish the switch (add --preview first to see the stack changes). Mail keeps one live trigger at every step, and what the command saved before the switch stays saved.",
+      },
+      {
+        code: "RECEIPT_RULE_DELETE_FAILED",
+        message:
+          "Could not delete the SES receipt rule wraps-inbound-catch-all or rule set wraps-inbound-rules: <message>. The email stack was not destroyed; the receipt rule or rule set may already be deleted or deactivated.",
+        solution:
+          "On AccessDenied, grant ses:DeleteReceiptRule, ses:DeleteReceiptRuleSet and ses:SetActiveReceiptRuleSet (wraps permissions --service email --json). Otherwise fix the SES error shown (or retry after throttling). Then run wraps email destroy again.",
       },
     ],
   },

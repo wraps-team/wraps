@@ -205,7 +205,9 @@ describe("IAM check utility", () => {
       const formatted = formatDeniedActions(["iam:CreateRole"]);
 
       expect(formatted).toContain("Missing permissions");
-      expect(formatted).toContain("wraps permissions --json");
+      expect(formatted).toContain(
+        "Write the IAM policies to attach: `wraps permissions --policy-dir ./wraps-policy`"
+      );
     });
   });
 });
