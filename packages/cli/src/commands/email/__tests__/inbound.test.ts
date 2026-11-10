@@ -71,6 +71,9 @@ vi.mock("../../../utils/email/receipt-rules.js", async (importOriginal) => {
     createReceiptRule: vi.fn().mockResolvedValue(undefined),
     setActiveReceiptRuleSet: vi.fn().mockResolvedValue(undefined),
     getActiveReceiptRuleSet: vi.fn().mockResolvedValue("wraps-inbound-rules"),
+    readActiveReceiptRuleSet: vi
+      .fn()
+      .mockResolvedValue({ readable: true, name: "wraps-inbound-rules" }),
     // Plan 041: init reads the rule to tell fresh from existing (null =
     // fresh, so the default keeps init off the switch path); the switch
     // reads it again and syncs it.
@@ -2031,6 +2034,7 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
         ruleTrigger: "ses-lambda-action",
         ruleEnabled: true,
         activeRuleSet: "wraps-inbound-rules",
+        activeRuleSetReadable: true,
         ruleSetInactive: false,
         sesInvokePermission: true,
         bucketPolicyCoversMail: true,
@@ -2059,7 +2063,7 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
         bucketName: BUCKET,
         savedTrigger: "s3-notification",
         repairCommand: REPAIR,
-        activeRuleSet: "wraps-inbound-rules",
+        activeRuleSetRead: { readable: true, name: "wraps-inbound-rules" },
       });
     });
 
@@ -2076,6 +2080,7 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
         ruleTrigger: "ses-lambda-action",
         ruleEnabled: true,
         activeRuleSet: "wraps-inbound-rules",
+        activeRuleSetReadable: true,
         ruleSetInactive: false,
         sesInvokePermission: false,
         bucketPolicyCoversMail: true,
@@ -2106,9 +2111,10 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
       );
       vi.mocked(loadConnectionMetadata).mockResolvedValue(cloneMetadata());
       const rules = await import("../../../utils/email/receipt-rules.js");
-      vi.mocked(rules.getActiveReceiptRuleSet).mockResolvedValueOnce(
-        "customer-rules"
-      );
+      vi.mocked(rules.readActiveReceiptRuleSet).mockResolvedValueOnce({
+        readable: true,
+        name: "customer-rules",
+      });
       const check = await import(
         "../../../utils/email/inbound-trigger-check.js"
       );

@@ -16,6 +16,7 @@ import {
   createReceiptRule,
   inboundRuleActions,
   RECEIPT_RULE_RETRY_DELAYS_MS,
+  readActiveReceiptRuleSet,
   receiptRuleRetryHooks,
   receiptRuleTriggerOf,
   removeDomainFromReceiptRule,
@@ -404,5 +405,28 @@ describe("removeDomainFromReceiptRule", () => {
         },
       },
     ]);
+  });
+});
+
+describe("readActiveReceiptRuleSet", () => {
+  it("tells an active set, none active and unreadable apart", async () => {
+    ses
+      .on(DescribeActiveReceiptRuleSetCommand)
+      .resolvesOnce({ Metadata: { Name: "customer-rules" } })
+      .resolvesOnce({})
+      .rejectsOnce(sesError("AccessDenied"));
+
+    expect(await readActiveReceiptRuleSet(REGION)).toEqual({
+      readable: true,
+      name: "customer-rules",
+    });
+    expect(await readActiveReceiptRuleSet(REGION)).toEqual({
+      readable: true,
+      name: null,
+    });
+    expect(await readActiveReceiptRuleSet(REGION)).toEqual({
+      readable: false,
+      error: "AccessDenied",
+    });
   });
 });

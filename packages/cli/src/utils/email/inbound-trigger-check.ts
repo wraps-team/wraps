@@ -17,6 +17,7 @@ import {
   RULE_SET_NAME,
 } from "./inbound-names.js";
 import {
+  type ActiveRuleSetRead,
   describeInboundReceiptRule,
   receiptRuleTriggerOf,
 } from "./receipt-rules.js";
@@ -38,12 +39,17 @@ export type InboundTriggerCheck = {
   /** The rule's Enabled flag; null when there is no rule or it couldn't be read. */
   ruleEnabled: boolean | null;
   /**
-   * The region's active receipt rule set (null = none active, or unreadable).
-   * SES allows one active set per region.
+   * The region's active receipt rule set (null = none active, or unreadable;
+   * see activeRuleSetReadable). SES allows one active set per region.
    */
   activeRuleSet: string | null;
-  /** wraps-inbound-rules is not the active set, so no mail reaches Wraps. */
-  ruleSetInactive: boolean;
+  /** False when the active set couldn't be read (e.g. missing permission). */
+  activeRuleSetReadable: boolean;
+  /**
+   * wraps-inbound-rules is not the active set, so no mail reaches Wraps.
+   * null when the active set couldn't be read.
+   */
+  ruleSetInactive: boolean | null;
   /** wraps-inbound-ses-invoke present; null when it couldn't be checked. */
   sesInvokePermission: boolean | null;
   /** AllowSESPut covers mail/*; null when it couldn't be checked. */
@@ -145,56 +151,55 @@ async function readRule(
 }
 
 /**
- * Compute the mismatches between the four pieces. Pure; exported for tests.
- * `repairCommand` is the command each warning names as the fix (status passes
- * an `inbound init` re-run built from the saved config).
+ * Compute the mismatches between the pieces. Pure; exported for tests.
+ * `repairCommand` is the command each trigger warning names as the fix
+ * (status passes `wraps email upgrade --action redeploy --region <r> --yes`).
  */
 export function compareInboundTrigger(
   check: Omit<InboundTriggerCheck, "mismatches" | "warnings">,
   repairCommand: string
 ): Pick<InboundTriggerCheck, "mismatches" | "warnings"> {
-  const FIX = `Run \`${repairCommand}\` to redeploy the saved config and bring the trigger back in line.`;
+  const FIX = `Run \`${repairCommand}\` to re-apply the saved configuration with this CLI version and bring the trigger back in line (add --preview first to see the stack changes).`;
   const mismatches: InboundTriggerMismatch[] = [];
   const warnings: string[] = [];
   const { savedTrigger, ruleTrigger } = check;
 
   // SES allows one active rule set per region. Wraps never suggests a command
   // that would activate its set over the customer's own (invariant 1).
-  if (check.ruleSetInactive) {
+  if (check.ruleSetInactive === true) {
     mismatches.push("rule-set-inactive");
     warnings.push(
       check.activeRuleSet
-        ? `The active receipt rule set in this region is ${check.activeRuleSet}, not ${RULE_SET_NAME}, so no inbound mail reaches Wraps. Wraps leaves it that way; note that \`wraps email inbound init\` and \`inbound add\` activate ${RULE_SET_NAME}, which deactivates ${check.activeRuleSet}.`
-        : `No receipt rule set is active in this region (or the active set couldn't be read), so no inbound mail reaches Wraps. Check the SES console (Email receiving) before activating ${RULE_SET_NAME}.`
+        ? `The active receipt rule set in this region is ${check.activeRuleSet}, not ${RULE_SET_NAME}, so no inbound mail reaches Wraps. Wraps leaves it that way; note that \`wraps email inbound init\` (and \`inbound add\` when it has to recreate the rule) activates ${RULE_SET_NAME}, which deactivates ${check.activeRuleSet}.`
+        : `No receipt rule set is active in this region, so no inbound mail reaches Wraps. Check the SES console (Email receiving) before activating ${RULE_SET_NAME}.`
     );
   }
 
   if (ruleTrigger === "missing") {
     mismatches.push("rule-missing");
     warnings.push(
-      check.ruleSetInactive
-        ? `The receipt rule ${RULE_NAME} does not exist, so no inbound mail is received.`
-        : `The receipt rule ${RULE_NAME} does not exist, so no inbound mail is received. \`wraps email inbound init\` recreates it.`
+      check.ruleSetInactive === false
+        ? `The receipt rule ${RULE_NAME} does not exist, so no inbound mail is received. \`wraps email inbound init\` recreates it.`
+        : `The receipt rule ${RULE_NAME} does not exist, so no inbound mail is received.`
     );
-  } else if (check.ruleEnabled === false) {
-    mismatches.push("rule-disabled");
-    warnings.push(
-      `The receipt rule ${RULE_NAME} is disabled, so SES skips it and no inbound mail reaches Wraps. Wraps keeps the rule's Enabled flag as it finds it: re-enable the rule in the SES console (Email receiving, rule set ${RULE_SET_NAME}).`
-    );
-  }
-
-  if (ruleTrigger === "missing") {
-    // reported above
-  } else if (ruleTrigger === "unknown") {
-    mismatches.push("rule-unrecognized");
-    warnings.push(
-      `The receipt rule's actions match neither trigger mode (raw/ alone, or mail/ + the processor's Lambda action). ${FIX}`
-    );
-  } else if (ruleTrigger !== null && ruleTrigger !== savedTrigger) {
-    mismatches.push("rule-differs-from-saved");
-    warnings.push(
-      `The receipt rule uses the ${ruleTrigger} trigger but metadata says ${savedTrigger} (a switch stopped part-way). ${FIX}`
-    );
+  } else {
+    if (check.ruleEnabled === false) {
+      mismatches.push("rule-disabled");
+      warnings.push(
+        `The receipt rule ${RULE_NAME} is disabled, so SES skips it and no inbound mail reaches Wraps. Wraps keeps the rule's Enabled flag as it finds it: re-enable the rule in the SES console (Email receiving, rule set ${RULE_SET_NAME}).`
+      );
+    }
+    if (ruleTrigger === "unknown") {
+      mismatches.push("rule-unrecognized");
+      warnings.push(
+        `The receipt rule's actions match neither trigger mode (raw/ alone, or mail/ + the processor's Lambda action). ${FIX}`
+      );
+    } else if (ruleTrigger !== null && ruleTrigger !== savedTrigger) {
+      mismatches.push("rule-differs-from-saved");
+      warnings.push(
+        `The receipt rule uses the ${ruleTrigger} trigger but metadata says ${savedTrigger} (a switch stopped part-way). ${FIX}`
+      );
+    }
   }
 
   const lambdaActionInUse =
@@ -221,8 +226,8 @@ export async function checkInboundTrigger(params: {
   bucketName: string;
   savedTrigger: InboundTrigger;
   repairCommand: string;
-  /** From getActiveReceiptRuleSet (status already reads it). */
-  activeRuleSet: string | null;
+  /** From readActiveReceiptRuleSet (status already reads it). */
+  activeRuleSetRead: ActiveRuleSetRead;
 }): Promise<InboundTriggerCheck> {
   const [rule, sesInvokePermission, bucketPolicyCoversMail] = await Promise.all(
     [
@@ -234,8 +239,13 @@ export async function checkInboundTrigger(params: {
   const pieces = {
     savedTrigger: params.savedTrigger,
     ...rule,
-    activeRuleSet: params.activeRuleSet,
-    ruleSetInactive: params.activeRuleSet !== RULE_SET_NAME,
+    activeRuleSet: params.activeRuleSetRead.readable
+      ? params.activeRuleSetRead.name
+      : null,
+    activeRuleSetReadable: params.activeRuleSetRead.readable,
+    ruleSetInactive: params.activeRuleSetRead.readable
+      ? params.activeRuleSetRead.name !== RULE_SET_NAME
+      : null,
     sesInvokePermission,
     bucketPolicyCoversMail,
   };

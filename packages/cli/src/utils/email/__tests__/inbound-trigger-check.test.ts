@@ -17,6 +17,7 @@ const REPAIR = "wraps email upgrade --action redeploy --region us-east-1 --yes";
 const ACTIVE = {
   ruleEnabled: true,
   activeRuleSet: "wraps-inbound-rules",
+  activeRuleSetReadable: true,
   ruleSetInactive: false,
 };
 const NEW_RULE = {
@@ -82,7 +83,7 @@ describe("checkInboundTrigger", () => {
       bucketName: BUCKET,
       savedTrigger: "ses-lambda-action",
       repairCommand: REPAIR,
-      activeRuleSet: "wraps-inbound-rules",
+      activeRuleSetRead: { readable: true, name: "wraps-inbound-rules" },
     });
 
     expect(result).toEqual({
@@ -90,6 +91,7 @@ describe("checkInboundTrigger", () => {
       ruleTrigger: "ses-lambda-action",
       ruleEnabled: true,
       activeRuleSet: "wraps-inbound-rules",
+      activeRuleSetReadable: true,
       ruleSetInactive: false,
       sesInvokePermission: true,
       bucketPolicyCoversMail: true,
@@ -119,7 +121,7 @@ describe("checkInboundTrigger", () => {
       bucketName: BUCKET,
       savedTrigger: "ses-lambda-action",
       repairCommand: REPAIR,
-      activeRuleSet: "wraps-inbound-rules",
+      activeRuleSetRead: { readable: true, name: "wraps-inbound-rules" },
     });
 
     expect(result.sesInvokePermission).toBe(false);
@@ -141,7 +143,7 @@ describe("checkInboundTrigger", () => {
       bucketName: BUCKET,
       savedTrigger: "ses-lambda-action",
       repairCommand: REPAIR,
-      activeRuleSet: "wraps-inbound-rules",
+      activeRuleSetRead: { readable: true, name: "wraps-inbound-rules" },
     });
     expect(result.ruleTrigger).toBeNull();
     expect(result.sesInvokePermission).toBe(false);
@@ -154,7 +156,7 @@ describe("checkInboundTrigger", () => {
       bucketName: BUCKET,
       savedTrigger: "ses-lambda-action",
       repairCommand: REPAIR,
-      activeRuleSet: "wraps-inbound-rules",
+      activeRuleSetRead: { readable: true, name: "wraps-inbound-rules" },
     });
     expect(unchecked.sesInvokePermission).toBeNull();
     expect(unchecked.bucketPolicyCoversMail).toBeNull();
@@ -232,7 +234,7 @@ describe("compareInboundTrigger", () => {
       bucketName: BUCKET,
       savedTrigger: "ses-lambda-action",
       repairCommand: REPAIR,
-      activeRuleSet: "customer-rules",
+      activeRuleSetRead: { readable: true, name: "customer-rules" },
     });
 
     expect(result.ruleSetInactive).toBe(true);
@@ -257,6 +259,7 @@ describe("compareInboundTrigger", () => {
       {
         ruleEnabled: null,
         activeRuleSet: "customer-rules",
+        activeRuleSetReadable: true,
         ruleSetInactive: true,
         savedTrigger: "ses-lambda-action",
         ruleTrigger: "missing",
@@ -284,5 +287,44 @@ describe("compareInboundTrigger", () => {
     );
     expect(mismatches).toEqual(["rule-disabled"]);
     expect(warnings[0]).toContain("disabled");
+  });
+
+  it("an unreadable active set is reported as unknown (null), not as inactive", async () => {
+    ses.on(DescribeReceiptRuleCommand).resolves({ Rule: NEW_RULE });
+    lambda.on(GetPolicyCommand).resolves({ Policy: SES_POLICY });
+    s3.on(GetBucketPolicyCommand).resolves({
+      Policy: bucketPolicy(["raw/", "mail/"]),
+    });
+
+    const result = await checkInboundTrigger({
+      region: "us-east-1",
+      bucketName: BUCKET,
+      savedTrigger: "ses-lambda-action",
+      repairCommand: REPAIR,
+      activeRuleSetRead: { readable: false, error: "AccessDenied" },
+    });
+
+    expect(result.activeRuleSetReadable).toBe(false);
+    expect(result.ruleSetInactive).toBeNull();
+    expect(result.activeRuleSet).toBeNull();
+    expect(result.mismatches).toEqual([]);
+  });
+
+  it("none active (readable, no set) is reported as inactive", () => {
+    const { mismatches, warnings } = compareInboundTrigger(
+      {
+        ...ACTIVE,
+        activeRuleSet: null,
+        ruleSetInactive: true,
+        savedTrigger: "ses-lambda-action",
+        ruleTrigger: "ses-lambda-action",
+        sesInvokePermission: true,
+        bucketPolicyCoversMail: true,
+      },
+      REPAIR
+    );
+    expect(mismatches).toEqual(["rule-set-inactive"]);
+    expect(warnings[0]).toContain("No receipt rule set is active");
+    expect(warnings[0]).not.toContain("couldn't be read");
   });
 });

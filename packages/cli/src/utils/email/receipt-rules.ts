@@ -358,6 +358,33 @@ export async function getActiveReceiptRuleSet(
   }
 }
 
+/** Result of reading the region's active receipt rule set. */
+export type ActiveRuleSetRead =
+  | { readable: true; name: string | null }
+  | { readable: false; error: string };
+
+/**
+ * Read the active receipt rule set, telling "none active" (readable, name
+ * null) apart from "couldn't read it" (e.g. no ses:DescribeActiveReceiptRuleSet).
+ */
+export async function readActiveReceiptRuleSet(
+  region: string
+): Promise<ActiveRuleSetRead> {
+  const ses = createSESClient(region);
+  try {
+    const response = await ses.send(
+      new DescribeActiveReceiptRuleSetCommand({})
+    );
+    return { readable: true, name: response.Metadata?.Name ?? null };
+  } catch (error: unknown) {
+    return {
+      readable: false,
+      error:
+        error instanceof Error ? error.name || error.message : String(error),
+    };
+  }
+}
+
 /**
  * Set the active receipt rule set
  * Returns the name of any previously active rule set (for warning purposes)

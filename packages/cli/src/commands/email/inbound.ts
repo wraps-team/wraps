@@ -20,6 +20,7 @@ import { runEmailStackPreview } from "../../utils/email/email-stack-deploy.js";
 import { checkInboundTrigger } from "../../utils/email/inbound-trigger-check.js";
 import {
   exitOnSwitchFailure,
+  redeployCommand,
   switchInboundTrigger,
 } from "../../utils/email/inbound-trigger-switch.js";
 import {
@@ -32,6 +33,7 @@ import {
   getActiveReceiptRuleSet,
   RULE_NAME,
   RULE_SET_NAME,
+  readActiveReceiptRuleSet,
   removeDomainFromReceiptRule,
   setActiveReceiptRuleSet,
 } from "../../utils/email/receipt-rules.js";
@@ -187,12 +189,13 @@ function reportInboundDNSCleanup(
 
 /**
  * The command `inbound status` names to bring the trigger back in line: an
- * `email upgrade` that redeploys the saved config unchanged (restoring the SES
- * invoke permission and the mail/* bucket policy, and switching a deployment
- * still on the S3 trigger). It never touches DNS or which rule set is active.
+ * `email upgrade` that re-applies the saved configuration with this CLI
+ * version (restoring the SES invoke permission and the mail/* bucket policy,
+ * and switching a deployment still on the S3 trigger). It never writes DNS or
+ * changes which rule set is active. Same string as the switch's suggestion.
  */
 export function inboundRepairCommand(region: string): string {
-  return `wraps email upgrade --action redeploy --region ${region} --yes`;
+  return redeployCommand(region);
 }
 
 /** Human label for an inbound trigger mode. */
@@ -1044,8 +1047,11 @@ export async function inboundStatus(
   const inbound = emailConfig.inbound!;
   const inboundDomains = emailConfig.inboundDomains ?? [];
 
-  // 4. Check receipt rule status
-  const activeRuleSet = await getActiveReceiptRuleSet(region);
+  // 4. Check receipt rule status ("none active" and "couldn't read" differ)
+  const activeRuleSetRead = await readActiveReceiptRuleSet(region);
+  const activeRuleSet = activeRuleSetRead.readable
+    ? activeRuleSetRead.name
+    : null;
 
   // 4b. Trigger mode, and whether the rule, metadata, SES invoke permission
   // and bucket policy agree (read-only).
@@ -1057,7 +1063,7 @@ export async function inboundStatus(
     bucketName,
     savedTrigger: getInboundTrigger(metadata),
     repairCommand,
-    activeRuleSet,
+    activeRuleSetRead,
   });
 
   // Build domain list — prefer inboundDomains, fallback to single domain
@@ -1088,6 +1094,7 @@ export async function inboundStatus(
       retention: inbound.retention || null,
       trigger: triggerCheck.savedTrigger,
       activeRuleSet: triggerCheck.activeRuleSet,
+      activeRuleSetReadable: triggerCheck.activeRuleSetReadable,
       triggerCheck: {
         repairCommand,
         ruleSetInactive: triggerCheck.ruleSetInactive,
@@ -1135,7 +1142,7 @@ export async function inboundStatus(
     }
   }
   console.log(
-    `  ${pc.dim("Receipt rule set:")}  ${activeRuleSet === RULE_SET_NAME ? pc.green("active") : pc.yellow(activeRuleSet ? `inactive (active set: ${activeRuleSet})` : "inactive")}`
+    `  ${pc.dim("Receipt rule set:")}  ${activeRuleSet === RULE_SET_NAME ? pc.green("active") : activeRuleSetRead.readable ? pc.yellow(activeRuleSet ? `inactive (active set: ${activeRuleSet})` : "inactive (no set is active)") : pc.dim("unknown (couldn't read the active set)")}`
   );
   console.log(
     `  ${pc.dim("Retention:")}         ${inbound.retention ? pc.cyan(inbound.retention) : pc.dim("indefinite")}`
@@ -1158,6 +1165,9 @@ export async function inboundStatus(
       ? "the processor's SES invoke permission"
       : null,
     triggerCheck.bucketPolicyCoversMail === null ? "the bucket policy" : null,
+    triggerCheck.activeRuleSetReadable
+      ? null
+      : "the region's active receipt rule set",
   ].filter((x): x is string => x !== null);
   if (unchecked.length > 0) {
     clack.log.info(
