@@ -439,13 +439,19 @@ export async function emailDestroy(options: DestroyOptions): Promise<void> {
       });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
+      const name = error instanceof Error ? error.name : "";
+      const accessDenied =
+        name === "AccessDenied" || name === "AccessDeniedException";
       trackError("RECEIPT_RULE_DELETE_FAILED", "email destroy", {
         step: "delete-receipt-rule",
+        awsError: name || undefined,
       });
       throw new WrapsError(
-        `Could not delete the SES receipt rule ${RULE_NAME} (rule set ${RULE_SET_NAME}): ${msg}. Nothing was destroyed.`,
+        `Could not delete the SES receipt rule ${RULE_NAME} or rule set ${RULE_SET_NAME}: ${msg}. The email stack was not destroyed; the receipt rule or rule set may already be deleted or deactivated.`,
         "RECEIPT_RULE_DELETE_FAILED",
-        "Check the credentials have ses:DeleteReceiptRule, ses:DeleteReceiptRuleSet and ses:SetActiveReceiptRuleSet (see `wraps permissions`), then run `wraps email destroy` again.",
+        accessDenied
+          ? "Grant ses:DeleteReceiptRule, ses:DeleteReceiptRuleSet and ses:SetActiveReceiptRuleSet (see `wraps permissions --service email --json`), then run `wraps email destroy` again."
+          : "Fix the SES error above (or wait and retry if SES throttled the call), then run `wraps email destroy` again.",
         "https://wraps.dev/docs/guides/aws-setup/permissions"
       );
     }

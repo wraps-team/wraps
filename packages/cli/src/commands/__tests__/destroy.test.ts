@@ -245,7 +245,7 @@ describe("email destroy command", () => {
   }
 
   describe("Inbound receipt rule cleanup (plan 041)", () => {
-    function withInbound() {
+    function withInbound(webhookSecret?: string) {
       vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue({
         version: "1.0.0",
         accountId: "123456789012",
@@ -267,6 +267,7 @@ describe("email destroy command", () => {
             },
             pulumiStackName: "wraps-email-123456789012-us-east-1",
             deployedAt: new Date().toISOString(),
+            ...(webhookSecret ? { webhookSecret } : {}),
           },
         },
       } as never);
@@ -309,9 +310,71 @@ describe("email destroy command", () => {
 
       await expect(emailDestroy({ force: true })).rejects.toMatchObject({
         code: "RECEIPT_RULE_DELETE_FAILED",
+        suggestion: expect.stringContaining("Grant ses:DeleteReceiptRule"),
       });
       expect(stack.destroy).not.toHaveBeenCalled();
       expect(metadata.deleteConnectionMetadata).not.toHaveBeenCalled();
+    });
+
+    it("a rule-set failure after the rule delete says the rule may already be gone, and doesn't blame IAM for throttling", async () => {
+      withInbound();
+      const stack = await setupPulumiMock();
+      const throttled = new Error("Rate exceeded");
+      throttled.name = "Throttling";
+      vi.mocked(receiptRules.deleteReceiptRuleSet).mockRejectedValueOnce(
+        throttled
+      );
+
+      const error = await emailDestroy({ force: true }).catch((e) => e);
+
+      expect(receiptRules.deleteReceiptRule).toHaveBeenCalledTimes(1);
+      expect(error.code).toBe("RECEIPT_RULE_DELETE_FAILED");
+      expect(error.message).toContain(
+        "The email stack was not destroyed; the receipt rule or rule set may already be deleted or deactivated."
+      );
+      expect(error.message).not.toContain("Nothing was destroyed");
+      expect(error.suggestion).not.toContain("Grant");
+      expect(error.suggestion).toContain("wraps email destroy");
+      expect(stack.destroy).not.toHaveBeenCalled();
+    });
+
+    it("a declined confirmation deletes no receipt rule", async () => {
+      withInbound();
+      const stack = await setupPulumiMock();
+      vi.mocked(prompts.confirm).mockResolvedValueOnce(false as never);
+      const exitSpy = vi.spyOn(process, "exit").mockImplementation(((
+        code: number
+      ) => {
+        throw new Error(`process.exit(${code})`);
+      }) as never);
+      try {
+        await expect(emailDestroy({})).rejects.toThrow("process.exit(0)");
+      } finally {
+        exitSpy.mockRestore();
+      }
+      expect(receiptRules.deleteReceiptRule).not.toHaveBeenCalled();
+      expect(receiptRules.deleteReceiptRuleSet).not.toHaveBeenCalled();
+      expect(stack.destroy).not.toHaveBeenCalled();
+    });
+
+    it("a mismatched typed account id deletes no receipt rule", async () => {
+      withInbound("platform-secret");
+      const stack = await setupPulumiMock();
+      vi.mocked(prompts.confirm).mockResolvedValueOnce(true as never);
+      vi.mocked(prompts.text).mockResolvedValueOnce("999999999999" as never);
+      const exitSpy = vi.spyOn(process, "exit").mockImplementation(((
+        code: number
+      ) => {
+        throw new Error(`process.exit(${code})`);
+      }) as never);
+      try {
+        await expect(emailDestroy({})).rejects.toThrow("process.exit(0)");
+      } finally {
+        exitSpy.mockRestore();
+      }
+      expect(receiptRules.deleteReceiptRule).not.toHaveBeenCalled();
+      expect(receiptRules.deleteReceiptRuleSet).not.toHaveBeenCalled();
+      expect(stack.destroy).not.toHaveBeenCalled();
     });
 
     it("--preview lists the rule and rule set and deletes nothing", async () => {
