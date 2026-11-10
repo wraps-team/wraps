@@ -342,9 +342,9 @@ async function callApi(
 // Fixed output shapes. Explicit field lists keep the JSON keys stable even if
 // the route later adds fields.
 /** Omitted, not null, when the API sent none: absent means unknown. */
-function envelopeJson(
-  recipients: string[] | undefined
-): { envelopeRecipients?: string[] } {
+function envelopeJson(recipients: string[] | undefined): {
+  envelopeRecipients?: string[];
+} {
   return Array.isArray(recipients) ? { envelopeRecipients: recipients } : {};
 }
 

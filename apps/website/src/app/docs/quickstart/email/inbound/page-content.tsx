@@ -643,8 +643,8 @@ TTL: 300`,
           lists the addresses SES actually delivered to, which can differ from{" "}
           <code className="rounded bg-muted px-1.5 py-0.5">to</code>. Use it to
           route on Bcc recipients, forwards and aliases. It is absent on mail
-          received before <code>wraps email upgrade</code>. Events are
-          delivered at least once, so deduplicate on{" "}
+          received before <code>wraps email upgrade</code>. Events are delivered
+          at least once, so deduplicate on{" "}
           <code className="rounded bg-muted px-1.5 py-0.5">emailId</code>.
         </p>
 

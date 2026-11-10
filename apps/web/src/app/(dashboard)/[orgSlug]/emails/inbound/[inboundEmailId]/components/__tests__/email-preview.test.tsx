@@ -123,6 +123,20 @@ describe("EmailPreview", () => {
     expect(screen.queryByText("Delivered to")).not.toBeInTheDocument();
   });
 
+  it("matches a mixed-case To header against the lowercased envelope", () => {
+    render(
+      <EmailPreview
+        email={makeEmail({
+          to: [{ address: "Support@ACME.test", name: "Support" }],
+          envelopeRecipients: ["support@acme.test"],
+        })}
+        orgSlug="acme"
+      />
+    );
+
+    expect(screen.queryByText("Delivered to")).not.toBeInTheDocument();
+  });
+
   it("hides the row when envelopeRecipients is absent or empty", () => {
     const { rerender } = render(
       <EmailPreview email={makeEmail()} orgSlug="acme" />

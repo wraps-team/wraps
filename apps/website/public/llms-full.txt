@@ -1124,7 +1124,7 @@ wraps email inbound destroy   # Remove inbound infrastructure
 
 `inbound init`, `inbound add` and `email upgrade` move a deployment that still uses the old trigger to the new one. Use the same CLI version everywhere that deploys the stack: older versions put the old trigger back.
 
-The `email.received` EventBridge event and the parsed email JSON carry `envelopeRecipients`: the lowercased SMTP envelope recipients SES delivered to, Bcc included. Use it to route on Bcc recipients, forwards and aliases. It is absent on mail received before `wraps email upgrade`, so treat absent as unknown, not empty. Events are delivered at least once: deduplicate on `emailId`. The dashboard and `wraps email inbound get` show it as "Delivered to".
+The `email.received` EventBridge event and the parsed email JSON carry `envelopeRecipients`: the lowercased SMTP envelope recipients SES delivered to, Bcc included. Use it to route on Bcc recipients, forwards and aliases. It is absent on mail received before `wraps email upgrade`, so treat absent as unknown, not empty. When an event is trimmed to its last-resort form, `envelopeRecipients` keeps the first 100 addresses, `envelopeRecipientCount` gives the full count, and `truncatedFields` includes `"envelopeRecipients"`; the full list is in the parsed JSON at `parsedS3Key`. Events are delivered at least once: deduplicate on `emailId`. The dashboard and `wraps email inbound get` show it as "Delivered to".
 
 ```typescript
 const email = new WrapsEmail({ inboxBucketName: 'my-inbox-bucket' });

@@ -1562,8 +1562,8 @@ export default function InfrastructureEventsPageContent() {
                           <td className="p-3 text-muted-foreground">
                             Lowercased SMTP envelope recipients SES delivered
                             to, Bcc included. Absent on mail received before{" "}
-                            <code>wraps email upgrade</code>, so treat absent
-                            as unknown, not empty
+                            <code>wraps email upgrade</code>, so treat absent as
+                            unknown, not empty
                           </td>
                         </tr>
                         <tr className="border-b">
@@ -1692,6 +1692,26 @@ export default function InfrastructureEventsPageContent() {
                 and{" "}
                 <code className="rounded bg-muted px-1.5 py-0.5">
                   autoReply
+                </code>
+                .
+              </p>
+              <p className="text-muted-foreground text-sm">
+                In that last-resort form,{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  envelopeRecipients
+                </code>{" "}
+                keeps the first 100 addresses,{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  envelopeRecipientCount
+                </code>{" "}
+                gives the full count, and{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  truncatedFields
+                </code>{" "}
+                includes <code>&quot;envelopeRecipients&quot;</code>. The full
+                list is in the parsed JSON at{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  parsedS3Key
                 </code>
                 .
               </p>
