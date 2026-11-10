@@ -8,7 +8,7 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
-import type { Context, S3Event } from "aws-lambda";
+import type { Context, S3Event, SESEvent } from "aws-lambda";
 import { mockClient } from "aws-sdk-client-mock";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { encodeReplyToken } from "../../src/reply-token.js";
@@ -932,5 +932,351 @@ describe("inbound-processor — retry-stable ids and timestamps", () => {
     expect(receivedAt).toMatch(ISO_UTC);
     expect(Date.parse(receivedAt)).toBeGreaterThanOrEqual(before);
     expect(Date.parse(receivedAt)).toBeLessThanOrEqual(after);
+  });
+});
+
+function sesEvent(opts: {
+  messageId?: string;
+  timestamp?: string;
+  recipients?: string[];
+}): SESEvent {
+  return {
+    Records: [
+      {
+        eventSource: "aws:ses",
+        eventVersion: "1.0",
+        ses: {
+          mail: { messageId: opts.messageId ?? "abc123" },
+          receipt: {
+            timestamp: opts.timestamp ?? "2026-03-04T05:06:07.890Z",
+            recipients: opts.recipients ?? ["inbox@support.foo.com"],
+          },
+        },
+      },
+    ],
+  } as unknown as SESEvent;
+}
+
+describe("inbound-processor — SES Lambda action event", () => {
+  it("reads the raw object under mail/, takes receivedAt from the receipt and lowercases envelopeRecipients", async () => {
+    parsedState.queue = [
+      {
+        from: { address: "sender@external.com" },
+        to: [{ address: "inbox@support.foo.com" }],
+      },
+    ];
+
+    await runHandler(
+      sesEvent({
+        messageId: "msg42",
+        timestamp: "2026-03-04T05:06:07.890Z",
+        recipients: ["Inbox@Support.Foo.com", "other@support.foo.com"],
+      }) as unknown as S3Event
+    );
+
+    const get = s3Mock.commandCalls(GetObjectCommand)[0].args[0].input;
+    expect(get).toEqual({ Bucket: PARSED_BUCKET, Key: "mail/msg42" });
+    const parsed = JSON.parse(capturedParsedObject().body);
+    const ev = await capturedPut();
+    for (const doc of [parsed, ev.detail]) {
+      expect(doc.rawS3Key).toBe("mail/msg42");
+      expect(doc.receivedAt).toBe("2026-03-04T05:06:07.890Z");
+      expect(doc.envelopeRecipients).toEqual([
+        "inbox@support.foo.com",
+        "other@support.foo.com",
+      ]);
+    }
+  });
+
+  it("derives the same emailId when the same SES record is retried", async () => {
+    const ids: unknown[] = [];
+    for (let i = 0; i < 2; i++) {
+      parsedState.queue = [{ from: { address: "a@external.com" } }];
+      await runHandler(sesEvent({ messageId: "same" }) as unknown as S3Event);
+      ids.push(JSON.parse(capturedParsedObject().body).emailId);
+      s3Mock.resetHistory();
+    }
+    expect(ids[1]).toBe(ids[0]);
+  });
+
+  it("sets receivingDomain from the envelope when the address is in no header (Bcc)", async () => {
+    parsedState.queue = [
+      {
+        from: { address: "sender@external.com" },
+        to: [{ address: "someone@elsewhere.com" }],
+      },
+    ];
+
+    await runHandler(
+      sesEvent({ recipients: ["Bcc@Support.Foo.com"] }) as unknown as S3Event
+    );
+
+    const ev = await capturedPut();
+    expect(ev.detail.receivingDomain).toBe("support.foo.com");
+  });
+
+  it("finds the reply token through the envelope when no header names it", async () => {
+    const secret = Buffer.alloc(32, 0x5a);
+    process.env.REPLY_SECRET_PARAMETER_PREFIX = "/wraps/email/reply-secret/";
+    ssmMock.on(GetParameterCommand).resolves({
+      Parameter: {
+        Value: JSON.stringify({ kid: 1, current: secret.toString("base64") }),
+      },
+    });
+    const token = encodeReplyToken({
+      kid: 1,
+      convId: Buffer.alloc(8, 0x77),
+      sendId: Buffer.alloc(8, 0x88),
+      exp: 0,
+      secret,
+    });
+    parsedState.queue = [
+      {
+        from: { address: "sender@external.com" },
+        to: [{ address: "list@elsewhere.com" }],
+        headers: [],
+      },
+    ];
+
+    await runHandler(
+      sesEvent({
+        recipients: [`${token}@r.mail.support.foo.com`],
+      }) as unknown as S3Event
+    );
+
+    const ev = await capturedPut();
+    expect((ev.detail.replyToken as { status: string }).status).toBe("valid");
+    expect(ev.detail.receivingDomain).toBe("r.mail.support.foo.com");
+  });
+
+  it("decodes a reply token from the envelope with its case preserved", async () => {
+    const secret = Buffer.alloc(32, 0x5a);
+    process.env.REPLY_SECRET_PARAMETER_PREFIX = "/wraps/email/reply-secret/";
+    ssmMock.on(GetParameterCommand).resolves({
+      Parameter: {
+        Value: JSON.stringify({ kid: 1, current: secret.toString("base64") }),
+      },
+    });
+    const token = encodeReplyToken({
+      kid: 1,
+      convId: Buffer.alloc(8, 0x77),
+      sendId: Buffer.alloc(8, 0x88),
+      exp: 0,
+      secret,
+    });
+    expect(token).not.toBe(token.toLowerCase());
+    parsedState.queue = [{ from: { address: "s@external.com" }, headers: [] }];
+
+    await runHandler(
+      sesEvent({
+        recipients: [`${token}@R.Mail.Support.Foo.com`],
+      }) as unknown as S3Event
+    );
+
+    const ev = await capturedPut();
+    expect((ev.detail.replyToken as { status: string }).status).toBe("valid");
+    expect(ev.detail.envelopeRecipients).toEqual([
+      `${token.toLowerCase()}@r.mail.support.foo.com`,
+    ]);
+  });
+
+  it("strips the mail/ prefix in the messageId fallback", async () => {
+    const { handler } = await import("./index.ts");
+    parsedState.queue = [{ from: { address: "a@external.com" } }];
+    const { simpleParser } = await import("mailparser");
+    vi.mocked(simpleParser).mockResolvedValueOnce({
+      ...parseFromFixture({ from: { address: "a@external.com" } }),
+      messageId: undefined,
+    } as never);
+    await handler(sesEvent({ messageId: "fallback1" }), makeCtx());
+    expect(JSON.parse(capturedParsedObject().body).messageId).toBe("fallback1");
+  });
+
+  it("logs 'raw object not readable' with bucket and key, then rethrows", async () => {
+    s3Mock.on(GetObjectCommand).rejects(new Error("AccessDenied"));
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expect(
+        runHandler(sesEvent({ messageId: "gone" }) as unknown as S3Event)
+      ).rejects.toThrow("AccessDenied");
+      const lines = errSpy.mock.calls.map((c) => String(c[0]));
+      const line = lines.find((l) => l.includes("raw object not readable"));
+      expect(line).toContain(PARSED_BUCKET);
+      expect(line).toContain("mail/gone");
+      expect(s3Mock.commandCalls(GetObjectCommand).length).toBe(1);
+    } finally {
+      errSpy.mockRestore();
+    }
+  });
+});
+
+describe("inbound-processor — S3 event after the SES Lambda action change", () => {
+  it("leaves S3 records unchanged and without envelopeRecipients", async () => {
+    parsedState.queue = [
+      {
+        from: { address: "sender@external.com" },
+        to: [{ address: "inbox@support.foo.com" }],
+      },
+    ];
+
+    await runHandler(singleS3Event("raw/legacy1", "2026-01-02T03:04:05.678Z"));
+
+    const parsed = JSON.parse(capturedParsedObject().body);
+    expect(parsed.rawS3Key).toBe("raw/legacy1");
+    expect(parsed.receivedAt).toBe("2026-01-02T03:04:05.678Z");
+    expect("envelopeRecipients" in parsed).toBe(false);
+    const ev = await capturedPut();
+    expect("envelopeRecipients" in ev.detail).toBe(false);
+    expect(ev.detail.receivingDomain).toBe("support.foo.com");
+  });
+
+  it("skips the AMAZON_SES_SETUP_NOTIFICATION key and keeps going", async () => {
+    parsedState.queue = [{ from: { address: "a@external.com" } }];
+
+    await runHandler(
+      multiS3Event(["mail/AMAZON_SES_SETUP_NOTIFICATION", "raw/real"])
+    );
+
+    const keys = s3Mock
+      .commandCalls(GetObjectCommand)
+      .map((c) => c.args[0].input.Key);
+    expect(keys).toEqual(["raw/real"]);
+    expect(ebMock.commandCalls(PutEventsCommand).length).toBe(1);
+  });
+
+  it("logs and rethrows a malformed record instead of throwing outside the try", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expect(
+        runHandler({ Records: [{}] } as unknown as S3Event)
+      ).rejects.toThrow();
+      expect(
+        errSpy.mock.calls.some((c) =>
+          String(c[0]).includes("Error processing inbound email")
+        )
+      ).toBe(true);
+    } finally {
+      errSpy.mockRestore();
+    }
+  });
+
+  it("strips the raw/ prefix in the messageId fallback", async () => {
+    const { simpleParser } = await import("mailparser");
+    vi.mocked(simpleParser).mockResolvedValueOnce({
+      ...parseFromFixture({ from: { address: "a@external.com" } }),
+      messageId: undefined,
+    } as never);
+    await runHandler(singleS3Event("raw/legacy2"));
+    expect(JSON.parse(capturedParsedObject().body).messageId).toBe("legacy2");
+  });
+});
+
+describe("buildEventDetail — envelopeRecipients", () => {
+  const base = {
+    emailId: "inb_1",
+    messageId: "<m@x>",
+    receivingDomain: "x.com",
+    from: { address: "a@x.com", name: "" },
+    to: [{ address: "b@x.com", name: "" }],
+    cc: [],
+    subject: "s",
+    date: "2026-01-01T00:00:00.000Z",
+    html: null,
+    htmlTruncated: false,
+    text: null,
+    headers: {},
+    attachments: [],
+    spamVerdict: null,
+    virusVerdict: null,
+    rawS3Key: "mail/1",
+    receivedAt: "2026-01-01T00:00:00.000Z",
+    replyToken: null,
+    autoReply: false,
+  };
+  const addrs = (n: number) =>
+    Array.from({ length: n }, (_, i) => `user${i}@x.com`);
+
+  it("keeps the field whole at every trim stage, including the last resort", async () => {
+    const { buildEventDetail } = await import("./index.ts");
+    const envelopeRecipients = addrs(3);
+    // Stage 1: text dropped.
+    const textStage = buildEventDetail(
+      { ...base, envelopeRecipients, text: "t".repeat(5000) },
+      "parsed/inb_1.json",
+      "wraps.inbound",
+      2000
+    );
+    expect(textStage.truncatedFields).toEqual(["text"]);
+    expect(JSON.parse(textStage.detail).envelopeRecipients).toEqual(
+      envelopeRecipients
+    );
+    // Stage 3: to/cc dropped.
+    const toStage = buildEventDetail(
+      {
+        ...base,
+        envelopeRecipients,
+        to: Array.from({ length: 500 }, (_, i) => ({
+          address: `to${i}@x.com`,
+          name: "",
+        })),
+      },
+      "parsed/inb_1.json",
+      "wraps.inbound",
+      4000
+    );
+    expect(toStage.truncatedFields).toEqual(["attachments", "recipients"]);
+    expect(JSON.parse(toStage.detail).envelopeRecipients).toEqual(
+      envelopeRecipients
+    );
+    // Last resort: unbounded from.name.
+    const last = buildEventDetail(
+      {
+        ...base,
+        envelopeRecipients,
+        from: { address: "a@x.com", name: "n".repeat(10_000) },
+      },
+      "parsed/inb_1.json",
+      "wraps.inbound",
+      4000
+    );
+    const parsed = JSON.parse(last.detail);
+    expect(last.truncatedFields.at(-1)).toBe("envelope");
+    expect(last.truncatedFields).not.toContain("envelopeRecipients");
+    expect(parsed.envelopeRecipients).toEqual(envelopeRecipients);
+    expect(parsed.envelopeRecipientCount).toBeUndefined();
+  });
+
+  it("cuts to the first 100 addresses at the last resort and says so", async () => {
+    const { buildEventDetail } = await import("./index.ts");
+    const envelopeRecipients = addrs(150);
+    const { detail, truncatedFields } = buildEventDetail(
+      {
+        ...base,
+        envelopeRecipients,
+        from: { address: "a@x.com", name: "n".repeat(20_000) },
+      },
+      "parsed/inb_1.json",
+      "wraps.inbound",
+      8000
+    );
+    const parsed = JSON.parse(detail);
+    expect(parsed.envelopeRecipients).toEqual(envelopeRecipients.slice(0, 100));
+    expect(parsed.envelopeRecipientCount).toBe(150);
+    expect(truncatedFields).toEqual(
+      expect.arrayContaining(["envelope", "envelopeRecipients"])
+    );
+    expect(parsed.truncatedFields).toEqual(truncatedFields);
+    expect(parsed.truncated).toBe(true);
+  });
+
+  it("omits the field when the email has none", async () => {
+    const { buildEventDetail } = await import("./index.ts");
+    const { detail } = buildEventDetail(
+      { ...base, from: { address: "a@x.com", name: "n".repeat(20_000) } },
+      "parsed/inb_1.json",
+      "wraps.inbound",
+      4000
+    );
+    expect("envelopeRecipients" in JSON.parse(detail)).toBe(false);
   });
 });
