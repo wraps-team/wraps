@@ -13,6 +13,8 @@ import type { InboundTrigger } from "../../types/index.js";
 import {
   INBOUND_PROCESSOR_FUNCTION_NAME,
   INBOUND_SES_INVOKE_PERMISSION,
+  RULE_NAME,
+  RULE_SET_NAME,
 } from "./inbound-names.js";
 import {
   describeInboundReceiptRule,
@@ -23,6 +25,8 @@ export type InboundTriggerMismatch =
   | "rule-missing"
   | "rule-unrecognized"
   | "rule-differs-from-saved"
+  | "rule-disabled"
+  | "rule-set-inactive"
   | "ses-invoke-permission-missing"
   | "bucket-policy-missing-mail";
 
@@ -31,6 +35,15 @@ export type InboundTriggerCheck = {
   savedTrigger: InboundTrigger;
   /** Mode the rule's actions implement; null when the rule couldn't be read. */
   ruleTrigger: InboundTrigger | "missing" | "unknown" | null;
+  /** The rule's Enabled flag; null when there is no rule or it couldn't be read. */
+  ruleEnabled: boolean | null;
+  /**
+   * The region's active receipt rule set (null = none active, or unreadable).
+   * SES allows one active set per region.
+   */
+  activeRuleSet: string | null;
+  /** wraps-inbound-rules is not the active set, so no mail reaches Wraps. */
+  ruleSetInactive: boolean;
   /** wraps-inbound-ses-invoke present; null when it couldn't be checked. */
   sesInvokePermission: boolean | null;
   /** AllowSESPut covers mail/*; null when it couldn't be checked. */
@@ -117,13 +130,17 @@ async function checkBucketPolicyCoversMail(
   }
 }
 
-async function readRuleTrigger(
+async function readRule(
   region: string
-): Promise<InboundTriggerCheck["ruleTrigger"]> {
+): Promise<Pick<InboundTriggerCheck, "ruleTrigger" | "ruleEnabled">> {
   try {
-    return receiptRuleTriggerOf(await describeInboundReceiptRule(region));
+    const rule = await describeInboundReceiptRule(region);
+    return {
+      ruleTrigger: receiptRuleTriggerOf(rule),
+      ruleEnabled: rule ? rule.Enabled === true : null,
+    };
   } catch {
-    return null;
+    return { ruleTrigger: null, ruleEnabled: null };
   }
 }
 
@@ -136,16 +153,38 @@ export function compareInboundTrigger(
   check: Omit<InboundTriggerCheck, "mismatches" | "warnings">,
   repairCommand: string
 ): Pick<InboundTriggerCheck, "mismatches" | "warnings"> {
-  const FIX = `Run \`${repairCommand}\` to redeploy from the saved config and bring the trigger back in line.`;
+  const FIX = `Run \`${repairCommand}\` to redeploy the saved config and bring the trigger back in line.`;
   const mismatches: InboundTriggerMismatch[] = [];
   const warnings: string[] = [];
   const { savedTrigger, ruleTrigger } = check;
 
+  // SES allows one active rule set per region. Wraps never suggests a command
+  // that would activate its set over the customer's own (invariant 1).
+  if (check.ruleSetInactive) {
+    mismatches.push("rule-set-inactive");
+    warnings.push(
+      check.activeRuleSet
+        ? `The active receipt rule set in this region is ${check.activeRuleSet}, not ${RULE_SET_NAME}, so no inbound mail reaches Wraps. Wraps leaves it that way; note that \`wraps email inbound init\` and \`inbound add\` activate ${RULE_SET_NAME}, which deactivates ${check.activeRuleSet}.`
+        : `No receipt rule set is active in this region (or the active set couldn't be read), so no inbound mail reaches Wraps. Check the SES console (Email receiving) before activating ${RULE_SET_NAME}.`
+    );
+  }
+
   if (ruleTrigger === "missing") {
     mismatches.push("rule-missing");
     warnings.push(
-      `The receipt rule wraps-inbound-catch-all does not exist, so no inbound mail is received. Run \`${repairCommand}\` to recreate it.`
+      check.ruleSetInactive
+        ? `The receipt rule ${RULE_NAME} does not exist, so no inbound mail is received.`
+        : `The receipt rule ${RULE_NAME} does not exist, so no inbound mail is received. \`wraps email inbound init\` recreates it.`
     );
+  } else if (check.ruleEnabled === false) {
+    mismatches.push("rule-disabled");
+    warnings.push(
+      `The receipt rule ${RULE_NAME} is disabled, so SES skips it and no inbound mail reaches Wraps. Wraps keeps the rule's Enabled flag as it finds it: re-enable the rule in the SES console (Email receiving, rule set ${RULE_SET_NAME}).`
+    );
+  }
+
+  if (ruleTrigger === "missing") {
+    // reported above
   } else if (ruleTrigger === "unknown") {
     mismatches.push("rule-unrecognized");
     warnings.push(
@@ -182,16 +221,21 @@ export async function checkInboundTrigger(params: {
   bucketName: string;
   savedTrigger: InboundTrigger;
   repairCommand: string;
+  /** From getActiveReceiptRuleSet (status already reads it). */
+  activeRuleSet: string | null;
 }): Promise<InboundTriggerCheck> {
-  const [ruleTrigger, sesInvokePermission, bucketPolicyCoversMail] =
-    await Promise.all([
-      readRuleTrigger(params.region),
+  const [rule, sesInvokePermission, bucketPolicyCoversMail] = await Promise.all(
+    [
+      readRule(params.region),
       checkSesInvokePermission(params.region),
       checkBucketPolicyCoversMail(params.region, params.bucketName),
-    ]);
+    ]
+  );
   const pieces = {
     savedTrigger: params.savedTrigger,
-    ruleTrigger,
+    ...rule,
+    activeRuleSet: params.activeRuleSet,
+    ruleSetInactive: params.activeRuleSet !== RULE_SET_NAME,
     sesInvokePermission,
     bucketPolicyCoversMail,
   };

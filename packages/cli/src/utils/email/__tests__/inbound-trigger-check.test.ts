@@ -13,10 +13,15 @@ const lambda = mockClient(LambdaClient);
 const s3 = mockClient(S3Client);
 
 const BUCKET = "wraps-inbound-123456789012-us-east-1";
-const REPAIR =
-  "wraps email inbound init --domain example.com --subdomain inbound --region us-east-1 --yes";
+const REPAIR = "wraps email upgrade --action redeploy --region us-east-1 --yes";
+const ACTIVE = {
+  ruleEnabled: true,
+  activeRuleSet: "wraps-inbound-rules",
+  ruleSetInactive: false,
+};
 const NEW_RULE = {
   Name: "wraps-inbound-catch-all",
+  Enabled: true,
   Recipients: ["inbound.example.com"],
   Actions: [
     { S3Action: { BucketName: BUCKET, ObjectKeyPrefix: "mail/" } },
@@ -77,11 +82,15 @@ describe("checkInboundTrigger", () => {
       bucketName: BUCKET,
       savedTrigger: "ses-lambda-action",
       repairCommand: REPAIR,
+      activeRuleSet: "wraps-inbound-rules",
     });
 
     expect(result).toEqual({
       savedTrigger: "ses-lambda-action",
       ruleTrigger: "ses-lambda-action",
+      ruleEnabled: true,
+      activeRuleSet: "wraps-inbound-rules",
+      ruleSetInactive: false,
       sesInvokePermission: true,
       bucketPolicyCoversMail: true,
       mismatches: [],
@@ -110,6 +119,7 @@ describe("checkInboundTrigger", () => {
       bucketName: BUCKET,
       savedTrigger: "ses-lambda-action",
       repairCommand: REPAIR,
+      activeRuleSet: "wraps-inbound-rules",
     });
 
     expect(result.sesInvokePermission).toBe(false);
@@ -131,6 +141,7 @@ describe("checkInboundTrigger", () => {
       bucketName: BUCKET,
       savedTrigger: "ses-lambda-action",
       repairCommand: REPAIR,
+      activeRuleSet: "wraps-inbound-rules",
     });
     expect(result.ruleTrigger).toBeNull();
     expect(result.sesInvokePermission).toBe(false);
@@ -143,6 +154,7 @@ describe("checkInboundTrigger", () => {
       bucketName: BUCKET,
       savedTrigger: "ses-lambda-action",
       repairCommand: REPAIR,
+      activeRuleSet: "wraps-inbound-rules",
     });
     expect(unchecked.sesInvokePermission).toBeNull();
     expect(unchecked.bucketPolicyCoversMail).toBeNull();
@@ -155,6 +167,7 @@ describe("compareInboundTrigger", () => {
     expect(
       compareInboundTrigger(
         {
+          ...ACTIVE,
           savedTrigger: "s3-notification",
           ruleTrigger: "ses-lambda-action",
           sesInvokePermission: true,
@@ -169,6 +182,7 @@ describe("compareInboundTrigger", () => {
     expect(
       compareInboundTrigger(
         {
+          ...ACTIVE,
           savedTrigger: "s3-notification",
           ruleTrigger: "s3-notification",
           sesInvokePermission: false,
@@ -183,6 +197,7 @@ describe("compareInboundTrigger", () => {
     expect(
       compareInboundTrigger(
         {
+          ...ACTIVE,
           savedTrigger: "ses-lambda-action",
           ruleTrigger: "missing",
           sesInvokePermission: true,
@@ -194,6 +209,7 @@ describe("compareInboundTrigger", () => {
     expect(
       compareInboundTrigger(
         {
+          ...ACTIVE,
           savedTrigger: "ses-lambda-action",
           ruleTrigger: "unknown",
           sesInvokePermission: true,
@@ -202,5 +218,71 @@ describe("compareInboundTrigger", () => {
         REPAIR
       ).mismatches
     ).toEqual(["rule-unrecognized"]);
+  });
+
+  it("another active rule set: flags it by name and never suggests a command that would activate wraps-inbound-rules", async () => {
+    ses.on(DescribeReceiptRuleCommand).resolves({ Rule: NEW_RULE });
+    lambda.on(GetPolicyCommand).rejects(named("ResourceNotFoundException"));
+    s3.on(GetBucketPolicyCommand).resolves({
+      Policy: bucketPolicy(["raw/", "mail/"]),
+    });
+
+    const result = await checkInboundTrigger({
+      region: "us-east-1",
+      bucketName: BUCKET,
+      savedTrigger: "ses-lambda-action",
+      repairCommand: REPAIR,
+      activeRuleSet: "customer-rules",
+    });
+
+    expect(result.ruleSetInactive).toBe(true);
+    expect(result.activeRuleSet).toBe("customer-rules");
+    expect(result.mismatches).toContain("rule-set-inactive");
+    const inactive = result.warnings[0];
+    expect(inactive).toContain("customer-rules");
+    // no warning tells the user to run a command that activates our set
+    for (const w of result.warnings) {
+      expect(w).not.toMatch(/Run `wraps email inbound (init|add)/);
+      expect(w).not.toMatch(/inbound (init|add)[^`]*--yes/);
+      expect(
+        w.includes("inbound init") ? w.includes("deactivates") : true
+      ).toBe(true);
+    }
+    // the repair it does name never touches the active set
+    expect(result.warnings.some((w) => w.includes(REPAIR))).toBe(true);
+  });
+
+  it("a missing rule while another set is active names no command", () => {
+    const { warnings } = compareInboundTrigger(
+      {
+        ruleEnabled: null,
+        activeRuleSet: "customer-rules",
+        ruleSetInactive: true,
+        savedTrigger: "ses-lambda-action",
+        ruleTrigger: "missing",
+        sesInvokePermission: true,
+        bucketPolicyCoversMail: true,
+      },
+      REPAIR
+    );
+    expect(warnings.join("\n")).not.toMatch(
+      /`wraps email inbound init`\s+recreates/
+    );
+  });
+
+  it("flags a disabled rule", () => {
+    const { mismatches, warnings } = compareInboundTrigger(
+      {
+        ...ACTIVE,
+        ruleEnabled: false,
+        savedTrigger: "ses-lambda-action",
+        ruleTrigger: "ses-lambda-action",
+        sesInvokePermission: true,
+        bucketPolicyCoversMail: true,
+      },
+      REPAIR
+    );
+    expect(mismatches).toEqual(["rule-disabled"]);
+    expect(warnings[0]).toContain("disabled");
   });
 });

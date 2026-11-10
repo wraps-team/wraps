@@ -186,42 +186,13 @@ function reportInboundDNSCleanup(
 }
 
 /**
- * The `inbound init` re-run that redeploys the stack from the saved config
- * with the same receiving domain: non-interactive, and with the saved values
- * it keeps everything (trigger, retention, webhook URL and secret, domains).
- * Re-running it restores the SES invoke permission and the mail/* bucket
- * policy, rewrites the rule's actions for the saved mode, and switches a
- * deployment still on the S3 trigger.
+ * The command `inbound status` names to bring the trigger back in line: an
+ * `email upgrade` that redeploys the saved config unchanged (restoring the SES
+ * invoke permission and the mail/* bucket policy, and switching a deployment
+ * still on the S3 trigger). It never touches DNS or which rule set is active.
  */
-export function inboundRepairCommand(
-  inbound: { subdomain?: string; receivingDomain?: string },
-  inboundDomains: InboundDomain[],
-  primaryDomain: string | undefined,
-  region: string
-): string {
-  // Build from a domain that is still configured: `inbound remove` filters
-  // inboundDomains but leaves inbound.receivingDomain (init's domain) as is,
-  // and re-running init for a removed domain would add it back.
-  const live =
-    inboundDomains.find((d) => d.receivingDomain === inbound.receivingDomain) ??
-    inboundDomains[0];
-  const label = live ? live.subdomain : (inbound.subdomain ?? "");
-  const receiving = live
-    ? live.receivingDomain
-    : (inbound.receivingDomain ?? "");
-  const parentMatches =
-    live?.parentDomain &&
-    receiving === (label ? `${label}.${live.parentDomain}` : live.parentDomain);
-  let parent: string;
-  if (parentMatches && live) {
-    parent = live.parentDomain;
-  } else if (label && receiving.startsWith(`${label}.`)) {
-    parent = receiving.slice(label.length + 1);
-  } else {
-    parent = receiving || primaryDomain || "<domain>";
-  }
-  const target = label ? `--subdomain ${label}` : "--root";
-  return `wraps email inbound init --domain ${parent} ${target} --region ${region} --yes`;
+export function inboundRepairCommand(region: string): string {
+  return `wraps email upgrade --action redeploy --region ${region} --yes`;
 }
 
 /** Human label for an inbound trigger mode. */
@@ -387,6 +358,7 @@ export async function inboundInit(
 
   // 8. Webhook secret: keep the saved one (rotating it would break the
   // receiver), else generate one.
+  const webhookSecretGenerated = !savedInbound?.webhookSecret;
   const webhookSecret =
     savedInbound?.webhookSecret ?? randomBytes(32).toString("hex");
 
@@ -725,7 +697,27 @@ export async function inboundInit(
         progress,
       });
     } catch (error) {
-      exitOnSwitchFailure("email.inbound.init", error);
+      // A webhook secret generated in this run was saved but never shown;
+      // don't let the failed switch swallow it (the finisher never prints it).
+      const showSecret = Boolean(webhookUrl) && webhookSecretGenerated;
+      if (showSecret && !isJsonMode()) {
+        clack.note(
+          [
+            "Inbound is deployed and saved; only the trigger switch failed.",
+            "Verify webhook POSTs with this header:",
+            `  ${pc.bold("X-Wraps-Inbound-Key")}: ${pc.yellow(webhookSecret)}`,
+            `Retrieve it later with: ${pc.cyan("wraps email inbound status --reveal-secret")}`,
+          ].join("\n"),
+          "Webhook secret"
+        );
+      }
+      exitOnSwitchFailure(
+        "email.inbound.init",
+        error,
+        showSecret
+          ? { webhookSecret, webhookHeader: "X-Wraps-Inbound-Key" }
+          : undefined
+      );
     }
   }
   const finalTrigger = getInboundTrigger(metadata);
@@ -1059,17 +1051,13 @@ export async function inboundStatus(
   // and bucket policy agree (read-only).
   const bucketName =
     inbound.bucketName || `wraps-inbound-${identity.accountId}-${region}`;
-  const repairCommand = inboundRepairCommand(
-    inbound,
-    inboundDomains,
-    emailConfig.domain,
-    region
-  );
+  const repairCommand = inboundRepairCommand(region);
   const triggerCheck = await checkInboundTrigger({
     region,
     bucketName,
     savedTrigger: getInboundTrigger(metadata),
     repairCommand,
+    activeRuleSet,
   });
 
   // Build domain list — prefer inboundDomains, fallback to single domain
@@ -1099,8 +1087,11 @@ export async function inboundStatus(
       receiptRuleSetActive: activeRuleSet === RULE_SET_NAME,
       retention: inbound.retention || null,
       trigger: triggerCheck.savedTrigger,
+      activeRuleSet: triggerCheck.activeRuleSet,
       triggerCheck: {
         repairCommand,
+        ruleSetInactive: triggerCheck.ruleSetInactive,
+        ruleEnabled: triggerCheck.ruleEnabled,
         ruleTrigger: triggerCheck.ruleTrigger,
         sesInvokePermission: triggerCheck.sesInvokePermission,
         bucketPolicyCoversMail: triggerCheck.bucketPolicyCoversMail,
@@ -1144,7 +1135,7 @@ export async function inboundStatus(
     }
   }
   console.log(
-    `  ${pc.dim("Receipt rule set:")}  ${activeRuleSet === RULE_SET_NAME ? pc.green("active") : pc.yellow("inactive")}`
+    `  ${pc.dim("Receipt rule set:")}  ${activeRuleSet === RULE_SET_NAME ? pc.green("active") : pc.yellow(activeRuleSet ? `inactive (active set: ${activeRuleSet})` : "inactive")}`
   );
   console.log(
     `  ${pc.dim("Retention:")}         ${inbound.retention ? pc.cyan(inbound.retention) : pc.dim("indefinite")}`
@@ -1155,7 +1146,7 @@ export async function inboundStatus(
   console.log();
   if (triggerCheck.savedTrigger === "s3-notification") {
     clack.log.info(
-      `Run ${pc.cyan("wraps email upgrade")} to switch to the SES Lambda action and start recording envelope recipients.`
+      `Run ${pc.cyan(repairCommand)} to switch to the SES Lambda action and start recording envelope recipients.`
     );
   }
   for (const warning of triggerCheck.warnings) {
@@ -1840,6 +1831,20 @@ export async function inboundAdd(
     }
     clack.outro(pc.green("Preview complete. Run without --preview to apply."));
     return;
+  }
+
+  // The switch adds two stack deploys this command never ran before; ask
+  // first, before any write (skipped with --yes or --json).
+  if (needsSwitch && !options.yes && !isJsonMode()) {
+    ensureInteractive("Trigger switch confirmation", "--yes");
+    const confirmed = await clack.confirm({
+      message: `This deployment still uses the S3 trigger, so adding a domain also switches it to the SES Lambda action (two stack deploys; ${pc.cyan("--preview")} shows the changes). Continue?`,
+      initialValue: true,
+    });
+    if (clack.isCancel(confirmed) || !confirmed) {
+      clack.cancel("Operation cancelled.");
+      process.exit(0);
+    }
   }
 
   await progress.execute("Updating SES receipt rule", async () => {
