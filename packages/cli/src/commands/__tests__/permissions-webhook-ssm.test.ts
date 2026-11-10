@@ -76,6 +76,7 @@ describe("permissions: webhook connections and reply-threading secret (plan 047)
     ["enterprise", "email"],
     [undefined, "email"],
     [undefined, undefined],
+    ["production", undefined],
     ["enterprise", undefined],
   ];
 
@@ -91,6 +92,7 @@ describe("permissions: webhook connections and reply-threading secret (plan 047)
     ["starter", "email"],
     ["starter", "sms"],
     ["starter", "cdn"],
+    ["starter", undefined],
     [undefined, "sms"],
     [undefined, "cdn"],
     ["enterprise", "sms"],
