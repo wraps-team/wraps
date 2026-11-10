@@ -519,9 +519,10 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
       },
       {
         code: "RECEIPT_RULE_SET_CONFLICT",
-        message: "Another receipt rule set is active: <activeRuleSet>",
+        message:
+          "Receipt rule set <name> is active in <region>; activating wraps-inbound-rules would deactivate it",
         solution:
-          "Wraps will activate wraps-inbound-rules, deactivating the current set",
+          "SES allows one active receipt rule set per region, so activating wraps-inbound-rules deactivates <name> and its rules stop applying to incoming mail. Raised by wraps email inbound init, inbound add and reply init under --yes or --json, before anything is deployed; also when the active set changed after you agreed, or could not be read (e.g. AccessDenied). Run interactively to be asked, or pass --replace-active-rule-set, only after the AWS account owner agrees.",
       },
       {
         code: "INBOUND_MX_CONFLICT",
