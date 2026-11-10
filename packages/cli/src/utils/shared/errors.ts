@@ -828,6 +828,15 @@ export const errors = {
       "https://wraps.dev/docs/cli-reference"
     ),
 
+  policyDirWriteFailed: (message: string, suggestion?: string) =>
+    new WrapsError(
+      message,
+      "POLICY_DIR_WRITE_FAILED",
+      suggestion ??
+        "Check that --policy-dir is a folder you can write to, then re-run. Stale policy files are only removed after every new one is written, so nothing was removed.",
+      "https://wraps.dev/docs/guides/aws-setup/permissions"
+    ),
+
   pulumiError: (message: string) =>
     new WrapsError(
       `Infrastructure deployment failed: ${message}`,

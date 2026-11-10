@@ -191,6 +191,12 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
         message: "IAM entity not found",
         solution: "Run wraps platform connect",
       },
+      {
+        code: "POLICY_DIR_WRITE_FAILED",
+        message: "Could not write <dir>/wraps-deployer-<n>.json: <detail>",
+        solution:
+          "Raised by wraps permissions --policy-dir when the folder can't be created or written, or a wraps-deployer-<n>.json in it is a symlink. Old wraps-deployer-<n>.json files are removed only after every new one is written, so a failed run removes nothing. Fix the folder and re-run.",
+      },
     ],
   },
   {
