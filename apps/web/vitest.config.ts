@@ -24,6 +24,17 @@ const SHARED_FIXTURE_FILES = [
   "src/app/api/__tests__/templates.test.ts",
 ];
 
+// Node 25+ turns its webstorage global on by default (24 can too, behind a
+// flag). With no `--localstorage-file`, `localStorage` is then a getter that
+// returns undefined, shadowing the one jsdom installs, so component tests die
+// with "Cannot read properties of undefined (reading 'clear')". Starting the
+// worker with the feature off lets jsdom's win. Only pass the flag where this
+// Node knows it; an older Node rejects unknown flags in `execArgv` outright.
+const WEBSTORAGE_OFF = "--no-experimental-webstorage";
+const workerExecArgv = process.allowedNodeEnvironmentFlags.has(WEBSTORAGE_OFF)
+  ? [WEBSTORAGE_OFF]
+  : [];
+
 export default defineConfig(async () => {
   // Load .env.test file
   const env = loadEnv("test", process.cwd(), "");
@@ -42,6 +53,10 @@ export default defineConfig(async () => {
     // writes — creating an org, seeding rows, then asserting — lands just past
     // the 5s default. Matches apps/api and packages/auth.
     testTimeout: 30_000,
+    // The default `forks` pool spawns a child process per worker, so Node
+    // flags in `execArgv` take effect there (a `threads` pool would not).
+    pool: "forks" as const,
+    execArgv: workerExecArgv,
     hookTimeout: 30_000,
     // Load environment variables from .env.test
     env,
