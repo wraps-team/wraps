@@ -229,3 +229,6 @@ Vercel Security Review (wraps team, Agent settings) reviews each push to this pr
 live in the team's Vulnerabilities dashboard, never in public PRs; read them with
 `vercel security vulnerabilities`. Verify each one against the code, then fix it through a normal
 plan and review. Don't use "Fix with Vercel Agent".
+
+Each review compares the push against the previous deployment, so it covers that diff, not the
+whole app. "No findings" on a push says nothing about code it did not touch.
