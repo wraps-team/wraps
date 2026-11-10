@@ -114,5 +114,6 @@ Don't refresh the parent from a PR (`pnpm test-db:refresh` refuses off main;
 `--from-branch` is only for a real rename): it puts the parent ahead of main, and then
 every other run, main's included, hits drizzle-kit's rename prompt and fails.
 
-`db:push` doesn't reach the branch your tests read either: it targets the dev DB in
-`.env.local`. Tests still failing `42703` after it is this gap, not a broken push.
+`db:push` doesn't reach the branch your tests read either: it targets `.env.local`'s
+database, the long-lived `dev` branch of `wraps-test`. Tests still failing `42703` after
+it is this gap, not a broken push.
