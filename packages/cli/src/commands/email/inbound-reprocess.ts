@@ -381,13 +381,9 @@ export async function inboundReprocess(
       } catch (error) {
         if (error instanceof RunStopped) {
           const done = results.filter((r) => r.outcome !== "failed").length;
-          const cause = error.cause;
-          throw new WrapsError(
-            `${cause.message}. Stopped after ${done} message${done === 1 ? "" : "s"} handed off; every other message is still in the queue.`,
-            cause.code,
-            cause.suggestion,
-            cause.docsUrl
-          );
+          const stopped = error.cause;
+          stopped.message = `${stopped.message}. Stopped after ${done} message${done === 1 ? "" : "s"} handed off; every other message is still in the queue.`;
+          throw stopped;
         }
         throw error;
       }
