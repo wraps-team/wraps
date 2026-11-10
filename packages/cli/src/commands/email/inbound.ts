@@ -1172,7 +1172,7 @@ export async function inboundStatus(
             dlq.error === "not-found"
               ? "not found (the queue doesn't exist in this region)"
               : dlq.error === "access-denied"
-                ? "access denied (re-apply the IAM policy: wraps permissions --service email)"
+                ? "access denied (re-apply the IAM policy: wraps permissions --service email --policy-dir ./wraps-policy)"
                 : "unknown (couldn't read the queue)"
           )
         : dlqDepth > 0
@@ -1463,7 +1463,7 @@ export function mapInboundTestSendError(
     return new WrapsError(
       `IAM permission denied: ses:SendEmail in ${ctx.region}`,
       "INBOUND_TEST_PERMISSION_DENIED",
-      `Your AWS credentials lack the "ses:SendEmail" permission in region ${ctx.region}.\n\nView required SES permissions:\n  wraps permissions --service email --json`,
+      `Your AWS credentials lack the "ses:SendEmail" permission in region ${ctx.region}.\n\nList the SES permissions Wraps needs (JSON to read, not a policy to paste):\n  wraps permissions --service email --json`,
       "https://wraps.dev/docs/guides/aws-setup/permissions"
     );
   }

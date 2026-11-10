@@ -782,6 +782,26 @@ describe("error factory functions", () => {
       expect(error.code).toBe("IAM_PERMISSION_DENIED");
       expect(error.suggestion).toContain("ses:SendEmail");
     });
+
+    it("points at --json as a list to read, not a policy to paste (plan 049)", () => {
+      const error = errors.iamPermissionDenied("ses:SendEmail", "x", "y");
+      expect(error.suggestion).toContain(
+        "List the permissions Wraps needs (JSON to read, not a policy to paste):\n  wraps permissions --json"
+      );
+      expect(errors.sesPermissionDenied("SendEmail").suggestion).toContain(
+        "List the SES permissions Wraps needs (JSON to read, not a policy to paste):\n  wraps permissions --service email --json"
+      );
+      for (const make of [
+        errors.dynamoDBPermissionDenied,
+        errors.lambdaPermissionDenied,
+        errors.eventBridgePermissionDenied,
+        errors.sqsPermissionDenied,
+      ]) {
+        expect(make().suggestion).toContain(
+          "List the permissions Wraps needs (JSON to read, not a policy to paste):\n  wraps permissions --json"
+        );
+      }
+    });
   });
 
   describe("sesPermissionDenied", () => {

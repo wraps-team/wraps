@@ -145,7 +145,7 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
         code: "IAM_PERMISSION_DENIED",
         message: "Permission denied: <action> on <resource>",
         solution:
-          "Your credentials lack the permission. View required permissions: wraps permissions --json",
+          "Your credentials lack the permission. List the permissions Wraps needs (JSON to read, not a policy to paste): wraps permissions --json",
       },
       {
         code: "SES_PERMISSION_DENIED",

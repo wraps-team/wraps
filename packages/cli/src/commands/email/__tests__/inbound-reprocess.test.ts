@@ -309,6 +309,9 @@ describe("inbound reprocess (replay)", () => {
     expect(err.message).toContain("SQS console");
     expect(err.message).toContain("any run before then replays it");
     expect(err.message).not.toContain("do not replay");
+    expect(err.suggestion).toContain(
+      "Re-apply the Wraps IAM policy, which now includes the InboundReprocess statement: run wraps permissions --service email --policy-dir ./wraps-policy and update each wraps-deployer-<n> policy in IAM from its file"
+    );
     expect(err.suggestion).toContain("before you run reprocess again");
     expect(err.suggestion).toContain("delivers them twice");
     expect(err.data).toEqual({
@@ -401,6 +404,8 @@ describe("inbound reprocess (replay)", () => {
     await expect(inboundReprocess({ yes: true })).rejects.toMatchObject({
       code: "LAMBDA_PERMISSION_DENIED",
       message: expect.stringContaining("lambda:InvokeFunction"),
+      suggestion:
+        "Re-apply the Wraps IAM policy, which now includes the InboundReprocess statement: run wraps permissions --service email --policy-dir ./wraps-policy and update each wraps-deployer-<n> policy in IAM from its file",
     });
     expect(lambda.commandCalls(InvokeCommand)).toHaveLength(1);
     expect(sqs.commandCalls(DeleteMessageCommand)).toHaveLength(0);
@@ -412,6 +417,8 @@ describe("inbound reprocess (replay)", () => {
       .rejects(Object.assign(new Error("denied"), { name: "AccessDenied" }));
     await expect(inboundReprocess({ yes: true })).rejects.toMatchObject({
       code: "SQS_PERMISSION_DENIED",
+      suggestion:
+        "Re-apply the Wraps IAM policy, which now includes the InboundReprocess statement: run wraps permissions --service email --policy-dir ./wraps-policy and update each wraps-deployer-<n> policy in IAM from its file",
     });
     expect(lambda.commandCalls(InvokeCommand)).toHaveLength(0);
   });

@@ -1009,7 +1009,7 @@ export const errors = {
     new WrapsError(
       `Permission denied: ${action} on ${resource}`,
       "IAM_PERMISSION_DENIED",
-      `Your AWS credentials lack the "${action}" permission.\n\n${suggestion}\n\nView required permissions:\n  wraps permissions --json`,
+      `Your AWS credentials lack the "${action}" permission.\n\n${suggestion}\n\nList the permissions Wraps needs (JSON to read, not a policy to paste):\n  wraps permissions --json`,
       "https://wraps.dev/docs/guides/aws-setup/permissions"
     ),
 
@@ -1017,7 +1017,7 @@ export const errors = {
     new WrapsError(
       `SES permission denied: ${action}`,
       "SES_PERMISSION_DENIED",
-      `Your IAM user/role needs the "ses:${action}" permission.\n\nView required SES permissions:\n  wraps permissions --service email --json`,
+      `Your IAM user/role needs the "ses:${action}" permission.\n\nList the SES permissions Wraps needs (JSON to read, not a policy to paste):\n  wraps permissions --service email --json`,
       "https://wraps.dev/docs/guides/aws-setup/permissions"
     ),
 
@@ -1162,7 +1162,7 @@ export const errors = {
     new WrapsError(
       "DynamoDB permission denied",
       "DYNAMODB_PERMISSION_DENIED",
-      "Your IAM user/role needs DynamoDB permissions.\nRequired actions: CreateTable, DeleteTable, DescribeTable, UpdateTable\n\nView required permissions:\n  wraps permissions --json",
+      "Your IAM user/role needs DynamoDB permissions.\nRequired actions: CreateTable, DeleteTable, DescribeTable, UpdateTable\n\nList the permissions Wraps needs (JSON to read, not a policy to paste):\n  wraps permissions --json",
       "https://wraps.dev/docs/guides/aws-setup/permissions"
     ),
 
@@ -1170,7 +1170,7 @@ export const errors = {
     new WrapsError(
       "Lambda permission denied",
       "LAMBDA_PERMISSION_DENIED",
-      "Your IAM user/role needs Lambda permissions.\nRequired actions: CreateFunction, UpdateFunctionCode, DeleteFunction\n\nView required permissions:\n  wraps permissions --json",
+      "Your IAM user/role needs Lambda permissions.\nRequired actions: CreateFunction, UpdateFunctionCode, DeleteFunction\n\nList the permissions Wraps needs (JSON to read, not a policy to paste):\n  wraps permissions --json",
       "https://wraps.dev/docs/guides/aws-setup/permissions"
     ),
 
@@ -1178,7 +1178,7 @@ export const errors = {
     new WrapsError(
       "EventBridge permission denied",
       "EVENTBRIDGE_PERMISSION_DENIED",
-      "Your IAM user/role needs EventBridge permissions.\nRequired actions: PutRule, PutTargets, DeleteRule\n\nView required permissions:\n  wraps permissions --json",
+      "Your IAM user/role needs EventBridge permissions.\nRequired actions: PutRule, PutTargets, DeleteRule\n\nList the permissions Wraps needs (JSON to read, not a policy to paste):\n  wraps permissions --json",
       "https://wraps.dev/docs/guides/aws-setup/permissions"
     ),
 
@@ -1186,7 +1186,7 @@ export const errors = {
     new WrapsError(
       "SQS permission denied",
       "SQS_PERMISSION_DENIED",
-      "Your IAM user/role needs SQS permissions.\nRequired actions: CreateQueue, DeleteQueue, GetQueueAttributes\n\nView required permissions:\n  wraps permissions --json",
+      "Your IAM user/role needs SQS permissions.\nRequired actions: CreateQueue, DeleteQueue, GetQueueAttributes\n\nList the permissions Wraps needs (JSON to read, not a policy to paste):\n  wraps permissions --json",
       "https://wraps.dev/docs/guides/aws-setup/permissions"
     ),
 
@@ -1194,7 +1194,7 @@ export const errors = {
     new WrapsError(
       "CloudWatch Logs permission denied",
       "CLOUDWATCH_LOGS_PERMISSION_DENIED",
-      `Your IAM user/role is not allowed to call ${action}.\nRequired actions: logs:DescribeLogGroups, logs:FilterLogEvents, logs:StartLiveTail\n\nView required permissions:\n  wraps permissions --json`,
+      `Your IAM user/role is not allowed to call ${action}.\nRequired actions: logs:DescribeLogGroups, logs:FilterLogEvents, logs:StartLiveTail\n\nList the permissions Wraps needs (JSON to read, not a policy to paste):\n  wraps permissions --json`,
       "https://wraps.dev/docs/guides/aws-setup/permissions"
     ),
 
