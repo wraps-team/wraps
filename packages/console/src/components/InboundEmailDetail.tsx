@@ -212,6 +212,8 @@ export function InboundEmailDetail() {
     );
   }
 
+  const deliveredTo = getDeliveredTo(email);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -297,19 +299,6 @@ export function InboundEmailDetail() {
                 }
               />
             </InputGroup>
-            {getDeliveredTo(email).length > 0 && (
-              <InputGroup className="w-full cursor-text! sm:w-auto sm:min-w-[518px]">
-                <InputGroupAddon align="inline-start">
-                  <InputGroupText>Delivered to</InputGroupText>
-                </InputGroupAddon>
-                <InputGroupInput
-                  className="min-w-0 cursor-text! truncate font-mono text-sm"
-                  disabled
-                  readOnly
-                  value={getDeliveredTo(email).join(", ")}
-                />
-              </InputGroup>
-            )}
             {email.cc.length > 0 && (
               <InputGroup className="w-full cursor-text! sm:w-auto sm:min-w-[518px]">
                 <InputGroupAddon align="inline-start">
@@ -320,6 +309,19 @@ export function InboundEmailDetail() {
                   disabled
                   readOnly
                   value={email.cc.map(formatAddress).join(", ")}
+                />
+              </InputGroup>
+            )}
+            {deliveredTo.length > 0 && (
+              <InputGroup className="w-full cursor-text! sm:w-auto sm:min-w-[518px]">
+                <InputGroupAddon align="inline-start">
+                  <InputGroupText>Delivered to</InputGroupText>
+                </InputGroupAddon>
+                <InputGroupInput
+                  className="min-w-0 cursor-text! truncate font-mono text-sm"
+                  disabled
+                  readOnly
+                  value={deliveredTo.join(", ")}
                 />
               </InputGroup>
             )}

@@ -1688,28 +1688,33 @@ export default function InfrastructureEventsPageContent() {
                 ,{" "}
                 <code className="rounded bg-muted px-1.5 py-0.5">
                   replyToken
-                </code>{" "}
-                and{" "}
+                </code>
+                ,{" "}
                 <code className="rounded bg-muted px-1.5 py-0.5">
                   autoReply
+                </code>{" "}
+                and, when the event has it,{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  envelopeRecipients
                 </code>
                 .
               </p>
               <p className="text-muted-foreground text-sm">
-                In that last-resort form,{" "}
                 <code className="rounded bg-muted px-1.5 py-0.5">
                   envelopeRecipients
                 </code>{" "}
-                keeps the first 100 addresses,{" "}
+                is kept whole at every earlier stage, and at the last resort
+                when it has 100 addresses or fewer. With more than 100, the
+                event keeps the first 100, adds{" "}
                 <code className="rounded bg-muted px-1.5 py-0.5">
                   envelopeRecipientCount
                 </code>{" "}
-                gives the full count, and{" "}
+                with the full count, and adds{" "}
+                <code>&quot;envelopeRecipients&quot;</code> to{" "}
                 <code className="rounded bg-muted px-1.5 py-0.5">
                   truncatedFields
-                </code>{" "}
-                includes <code>&quot;envelopeRecipients&quot;</code>. The full
-                list is in the parsed JSON at{" "}
+                </code>
+                . The full list is in the parsed JSON at{" "}
                 <code className="rounded bg-muted px-1.5 py-0.5">
                   parsedS3Key
                 </code>

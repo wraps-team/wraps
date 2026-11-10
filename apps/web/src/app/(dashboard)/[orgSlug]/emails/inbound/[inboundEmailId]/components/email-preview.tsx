@@ -154,14 +154,6 @@ export function EmailPreview({ email, orgSlug }: EmailPreviewProps) {
                 {email.to.map(formatAddress).join(", ") || "(no recipients)"}
               </span>
             </div>
-            {deliveredTo.length > 0 && (
-              <div className="flex gap-2">
-                <span className="w-24 shrink-0 font-medium text-muted-foreground">
-                  Delivered to
-                </span>
-                <span className="font-mono">{deliveredTo.join(", ")}</span>
-              </div>
-            )}
             {email.cc.length > 0 && (
               <div className="flex gap-2">
                 <span className="w-24 shrink-0 font-medium text-muted-foreground">
@@ -170,6 +162,14 @@ export function EmailPreview({ email, orgSlug }: EmailPreviewProps) {
                 <span className="font-mono">
                   {email.cc.map(formatAddress).join(", ")}
                 </span>
+              </div>
+            )}
+            {deliveredTo.length > 0 && (
+              <div className="flex gap-2">
+                <span className="w-24 shrink-0 font-medium text-muted-foreground">
+                  Delivered to
+                </span>
+                <span className="font-mono">{deliveredTo.join(", ")}</span>
               </div>
             )}
             <div className="flex gap-2">

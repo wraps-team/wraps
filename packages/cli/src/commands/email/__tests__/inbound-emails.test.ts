@@ -482,23 +482,40 @@ describe("wraps email inbound", () => {
       expect(envelope(logSpy).data).not.toHaveProperty("envelopeRecipients");
     });
 
-    it("human output prints a Delivered to line only when envelopeRecipients is present", async () => {
+    it("human output prints a Delivered to line only when the envelope adds an address to To and Cc", async () => {
       setJsonMode(false);
-      fetchMock.mockResolvedValueOnce(
-        res(200, { ...DETAIL, envelopeRecipients: ["bcc@example.com"] })
-      );
-      await inboundEmailsGet({ emailId: "em_1" });
-      expect(note).toHaveBeenCalledWith(
-        expect.stringContaining("bcc@example.com"),
-        "Inbound email — Hello there"
-      );
+      const printed = async (extra: Record<string, unknown>) => {
+        vi.mocked(note).mockClear();
+        fetchMock.mockResolvedValueOnce(res(200, { ...DETAIL, ...extra }));
+        await inboundEmailsGet({ emailId: "em_1" });
+        return String(vi.mocked(note).mock.calls[0][0]);
+      };
 
-      vi.mocked(note).mockClear();
-      fetchMock.mockResolvedValueOnce(res(200, DETAIL));
-      await inboundEmailsGet({ emailId: "em_1" });
-      expect(note).not.toHaveBeenCalledWith(
-        expect.stringContaining("Delivered to:"),
-        expect.anything()
+      // Adds a Bcc address: shown, with the label.
+      expect(
+        await printed({
+          envelopeRecipients: ["support@example.com", "bcc@example.com"],
+        })
+      ).toMatch(/Delivered to:\s+support@example.com, bcc@example.com/);
+
+      // Same as To, mixed-case header: hidden.
+      expect(
+        await printed({
+          to: [{ address: "Support@Example.COM", name: "" }],
+          envelopeRecipients: ["support@example.com"],
+        })
+      ).not.toContain("Delivered to:");
+
+      // Covered by Cc: hidden. Absent or empty: hidden.
+      expect(
+        await printed({
+          cc: [{ address: "Team@example.com", name: "" }],
+          envelopeRecipients: ["support@example.com", "team@example.com"],
+        })
+      ).not.toContain("Delivered to:");
+      expect(await printed({})).not.toContain("Delivered to:");
+      expect(await printed({ envelopeRecipients: [] })).not.toContain(
+        "Delivered to:"
       );
     });
 

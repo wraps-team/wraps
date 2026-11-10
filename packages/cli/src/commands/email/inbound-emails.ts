@@ -507,7 +507,25 @@ function printListHuman(view: ListView): void {
   }
 }
 
+/**
+ * The envelope list, only when it holds an address To and Cc do not show
+ * (Bcc, forwards, aliases). Same rule as the dashboard.
+ */
+function deliveredToOf(email: InboundDetail): string[] {
+  const envelope = email.envelopeRecipients;
+  if (!envelope || envelope.length === 0) {
+    return [];
+  }
+  const shown = new Set(
+    [...(email.to ?? []), ...(email.cc ?? [])].map((a) =>
+      a.address.toLowerCase()
+    )
+  );
+  return envelope.some((a) => !shown.has(a.toLowerCase())) ? envelope : [];
+}
+
 function printDetailHuman(email: InboundDetail): void {
+  const deliveredTo = deliveredToOf(email);
   const lines = [
     kv("Email ID:", email.emailId),
     kv("Message ID:", email.messageId ?? pc.dim("—")),
@@ -516,8 +534,8 @@ function printDetailHuman(email: InboundDetail): void {
     ...((email.cc ?? []).length > 0
       ? [kv("Cc:", formatAddresses(email.cc))]
       : []),
-    ...((email.envelopeRecipients ?? []).length > 0
-      ? [kv("Delivered to:", (email.envelopeRecipients ?? []).join(", "))]
+    ...(deliveredTo.length > 0
+      ? [kv("Delivered to:", deliveredTo.join(", "))]
       : []),
     kv("Subject:", email.subject || pc.dim("—")),
     kv("Date:", email.date || pc.dim("—")),

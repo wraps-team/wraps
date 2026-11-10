@@ -1092,8 +1092,9 @@ export default function CLIReferenceEmailPageContent() {
           <p className="mb-4 text-muted-foreground text-sm">
             Display the status of inbound email infrastructure, including MX
             records and receipt rules. Also shows the trigger mode (how the
-            receipt rule starts the processor) and warns when the rule and the
-            saved mode disagree.
+            receipt rule starts the processor) and warns when the
+            deployment&apos;s trigger pieces (receipt rule, permission, bucket
+            policy, saved mode) disagree.
           </p>
           <Card>
             <CardHeader>
@@ -1226,8 +1227,20 @@ export default function CLIReferenceEmailPageContent() {
             <code className="rounded bg-muted px-1 py-0.5">inbound add</code>{" "}
             and{" "}
             <code className="rounded bg-muted px-1 py-0.5">email upgrade</code>{" "}
-            all move it to the new one. Use this CLI version on every machine
-            that deploys the stack: older versions put the old trigger back.
+            all move it to the new one. Deploy with this CLI version or later
+            everywhere. An older CLI that deploys the stack afterwards removes
+            the <code>wraps-inbound-ses-invoke</code> permission and narrows the
+            bucket policy to <code>raw/*</code>, while the receipt rule still
+            sends new mail to <code>mail/</code>. New inbound mail then stops
+            being processed, and may not be stored.{" "}
+            <code className="rounded bg-muted px-1 py-0.5">
+              wraps email inbound status
+            </code>{" "}
+            flags the mismatch, and{" "}
+            <code className="rounded bg-muted px-1 py-0.5">
+              wraps email upgrade
+            </code>{" "}
+            with the new CLI repairs it.
           </p>
           <Card className="mb-4">
             <CardHeader>
@@ -1466,7 +1479,11 @@ export default function CLIReferenceEmailPageContent() {
           <p className="mb-4 text-muted-foreground text-sm">
             Show one inbound email: headers, text body, HTML body and attachment
             metadata. Pass the emailId from{" "}
-            <code>wraps email inbound list</code>.
+            <code>wraps email inbound list</code>. When the email has{" "}
+            <code>envelopeRecipients</code> (the addresses SES delivered to, Bcc
+            included), a &quot;Delivered to&quot; line shows the ones To and Cc
+            do not; <code>--json</code> returns the field whenever it is
+            present.
           </p>
           <Card className="mb-4">
             <CardHeader>
@@ -1612,6 +1629,12 @@ export default function CLIReferenceEmailPageContent() {
         <p className="mb-4 text-muted-foreground">
           Add additional features to your existing Wraps deployment. Upgrade
           from Starter to Production, or add individual features incrementally.
+          If inbound email is enabled and still uses the old trigger, it also
+          moves inbound to the new one (see{" "}
+          <code className="rounded bg-muted px-1 py-0.5">
+            wraps email inbound add
+          </code>
+          ).
         </p>
 
         <Card className="mb-4">
