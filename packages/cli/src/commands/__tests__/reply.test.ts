@@ -91,6 +91,11 @@ vi.mock("../../utils/email/receipt-rules.js", async (importOriginal) => {
     describeInboundReceiptRule: vi.fn().mockResolvedValue(null),
     syncReceiptRuleTrigger: vi.fn().mockResolvedValue(undefined),
     createReceiptRule: vi.fn().mockResolvedValue(undefined),
+    // Plan 048 preflight: the rule is missing (default above), so replyInit
+    // reads the active set; ours active means nothing to ask.
+    readActiveReceiptRuleSet: vi
+      .fn()
+      .mockResolvedValue({ readable: true, name: "wraps-inbound-rules" }),
   };
 });
 
@@ -497,7 +502,8 @@ describe("replyInit", () => {
         "123456789012",
         "r.mail.support.foo.com",
         "wraps-inbound-123456789012-us-east-1",
-        expected
+        expected,
+        { readable: true, name: "wraps-inbound-rules" }
       );
     }
   );

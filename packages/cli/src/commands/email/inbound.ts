@@ -29,18 +29,23 @@ import {
   switchInboundTrigger,
 } from "../../utils/email/inbound-trigger-switch.js";
 import {
+  type ActiveRuleSetRead,
   addDomainToReceiptRule,
+  confirmRuleSetActivation,
   createReceiptRule,
   createReceiptRuleSet,
   deleteReceiptRule,
   deleteReceiptRuleSet,
   describeInboundReceiptRule,
+  describeRuleSetDeactivation,
   getActiveReceiptRuleSet,
+  REPLACE_NO_RULE_SET,
   RULE_NAME,
   RULE_SET_NAME,
   readActiveReceiptRuleSet,
   removeDomainFromReceiptRule,
   setActiveReceiptRuleSet,
+  wouldDeactivateAnotherRuleSet,
 } from "../../utils/email/receipt-rules.js";
 import {
   getAWSRegion,
@@ -216,11 +221,18 @@ function assertValidInboundFlags(options: {
   root?: boolean;
   subdomain?: string;
   preview?: boolean;
+  replaceActiveRuleSet?: boolean;
 }): void {
   if (options.unexpectedArg) {
     // A stray positional is almost always a value given to a boolean flag;
     // name the flag that was actually passed.
-    const flag = options.root ? "--root" : options.preview ? "--preview" : null;
+    const flag = options.root
+      ? "--root"
+      : options.preview
+        ? "--preview"
+        : options.replaceActiveRuleSet
+          ? "--replace-active-rule-set"
+          : null;
     throw errors.invalidFlagUsage(
       `Unexpected argument: ${options.unexpectedArg}`,
       flag
@@ -375,6 +387,12 @@ export async function inboundInit(
     `${pc.bold("Estimated cost:")} ~$0.05/mo for 10K emails (S3 + Lambda)`
   );
 
+  // 9b. Init always activates wraps-inbound-rules (step 15). Read the active
+  // set now, before any write, so a run that would deactivate another set
+  // asks first or refuses (plan 048, invariant 1). An unreadable set counts
+  // as another set.
+  const activeRuleSetRead = await readActiveReceiptRuleSet(region);
+
   // 10. Confirm deployment
   if (!(options.yes || options.preview)) {
     ensureInteractive("Deployment confirmation", "--yes");
@@ -388,6 +406,17 @@ export async function inboundInit(
       process.exit(0);
     }
   }
+
+  // 10b. Consent to deactivate another set (prompt, or refuse under
+  // --yes/--json without --replace-active-rule-set). Preview only reports it.
+  const expectedActive = options.preview
+    ? activeRuleSetRead
+    : await confirmRuleSetActivation({
+        region,
+        read: activeRuleSetRead,
+        yes: options.yes,
+        replaceActiveRuleSet: options.replaceActiveRuleSet,
+      });
 
   // 11. Ensure Pulumi work directory
   await progress.execute("Preparing deployment workspace", async () =>
@@ -482,6 +511,10 @@ export async function inboundInit(
     clack.log.info(
       `Not covered by the preview: the SES receipt rule for ${pc.cyan(receivingDomain)} and its DNS records.`
     );
+    const deactivation = describeRuleSetDeactivation(activeRuleSetRead);
+    if (deactivation) {
+      clack.log.warn(deactivation);
+    }
     if (inboundTriggerOf(updatedEmailConfig) === "s3-notification") {
       clack.log.info(
         "Not covered either: this deployment still uses the S3-notification trigger, so init would then switch it to the SES Lambda action (receipt rule update and a second deploy that removes the S3 notification)."
@@ -543,11 +576,20 @@ export async function inboundInit(
       getInboundTrigger(metadata)
     );
 
-    // Activate rule set (warn if another is active)
-    const previousActive = await setActiveReceiptRuleSet(region, RULE_SET_NAME);
-    if (previousActive && previousActive !== RULE_SET_NAME) {
+    // Activate rule set, only over the set agreed to at step 10b: it
+    // re-reads the active set and refuses if that changed.
+    const previousActive = await setActiveReceiptRuleSet(
+      region,
+      RULE_SET_NAME,
+      expectedActive
+    );
+    if (!previousActive.readable) {
       clack.log.warn(
-        `Deactivated previous receipt rule set: ${pc.yellow(previousActive)}`
+        `Activated ${pc.cyan(RULE_SET_NAME)}; the previously active receipt rule set could not be read (${previousActive.error}) and, if there was one, is now inactive.`
+      );
+    } else if (previousActive.name && previousActive.name !== RULE_SET_NAME) {
+      clack.log.warn(
+        `Deactivated previous receipt rule set: ${pc.yellow(previousActive.name)}`
       );
     }
   });
@@ -1344,8 +1386,12 @@ export async function inboundVerify(
   if (activeRuleSet === RULE_SET_NAME) {
     clack.log.success(`Receipt rule set: ${pc.green("active")}`);
   } else {
+    // Init asks before deactivating another set, or with --yes/--json needs
+    // --replace-active-rule-set (plan 048).
     clack.log.error(
-      `Receipt rule set: ${pc.red("inactive")}. Run ${pc.cyan("wraps email inbound init")} to reactivate.`
+      activeRuleSet
+        ? `Receipt rule set: ${pc.red("inactive")}; ${pc.yellow(activeRuleSet)} is active instead. ${pc.cyan("wraps email inbound init")} reactivates it, which deactivates ${activeRuleSet}: init asks first, and with --yes or --json needs ${pc.cyan("--replace-active-rule-set")}.`
+        : `Receipt rule set: ${pc.red("inactive")}. Run ${pc.cyan("wraps email inbound init")} to reactivate (if another set is active, init asks first, and with --yes or --json needs ${pc.cyan("--replace-active-rule-set")}).`
     );
     allPassed = false;
   }
@@ -1795,6 +1841,16 @@ export async function inboundAdd(
     );
   }
 
+  // 8a. The rule write activates wraps-inbound-rules only when the rule (or
+  // its set) is missing and gets recreated. Know that now, before any write,
+  // and read the active set so a run that would deactivate another set asks
+  // first or refuses (plan 048). With the rule in place nothing is
+  // activated, and the write may replace no set.
+  const ruleMissing = (await describeInboundReceiptRule(region)) === null;
+  const activeRuleSetRead: ActiveRuleSetRead = ruleMissing
+    ? await readActiveReceiptRuleSet(region)
+    : REPLACE_NO_RULE_SET;
+
   // 8b. Preview: show what would change, including the trigger switch, and
   // apply nothing (no rule write, DNS write, deploy or metadata save).
   if (options.preview) {
@@ -1843,6 +1899,14 @@ export async function inboundAdd(
         })),
         triggerSwitch: needsSwitch,
         trigger: getInboundTrigger(metadata),
+        wouldDeactivateRuleSet:
+          activeRuleSetRead.readable &&
+          wouldDeactivateAnotherRuleSet(activeRuleSetRead)
+            ? activeRuleSetRead.name
+            : null,
+        activeRuleSetUnreadable: activeRuleSetRead.readable
+          ? null
+          : activeRuleSetRead.error,
         region,
       });
       return;
@@ -1851,6 +1915,10 @@ export async function inboundAdd(
     clack.log.info(
       `Would add ${ruleDomains.map((d) => pc.cyan(d)).join(" and ")} to receipt rule ${pc.cyan(RULE_NAME)}.`
     );
+    const deactivation = describeRuleSetDeactivation(activeRuleSetRead);
+    if (deactivation) {
+      clack.log.warn(deactivation);
+    }
     if (dnsRecords.length > 0) {
       clack.log.info(pc.bold("DNS records that would be created:"));
       for (const record of dnsRecords) {
@@ -1878,6 +1946,15 @@ export async function inboundAdd(
     return;
   }
 
+  // 8c. Consent to deactivate another set (prompt, or refuse under
+  // --yes/--json without --replace-active-rule-set), before any write.
+  const expectedActive = await confirmRuleSetActivation({
+    region,
+    read: activeRuleSetRead,
+    yes: options.yes,
+    replaceActiveRuleSet: options.replaceActiveRuleSet,
+  });
+
   // The switch adds two stack deploys this command never ran before; ask
   // first, before any write (skipped with --yes or --json).
   if (needsSwitch && !options.yes && !isJsonMode()) {
@@ -1898,7 +1975,8 @@ export async function inboundAdd(
       identity.accountId,
       receivingDomain,
       bucketName,
-      getInboundTrigger(metadata)
+      getInboundTrigger(metadata),
+      expectedActive
     );
     // If reply-threading is enabled globally, also register r.mail.{parent}
     // as a catch-all recipient so signed-reply addresses route into the same
@@ -1909,7 +1987,8 @@ export async function inboundAdd(
         identity.accountId,
         `r.mail.${parentDomain}`,
         bucketName,
-        getInboundTrigger(metadata)
+        getInboundTrigger(metadata),
+        expectedActive
       );
     }
   });

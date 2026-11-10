@@ -22,8 +22,15 @@ import { SES_RECEIVING_REGIONS } from "../../types/index.js";
 import type { InboundDNSCleanupResult } from "../../utils/dns/index.js";
 import { runEmailStackDeploy } from "../../utils/email/email-stack-deploy.js";
 import {
+  type ActiveRuleSetRead,
   addDomainToReceiptRule,
+  confirmRuleSetActivation,
+  describeInboundReceiptRule,
+  describeRuleSetDeactivation,
+  type ExpectedActiveRuleSet,
   getReceiptRuleDomains,
+  REPLACE_NO_RULE_SET,
+  readActiveReceiptRuleSet,
   removeDomainFromReceiptRule,
 } from "../../utils/email/receipt-rules.js";
 import {
@@ -142,6 +149,8 @@ async function replyInitForSingleDomain(params: {
   stackName: string;
   autoConfirm?: boolean;
   progress: DeploymentProgress;
+  /** What the receipt-rule fallback may deactivate, agreed in replyInit's preflight. */
+  expectedActive: ExpectedActiveRuleSet;
 }): Promise<{
   parameterArn: string;
   parameterName: string;
@@ -247,7 +256,8 @@ async function replyInitForSingleDomain(params: {
         accountId,
         `r.mail.${domain}`,
         bucketName,
-        getInboundTrigger(metadata)
+        getInboundTrigger(metadata),
+        params.expectedActive
       );
     }
   );
@@ -451,6 +461,16 @@ export async function replyInit(options: EmailReplyInitOptions): Promise<void> {
   const stackName =
     emailService.pulumiStackName || `wraps-${identity.accountId}-${region}`;
 
+  // Each domain's receipt-rule write recreates and activates
+  // wraps-inbound-rules when the rule is missing. That write comes after the
+  // per-domain metadata save and deploy, so decide here, once, before the
+  // loop's first mutation: read the active set so a run that would
+  // deactivate another set asks first or refuses (plan 048).
+  const ruleMissing = (await describeInboundReceiptRule(region)) === null;
+  const activeRuleSetRead: ActiveRuleSetRead = ruleMissing
+    ? await readActiveReceiptRuleSet(region)
+    : REPLACE_NO_RULE_SET;
+
   // Preview mode — show what Pulumi would create across all target domains,
   // using placeholder secrets (nothing is saved to disk or deployed).
   if (options.preview) {
@@ -507,9 +527,22 @@ export async function replyInit(options: EmailReplyInitOptions): Promise<void> {
       resourceChanges: previewResult.resourceChanges,
       commandName: "wraps email reply init",
     });
+    const deactivation = describeRuleSetDeactivation(activeRuleSetRead);
+    if (deactivation) {
+      clack.log.warn(deactivation);
+    }
     clack.outro(pc.green("Preview complete. Run without --preview to deploy."));
     return;
   }
+
+  // Consent (prompt, or refuse under --yes/--json without
+  // --replace-active-rule-set) before any domain is saved or deployed.
+  const expectedActive = await confirmRuleSetActivation({
+    region,
+    read: activeRuleSetRead,
+    yes: options.yes,
+    replaceActiveRuleSet: options.replaceActiveRuleSet,
+  });
 
   const results: Array<{
     domain: string;
@@ -532,6 +565,7 @@ export async function replyInit(options: EmailReplyInitOptions): Promise<void> {
       stackName,
       autoConfirm: options.yes,
       progress,
+      expectedActive,
     });
     results.push({ domain, ...result });
   }

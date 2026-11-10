@@ -74,7 +74,10 @@ vi.mock("../../../utils/email/receipt-rules.js", async (importOriginal) => {
     // doesn't fall through to the real AWS SDK client.
     createReceiptRuleSet: vi.fn().mockResolvedValue(undefined),
     createReceiptRule: vi.fn().mockResolvedValue(undefined),
-    setActiveReceiptRuleSet: vi.fn().mockResolvedValue(undefined),
+    // Returns the read taken just before activating (plan 048).
+    setActiveReceiptRuleSet: vi
+      .fn()
+      .mockResolvedValue({ readable: true, name: "wraps-inbound-rules" }),
     getActiveReceiptRuleSet: vi.fn().mockResolvedValue("wraps-inbound-rules"),
     readActiveReceiptRuleSet: vi
       .fn()

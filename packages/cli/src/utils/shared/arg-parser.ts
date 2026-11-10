@@ -59,6 +59,8 @@ export type CliFlags = {
   subdomain?: string;
   root?: boolean;
   all?: boolean;
+  /** inbound init/add, reply init: consent to deactivate another active receipt rule set. */
+  replaceActiveRuleSet?: boolean;
 
   // Email agent
   name?: string;
@@ -401,6 +403,7 @@ const BOOLEAN_FLAGS = [
   "acknowledge-complaint",
   "draft",
   "root",
+  "replace-active-rule-set",
   "cleanup",
   "reveal-secret",
   "opens",

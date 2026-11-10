@@ -330,7 +330,7 @@ function showHelp() {
     `  ${pc.cyan("email domains config")}    Configure domain tracking, TLS, and archiving`
   );
   console.log(
-    `  ${pc.cyan("email inbound init")}      Enable inbound email receiving`
+    `  ${pc.cyan("email inbound init")}      Enable inbound email receiving (--replace-active-rule-set: deactivate another active receipt rule set without asking; pass it only after the AWS account owner agrees)`
   );
   console.log(
     `  ${pc.cyan("email inbound status")}    Show inbound email status`
@@ -342,7 +342,7 @@ function showHelp() {
     `  ${pc.cyan("email inbound test")}      Send test email and verify receipt`
   );
   console.log(
-    `  ${pc.cyan("email inbound add")}       Add an inbound receiving domain (--preview: show what would change, including the trigger switch, without applying it)`
+    `  ${pc.cyan("email inbound add")}       Add an inbound receiving domain (--preview: show what would change, including the trigger switch, without applying it; --replace-active-rule-set: deactivate another active receipt rule set without asking; pass it only after the AWS account owner agrees)`
   );
   console.log(
     `  ${pc.cyan("email inbound remove")}    Remove an inbound receiving domain`
@@ -360,7 +360,7 @@ function showHelp() {
     `  ${pc.cyan("email inbound get <emailId>")} Show one inbound email (--account, --json). htmlTruncated flags an HTML body cut at 200 KB`
   );
   console.log(
-    `  ${pc.cyan("email reply init")}        Set up signed reply-to threading`
+    `  ${pc.cyan("email reply init")}        Set up signed reply-to threading (--replace-active-rule-set: deactivate another active receipt rule set without asking; pass it only after the AWS account owner agrees)`
   );
   console.log(
     `  ${pc.cyan("email reply rotate")}      Rotate the reply-threading signing secret`
@@ -1220,6 +1220,7 @@ async function run() {
                 preview: flags.preview,
                 json: flags.json,
                 unexpectedArg: sub[3],
+                replaceActiveRuleSet: flags.replaceActiveRuleSet,
               });
               break;
 
@@ -1274,6 +1275,7 @@ async function run() {
                 preview: flags.preview,
                 json: flags.json,
                 unexpectedArg: sub[3],
+                replaceActiveRuleSet: flags.replaceActiveRuleSet,
               });
               break;
 
@@ -1407,6 +1409,7 @@ async function run() {
                 yes: flags.yes,
                 preview: flags.preview,
                 json: flags.json,
+                replaceActiveRuleSet: flags.replaceActiveRuleSet,
               });
               break;
 
