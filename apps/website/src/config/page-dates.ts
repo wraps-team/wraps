@@ -69,7 +69,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/docs/cli-reference/auth": "2026-04-14T13:00:57-06:00",
   "/docs/cli-reference/aws": "2026-08-21T20:49:06-06:00",
   "/docs/cli-reference/cdn": "2026-04-14T13:00:57-06:00",
-  "/docs/cli-reference/email": "2026-11-10T09:58:07-07:00",
+  "/docs/cli-reference/email": "2026-11-10T11:24:16-07:00",
   "/docs/cli-reference/platform": "2026-10-27T09:08:58-06:00",
   "/docs/cli-reference/sms": "2026-07-30T10:11:08-06:00",
   "/docs/client-sdk-reference": "2026-10-27T09:08:58-06:00",
