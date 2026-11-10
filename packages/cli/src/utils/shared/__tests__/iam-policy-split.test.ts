@@ -16,8 +16,12 @@ import { WrapsError } from "../errors.js";
 
 /** Make one fs call fail for a given path; everything else is the real fs. */
 const failures = vi.hoisted(() => ({
-  unlink: undefined as string | undefined,
+  unlink: [] as string[],
   readdir: undefined as string | undefined,
+  /** lstat on this path reports ENOENT, as if deleted after readdir. */
+  lstatGone: undefined as string | undefined,
+  /** lstat on this path fails with EACCES. */
+  lstatDenied: undefined as string | undefined,
 }));
 
 vi.mock("node:fs", async (importOriginal) => {
@@ -30,11 +34,23 @@ vi.mock("node:fs", async (importOriginal) => {
   return {
     ...actual,
     unlinkSync: (path: string) => {
-      if (path === failures.unlink) {
+      if (failures.unlink.includes(path)) {
         throw eacces("unlink", path);
       }
       return actual.unlinkSync(path);
     },
+    lstatSync: ((path: string, ...rest: unknown[]) => {
+      if (path === failures.lstatGone) {
+        throw Object.assign(
+          new Error(`ENOENT: no such file or directory, lstat '${path}'`),
+          { code: "ENOENT" }
+        );
+      }
+      if (path === failures.lstatDenied) {
+        throw eacces("lstat", path);
+      }
+      return (actual.lstatSync as (...a: unknown[]) => unknown)(path, ...rest);
+    }) as typeof actual.lstatSync,
     readdirSync: ((path: string, ...rest: unknown[]) => {
       if (path === failures.readdir) {
         throw eacces("scandir", path);
@@ -48,8 +64,10 @@ vi.mock("node:fs", async (importOriginal) => {
 });
 
 afterEach(() => {
-  failures.unlink = undefined;
+  failures.unlink = [];
   failures.readdir = undefined;
+  failures.lstatGone = undefined;
+  failures.lstatDenied = undefined;
 });
 
 import {
@@ -330,33 +348,68 @@ describe("writePolicyDir: failures after the writes", () => {
     expect(readFileSync(file, "utf8")).toBe("x");
   });
 
-  it("an unlink failing partway names the file and the ones already removed", () => {
+  it("an unlink failure doesn't stop the others; one error names every removed and left file", () => {
     const dir = tempDir();
-    writePolicyDir(dir, parts(4));
-    failures.unlink = join(dir, "wraps-deployer-3.json");
+    writePolicyDir(dir, parts(5));
+    const p = (n: number) => join(dir, `wraps-deployer-${n}.json`);
+    failures.unlink = [p(3), p(5)];
+
+    const thrown = catchError(() => writePolicyDir(dir, parts(1)));
+
+    expect(thrown).toBeInstanceOf(WrapsError);
+    expect(thrown.code).toBe("POLICY_DIR_WRITE_FAILED");
+    expect(thrown.message).toBe(
+      `Wrote the new policies but could not remove these stale files: ${p(3)} (EACCES: permission denied, unlink '${p(3)}'); ${p(5)} (EACCES: permission denied, unlink '${p(5)}'). Removed in this run: ${p(2)}, ${p(4)}.`
+    );
+    expect(thrown.suggestion).toBe(
+      "Delete the files that couldn't be removed yourself, and don't create IAM policies from them. Detach and delete the IAM policies named after every file this message lists."
+    );
+    expect([2, 3, 4, 5].map((n) => existsSync(p(n)))).toEqual([
+      false,
+      true,
+      false,
+      true,
+    ]);
+  });
+
+  it("a single unlink failure with nothing removed says so", () => {
+    const dir = tempDir();
+    writePolicyDir(dir, parts(2));
+    const stale = join(dir, "wraps-deployer-2.json");
+    failures.unlink = [stale];
+    const thrown = catchError(() => writePolicyDir(dir, parts(1)));
+    expect(thrown.code).toBe("POLICY_DIR_WRITE_FAILED");
+    expect(thrown.message).toBe(
+      `Wrote the new policies but could not remove this stale file: ${stale} (EACCES: permission denied, unlink '${stale}'). Nothing was removed.`
+    );
+  });
+
+  it("a stale file gone between readdir and lstat (ENOENT) is skipped without an error", () => {
+    const dir = tempDir();
+    writePolicyDir(dir, parts(3));
+    failures.lstatGone = join(dir, "wraps-deployer-2.json");
+
+    const result = writePolicyDir(dir, parts(1));
+
+    expect(result.removed).toEqual([join(dir, "wraps-deployer-3.json")]);
+    // Reported as gone, so it is neither removed nor named.
+    expect(existsSync(join(dir, "wraps-deployer-2.json"))).toBe(true);
+  });
+
+  it("a stale file that can't be checked is named in the error; the others are still removed", () => {
+    const dir = tempDir();
+    writePolicyDir(dir, parts(3));
+    const denied = join(dir, "wraps-deployer-2.json");
+    failures.lstatDenied = denied;
 
     const thrown = catchError(() => writePolicyDir(dir, parts(1)));
 
     expect(thrown.code).toBe("POLICY_DIR_WRITE_FAILED");
     expect(thrown.message).toBe(
-      `Wrote the new policies but could not remove the stale ${join(dir, "wraps-deployer-3.json")}: EACCES: permission denied, unlink '${join(dir, "wraps-deployer-3.json")}'. Already removed in this run: ${join(dir, "wraps-deployer-2.json")}.`
+      `Wrote the new policies but could not remove this stale file: ${denied} (could not check it: EACCES: permission denied, lstat '${denied}'). Removed in this run: ${join(dir, "wraps-deployer-3.json")}.`
     );
-    expect(thrown.suggestion).toBe(
-      "Delete it yourself, and don't create an IAM policy from it. Detach and delete the IAM policies named after every stale file listed here."
-    );
-    expect(existsSync(join(dir, "wraps-deployer-2.json"))).toBe(false);
-    expect(existsSync(join(dir, "wraps-deployer-3.json"))).toBe(true);
-    // Stopped at the failure: -4 is left for the next run.
-    expect(existsSync(join(dir, "wraps-deployer-4.json"))).toBe(true);
-  });
-
-  it("an unlink failing first says nothing was removed yet", () => {
-    const dir = tempDir();
-    writePolicyDir(dir, parts(2));
-    failures.unlink = join(dir, "wraps-deployer-2.json");
-    const thrown = catchError(() => writePolicyDir(dir, parts(1)));
-    expect(thrown.code).toBe("POLICY_DIR_WRITE_FAILED");
-    expect(thrown.message).not.toContain("Already removed");
+    expect(existsSync(denied)).toBe(true);
+    expect(existsSync(join(dir, "wraps-deployer-3.json"))).toBe(false);
   });
 
   it("a failed listing of the folder throws POLICY_DIR_WRITE_FAILED after the writes", () => {
@@ -372,7 +425,7 @@ describe("writePolicyDir: failures after the writes", () => {
       `Wrote the new policies but could not list ${dir} to remove stale files: EACCES: permission denied, scandir '${dir}'`
     );
     expect(thrown.suggestion).toBe(
-      "Delete any wraps-deployer-<n>.json numbered above 2 in that folder yourself, and don't create IAM policies from them."
+      "Delete any wraps-deployer-<n>.json numbered above 2 in that folder yourself, don't create IAM policies from them, and detach and delete any IAM policies named after them."
     );
     expect(existsSync(join(dir, "wraps-deployer-3.json"))).toBe(true);
   });

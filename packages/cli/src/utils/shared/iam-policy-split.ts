@@ -177,6 +177,8 @@ function writeNoFollow(path: string, text: string): void {
  *
  * - Every write happens before any removal. If a write fails, nothing is
  *   removed and it throws; files written before the failure stay.
+ * - Every stale file is attempted. If any can't be checked or removed, it
+ *   throws once afterwards, naming the files removed and the ones left.
  * - A stale file is a regular file (never a symlink) whose name matches
  *   `wraps-deployer-<n>.json` exactly. Nothing else in the folder is touched.
  * - A symlink at a target path fails the run before anything is written.
@@ -220,45 +222,64 @@ export function writePolicyDir<S extends PolicyStatement>(
     written.push(path);
   }
 
-  const stale = findStaleFiles(dir, parts.length);
+  const removed = removeStaleFiles(dir, parts.length);
+  return { dir, written, removed };
+}
+
+/**
+ * Remove every stale file, then report once, so the message names every file
+ * removed and every file left behind. Returns the removed paths.
+ */
+function removeStaleFiles(dir: string, count: number): string[] {
+  const { stale, failed } = findStaleFiles(dir, count);
 
   const removed: string[] = [];
   for (const path of stale) {
     try {
       unlinkSync(path);
+      removed.push(path);
     } catch (err) {
-      const already =
-        removed.length > 0
-          ? ` Already removed in this run: ${removed.join(", ")}.`
-          : "";
-      throw errors.policyDirWriteFailed(
-        `Wrote the new policies but could not remove the stale ${path}: ${errorText(err)}.${already}`,
-        "Delete it yourself, and don't create an IAM policy from it. Detach and delete the IAM policies named after every stale file listed here."
-      );
+      failed.push(`${path} (${errorText(err)})`);
     }
-    removed.push(path);
   }
 
-  return { dir, written, removed };
+  if (failed.length > 0) {
+    const removedText =
+      removed.length > 0
+        ? ` Removed in this run: ${removed.join(", ")}.`
+        : " Nothing was removed.";
+    throw errors.policyDirWriteFailed(
+      `Wrote the new policies but could not remove ${failed.length === 1 ? "this stale file" : "these stale files"}: ${failed.join("; ")}.${removedText}`,
+      "Delete the files that couldn't be removed yourself, and don't create IAM policies from them. Detach and delete the IAM policies named after every file this message lists."
+    );
+  }
+
+  return removed;
 }
 
 /**
  * Regular files in `dir` named `wraps-deployer-<n>.json` with n above
- * `count`, in numeric order. Runs after every write, so a failure here throws
+ * `count`, in numeric order, plus the ones that couldn't be checked (as
+ * "<path> (could not check it: <error>)"). A file gone since readdir is
+ * skipped. Runs after every write, so a failed listing throws
  * POLICY_DIR_WRITE_FAILED saying the new files are already written.
  */
-function findStaleFiles(dir: string, count: number): string[] {
+function findStaleFiles(
+  dir: string,
+  count: number
+): { stale: string[]; failed: string[] } {
   let names: string[];
   try {
     names = readdirSync(dir);
   } catch (err) {
     throw errors.policyDirWriteFailed(
       `Wrote the new policies but could not list ${dir} to remove stale files: ${errorText(err)}`,
-      `Delete any wraps-deployer-<n>.json numbered above ${count} in that folder yourself, and don't create IAM policies from them.`
+      `Delete any wraps-deployer-<n>.json numbered above ${count} in that folder yourself, don't create IAM policies from them, and detach and delete any IAM policies named after them.`
     );
   }
 
   const stale: string[] = [];
+  const failed: string[] = [];
   const candidates = names
     .map((name) => ({ name, match: OWNED_FILE.exec(name) }))
     .filter(
@@ -268,21 +289,16 @@ function findStaleFiles(dir: string, count: number): string[] {
     .sort((a, b) => Number(a.match[1]) - Number(b.match[1]));
   for (const { name } of candidates) {
     const path = join(dir, name);
-    let isFile: boolean;
     try {
-      isFile = lstatSync(path).isFile();
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-        continue; // Gone since readdir: nothing to remove.
+      if (lstatSync(path).isFile()) {
+        stale.push(path);
       }
-      throw errors.policyDirWriteFailed(
-        `Wrote the new policies but could not check the stale ${path}: ${errorText(err)}`,
-        "Delete it yourself if it's a stale policy file, and don't create an IAM policy from it."
-      );
-    }
-    if (isFile) {
-      stale.push(path);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+        failed.push(`${path} (could not check it: ${errorText(err)})`);
+      }
+      // ENOENT: gone since readdir, nothing to remove.
     }
   }
-  return stale;
+  return { stale, failed };
 }
