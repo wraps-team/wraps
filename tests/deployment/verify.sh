@@ -1553,6 +1553,124 @@ verify_reply_threading() {
   fi
 }
 
+# ─── Inbound Trigger (plan 041) ──────────────────────────────────────
+
+# Verifies the inbound trigger is wired for one mode and nothing else:
+#   ses-lambda-action: rule = S3 action on mail/ + LambdaAction (Event) on
+#     wraps-inbound-email-processor; Lambda policy has wraps-inbound-ses-invoke
+#     (SourceArn = the wraps receipt rule) and no S3 invoke; the bucket has no
+#     Lambda notification.
+#   s3-notification: rule = S3 action on raw/ alone; Lambda policy has both
+#     the SES and the S3 invoke statements; the bucket notifies the processor
+#     on raw/.
+# In both modes AllowSESPut covers raw/* and mail/*.
+#
+# Usage: verify_inbound_trigger <region> <account_id> [mode]
+
+verify_inbound_trigger() {
+  local region="${1:?region required}"
+  local account_id="${2:?account id required}"
+  local mode="${3:-ses-lambda-action}"
+  local bucket="wraps-inbound-${account_id}-${region}"
+  local fn="wraps-inbound-email-processor"
+  local fn_arn="arn:aws:lambda:${region}:${account_id}:function:${fn}"
+  local rule_arn="arn:aws:ses:${region}:${account_id}:receipt-rule-set/wraps-inbound-rules:receipt-rule/wraps-inbound-catch-all"
+
+  section "Inbound trigger ($mode): receipt rule"
+
+  local rule_output
+  if ! rule_output=$(aws_check ses describe-receipt-rule \
+    --rule-set-name wraps-inbound-rules \
+    --rule-name wraps-inbound-catch-all \
+    --region "$region"); then
+    fail "Receipt rule wraps-inbound-catch-all not found" "$rule_output"
+    return 0
+  fi
+
+  local prefixes lambda_arns invocation enabled
+  prefixes=$(echo "$rule_output" | jq -r '[.Rule.Actions[].S3Action.ObjectKeyPrefix // empty] | join(",")')
+  lambda_arns=$(echo "$rule_output" | jq -r '[.Rule.Actions[].LambdaAction.FunctionArn // empty] | join(",")')
+  invocation=$(echo "$rule_output" | jq -r '[.Rule.Actions[].LambdaAction.InvocationType // empty] | join(",")')
+  enabled=$(echo "$rule_output" | jq -r '.Rule.Enabled')
+
+  if [[ "$enabled" == "true" ]]; then
+    pass "Receipt rule is enabled"
+  else
+    fail "Receipt rule is not enabled (Enabled=$enabled)"
+  fi
+
+  if [[ "$mode" == "ses-lambda-action" ]]; then
+    [[ "$prefixes" == "mail/" ]] && pass "Rule stores mail under mail/ only" \
+      || fail "Rule S3 prefixes: expected 'mail/', got '$prefixes'"
+    [[ "$lambda_arns" == "$fn_arn" ]] && pass "Rule invokes $fn" \
+      || fail "Rule Lambda action: expected '$fn_arn', got '$lambda_arns'"
+    [[ "$invocation" == "Event" ]] && pass "Lambda action is asynchronous (Event)" \
+      || fail "Lambda action InvocationType: expected 'Event', got '$invocation'"
+  else
+    [[ "$prefixes" == "raw/" ]] && pass "Rule stores mail under raw/ only" \
+      || fail "Rule S3 prefixes: expected 'raw/', got '$prefixes'"
+    [[ -z "$lambda_arns" ]] && pass "Rule has no Lambda action" \
+      || fail "Legacy rule must not invoke Lambda; got '$lambda_arns'"
+  fi
+
+  section "Inbound trigger ($mode): processor permissions"
+
+  local policy
+  policy=$(aws lambda get-policy --function-name "$fn" --region "$region" \
+    --query Policy --output text 2>/dev/null || echo '{"Statement":[]}')
+
+  local ses_stmt s3_stmt
+  ses_stmt=$(echo "$policy" | jq -r --arg arn "$rule_arn" \
+    '[.Statement[] | select(.Principal.Service == "ses.amazonaws.com") | .Condition.ArnLike["AWS:SourceArn"] // empty] | map(select(. == $arn)) | length')
+  s3_stmt=$(echo "$policy" | jq -r \
+    '[.Statement[] | select(.Principal.Service == "s3.amazonaws.com")] | length')
+
+  (( ses_stmt >= 1 )) && pass "wraps-inbound-ses-invoke present, scoped to the wraps receipt rule" \
+    || fail "No SES invoke permission scoped to $rule_arn"
+  if [[ "$mode" == "ses-lambda-action" ]]; then
+    (( s3_stmt == 0 )) && pass "No S3 invoke permission (wraps-inbound-s3-invoke removed)" \
+      || fail "S3 invoke permission still present after the switch"
+  else
+    (( s3_stmt >= 1 )) && pass "S3 invoke permission present (legacy mode)" \
+      || fail "Legacy mode is missing wraps-inbound-s3-invoke"
+  fi
+
+  section "Inbound trigger ($mode): bucket"
+
+  local notif lambda_notifs
+  notif=$(aws s3api get-bucket-notification-configuration --bucket "$bucket" --output json 2>/dev/null || echo '{}')
+  lambda_notifs=$(echo "$notif" | jq -r '[.LambdaFunctionConfigurations // [] | .[] | .Filter.Key.FilterRules[]? | select(.Name == "Prefix" or .Name == "prefix") | .Value] | join(",")')
+  if [[ "$mode" == "ses-lambda-action" ]]; then
+    [[ -z "$lambda_notifs" ]] && pass "Bucket has no Lambda notification (old trigger gone)" \
+      || fail "Bucket still notifies Lambda on: $lambda_notifs"
+  else
+    [[ "$lambda_notifs" == "raw/" ]] && pass "Bucket notifies the processor on raw/" \
+      || fail "Legacy bucket notification prefixes: expected 'raw/', got '$lambda_notifs'"
+  fi
+
+  local bucket_policy covered
+  bucket_policy=$(aws s3api get-bucket-policy --bucket "$bucket" --query Policy --output text 2>/dev/null || echo '{"Statement":[]}')
+  covered=$(echo "$bucket_policy" | jq -r --arg b "arn:aws:s3:::${bucket}" \
+    '[.Statement[] | select(.Sid == "AllowSESPut") | .Resource | if type == "array" then .[] else . end] | map(select(. == ($b + "/raw/*") or . == ($b + "/mail/*"))) | length')
+  (( covered == 2 )) && pass "AllowSESPut covers raw/* and mail/*" \
+    || fail "AllowSESPut covers $covered of raw/*, mail/*"
+}
+
+# Verifies `wraps email destroy` removed the inbound receipt rule set.
+# Usage: verify_inbound_rules_removed <region>
+
+verify_inbound_rules_removed() {
+  local region="${1:?region required}"
+
+  section "Teardown: inbound receipt rules"
+
+  if aws ses describe-receipt-rule-set --rule-set-name wraps-inbound-rules --region "$region" &>/dev/null; then
+    fail "Receipt rule set wraps-inbound-rules still exists"
+  else
+    pass "Receipt rule set wraps-inbound-rules removed"
+  fi
+}
+
 # ─── Pre-Teardown ─────────────────────────────────────────────────────
 
 # Rename the MailManager archive before deleting so the name is freed immediately.
