@@ -24,12 +24,12 @@ import {
 
 const permissionsCommand = "npx @wraps.dev/cli permissions";
 const permissionsJsonCommand = "npx @wraps.dev/cli permissions --json";
+const permissionsPolicyDirCommand =
+  "npx @wraps.dev/cli permissions --policy-dir ./wraps-policy";
 const permissionsPresetCommand =
-  "npx @wraps.dev/cli permissions --preset production --json";
+  "npx @wraps.dev/cli permissions --preset production --policy-dir ./wraps-policy";
 const permissionsServiceCommand =
-  "npx @wraps.dev/cli permissions --service email --json";
-const saveToFileCommand =
-  "npx @wraps.dev/cli permissions --json > wraps-policy.json";
+  "npx @wraps.dev/cli permissions --service email --policy-dir ./wraps-policy";
 
 const presets = [
   {
@@ -174,12 +174,99 @@ export default function PermissionsPageContent() {
         <div className="space-y-4">
           <Card>
             <CardHeader className="pb-2">
+              <CardTitle className="font-mono text-base">
+                --policy-dir &lt;dir&gt;
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-3 text-muted-foreground text-sm">
+                Write the policy to a folder as{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  wraps-deployer-1.json
+                </code>
+                ,{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  wraps-deployer-2.json
+                </code>
+                , and so on. Each file is a bare IAM policy small enough for one
+                managed policy: IAM caps a managed policy at 6,144 characters,
+                whitespace not counted, and the full Wraps policy is larger. The
+                folder is created if it&apos;s missing. Older{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  wraps-deployer-&lt;n&gt;.json
+                </code>{" "}
+                files numbered above the new count are removed; nothing else in
+                the folder is touched.
+              </p>
+              <CodeBlock
+                className="h-auto"
+                data={[
+                  {
+                    language: "bash",
+                    filename: "terminal.sh",
+                    code: permissionsPolicyDirCommand,
+                  },
+                ]}
+                defaultValue="bash"
+              >
+                <CodeBlockHeader>
+                  <CodeBlockFiles>
+                    {(item) => (
+                      <CodeBlockFilename
+                        key={item.language}
+                        value={item.language}
+                      >
+                        {item.filename}
+                      </CodeBlockFilename>
+                    )}
+                  </CodeBlockFiles>
+                  <CodeBlockCopyButton />
+                </CodeBlockHeader>
+                <CodeBlockBody>
+                  {(item) => (
+                    <CodeBlockItem
+                      key={item.language}
+                      lineNumbers={false}
+                      value={item.language}
+                    >
+                      <CodeBlockContent language={item.language}>
+                        {item.code}
+                      </CodeBlockContent>
+                    </CodeBlockItem>
+                  )}
+                </CodeBlockBody>
+              </CodeBlock>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
               <CardTitle className="font-mono text-base">--json</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="mb-3 text-muted-foreground text-sm">
-                Output the full IAM policy as JSON (ready to paste into AWS
-                Console):
+                For scripts and agents. Prints a JSON envelope (
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  {"{ success, command, data }"}
+                </code>
+                ), not a policy you can paste into IAM.{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  data.policies
+                </code>{" "}
+                holds the split, one{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  {"{ name, policy }"}
+                </code>{" "}
+                per{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  wraps-deployer-&lt;n&gt;
+                </code>
+                .{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  data.policy
+                </code>{" "}
+                is the merged document: it can exceed 6,144 characters, so it
+                only fits as an inline role policy (10,240).
               </p>
               <CodeBlock
                 className="h-auto"
@@ -230,8 +317,8 @@ export default function PermissionsPageContent() {
             </CardHeader>
             <CardContent>
               <p className="mb-3 text-muted-foreground text-sm">
-                Get permissions for a specific preset (starter, production, or
-                enterprise):
+                Write the policies for a specific preset (starter, production,
+                or enterprise):
               </p>
               <CodeBlock
                 className="h-auto"
@@ -282,7 +369,7 @@ export default function PermissionsPageContent() {
             </CardHeader>
             <CardContent>
               <p className="mb-3 text-muted-foreground text-sm">
-                Get permissions for a specific service (email, sms, or cdn):
+                Write the policies for a specific service (email, sms, or cdn):
               </p>
               <CodeBlock
                 className="h-auto"
@@ -396,10 +483,19 @@ export default function PermissionsPageContent() {
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
             1
           </div>
-          Generate the Policy
+          Generate the Policies
         </h2>
         <p className="mb-4 text-muted-foreground">
-          Save the IAM policy JSON to a file:
+          Write the IAM policies to a folder. The full Wraps policy is larger
+          than one managed policy allows, so it is split into{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">
+            wraps-deployer-1.json
+          </code>
+          ,{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">
+            wraps-deployer-2.json
+          </code>
+          , and so on. A single service or preset may fit in one file.
         </p>
         <CodeBlock
           className="mb-4 h-auto"
@@ -407,7 +503,7 @@ export default function PermissionsPageContent() {
             {
               language: "bash",
               filename: "terminal.sh",
-              code: saveToFileCommand,
+              code: permissionsPolicyDirCommand,
             },
           ]}
           defaultValue="bash"
@@ -443,8 +539,11 @@ export default function PermissionsPageContent() {
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
             2
           </div>
-          Create Policy in AWS Console
+          Create One Policy per File
         </h2>
+        <p className="mb-4 text-muted-foreground">
+          Repeat these steps for each file in the folder.
+        </p>
         <Card>
           <CardContent className="p-6">
             <ol className="space-y-4">
@@ -493,7 +592,12 @@ export default function PermissionsPageContent() {
                   4
                 </div>
                 <div>
-                  <p>Paste the contents of your policy JSON file</p>
+                  <p>
+                    Paste the contents of one file, such as{" "}
+                    <code className="rounded bg-muted px-1.5 py-0.5">
+                      wraps-deployer-1.json
+                    </code>
+                  </p>
                 </div>
               </li>
               <li className="flex items-start gap-3">
@@ -502,9 +606,9 @@ export default function PermissionsPageContent() {
                 </div>
                 <div>
                   <p>
-                    Name it{" "}
+                    Name it after the file:{" "}
                     <code className="rounded bg-muted px-1.5 py-0.5">
-                      WrapsDeploymentPolicy
+                      wraps-deployer-1
                     </code>
                   </p>
                 </div>
@@ -570,14 +674,102 @@ export default function PermissionsPageContent() {
                 </div>
                 <div>
                   <p>
-                    Search for and select{" "}
+                    Search for and select every{" "}
                     <code className="rounded bg-muted px-1.5 py-0.5">
-                      WrapsDeploymentPolicy
-                    </code>
+                      wraps-deployer-&lt;n&gt;
+                    </code>{" "}
+                    policy
                   </p>
                 </div>
               </li>
             </ol>
+            <p className="mt-6 flex items-start gap-2 text-muted-foreground text-sm">
+              <Info className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                Each user takes up to 10 managed policies by default (20 per
+                role, 10 per group), and the policies already attached count
+                toward that. Wraps splits its policy into 3 files or fewer.
+              </span>
+            </p>
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* Updating */}
+      <section className="mb-12">
+        <h2 className="mb-4 font-bold text-2xl">Updating the Policies</h2>
+        <p className="mb-4 text-muted-foreground">
+          A new Wraps version can add permissions or move a statement to a
+          different file. When it does:
+        </p>
+        <Card>
+          <CardContent className="p-6">
+            <ul className="space-y-3">
+              <li className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
+                <div>
+                  <strong>Regenerate the files</strong>
+                  <p className="text-muted-foreground text-sm">
+                    Run{" "}
+                    <code className="rounded bg-muted px-1.5 py-0.5">
+                      wraps permissions --policy-dir ./wraps-policy
+                    </code>{" "}
+                    with the same{" "}
+                    <code className="rounded bg-muted px-1.5 py-0.5">
+                      --service
+                    </code>{" "}
+                    and{" "}
+                    <code className="rounded bg-muted px-1.5 py-0.5">
+                      --preset
+                    </code>{" "}
+                    you used before.
+                  </p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
+                <div>
+                  <strong>Update every policy</strong>
+                  <p className="text-muted-foreground text-sm">
+                    Open each{" "}
+                    <code className="rounded bg-muted px-1.5 py-0.5">
+                      wraps-deployer-&lt;n&gt;
+                    </code>{" "}
+                    policy, choose Edit, and paste its file into the JSON tab.
+                    IAM keeps up to 5 versions of a managed policy; when you
+                    save a sixth, the console asks you to delete an old one.
+                  </p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
+                <div>
+                  <strong>Match the number of files</strong>
+                  <p className="text-muted-foreground text-sm">
+                    Create and attach a policy for each new file. The CLI lists
+                    the files it removed: detach and delete the policies named
+                    after them.
+                  </p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
+                <div>
+                  <strong>Replace an old single policy</strong>
+                  <p className="text-muted-foreground text-sm">
+                    If you attached one{" "}
+                    <code className="rounded bg-muted px-1.5 py-0.5">
+                      WrapsDeploymentPolicy
+                    </code>{" "}
+                    before, attach the{" "}
+                    <code className="rounded bg-muted px-1.5 py-0.5">
+                      wraps-deployer-&lt;n&gt;
+                    </code>{" "}
+                    policies, then detach it.
+                  </p>
+                </div>
+              </li>
+            </ul>
           </CardContent>
         </Card>
       </section>
@@ -607,9 +799,13 @@ export default function PermissionsPageContent() {
                   <p className="text-muted-foreground text-sm">
                     Run{" "}
                     <code className="rounded bg-muted px-1.5 py-0.5">
-                      wraps permissions --json
+                      wraps permissions --policy-dir ./wraps-policy
                     </code>{" "}
-                    to get the latest required permissions
+                    and update each{" "}
+                    <code className="rounded bg-muted px-1.5 py-0.5">
+                      wraps-deployer-&lt;n&gt;
+                    </code>{" "}
+                    policy from its file
                   </p>
                 </div>
               </li>
