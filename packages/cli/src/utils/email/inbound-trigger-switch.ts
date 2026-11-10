@@ -60,21 +60,42 @@ function rowText(step: InboundSwitchStep, ruleExisted: boolean): string {
   }
 }
 
-export class InboundTriggerSwitchError extends WrapsError {
-  constructor(
-    public step: InboundSwitchStep,
-    public ruleExisted: boolean,
-    cause: unknown
-  ) {
-    const causeText = cause instanceof Error ? cause.message : String(cause);
-    super(
-      `Inbound trigger switch did not finish. ${rowText(step, ruleExisted)} Cause: ${causeText}`,
-      "INBOUND_TRIGGER_SWITCH_FAILED",
-      `Run ${FINISH_SWITCH_COMMAND} to finish the switch. Everything this command saved before the switch stays saved.`,
-      "https://wraps.dev/docs/quickstart/email/inbound"
-    );
-    this.cause = cause;
-  }
+export const INBOUND_TRIGGER_SWITCH_FAILED = "INBOUND_TRIGGER_SWITCH_FAILED";
+
+/** A switch failure: a WrapsError carrying the §4.4 step it stopped at. */
+export type InboundTriggerSwitchError = WrapsError & {
+  step: InboundSwitchStep;
+  ruleExisted: boolean;
+};
+
+/**
+ * Build a switch failure. Constructed directly as a WrapsError (not a subclass) so
+ * the CLI error-code docs parity check sees the code.
+ */
+export function inboundTriggerSwitchError(
+  step: InboundSwitchStep,
+  ruleExisted: boolean,
+  cause: unknown
+): InboundTriggerSwitchError {
+  const causeText = cause instanceof Error ? cause.message : String(cause);
+  const message = `Inbound trigger switch did not finish. ${rowText(step, ruleExisted)} Cause: ${causeText}`;
+  const suggestion = `Run ${FINISH_SWITCH_COMMAND} to finish the switch. Everything this command saved before the switch stays saved.`;
+  const error = new WrapsError(
+    message,
+    "INBOUND_TRIGGER_SWITCH_FAILED",
+    suggestion,
+    "https://wraps.dev/docs/quickstart/email/inbound"
+  );
+  error.cause = cause;
+  return Object.assign(error, { step, ruleExisted });
+}
+
+export function isInboundTriggerSwitchError(
+  error: unknown
+): error is InboundTriggerSwitchError {
+  return (
+    error instanceof WrapsError && error.code === INBOUND_TRIGGER_SWITCH_FAILED
+  );
 }
 
 export type SwitchInboundTriggerContext = {
@@ -105,7 +126,7 @@ async function step<T>(
 }
 
 /**
- * Run the add-before-remove switch. Throws `InboundTriggerSwitchError`
+ * Run the add-before-remove switch. Throws an `InboundTriggerSwitchError`
  * naming the failed step; a no-op when the saved mode is already the new one.
  */
 export async function switchInboundTrigger(
@@ -127,11 +148,7 @@ export async function switchInboundTrigger(
   try {
     rule = await describeInboundReceiptRule(region);
   } catch (error) {
-    throw new InboundTriggerSwitchError(
-      ctx.skipInitialDeploy ? 2 : 1,
-      true,
-      error
-    );
+    throw inboundTriggerSwitchError(ctx.skipInitialDeploy ? 2 : 1, true, error);
   }
   const ruleExisted = rule !== null;
 
@@ -156,7 +173,7 @@ export async function switchInboundTrigger(
             })
         );
       } catch (error) {
-        throw new InboundTriggerSwitchError(1, true, error);
+        throw inboundTriggerSwitchError(1, true, error);
       }
     }
 
@@ -175,7 +192,7 @@ export async function switchInboundTrigger(
           )
       );
     } catch (error) {
-      throw new InboundTriggerSwitchError(2, true, error);
+      throw inboundTriggerSwitchError(2, true, error);
     }
   }
 
@@ -189,7 +206,7 @@ export async function switchInboundTrigger(
       await saveConnectionMetadata(metadata);
     });
   } catch (error) {
-    throw new InboundTriggerSwitchError(3, ruleExisted, error);
+    throw inboundTriggerSwitchError(3, ruleExisted, error);
   }
 
   // 4. Deploy in the new mode: removes the raw/ notification and S3 permission.
@@ -204,7 +221,7 @@ export async function switchInboundTrigger(
       })
     );
   } catch (error) {
-    throw new InboundTriggerSwitchError(4, ruleExisted, error);
+    throw inboundTriggerSwitchError(4, ruleExisted, error);
   }
 
   return { trigger: "ses-lambda-action", ruleExisted };
@@ -216,7 +233,7 @@ export async function switchInboundTrigger(
  * non-zero. Non-switch errors are rethrown for `handleCLIError`.
  */
 export function exitOnSwitchFailure(command: string, error: unknown): never {
-  if (!(error instanceof InboundTriggerSwitchError)) {
+  if (!isInboundTriggerSwitchError(error)) {
     throw error;
   }
   if (isJsonMode()) {

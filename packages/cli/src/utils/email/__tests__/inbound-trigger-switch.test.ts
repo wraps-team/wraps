@@ -20,7 +20,7 @@ vi.mock("../../shared/metadata.js", async (importOriginal) => {
 import { saveConnectionMetadata } from "../../shared/metadata.js";
 import { deployHooks } from "../email-stack-deploy.js";
 import {
-  InboundTriggerSwitchError,
+  isInboundTriggerSwitchError,
   switchInboundTrigger,
 } from "../inbound-trigger-switch.js";
 import {
@@ -190,7 +190,8 @@ describe("switchInboundTrigger", () => {
       deployHooks.deploy = vi.fn().mockRejectedValue(new Error("deploy boom"));
       const m = metadata();
       const error = await switchInboundTrigger(ctx(m)).catch((e) => e);
-      expect(error).toBeInstanceOf(InboundTriggerSwitchError);
+      expect(isInboundTriggerSwitchError(error)).toBe(true);
+      expect(error.code).toBe("INBOUND_TRIGGER_SWITCH_FAILED");
       expect(error.step).toBe(1);
       expect(error.message).toContain("old code, old rule");
       expect(error.message).toContain("deploy boom");

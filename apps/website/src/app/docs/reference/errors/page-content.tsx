@@ -547,6 +547,20 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
         message: "IAM permission denied: ses:SendEmail in <region>",
         solution: "wraps permissions --service email --json",
       },
+      {
+        code: "INBOUND_TRIGGER_SWITCH_FAILED",
+        message:
+          "Inbound trigger switch did not finish. Stopped at step <n> (<state>). Cause: <message>",
+        solution:
+          "Fix the cause, then run wraps email upgrade to finish the switch. Mail keeps one live trigger at every step, and what the command saved before the switch stays saved.",
+      },
+      {
+        code: "RECEIPT_RULE_DELETE_FAILED",
+        message:
+          "Could not delete the SES receipt rule wraps-inbound-catch-all (rule set wraps-inbound-rules): <message>. Nothing was destroyed.",
+        solution:
+          "Grant ses:DeleteReceiptRule, ses:DeleteReceiptRuleSet and ses:SetActiveReceiptRuleSet (wraps permissions --service email --json), then run wraps email destroy again.",
+      },
     ],
   },
   {
