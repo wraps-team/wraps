@@ -369,6 +369,7 @@ const inboundPayload = `{
     "messageId": "abcdef12-3456-7890-abcd-ef1234567890",
     "from": "sender@external.com",
     "to": ["inbox@yourapp.com"],
+    "envelopeRecipients": ["inbox@yourapp.com"],
     "subject": "Re: Your recent order",
     "date": "2025-01-15T14:00:00.000Z",
     "receivedAt": "2025-01-15T14:00:00.500Z",
@@ -1555,6 +1556,19 @@ export default function InfrastructureEventsPageContent() {
                         <tr className="border-b">
                           <td className="p-3">
                             <code className="rounded bg-muted px-1 py-0.5">
+                              detail.envelopeRecipients
+                            </code>
+                          </td>
+                          <td className="p-3 text-muted-foreground">
+                            Lowercased SMTP envelope recipients SES delivered
+                            to, Bcc included. Absent on mail received before{" "}
+                            <code>wraps email upgrade</code>, so treat absent
+                            as unknown, not empty
+                          </td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-3">
+                            <code className="rounded bg-muted px-1 py-0.5">
                               detail.subject
                             </code>
                           </td>
@@ -1680,6 +1694,14 @@ export default function InfrastructureEventsPageContent() {
                   autoReply
                 </code>
                 .
+              </p>
+              <p className="text-muted-foreground text-sm">
+                EventBridge delivers events at least once, so the same{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  email.received
+                </code>{" "}
+                event can arrive more than once. Deduplicate on{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">emailId</code>.
               </p>
               <p className="text-muted-foreground text-sm">
                 When replying to a signed message,{" "}

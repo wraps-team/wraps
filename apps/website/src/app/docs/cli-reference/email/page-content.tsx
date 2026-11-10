@@ -1091,7 +1091,9 @@ export default function CLIReferenceEmailPageContent() {
           </h3>
           <p className="mb-4 text-muted-foreground text-sm">
             Display the status of inbound email infrastructure, including MX
-            records and receipt rules.
+            records and receipt rules. Also shows the trigger mode (how the
+            receipt rule starts the processor) and warns when the rule and the
+            saved mode disagree.
           </p>
           <Card>
             <CardHeader>
@@ -1219,7 +1221,13 @@ export default function CLIReferenceEmailPageContent() {
               wraps email inbound init
             </code>
             . Updates the SES receipt rule and optionally auto-creates DNS
-            records.
+            records. If the deployment still uses the old trigger,{" "}
+            <code className="rounded bg-muted px-1 py-0.5">inbound init</code>,{" "}
+            <code className="rounded bg-muted px-1 py-0.5">inbound add</code>{" "}
+            and{" "}
+            <code className="rounded bg-muted px-1 py-0.5">email upgrade</code>{" "}
+            all move it to the new one. Use this CLI version on every machine
+            that deploys the stack: older versions put the old trigger back.
           </p>
           <Card className="mb-4">
             <CardHeader>
@@ -1263,6 +1271,13 @@ export default function CLIReferenceEmailPageContent() {
                   </code>{" "}
                   <span className="text-muted-foreground">
                     AWS region (must support SES inbound)
+                  </span>
+                </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">--preview</code>{" "}
+                  <span className="text-muted-foreground">
+                    Show what would change, including a trigger switch, without
+                    applying anything
                   </span>
                 </li>
                 <li>

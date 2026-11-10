@@ -119,6 +119,7 @@ const eventBridgeEventCode = `// EventBridge event payload (email.received)
     "messageId": "<message-id@mail.example.com>",
     "from": { "name": "John Doe", "address": "john@example.com" },
     "to": [{ "name": "", "address": "support@yourdomain.com" }],
+    "envelopeRecipients": ["support@yourdomain.com"],
     "subject": "Help with my order",
     "html": "<p>Email body...</p>",
     "text": "Email body...",
@@ -634,6 +635,18 @@ TTL: 300`,
             </div>
           </CardContent>
         </Card>
+
+        <p className="mb-4 text-muted-foreground text-sm">
+          <code className="rounded bg-muted px-1.5 py-0.5">
+            envelopeRecipients
+          </code>{" "}
+          lists the addresses SES actually delivered to, which can differ from{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">to</code>. Use it to
+          route on Bcc recipients, forwards and aliases. It is absent on mail
+          received before <code>wraps email upgrade</code>. Events are
+          delivered at least once, so deduplicate on{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">emailId</code>.
+        </p>
 
         <p className="mb-2 font-medium text-sm">Event Payload Example</p>
         <CodeBlock
