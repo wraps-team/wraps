@@ -117,6 +117,7 @@ wraps email check [domain]    Deliverability audit (DKIM, SPF, DMARC, blacklists
 wraps email verify            Verify domain DNS records
 wraps email config            Apply CLI updates to infrastructure
 wraps email upgrade           Add features (tracking, history, archiving)
+wraps email upgrade --action redeploy   Redeploy the saved configuration with the current CLI; finishes a pending inbound trigger switch (no DNS writes, works with --yes)
 wraps email restore           Restore from saved metadata
 wraps email destroy           Remove all email infrastructure
 ```
@@ -135,7 +136,7 @@ wraps email domains remove    Remove domain from SES
 
 ```
 wraps email inbound init      Enable inbound email receiving
-wraps email inbound status    Show inbound status and trigger mode
+wraps email inbound status    Show inbound status and trigger mode; flags a mismatch with the repair command and warns when another receipt rule set is active
 wraps email inbound add       Add a receiving domain (--preview shows changes without applying)
 wraps email inbound verify    Verify inbound DNS records
 wraps email inbound test      Send test and verify receipt
@@ -1123,7 +1124,7 @@ wraps email inbound test      # Send test and verify receipt
 wraps email inbound destroy   # Remove inbound infrastructure
 ```
 
-`inbound init`, `inbound add` and `email upgrade` move a deployment that still uses the old trigger to the new one. Deploy with this CLI version or later everywhere. An older CLI that deploys the stack after the upgrade removes the `wraps-inbound-ses-invoke` permission and narrows the bucket policy to `raw/*`, while the receipt rule still sends new mail to `mail/`. New inbound mail then stops being processed, and may not be stored. `wraps email inbound status` flags the mismatch, and `wraps email upgrade` with the new CLI repairs it. New mail is stored under `mail/`: if your own code reads `raw/` by prefix, read `rawS3Key` from the parsed JSON or the event instead.
+`inbound init`, `inbound add` and `email upgrade` move a deployment that still uses the old trigger to the new one. Deploy with this CLI version or later everywhere. An older CLI that deploys the stack after the upgrade removes the `wraps-inbound-ses-invoke` permission and narrows the bucket policy to `raw/*`, while the receipt rule still sends new mail to `mail/`. New inbound mail then stops being processed, and may not be stored. `wraps email inbound status` flags the mismatch, and `wraps email upgrade --action redeploy` with the new CLI repairs it (`inbound status` prints the exact command). New mail is stored under `mail/`: if your own code reads `raw/` by prefix, read `rawS3Key` from the parsed JSON or the event instead.
 
 The `email.received` EventBridge event and the parsed email JSON carry `envelopeRecipients`: the lowercased SMTP envelope recipients SES delivered to, Bcc included. Use it to route on Bcc recipients, forwards and aliases. It is absent on mail received before `wraps email upgrade`, so treat absent as unknown, not empty. `envelopeRecipients` is kept whole when an event is trimmed, including the last-resort form (which also keeps `emailId`, `rawS3Key`, `parsedS3Key`, `receivedAt`, `replyToken` and `autoReply`), as long as it has 100 addresses or fewer. With more than 100, the event keeps the first 100, adds `envelopeRecipientCount` with the full count, and adds `"envelopeRecipients"` to `truncatedFields`; the full list is in the parsed JSON at `parsedS3Key`. Events are delivered at least once: deduplicate on `emailId`. The dashboard, the local console and `wraps email inbound get` show it as "Delivered to" only when it adds an address not already in To or Cc; `--json` and the API return it whenever present.
 

@@ -1094,7 +1094,14 @@ export default function CLIReferenceEmailPageContent() {
             records and receipt rules. Also shows the trigger mode (how the
             receipt rule starts the processor) and warns when the
             deployment&apos;s trigger pieces (receipt rule, permission, bucket
-            policy, saved mode) disagree.
+            policy, saved mode) disagree. On a mismatch it prints the repair
+            command (
+            <code>
+              wraps email upgrade --action redeploy --region &lt;r&gt; --yes
+            </code>
+            ), and it warns when a different receipt rule set is active in the
+            region, because <code>inbound init</code> and{" "}
+            <code>inbound add</code> would deactivate it.
           </p>
           <Card>
             <CardHeader>
@@ -1238,7 +1245,7 @@ export default function CLIReferenceEmailPageContent() {
             </code>{" "}
             flags the mismatch, and{" "}
             <code className="rounded bg-muted px-1 py-0.5">
-              wraps email upgrade
+              wraps email upgrade --action redeploy
             </code>{" "}
             with the new CLI repairs it.
           </p>
@@ -1682,6 +1689,15 @@ export default function CLIReferenceEmailPageContent() {
               <li>
                 <code>--action managed-dedicated-ips</code>: Toggle an SES
                 managed dedicated IP pool and show the cost for your SES plan
+              </li>
+              <li>
+                <code>--action redeploy</code>: Redeploy the saved
+                configuration. Re-applies it with the current CLI version and
+                finishes the inbound trigger switch if it is still pending. It
+                writes no DNS records and never activates a receipt rule set,
+                works with <code>--yes</code>, and <code>--json</code> reports{" "}
+                <code>trigger</code>. Use it to finish a failed switch, or to
+                repair a deployment an older CLI redeployed.
               </li>
             </ul>
           </CardContent>
