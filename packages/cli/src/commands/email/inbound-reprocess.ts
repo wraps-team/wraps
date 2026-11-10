@@ -90,7 +90,7 @@ function lambdaDenied(): WrapsError {
   return new WrapsError(
     `Not allowed to invoke ${INBOUND_PROCESSOR_FUNCTION_NAME} (lambda:InvokeFunction)`,
     "LAMBDA_PERMISSION_DENIED",
-    "Re-apply the Wraps IAM policy, which now includes the InboundReprocess statement: run wraps permissions --service email --policy-dir ./wraps-policy and update each wraps-deployer-<n> policy in IAM from its file",
+    "Re-apply the Wraps IAM policy, which now includes the InboundReprocess statement: re-run `wraps permissions --policy-dir ./wraps-policy` with the same `--service`/`--preset` you used before, then update every `wraps-deployer-*` policy",
     "https://wraps.dev/docs/guides/aws-setup/permissions"
   );
 }
@@ -99,7 +99,7 @@ function sqsDeleteDenied(): WrapsError {
   return new WrapsError(
     `Not allowed to delete messages from the dead-letter queue ${INBOUND_DLQ_NAME} (sqs:DeleteMessage)`,
     "SQS_PERMISSION_DENIED",
-    "Re-apply the Wraps IAM policy, which now includes the InboundReprocess statement: run wraps permissions --service email --policy-dir ./wraps-policy and update each wraps-deployer-<n> policy in IAM from its file. Delete the messages the processor already took (their ids are in this error) before you run reprocess again, or the next run delivers them twice.",
+    "Re-apply the Wraps IAM policy, which now includes the InboundReprocess statement: re-run `wraps permissions --policy-dir ./wraps-policy` with the same `--service`/`--preset` you used before, then update every `wraps-deployer-*` policy. Delete the messages the processor already took (their ids are in this error) before you run reprocess again, or the next run delivers them twice.",
     "https://wraps.dev/docs/guides/aws-setup/permissions"
   );
 }
@@ -108,7 +108,7 @@ function sqsDenied(): WrapsError {
   return new WrapsError(
     `Not allowed to read the dead-letter queue ${INBOUND_DLQ_NAME} (sqs:GetQueueUrl, ReceiveMessage, DeleteMessage)`,
     "SQS_PERMISSION_DENIED",
-    "Re-apply the Wraps IAM policy, which now includes the InboundReprocess statement: run wraps permissions --service email --policy-dir ./wraps-policy and update each wraps-deployer-<n> policy in IAM from its file",
+    "Re-apply the Wraps IAM policy, which now includes the InboundReprocess statement: re-run `wraps permissions --policy-dir ./wraps-policy` with the same `--service`/`--preset` you used before, then update every `wraps-deployer-*` policy",
     "https://wraps.dev/docs/guides/aws-setup/permissions"
   );
 }

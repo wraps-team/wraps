@@ -1172,7 +1172,7 @@ export async function inboundStatus(
             dlq.error === "not-found"
               ? "not found (the queue doesn't exist in this region)"
               : dlq.error === "access-denied"
-                ? "access denied (re-apply the IAM policy: wraps permissions --service email --policy-dir ./wraps-policy)"
+                ? "access denied (re-apply the IAM policy: re-run `wraps permissions --policy-dir ./wraps-policy` with the same `--service`/`--preset` you used before, then update every `wraps-deployer-*` policy)"
                 : "unknown (couldn't read the queue)"
           )
         : dlqDepth > 0
