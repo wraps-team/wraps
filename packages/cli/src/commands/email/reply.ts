@@ -187,7 +187,7 @@ async function replyInitForSingleDomain(params: {
   // Save metadata BEFORE deploying so that Pulumi reads the initialSecret from
   // the stack config we pass in (buildEmailStackConfig uses the config object).
   metadata.timestamp = new Date().toISOString();
-  await saveConnectionMetadata(metadata); // baseline:allow-early-save — deliberate (initialSecret must reach the deploy); flagged only since the deploy seam moved to utils/email/email-stack-deploy.ts
+  await saveConnectionMetadata(metadata); // baseline:allow-early-save — initialSecret must be in metadata before the deploy reads it
 
   // Build stack config from the updated metadata.
   const stackConfig = buildEmailStackConfig(metadata, region);
