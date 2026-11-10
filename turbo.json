@@ -32,6 +32,8 @@
   "cacheMaxSize": "10GB",
   "cacheMaxAge": "7d",
   "concurrency": "75%",
+  "cacheMaxSize": "5GB",
+  "cacheMaxAge": "3d",
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
