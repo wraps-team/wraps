@@ -1011,6 +1011,16 @@ export default function CLIReferenceEmailPageContent() {
           </h3>
           <p className="mb-4 text-muted-foreground text-sm">
             Deploy inbound email receiving infrastructure to your AWS account.
+            SES allows one active receipt rule set per region, and init
+            activates <code>wraps-inbound-rules</code>. If another set is
+            active, or the active set can&apos;t be read, init asks before
+            deploying anything, because activating the Wraps set stops the other
+            set&apos;s rules from applying. With <code>--yes</code> it refuses
+            with <code>RECEIPT_RULE_SET_CONFLICT</code> unless you also pass{" "}
+            <code>--replace-active-rule-set</code> (<code>--json</code> without{" "}
+            <code>--yes</code> stops earlier and asks for <code>--yes</code>).{" "}
+            <code>--json</code> reports <code>deactivatedRuleSet</code> and{" "}
+            <code>previousRuleSetUnreadable</code>.
           </p>
           <Card className="mb-4">
             <CardHeader>
@@ -1055,6 +1065,19 @@ export default function CLIReferenceEmailPageContent() {
                   <code className="rounded bg-muted px-2 py-1">--preview</code>{" "}
                   <span className="text-muted-foreground">
                     Show the planned infrastructure changes without deploying
+                  </span>
+                </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">
+                    --replace-active-rule-set
+                  </code>{" "}
+                  <span className="text-muted-foreground">
+                    Deactivate another active SES receipt rule set when
+                    activating wraps-inbound-rules. SES allows one active set
+                    per region, so that set&apos;s rules stop applying to
+                    incoming mail. Without it the command asks first (default
+                    No), and with --yes it refuses. Pass it only after the AWS
+                    account owner agrees.
                   </span>
                 </li>
                 <li>
@@ -1107,11 +1130,13 @@ export default function CLIReferenceEmailPageContent() {
             reported without that command because a redeploy does not fix it. If
             a different receipt rule set is active in the region, status warns
             that <code>inbound init</code> (and <code>inbound add</code>, when
-            it has to recreate the missing rule) would activate the Wraps set
-            and deactivate that one; Wraps leaves it as it finds it. If no set
-            is active it says so, and if the active set cannot be read it
-            reports unknown rather than inactive. Status also shows the inbound
-            dead-letter queue depth and, when it is above zero, the{" "}
+            it has to recreate the missing rule) would deactivate it by
+            activating the Wraps set; those commands ask first, and with{" "}
+            <code>--yes</code> need <code>--replace-active-rule-set</code>.
+            Wraps leaves the other set as it finds it. If no set is active it
+            says so, and if the active set cannot be read it reports unknown
+            rather than inactive. Status also shows the inbound dead-letter
+            queue depth and, when it is above zero, the{" "}
             <code>inbound reprocess</code> command. <code>--json</code> always
             includes <code>triggerCheck.repairCommand</code>,{" "}
             <code>dlq.reprocessCommand</code> and{" "}
@@ -1312,6 +1337,20 @@ export default function CLIReferenceEmailPageContent() {
                   <span className="text-muted-foreground">
                     Show what would change, including a trigger switch, without
                     applying anything
+                  </span>
+                </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">
+                    --replace-active-rule-set
+                  </code>{" "}
+                  <span className="text-muted-foreground">
+                    Deactivate another active SES receipt rule set when
+                    activating wraps-inbound-rules. SES allows one active set
+                    per region, so that set&apos;s rules stop applying to
+                    incoming mail. Without it the command asks first (default
+                    No), and with --yes or --json it refuses. Only needed when
+                    the receipt rule is missing and add recreates it. Pass it
+                    only after the AWS account owner agrees.
                   </span>
                 </li>
                 <li>

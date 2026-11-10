@@ -126,7 +126,7 @@ ${usageExamplesCode}
 | \`email domains verify\` | \`email.domains.verify\` | \`domain\`, \`verified\` |
 | \`email domains get-dkim\` | \`email.domains.get-dkim\` | \`domain\`, \`dkimTokens\` |
 | \`email domains remove\` | \`email.domains.remove\` | \`domain\`, \`removed\` |
-| \`email inbound init\` | \`email.inbound.init\` | \`receivingDomain\`, \`bucketName\` |
+| \`email inbound init\` | \`email.inbound.init\` | \`receivingDomain\`, \`bucketName\`, \`deactivatedRuleSet\`, \`previousRuleSetUnreadable\` |
 | \`email inbound status\` | \`email.inbound.status\` | \`enabled\`, \`receivingDomain\`, \`bucketName\`, \`activeRuleSetReadable\`, \`triggerCheck\`, \`dlq\` |
 | \`email inbound verify\` | \`email.inbound.verify\` | \`verified\`, \`receivingDomain\` |
 | \`email inbound test\` | \`email.inbound.test\` | \`messageId\`, \`receivingDomain\` |
@@ -623,7 +623,8 @@ export default function PageContent() {
                   {
                     cli: "email inbound init",
                     command: "email.inbound.init",
-                    dataFields: "receivingDomain, bucketName",
+                    dataFields:
+                      "receivingDomain, bucketName, deactivatedRuleSet, previousRuleSetUnreadable",
                   },
                   {
                     cli: "email inbound status",

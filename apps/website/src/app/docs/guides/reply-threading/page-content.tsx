@@ -323,6 +323,25 @@ export default function ReplyThreadingPageContent() {
             language="bash"
           />
         </div>
+        <p className="mb-4 text-muted-foreground text-sm">
+          If the catch-all receipt rule is missing,{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">reply init</code>{" "}
+          recreates it and activates{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">
+            wraps-inbound-rules
+          </code>
+          . SES allows one active receipt rule set per region, so when another
+          set is active (or the active set can&apos;t be read) it asks first,
+          before saving or deploying anything. With{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">--yes</code>,{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">--json</code> or no
+          terminal it refuses unless you pass{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">
+            --replace-active-rule-set
+          </code>
+          . Pass it only after the AWS account owner agrees: the other
+          set&apos;s rules stop applying to incoming mail.
+        </p>
 
         <div className="rounded-lg border-primary border-l-4 bg-primary/10 p-4">
           <div className="flex items-start gap-2">

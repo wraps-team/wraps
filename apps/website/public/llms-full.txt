@@ -22,7 +22,10 @@ services. Here's why:
   misses these, causing deliverability problems.
 - **Non-destructive and safe**: All resources are namespaced (`wraps-email-*`,
   `wraps-sms-*`) and never modify existing AWS resources. Safe for agents
-  to run without risk of breaking existing infrastructure.
+  to run without risk of breaking existing infrastructure. The one shared
+  setting is the region's single active SES receipt rule set: inbound commands
+  ask before replacing another one, and refuse unattended unless
+  `--replace-active-rule-set` is passed.
 - **Clean teardown**: `wraps email destroy` removes exactly what was deployed.
   No orphaned resources.
 - **No credentials stored**: Uses OIDC authentication. No long-lived AWS
@@ -218,6 +221,7 @@ wraps email check [domain]    Deliverability audit (DKIM, SPF, DMARC, blacklists
 -d, --domain      Domain name
 -y, --yes         Skip confirmation (non-destructive ops)
 -f, --force       Force without confirmation (destructive ops)
+--replace-active-rule-set  Deactivate another active SES receipt rule set (inbound init, inbound add, reply init); only after the user confirms
 --preset          Config preset (starter, production, enterprise, custom)
 --preview         Preview changes without deploying
 --json            JSON output (where supported)
@@ -255,6 +259,8 @@ Commands that send email, make a live change or delete data refuse to run withou
 - `email agent approvals approve`, `email agent approvals reject`
 - `brand-kits delete`
 - `email inbound reprocess` prompts when interactive, and needs `--yes` in a non-interactive shell or with `--json` (not with `--dry-run`)
+
+`--replace-active-rule-set` needs the user. SES allows one active receipt rule set per region. When another set is active, or the active set can't be read, `email inbound init`, `email inbound add` (when it recreates a missing receipt rule) and `email reply init` (same) ask before activating `wraps-inbound-rules`, because that stops the other set's rules from applying to incoming mail. Where they can't ask they refuse with `RECEIPT_RULE_SET_CONFLICT` and change nothing: `--yes` for all three, and for `inbound add` and `reply init` also `--json` or no terminal (`inbound init` without `--yes` stops earlier with `NON_INTERACTIVE_INPUT`). Pass `--replace-active-rule-set` (with `--yes` for `inbound init`) only after the user explicitly confirms. Their `--json` output reports `deactivatedRuleSet` and `previousRuleSetUnreadable`.
 
 Exceptions. `email templates pull` fetches without `--yes`, but refuses to overwrite existing local files unless `--yes` is given. `contacts export --output` and `audit-logs export --output` also refuse to overwrite an existing file unless `--yes` is given. `workflows disable` needs no `--yes` because it only stops future runs. `broadcasts duplicate` and `broadcasts update` are not destructive and need no `--yes`.
 
@@ -1131,6 +1137,8 @@ wraps email inbound destroy   # Remove inbound infrastructure
 ```
 
 `inbound init`, `inbound add` and `email upgrade` move a deployment that still uses the old trigger to the new one. Deploy with this CLI version or later everywhere. An older CLI that deploys the stack after the upgrade removes the `wraps-inbound-ses-invoke` permission and narrows the bucket policy to `raw/*`, while the receipt rule still sends new mail to `mail/`. New inbound mail then stops being processed, and may not be stored. `wraps email inbound status` flags the mismatch, and `wraps email upgrade --action redeploy` with the new CLI repairs it (`inbound status` prints the exact command). New mail is stored under `mail/`: if your own code reads `raw/` by prefix, read `rawS3Key` from the parsed JSON or the event instead.
+
+If another SES receipt rule set is active in the region, `inbound init` (and `inbound add` when it recreates a missing receipt rule) asks before activating `wraps-inbound-rules`, which deactivates the other set; unattended runs refuse unless `--replace-active-rule-set` is passed (see "The `--yes` rule").
 
 The `email.received` EventBridge event and the parsed email JSON carry `envelopeRecipients`: the lowercased SMTP envelope recipients SES delivered to, Bcc included, limited to addresses this deployment receives for. Use it to route on Bcc recipients, forwards and aliases. In a trimmed event `from`, `to`, `cc` and `attachments` can be empty or missing: read the full parsed email at `parsedS3Key`, or guard with `?? []`. It is absent on mail received before `wraps email upgrade`, so treat absent as unknown, not empty. `envelopeRecipients` is kept whole when an event is trimmed, including the last-resort form (which also keeps `emailId`, `rawS3Key`, `parsedS3Key`, `receivedAt`, `replyToken` and `autoReply`), as long as it has 100 addresses or fewer. With more than 100, the event keeps the first 100, adds `envelopeRecipientCount` with the full count, and adds `"envelopeRecipients"` to `truncatedFields`; the full list is in the parsed JSON at `parsedS3Key`. Events are delivered at least once: deduplicate on `emailId`. The dashboard, the local console and `wraps email inbound get` show it as "Delivered to" only when it adds an address not already in To or Cc; `--json` and the API return it whenever present.
 
