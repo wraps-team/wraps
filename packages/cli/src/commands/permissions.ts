@@ -955,7 +955,8 @@ export async function permissions(options: PermissionsOptions): Promise<void> {
 
   const policy = buildPolicy(options.service, options.preset);
   // Each part fits one managed policy (6,144 characters, whitespace not
-  // counted). `policy` itself only fits an inline role policy (10,240).
+  // counted). `policy` itself only fits as a role's inline policy (10,240
+  // characters across all of that role's inline policies).
   const policies = splitPolicy(policy);
   const written =
     options.policyDir === undefined

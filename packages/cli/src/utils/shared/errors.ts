@@ -837,6 +837,14 @@ export const errors = {
       "https://wraps.dev/docs/guides/aws-setup/permissions"
     ),
 
+  policySplitFailed: (message: string) =>
+    new WrapsError(
+      message,
+      "POLICY_SPLIT_FAILED",
+      "This is a bug in the Wraps CLI's deployer policy, not in your setup. Report it with the command you ran: wraps support",
+      "https://wraps.dev/docs/guides/aws-setup/permissions"
+    ),
+
   pulumiError: (message: string) =>
     new WrapsError(
       `Infrastructure deployment failed: ${message}`,

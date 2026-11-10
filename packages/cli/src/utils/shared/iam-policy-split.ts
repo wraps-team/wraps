@@ -68,7 +68,10 @@ export function policySize(doc: unknown): number {
  * policy; Wraps keeps them unique across all parts so a `Sid` names one file.
  * A repeated `Sid` in the input is a bug in the caller, so it throws.
  *
- * Throws if a single statement, alone in a policy, is over the limit.
+ * Throws if a single statement, alone in a policy, is over the limit. Both
+ * throws are `POLICY_SPLIT_FAILED` WrapsErrors: `wraps permissions` splits on
+ * every run, so a bad statement must surface with a code, not as an
+ * unhandled error.
  */
 export function splitPolicy<S extends PolicyStatement>(
   policy: PolicyDocument<S>,
@@ -77,12 +80,14 @@ export function splitPolicy<S extends PolicyStatement>(
   const seen = new Set<string>();
   for (const stmt of policy.Statement) {
     if (seen.has(stmt.Sid)) {
-      throw new Error(`Duplicate IAM statement Sid "${stmt.Sid}"`);
+      throw errors.policySplitFailed(
+        `Duplicate IAM statement Sid "${stmt.Sid}"`
+      );
     }
     seen.add(stmt.Sid);
     const alone = policySize({ Version: policy.Version, Statement: [stmt] });
     if (alone > limit) {
-      throw new Error(
+      throw errors.policySplitFailed(
         `IAM statement "${stmt.Sid}" alone is ${alone} characters, over the ${limit}-character managed policy limit`
       );
     }
@@ -215,28 +220,69 @@ export function writePolicyDir<S extends PolicyStatement>(
     written.push(path);
   }
 
-  const stale = readdirSync(dir)
-    .map((name) => ({ name, match: OWNED_FILE.exec(name) }))
-    .filter(
-      (e): e is { name: string; match: RegExpExecArray } =>
-        e.match !== null && Number(e.match[1]) > parts.length
-    )
-    .sort((a, b) => Number(a.match[1]) - Number(b.match[1]))
-    .map((e) => join(dir, e.name))
-    .filter((path) => lstatSync(path).isFile());
+  const stale = findStaleFiles(dir, parts.length);
 
   const removed: string[] = [];
   for (const path of stale) {
     try {
       unlinkSync(path);
     } catch (err) {
+      const already =
+        removed.length > 0
+          ? ` Already removed in this run: ${removed.join(", ")}.`
+          : "";
       throw errors.policyDirWriteFailed(
-        `Wrote the new policies but could not remove the stale ${path}: ${errorText(err)}`,
-        "Delete it yourself, and don't create an IAM policy from it."
+        `Wrote the new policies but could not remove the stale ${path}: ${errorText(err)}.${already}`,
+        "Delete it yourself, and don't create an IAM policy from it. Detach and delete the IAM policies named after every stale file listed here."
       );
     }
     removed.push(path);
   }
 
   return { dir, written, removed };
+}
+
+/**
+ * Regular files in `dir` named `wraps-deployer-<n>.json` with n above
+ * `count`, in numeric order. Runs after every write, so a failure here throws
+ * POLICY_DIR_WRITE_FAILED saying the new files are already written.
+ */
+function findStaleFiles(dir: string, count: number): string[] {
+  let names: string[];
+  try {
+    names = readdirSync(dir);
+  } catch (err) {
+    throw errors.policyDirWriteFailed(
+      `Wrote the new policies but could not list ${dir} to remove stale files: ${errorText(err)}`,
+      `Delete any wraps-deployer-<n>.json numbered above ${count} in that folder yourself, and don't create IAM policies from them.`
+    );
+  }
+
+  const stale: string[] = [];
+  const candidates = names
+    .map((name) => ({ name, match: OWNED_FILE.exec(name) }))
+    .filter(
+      (e): e is { name: string; match: RegExpExecArray } =>
+        e.match !== null && Number(e.match[1]) > count
+    )
+    .sort((a, b) => Number(a.match[1]) - Number(b.match[1]));
+  for (const { name } of candidates) {
+    const path = join(dir, name);
+    let isFile: boolean;
+    try {
+      isFile = lstatSync(path).isFile();
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        continue; // Gone since readdir: nothing to remove.
+      }
+      throw errors.policyDirWriteFailed(
+        `Wrote the new policies but could not check the stale ${path}: ${errorText(err)}`,
+        "Delete it yourself if it's a stale policy file, and don't create an IAM policy from it."
+      );
+    }
+    if (isFile) {
+      stale.push(path);
+    }
+  }
+  return stale;
 }

@@ -150,7 +150,8 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
       {
         code: "SES_PERMISSION_DENIED",
         message: "SES permission denied: <action>",
-        solution: "wraps permissions --service email --json",
+        solution:
+          "Your IAM user/role needs the ses:<action> permission. List the SES permissions Wraps needs (JSON to read, not a policy to paste): wraps permissions --service email --json",
       },
       {
         code: "DYNAMODB_PERMISSION_DENIED",
@@ -195,7 +196,14 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
         code: "POLICY_DIR_WRITE_FAILED",
         message: "Could not write <dir>/wraps-deployer-<n>.json: <detail>",
         solution:
-          "Raised by wraps permissions --policy-dir when the folder can't be created or written, or a wraps-deployer-<n>.json in it is a symlink. Old wraps-deployer-<n>.json files are removed only after every new one is written, so a failed write removes nothing. If removing an old file fails, the message names it: delete it yourself and don't create an IAM policy from it. Otherwise fix the folder and re-run.",
+          "Raised by wraps permissions --policy-dir when the folder can't be created, written or listed, or a wraps-deployer-<n>.json in it is a symlink. Old wraps-deployer-<n>.json files are removed only after every new one is written, so a failed write removes nothing. If listing the folder or removing an old file fails after the writes, the message names the files still there and any already removed: delete the leftovers yourself, don't create IAM policies from them, and detach and delete the IAM policies named after the removed ones. Otherwise fix the folder and re-run.",
+      },
+      {
+        code: "POLICY_SPLIT_FAILED",
+        message:
+          'Duplicate IAM statement Sid "<sid>", or IAM statement "<sid>" alone is over the 6144-character managed policy limit',
+        solution:
+          "Raised by wraps permissions when the CLI's own deployer policy can't be split into managed policies. It's a bug in the CLI, not in your setup: report it with the command you ran (wraps support).",
       },
     ],
   },

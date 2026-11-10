@@ -11,8 +11,47 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { WrapsError } from "../errors.js";
+
+/** Make one fs call fail for a given path; everything else is the real fs. */
+const failures = vi.hoisted(() => ({
+  unlink: undefined as string | undefined,
+  readdir: undefined as string | undefined,
+}));
+
+vi.mock("node:fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs")>();
+  const eacces = (syscall: string, path: string) =>
+    Object.assign(
+      new Error(`EACCES: permission denied, ${syscall} '${path}'`),
+      { code: "EACCES" }
+    );
+  return {
+    ...actual,
+    unlinkSync: (path: string) => {
+      if (path === failures.unlink) {
+        throw eacces("unlink", path);
+      }
+      return actual.unlinkSync(path);
+    },
+    readdirSync: ((path: string, ...rest: unknown[]) => {
+      if (path === failures.readdir) {
+        throw eacces("scandir", path);
+      }
+      return (actual.readdirSync as (...a: unknown[]) => unknown)(
+        path,
+        ...rest
+      );
+    }) as typeof actual.readdirSync,
+  };
+});
+
+afterEach(() => {
+  failures.unlink = undefined;
+  failures.readdir = undefined;
+});
+
 import {
   MANAGED_POLICY_SIZE_LIMIT,
   type NamedPolicy,
@@ -105,18 +144,38 @@ describe("splitPolicy", () => {
     ]);
   });
 
-  it("throws when one statement alone is over the limit", () => {
-    expect(() =>
+  it("throws POLICY_SPLIT_FAILED when one statement alone is over the limit", () => {
+    const thrown = catchError(() =>
       splitPolicy(doc([stmt("Ok", 10), stmt("Huge", 7000)]))
-    ).toThrow(/"Huge" alone is \d+ characters, over the 6144-character/);
+    );
+    expect(thrown).toBeInstanceOf(WrapsError);
+    expect(thrown.code).toBe("POLICY_SPLIT_FAILED");
+    expect(thrown.message).toMatch(
+      /^IAM statement "Huge" alone is \d+ characters, over the 6144-character managed policy limit$/
+    );
+    expect(thrown.suggestion).toBe(
+      "This is a bug in the Wraps CLI's deployer policy, not in your setup. Report it with the command you ran: wraps support"
+    );
   });
 
-  it("throws on a duplicate Sid instead of deduplicating", () => {
-    expect(() =>
+  it("throws POLICY_SPLIT_FAILED on a duplicate Sid instead of deduplicating", () => {
+    const thrown = catchError(() =>
       splitPolicy(doc([stmt("Same", 10), stmt("Other", 10), stmt("Same", 20)]))
-    ).toThrow('Duplicate IAM statement Sid "Same"');
+    );
+    expect(thrown).toBeInstanceOf(WrapsError);
+    expect(thrown.code).toBe("POLICY_SPLIT_FAILED");
+    expect(thrown.message).toBe('Duplicate IAM statement Sid "Same"');
   });
 });
+
+function catchError(fn: () => unknown): WrapsError {
+  try {
+    fn();
+  } catch (err) {
+    return err as WrapsError;
+  }
+  throw new Error("expected a throw");
+}
 
 const tempDirs: string[] = [];
 
@@ -253,5 +312,68 @@ describe("writePolicyDir", () => {
       "Pass a directory: wraps permissions --policy-dir ./wraps-policy"
     );
     expect(readFileSync(file, "utf8")).toBe("x");
+  });
+});
+
+describe("writePolicyDir: failures after the writes", () => {
+  it("a failed mkdir throws POLICY_DIR_WRITE_FAILED", () => {
+    const file = join(tempDir(), "a-file");
+    writeFileSync(file, "x");
+    const thrown = catchError(() =>
+      writePolicyDir(join(file, "sub"), parts(1))
+    );
+    expect(thrown).toBeInstanceOf(WrapsError);
+    expect(thrown.code).toBe("POLICY_DIR_WRITE_FAILED");
+    expect(thrown.message).toMatch(
+      new RegExp(`^Could not create ${join(file, "sub")}: ENOTDIR`)
+    );
+    expect(readFileSync(file, "utf8")).toBe("x");
+  });
+
+  it("an unlink failing partway names the file and the ones already removed", () => {
+    const dir = tempDir();
+    writePolicyDir(dir, parts(4));
+    failures.unlink = join(dir, "wraps-deployer-3.json");
+
+    const thrown = catchError(() => writePolicyDir(dir, parts(1)));
+
+    expect(thrown.code).toBe("POLICY_DIR_WRITE_FAILED");
+    expect(thrown.message).toBe(
+      `Wrote the new policies but could not remove the stale ${join(dir, "wraps-deployer-3.json")}: EACCES: permission denied, unlink '${join(dir, "wraps-deployer-3.json")}'. Already removed in this run: ${join(dir, "wraps-deployer-2.json")}.`
+    );
+    expect(thrown.suggestion).toBe(
+      "Delete it yourself, and don't create an IAM policy from it. Detach and delete the IAM policies named after every stale file listed here."
+    );
+    expect(existsSync(join(dir, "wraps-deployer-2.json"))).toBe(false);
+    expect(existsSync(join(dir, "wraps-deployer-3.json"))).toBe(true);
+    // Stopped at the failure: -4 is left for the next run.
+    expect(existsSync(join(dir, "wraps-deployer-4.json"))).toBe(true);
+  });
+
+  it("an unlink failing first says nothing was removed yet", () => {
+    const dir = tempDir();
+    writePolicyDir(dir, parts(2));
+    failures.unlink = join(dir, "wraps-deployer-2.json");
+    const thrown = catchError(() => writePolicyDir(dir, parts(1)));
+    expect(thrown.code).toBe("POLICY_DIR_WRITE_FAILED");
+    expect(thrown.message).not.toContain("Already removed");
+  });
+
+  it("a failed listing of the folder throws POLICY_DIR_WRITE_FAILED after the writes", () => {
+    const dir = tempDir();
+    writePolicyDir(dir, parts(3));
+    failures.readdir = dir;
+
+    const thrown = catchError(() => writePolicyDir(dir, parts(2)));
+
+    expect(thrown).toBeInstanceOf(WrapsError);
+    expect(thrown.code).toBe("POLICY_DIR_WRITE_FAILED");
+    expect(thrown.message).toBe(
+      `Wrote the new policies but could not list ${dir} to remove stale files: EACCES: permission denied, scandir '${dir}'`
+    );
+    expect(thrown.suggestion).toBe(
+      "Delete any wraps-deployer-<n>.json numbered above 2 in that folder yourself, and don't create IAM policies from them."
+    );
+    expect(existsSync(join(dir, "wraps-deployer-3.json"))).toBe(true);
   });
 });
