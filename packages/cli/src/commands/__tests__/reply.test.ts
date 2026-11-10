@@ -86,6 +86,11 @@ vi.mock("../../utils/email/receipt-rules.js", async (importOriginal) => {
     addDomainToReceiptRule: vi.fn().mockResolvedValue(undefined),
     removeDomainFromReceiptRule: vi.fn().mockResolvedValue(undefined),
     getReceiptRuleDomains: vi.fn().mockResolvedValue([]),
+    // Plan 041 exports that call SES: never reached by reply, mocked so a
+    // future path can't fall through to the real client.
+    describeInboundReceiptRule: vi.fn().mockResolvedValue(null),
+    syncReceiptRuleTrigger: vi.fn().mockResolvedValue(undefined),
+    createReceiptRule: vi.fn().mockResolvedValue(undefined),
   };
 });
 
@@ -463,6 +468,39 @@ describe("replyInit", () => {
     expect(consoleLogSpy).toBeDefined();
     expect(consoleErrorSpy).toBeDefined();
   });
+
+  it.each([
+    ["ses-lambda-action", "ses-lambda-action"],
+    [undefined, "s3-notification"],
+  ] as const)(
+    "registers r.mail.<domain> with the saved trigger mode (saved %s → %s)",
+    async (savedTrigger, expected) => {
+      const { loadConnectionMetadata } = await import(
+        "../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(
+        cloneMetadata((m) => {
+          if (savedTrigger) {
+            // biome-ignore lint/suspicious/noExplicitAny: test setup
+            (m.services.email.config.inbound as any).trigger = savedTrigger;
+          }
+        })
+      );
+      const { addDomainToReceiptRule } = await import(
+        "../../utils/email/receipt-rules.js"
+      );
+
+      await replyInit({ domain: "support.foo.com", yes: true });
+
+      expect(vi.mocked(addDomainToReceiptRule)).toHaveBeenCalledWith(
+        "us-east-1",
+        "123456789012",
+        "r.mail.support.foo.com",
+        "wraps-inbound-123456789012-us-east-1",
+        expected
+      );
+    }
+  );
 
   it("does not print the manual-DNS block for a successful no-op write (success:true, recordsCreated:0)", async () => {
     const { loadConnectionMetadata } = await import(

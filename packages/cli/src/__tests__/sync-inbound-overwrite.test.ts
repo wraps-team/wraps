@@ -300,4 +300,51 @@ describe("wraps email sync — inbound configuration preservation", () => {
       expect(metadata.services.email?.config.inbound?.retention).toBe("1year");
     });
   });
+
+  describe("inbound.trigger survives every metadata path (plan 041)", () => {
+    function withTrigger(): ConnectionMetadata {
+      const metadata = createMetadataWithInbound();
+      // biome-ignore lint/style/noNonNullAssertion: fixture has inbound
+      metadata.services.email!.config.inbound!.trigger = "ses-lambda-action";
+      return metadata;
+    }
+
+    it("buildEmailStackConfig passes the saved trigger to the deploy", () => {
+      const stackConfig = buildEmailStackConfig(withTrigger(), "us-east-1");
+      expect(stackConfig.emailConfig.inbound?.trigger).toBe(
+        "ses-lambda-action"
+      );
+    });
+
+    it("a later partial inbound update (e.g. upgrade's retention change) keeps the trigger", () => {
+      const metadata = withTrigger();
+      updateServiceConfig(metadata, "email", {
+        inbound: { enabled: true, subdomain: "inbound", retention: "1year" },
+      });
+      expect(metadata.services.email?.config.inbound?.trigger).toBe(
+        "ses-lambda-action"
+      );
+    });
+
+    it("applyConfigUpdates with a trigger-only update (the switch's step 3) keeps every other inbound field", () => {
+      const metadata = createMetadataWithInbound();
+      const result = applyConfigUpdates(
+        // biome-ignore lint/style/noNonNullAssertion: fixture has email
+        metadata.services.email!.config,
+        {
+          inbound: { trigger: "ses-lambda-action" },
+        } as Partial<WrapsEmailConfig>
+      );
+      expect(result.inbound).toEqual({
+        enabled: true,
+        subdomain: "inbound",
+        receivingDomain: "inbound.example.com",
+        bucketName: "wraps-inbound-123456789012-us-east-1",
+        webhookUrl: "https://myapp.example.com/api/email/inbound",
+        webhookSecret: "super-secret-webhook-key-abc123",
+        retention: "90days",
+        trigger: "ses-lambda-action",
+      });
+    });
+  });
 });
