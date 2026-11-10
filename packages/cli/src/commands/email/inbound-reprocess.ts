@@ -37,6 +37,8 @@ const REPLAY_VISIBILITY_SECONDS = 120;
 
 type MessageReport = {
   messageId: string;
+  /** When SQS accepted the message into the DLQ (ISO), or null. */
+  sentTime: string | null;
   time: string | null;
   keys: string[];
   envelopeCount: number | null;
@@ -58,9 +60,12 @@ type ReplayReport = MessageReport & {
 /** An error that would repeat for every message; the run stops on it. */
 class RunStopped extends Error {
   readonly cause: WrapsError;
-  constructor(cause: WrapsError) {
+  /** The message Lambda had already accepted when the run stopped, if any. */
+  readonly handedOff?: ReplayReport;
+  constructor(cause: WrapsError, handedOff?: ReplayReport) {
     super(cause.message);
     this.cause = cause;
+    this.handedOff = handedOff;
   }
 }
 
@@ -90,6 +95,15 @@ function lambdaDenied(): WrapsError {
   );
 }
 
+function sqsDeleteDenied(): WrapsError {
+  return new WrapsError(
+    `Not allowed to delete messages from the dead-letter queue ${INBOUND_DLQ_NAME} (sqs:DeleteMessage)`,
+    "SQS_PERMISSION_DENIED",
+    "Re-apply the Wraps IAM policy, which now includes the InboundReprocess statement: wraps permissions --service email --json",
+    "https://wraps.dev/docs/guides/aws-setup/permissions"
+  );
+}
+
 function sqsDenied(): WrapsError {
   return new WrapsError(
     `Not allowed to read the dead-letter queue ${INBOUND_DLQ_NAME} (sqs:GetQueueUrl, ReceiveMessage, DeleteMessage)`,
@@ -114,8 +128,11 @@ function parseMax(raw: string | undefined): number {
 
 function report(message: Message): MessageReport {
   const summary = summarizeDlqBody(message.Body);
+  const sent = Number(message.Attributes?.SentTimestamp);
   return {
     messageId: message.MessageId ?? "",
+    sentTime:
+      Number.isFinite(sent) && sent > 0 ? new Date(sent).toISOString() : null,
     time: summary.time,
     keys: summary.keys,
     envelopeCount: summary.envelopeCount,
@@ -155,6 +172,7 @@ async function receive(
       new ReceiveMessageCommand({
         QueueUrl: queueUrl,
         MaxNumberOfMessages: Math.min(BATCH_SIZE, maxMessages),
+        MessageSystemAttributeNames: ["SentTimestamp"],
         VisibilityTimeout: visibilityTimeout,
         WaitTimeSeconds: WAIT_SECONDS,
       })
@@ -253,13 +271,41 @@ async function replayOne(
       })
     );
   } catch (error) {
-    return {
+    const kept: ReplayReport = {
       ...base,
       outcome: "replayed-not-deleted",
       error: errorText(error),
     };
+    // Every delete would fail the same way and each message would be handed
+    // off and left queued, so stop at the first denial.
+    if (isAccessDenied(error)) {
+      throw new RunStopped(sqsDeleteDenied(), kept);
+    }
+    return kept;
   }
   return { ...base, outcome: "replayed" };
+}
+
+/**
+ * The error a stopped run throws. It says what was already handed off, and
+ * in --json carries the ids so the caller can tell which messages those were.
+ */
+function stoppedError(cause: WrapsError, results: ReplayReport[]): WrapsError {
+  const handedOff = results.filter((r) => r.outcome !== "failed");
+  const kept = results.filter((r) => r.outcome === "replayed-not-deleted");
+  const n = handedOff.length;
+  const keptNote =
+    kept.length > 0
+      ? ` ${kept.length} of them ${kept.length === 1 ? "is" : "are"} still queued although the processor took ${kept.length === 1 ? "it" : "them"}; do not replay ${kept.length === 1 ? "it" : "them"} (ids in the --json data, or leave ${kept.length === 1 ? "it" : "them"} to expire after 14 days).`
+      : "";
+  // Reuse the cause: its code is a literal where it was built, which the
+  // error-code parity test relies on.
+  cause.data = {
+    handedOff: handedOff.map((r) => r.messageId),
+    handedOffNotDeleted: kept.map((r) => r.messageId),
+  };
+  cause.message = `${cause.message}. Stopped after ${n} message${n === 1 ? "" : "s"} handed off to the processor; messages not handed off are still in the queue.${keptNote}`;
+  return cause;
 }
 
 /**
@@ -380,10 +426,10 @@ export async function inboundReprocess(
         result = await replayOne(sqs, lambda, queueUrl, message, region);
       } catch (error) {
         if (error instanceof RunStopped) {
-          const done = results.filter((r) => r.outcome !== "failed").length;
-          const stopped = error.cause;
-          stopped.message = `${stopped.message}. Stopped after ${done} message${done === 1 ? "" : "s"} handed off; every other message is still in the queue.`;
-          throw stopped;
+          if (error.handedOff) {
+            results.push(error.handedOff);
+          }
+          throw stoppedError(error.cause, results);
         }
         throw error;
       }
@@ -441,8 +487,17 @@ export async function inboundReprocess(
     `${results.length} handled: ${parts.join(", ")}${capped ? ` (stopped at --max ${max}; the queue may hold more)` : ""}.`
   );
   if (notDeleted > 0) {
+    const kept = results.filter((r) => r.outcome === "replayed-not-deleted");
+    const them = notDeleted === 1 ? "it" : "them";
     clack.log.warn(
-      `${notDeleted} message${notDeleted === 1 ? " was" : "s were"} accepted by the processor but could not be deleted from the queue, so ${notDeleted === 1 ? "it is" : "they are"} still there. The processor already took ${notDeleted === 1 ? "it" : "them"}: do not run reprocess again for ${notDeleted === 1 ? "it" : "them"}, or the email is processed twice. Delete ${notDeleted === 1 ? "it" : "them"} in the SQS console or with aws sqs delete-message (the delete needs sqs:DeleteMessage on ${INBOUND_DLQ_NAME}), or let the 14-day retention expire.`
+      `${notDeleted} message${notDeleted === 1 ? " was" : "s were"} accepted by the processor but could not be deleted from the queue, so ${notDeleted === 1 ? "it is" : "they are"} still there:\n${kept
+        .map(
+          (r) =>
+            `  ${r.messageId}  sent to the queue ${r.sentTime ?? "at an unknown time"}`
+        )
+        .join(
+          "\n"
+        )}\nThe processor already took ${them}. The next reprocess run would take ${them} from the queue and replay ${them} again, delivering the email twice. Delete ${them} from the SQS console (${INBOUND_DLQ_NAME}, Send and receive messages, poll, find the id) before running reprocess again, or leave ${them} to expire: the queue keeps messages 14 days.`
     );
   }
   if (failed > 0) {

@@ -79,7 +79,12 @@ function s3Body(key: string) {
 }
 
 function msg(id: string, body: string): Message {
-  return { MessageId: id, ReceiptHandle: `rh-${id}`, Body: body };
+  return {
+    MessageId: id,
+    ReceiptHandle: `rh-${id}`,
+    Body: body,
+    Attributes: { SentTimestamp: "1793000000000" },
+  };
 }
 
 function jsonOut(): any {
@@ -266,11 +271,71 @@ describe("inbound reprocess (replay)", () => {
       .mock.calls.map((c) => String(c[0]))
       .join("\n");
     expect(warned).toContain("already took it");
-    expect(warned).toContain("do not run reprocess again");
+    expect(warned).toContain("m1");
+    expect(warned).toContain("2026-10-26T07:33:20.000Z");
+    expect(warned).toContain(
+      "would take it from the queue and replay it again"
+    );
+    expect(warned).toContain("14 days");
+    expect(warned).toContain("SQS console");
+    expect(warned).not.toContain("aws sqs delete-message");
     expect(warned).not.toContain("could not be handed to the processor");
     expect(String(vi.mocked(clack.log.info).mock.calls[0][0])).toContain(
       "1 replayed but not deleted, 0 failed"
     );
+  });
+
+  it("an sqs:DeleteMessage denial stops the run at the first one and says what was handed off", async () => {
+    sqs
+      .on(DeleteMessageCommand)
+      .rejects(Object.assign(new Error("denied"), { name: "AccessDenied" }));
+    sqs.on(ReceiveMessageCommand).resolves({
+      Messages: [msg("m1", sesBody("a")), msg("m2", sesBody("b"))],
+    });
+
+    const err = await inboundReprocess({ yes: true }).then(
+      () => null,
+      (e) => e
+    );
+
+    expect(err).toMatchObject({ code: "SQS_PERMISSION_DENIED" });
+    expect(err.message).toContain("sqs:DeleteMessage");
+    expect(err.message).toContain("Stopped after 1 message handed off");
+    expect(err.message).toContain("do not replay");
+    expect(err.message).toContain("still queued");
+    expect(err.data).toEqual({
+      handedOff: ["m1"],
+      handedOffNotDeleted: ["m1"],
+    });
+    // m2 was never invoked: one invoke, one delete attempt.
+    expect(lambda.commandCalls(InvokeCommand)).toHaveLength(1);
+    expect(sqs.commandCalls(DeleteMessageCommand)).toHaveLength(1);
+  });
+
+  it("a stopped run keeps the earlier hand-offs in the error data (processor denied mid-run)", async () => {
+    let n = 0;
+    lambda.on(InvokeCommand).callsFake(async () => {
+      if (++n === 2) {
+        throw Object.assign(new Error("denied"), {
+          name: "AccessDeniedException",
+        });
+      }
+      return { StatusCode: 202 };
+    });
+    sqs.on(ReceiveMessageCommand).resolves({
+      Messages: [
+        msg("m1", sesBody("a")),
+        msg("m2", sesBody("b")),
+        msg("m3", sesBody("c")),
+      ],
+    });
+    const err = await inboundReprocess({ yes: true }).then(
+      () => null,
+      (e) => e
+    );
+    expect(err.code).toBe("LAMBDA_PERMISSION_DENIED");
+    expect(err.data).toEqual({ handedOff: ["m1"], handedOffNotDeleted: [] });
+    expect(sqs.commandCalls(DeleteMessageCommand)).toHaveLength(1);
   });
 
   it("reports replayed-not-deleted separately in --json", async () => {

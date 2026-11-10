@@ -13,7 +13,9 @@ export class WrapsError extends Error {
     message: string,
     public code: string,
     public suggestion?: string,
-    public docsUrl?: string
+    public docsUrl?: string,
+    /** Values a failed command still hands back in `--json` (as the envelope's `data`). */
+    public data?: Record<string, unknown>
   ) {
     super(message);
     this.name = "WrapsError";
@@ -377,9 +379,11 @@ export function handleCLIError(error: unknown, command?: string): void {
     let message = "An unexpected error occurred";
     let suggestion: string | undefined;
     let docsUrl: string | undefined;
+    let data: Record<string, unknown> | undefined;
 
     if (error instanceof WrapsError) {
       trackError(error.code, cmdContext);
+      data = error.data;
       code = error.code;
       message = error.message;
       suggestion = error.suggestion;
@@ -429,7 +433,11 @@ export function handleCLIError(error: unknown, command?: string): void {
         error instanceof Error ? error.message : String(error || message);
     }
 
-    jsonError(cmdContext, { code, message, suggestion, docsUrl });
+    if (data) {
+      jsonError(cmdContext, { code, message, suggestion, docsUrl }, data);
+    } else {
+      jsonError(cmdContext, { code, message, suggestion, docsUrl });
+    }
     // `process.exitCode`, not `process.exit`, so cli.ts's finally block still
     // flushes telemetry. The `return` is load-bearing: without it execution
     // falls out of this block into the human chain and prints the error twice.
