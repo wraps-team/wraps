@@ -22,6 +22,10 @@ import {
 } from "../../utils/dns/credentials.js";
 import { calculateCosts, formatCost } from "../../utils/email/costs.js";
 import { checkEventPipeline } from "../../utils/email/event-pipeline-check.js";
+import {
+  exitOnSwitchFailure,
+  switchInboundTrigger,
+} from "../../utils/email/inbound-trigger-switch.js";
 import { confirmManagedDedicatedIps } from "../../utils/email/managed-dedicated-ips.js";
 import { getAllPresetInfo, getPreset } from "../../utils/email/presets.js";
 import { resolveDashboardUrl } from "../../utils/selfhost/dashboard-url.js";
@@ -40,6 +44,7 @@ import {
   buildEmailStackConfig,
   generateWebhookSecret,
   getAllTrackedDomains,
+  getInboundTrigger,
   loadConnectionMetadata,
   saveConnectionMetadata,
   updateEmailConfig,
@@ -2608,6 +2613,32 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
 
   // Always persist metadata after all upgrade actions
   await saveConnectionMetadata(metadata);
+
+  // Switch an inbound deployment still on the S3-notification trigger to the
+  // SES Lambda action (design §4.4 steps 2-4; the deploy above was step 1).
+  // The command's last mutating step, after both of upgrade's saves and after
+  // the once-shown SMTP credentials are printed, never inside a Pulumi
+  // program and never in --preview (which returned earlier). Plan 041 R1.
+  if (
+    metadata.services.email?.config.inbound?.enabled &&
+    getInboundTrigger(metadata) === "s3-notification"
+  ) {
+    try {
+      await switchInboundTrigger({
+        metadata,
+        accountId: identity.accountId,
+        region,
+        stackName:
+          metadata.services.email.pulumiStackName ||
+          `wraps-${identity.accountId}-${region}`,
+        autoConfirm: options.yes,
+        skipInitialDeploy: true,
+        progress,
+      });
+    } catch (error) {
+      exitOnSwitchFailure("email.upgrade", error);
+    }
+  }
 
   // Post-deploy pipeline check (warn-only): verify SES events can actually
   // reach the event log/dashboard after this deploy. Never fails the
