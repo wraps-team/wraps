@@ -1094,16 +1094,28 @@ export default function CLIReferenceEmailPageContent() {
             records and receipt rules. Also shows the trigger mode (how the
             receipt rule starts the processor) and warns when the
             deployment&apos;s trigger pieces (receipt rule, permission, bucket
-            policy, saved mode) disagree. On a mismatch it prints the repair
-            command (
+            policy, saved mode) disagree. Where a redeploy fixes a mismatch (the
+            receipt rule does not match the saved mode, the SES invoke
+            permission or the <code>mail/*</code> bucket policy is missing, or
+            the deployment is still on the old trigger), it prints the repair
+            command,{" "}
             <code>
               wraps email upgrade --action redeploy --region &lt;r&gt; --yes
-            </code>
-            ), and it warns when a different receipt rule set is active in the
-            region, because <code>inbound init</code> and{" "}
-            <code>inbound add</code> would deactivate it. It also shows the
-            inbound dead-letter queue depth and, when it is not zero, the{" "}
-            <code>inbound reprocess</code> command.
+            </code>{" "}
+            (add <code>--preview</code> first to see the stack changes). A
+            missing or disabled receipt rule, or an inactive rule set, is
+            reported without that command because a redeploy does not fix it. If
+            a different receipt rule set is active in the region, status warns
+            that <code>inbound init</code> (and <code>inbound add</code>, when
+            it has to recreate the missing rule) would activate the Wraps set
+            and deactivate that one; Wraps leaves it as it finds it. If no set
+            is active it says so, and if the active set cannot be read it
+            reports unknown rather than inactive. Status also shows the inbound
+            dead-letter queue depth and, when it is above zero, the{" "}
+            <code>inbound reprocess</code> command. <code>--json</code> always
+            includes <code>triggerCheck.repairCommand</code>,{" "}
+            <code>dlq.reprocessCommand</code> and{" "}
+            <code>activeRuleSetReadable</code>.
           </p>
           <Card>
             <CardHeader>
@@ -1537,10 +1549,22 @@ export default function CLIReferenceEmailPageContent() {
             Replay inbound emails that failed every Lambda retry and landed in
             the dead-letter queue (<code>wraps-inbound-events-dlq</code>, kept
             14 days). Each message is handed back to the processor and deleted
-            from the queue once Lambda accepts it. A message Lambda does not
-            accept stays queued. If a replay is accepted but the delete fails,
-            it is reported as &quot;replayed, not deleted&quot;: do not replay
-            it again.
+            from the queue once Lambda accepts the hand-off. Accepting is not
+            processing: a replay that fails again returns to the queue later as
+            a new message. A message Lambda does not accept stays queued. If
+            Lambda accepts a message but the delete fails, the run reports it as
+            replayed but not deleted (<code>replayed-not-deleted</code> in{" "}
+            <code>--json</code>) and the message stays in the queue. The
+            processor already has it, but the next run takes it from the queue
+            and replays it again, so the email is delivered twice. Delete it
+            from the SQS console (<code>wraps-inbound-events-dlq</code>, Send
+            and receive messages, poll, find the id) before running reprocess
+            again, or leave it to expire: any run before the 14 days are up
+            replays it. The run lists the ids at its end; if it stopped early,
+            they are in the <code>--json</code> error <code>data</code>. The run
+            stops at the first denied <code>lambda:InvokeFunction</code> or{" "}
+            <code>sqs:DeleteMessage</code>, or if the processor is missing;
+            messages not handed off stay queued.
           </p>
           <Card className="mb-4">
             <CardHeader>
@@ -1581,8 +1605,10 @@ export default function CLIReferenceEmailPageContent() {
                 <li>
                   <code className="rounded bg-muted px-2 py-1">--json</code>{" "}
                   <span className="text-muted-foreground">
-                    Machine-readable output with the counts replayed,
-                    replayedNotDeleted and failed
+                    Machine-readable output with the counts found, replayed,
+                    replayedNotDeleted and failed, and one entry per message
+                    (outcome, sentTime, keys). A stopped run is an error whose
+                    data lists handedOff and handedOffNotDeleted message ids
                   </span>
                 </li>
               </ul>
@@ -1756,12 +1782,17 @@ export default function CLIReferenceEmailPageContent() {
               </li>
               <li>
                 <code>--action redeploy</code>: Redeploy the saved
-                configuration. Re-applies it with the current CLI version and
-                finishes the inbound trigger switch if it is still pending. It
-                writes no DNS records and never activates a receipt rule set,
-                works with <code>--yes</code>, and <code>--json</code> reports{" "}
-                <code>trigger</code>. Use it to finish a failed switch, or to
-                repair a deployment an older CLI redeployed.
+                configuration. Re-applies it with the current CLI version (a
+                newer stack program can add or change Wraps resources, and the
+                deploy reverts out-of-band drift in them) and moves a deployment
+                still on the old inbound trigger to the new one. The CLI&apos;s
+                own DNS steps (CAA, DKIM, ACM validation records) are skipped,
+                and it never activates a receipt rule set. Works with{" "}
+                <code>--yes</code>; <code>--preview</code> shows the stack
+                changes first and notes a pending trigger switch. With{" "}
+                <code>--json</code> it reports <code>trigger</code> when inbound
+                is enabled. Use it to finish a failed switch, or to repair a
+                deployment an older CLI redeployed.
               </li>
             </ul>
           </CardContent>

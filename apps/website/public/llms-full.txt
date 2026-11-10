@@ -117,7 +117,7 @@ wraps email check [domain]    Deliverability audit (DKIM, SPF, DMARC, blacklists
 wraps email verify            Verify domain DNS records
 wraps email config            Apply CLI updates to infrastructure
 wraps email upgrade           Add features (tracking, history, archiving)
-wraps email upgrade --action redeploy   Redeploy the saved configuration with the current CLI; finishes a pending inbound trigger switch (no DNS writes, works with --yes)
+wraps email upgrade --action redeploy   Redeploy the saved configuration with the current CLI; also performs a pending inbound trigger switch (skips the CLI's DNS steps; works with --yes; --preview first)
 wraps email restore           Restore from saved metadata
 wraps email destroy           Remove all email infrastructure
 ```
@@ -136,7 +136,7 @@ wraps email domains remove    Remove domain from SES
 
 ```
 wraps email inbound init      Enable inbound email receiving
-wraps email inbound status    Show inbound status and trigger mode; flags a mismatch with the repair command and warns when another receipt rule set is active; shows the dead-letter queue depth and, when it is not zero, the reprocess command
+wraps email inbound status    Show inbound status and trigger mode; flags trigger mismatches (with the redeploy repair command where a redeploy fixes them), warns when another receipt rule set is active, and shows the dead-letter queue depth (with the reprocess command when it is not zero)
 wraps email inbound add       Add a receiving domain (--preview shows changes without applying)
 wraps email inbound verify    Verify inbound DNS records
 wraps email inbound test      Send test and verify receipt
