@@ -41,6 +41,7 @@ import {
   buildEmailStackConfig,
   type ConnectionMetadata,
   getAllTrackedDomains,
+  getInboundTrigger,
   loadConnectionMetadata,
   removeInboundDomainFromMetadata,
   saveConnectionMetadata,
@@ -449,8 +450,10 @@ export async function inboundInit(
     await createReceiptRuleSet(region);
     await createReceiptRule(
       region,
+      identity.accountId,
       receivingDomain,
-      `wraps-inbound-${identity.accountId}-${region}`
+      `wraps-inbound-${identity.accountId}-${region}`,
+      getInboundTrigger(metadata)
     );
 
     // Activate rule set (warn if another is active)
@@ -1564,15 +1567,23 @@ export async function inboundAdd(
     (emailConfig.replyThreading?.domains?.length ?? 0) > 0;
 
   await progress.execute("Updating SES receipt rule", async () => {
-    await addDomainToReceiptRule(region, receivingDomain, bucketName);
+    await addDomainToReceiptRule(
+      region,
+      identity.accountId,
+      receivingDomain,
+      bucketName,
+      getInboundTrigger(metadata)
+    );
     // If reply-threading is enabled globally, also register r.mail.{parent}
     // as a catch-all recipient so signed-reply addresses route into the same
     // Lambda pipeline.
     if (replyThreadingEnabled) {
       await addDomainToReceiptRule(
         region,
+        identity.accountId,
         `r.mail.${parentDomain}`,
-        bucketName
+        bucketName,
+        getInboundTrigger(metadata)
       );
     }
   });

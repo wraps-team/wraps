@@ -20,6 +20,7 @@ import type {
 } from "../../types/index.js";
 import { SES_RECEIVING_REGIONS } from "../../types/index.js";
 import type { InboundDNSCleanupResult } from "../../utils/dns/index.js";
+import { runEmailStackDeploy } from "../../utils/email/email-stack-deploy.js";
 import {
   addDomainToReceiptRule,
   getReceiptRuleDomains,
@@ -37,6 +38,7 @@ import {
 import { isJsonMode, jsonSuccess } from "../../utils/shared/json-output.js";
 import {
   buildEmailStackConfig,
+  getInboundTrigger,
   loadConnectionMetadata,
   saveConnectionMetadata,
 } from "../../utils/shared/metadata.js";
@@ -47,12 +49,7 @@ import {
 import {
   ensurePulumiInstalled,
   previewWithResourceChanges,
-  withLockRetry,
 } from "../../utils/shared/pulumi.js";
-import {
-  DEFAULT_PULUMI_TIMEOUT_MS,
-  withTimeout,
-} from "../../utils/shared/timeout.js";
 
 // ---------------------------------------------------------------------------
 // Private helpers
@@ -68,86 +65,13 @@ type ReplyThreadingConfig = NonNullable<
 
 type ReplyDomainEntry = NonNullable<ReplyThreadingConfig>["domains"][number];
 
-/**
- * Deploy helper indirection — tests replace `deployHooks.deploy` so the full
- * Pulumi workspace + AWS credential resolution path is skipped without having
- * to mock every leaf module.
- */
-export const deployHooks = {
-  // biome-ignore lint/suspicious/noExplicitAny: test override hook
-  deploy: (params: any) => runEmailStackDeployImpl(params),
-};
-
-/**
- * Deploy the email stack via Pulumi. Exported for test-time monkey-patching;
- * tests mock this so they don't spin up a real Pulumi workspace.
- */
-export async function runEmailStackDeploy(params: {
-  accountId: string;
-  region: string;
-  stackName: string;
-  stackConfig: Parameters<typeof deployEmailStack>[0];
-  autoConfirm?: boolean;
-}): Promise<void> {
-  return deployHooks.deploy(params);
-}
-
-async function runEmailStackDeployImpl(params: {
-  accountId: string;
-  region: string;
-  stackName: string;
-  stackConfig: Parameters<typeof deployEmailStack>[0];
-  autoConfirm?: boolean;
-}): Promise<void> {
-  await ensurePulumiWorkDir({
-    accountId: params.accountId,
-    region: params.region,
-  });
-  const pulumiWorkDir = getPulumiWorkDir();
-
-  const stack = await pulumi.automation.LocalWorkspace.createOrSelectStack(
-    {
-      stackName: params.stackName,
-      projectName: "wraps-email",
-      program: async () => {
-        const result = await deployEmailStack(params.stackConfig);
-        return result as Record<string, unknown>;
-      },
-    },
-    {
-      workDir: pulumiWorkDir,
-    }
-  );
-
-  await stack.setConfig("aws:region", { value: params.region });
-
-  const pulumiOutput: string[] = [];
-  await withLockRetry(
-    () =>
-      withTimeout(
-        stack.up({
-          onOutput: (msg) => {
-            pulumiOutput.push(msg);
-          },
-        }),
-        DEFAULT_PULUMI_TIMEOUT_MS,
-        "Pulumi deployment"
-      ).catch((error: unknown) => {
-        if (pulumiOutput.length > 0) {
-          const fullOutput = pulumiOutput.join("");
-          clack.log.error("Pulumi deployment output:");
-          // biome-ignore lint/suspicious/noConsole: Pulumi failure diagnostic
-          console.error(fullOutput);
-        }
-        throw error;
-      }),
-    {
-      accountId: params.accountId,
-      region: params.region,
-      autoConfirm: params.autoConfirm,
-    }
-  );
-}
+// The deploy seam lives in `utils/email/email-stack-deploy.ts` (shared with
+// the inbound trigger switch). Re-exported so existing imports and tests that
+// replace `deployHooks.deploy` keep working on the same object.
+export {
+  deployHooks,
+  runEmailStackDeploy,
+} from "../../utils/email/email-stack-deploy.js";
 
 /**
  * Fetch the SSM parameter ARN + name for a given sending domain.
@@ -318,7 +242,13 @@ async function replyInitForSingleDomain(params: {
   await progress.execute(
     `Adding r.mail.${domain} to receipt rule`,
     async () => {
-      await addDomainToReceiptRule(region, `r.mail.${domain}`, bucketName);
+      await addDomainToReceiptRule(
+        region,
+        accountId,
+        `r.mail.${domain}`,
+        bucketName,
+        getInboundTrigger(metadata)
+      );
     }
   );
 

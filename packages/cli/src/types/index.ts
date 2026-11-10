@@ -57,6 +57,7 @@ export type {
   EmailUpgradeOptions,
   EmailVerifyOptions,
   InboundDomain,
+  InboundTrigger,
   SESEventType,
   SESReceivingRegion,
   SuppressionReason,

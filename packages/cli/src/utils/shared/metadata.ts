@@ -8,6 +8,7 @@ import type {
   EmailConfigPreset,
   EmailStackConfig,
   InboundDomain,
+  InboundTrigger,
   Provider,
   SelfhostConfig,
   ServiceType,
@@ -1052,6 +1053,29 @@ export function getAllTrackedDomains(
 // ---------------------------------------------------------------------------
 // Inbound domain helpers (for `wraps email inbound add/remove`)
 // ---------------------------------------------------------------------------
+
+/** The trigger every deployment made before the SES Lambda action uses. */
+export const DEFAULT_INBOUND_TRIGGER: InboundTrigger = "s3-notification";
+
+/**
+ * The inbound trigger mode of an email config: the saved value, or
+ * "s3-notification" when absent (legacy deployments never saved one).
+ */
+export function inboundTriggerOf(
+  config: Pick<WrapsEmailConfig, "inbound"> | undefined
+): InboundTrigger {
+  return config?.inbound?.trigger ?? DEFAULT_INBOUND_TRIGGER;
+}
+
+/**
+ * The inbound trigger mode the most recent deploy used, read from saved
+ * metadata. Rule writers take this, never a stale local object.
+ */
+export function getInboundTrigger(
+  metadata: ConnectionMetadata | null | undefined
+): InboundTrigger {
+  return inboundTriggerOf(metadata?.services?.email?.config);
+}
 
 /**
  * Migrate single-domain inbound config to multi-domain inboundDomains array.
