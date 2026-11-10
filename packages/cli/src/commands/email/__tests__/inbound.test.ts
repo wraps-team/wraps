@@ -1,6 +1,9 @@
 import { LambdaClient } from "@aws-sdk/client-lambda";
 import { S3Client } from "@aws-sdk/client-s3";
-import { SESClient } from "@aws-sdk/client-ses";
+import {
+  DescribeActiveReceiptRuleSetCommand,
+  SESClient,
+} from "@aws-sdk/client-ses";
 import {
   GetQueueAttributesCommand,
   GetQueueUrlCommand,
@@ -242,7 +245,7 @@ import {
 
 // Backstop: if a receipt-rule or trigger-check export is ever left unmocked,
 // its SDK call lands here instead of on real AWS.
-mockClient(SESClient);
+const sesBackstop = mockClient(SESClient);
 const lambdaBackstop = mockClient(LambdaClient);
 const s3Backstop = mockClient(S3Client);
 // `inbound status` reads the DLQ depth through SQS.
@@ -2331,9 +2334,13 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
     const UNREADABLE = { readable: false, error: "AccessDenied" } as const;
     const NO_REPLACEMENT = { readable: true, name: null } as const;
 
+    // isInteractive() also needs CI unset; GitHub Actions sets it.
     async function withTTY<T>(fn: () => Promise<T>): Promise<T> {
       const stdin = process.stdin.isTTY;
       const stdout = process.stdout.isTTY;
+      const ci = process.env.CI;
+      // biome-ignore lint/performance/noDelete: an unset env var, not an empty one
+      delete process.env.CI;
       Object.defineProperty(process.stdin, "isTTY", {
         value: true,
         configurable: true,
@@ -2345,6 +2352,9 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
       try {
         return await fn();
       } finally {
+        if (ci !== undefined) {
+          process.env.CI = ci;
+        }
         Object.defineProperty(process.stdin, "isTTY", {
           value: stdin,
           configurable: true,
@@ -2394,9 +2404,27 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
     }
 
     afterEach(async () => {
-      // Back to the file default (ours active) for the tests that follow.
+      // Back to the file defaults (ours active; every confirm says yes) for
+      // the tests that follow, even when a test failed midway.
       await setActiveRead({ readable: true, name: "wraps-inbound-rules" });
+      const clack = await import("@clack/prompts");
+      vi.mocked(clack.confirm).mockReset();
+      vi.mocked(clack.confirm).mockResolvedValue(true);
+      sesBackstop.reset();
     });
+
+    /**
+     * Let the command's (mocked) activation run the real setActiveReceiptRuleSet
+     * against the SES backstop, which reports `name` as active by then.
+     */
+    async function activeSetChangesTo(name: string) {
+      sesBackstop
+        .on(DescribeActiveReceiptRuleSetCommand)
+        .resolves({ Metadata: { Name: name } });
+      return vi.importActual<
+        typeof import("../../../utils/email/receipt-rules.js")
+      >("../../../utils/email/receipt-rules.js");
+    }
 
     describe("inbound init", () => {
       it("interactive, another set active: asks (default No) naming the set; yes activates over that set", async () => {
@@ -2417,7 +2445,7 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
         expect(rules.setActiveReceiptRuleSet).toHaveBeenCalledWith(
           "us-east-1",
           "wraps-inbound-rules",
-          CUSTOMER
+          expect.objectContaining({ expected: CUSTOMER })
         );
         expect(events[0]).toBe("command-up");
       });
@@ -2442,8 +2470,6 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
         expect(events).toEqual([]);
         expect(rules.createReceiptRule).not.toHaveBeenCalled();
         expect(rules.setActiveReceiptRuleSet).not.toHaveBeenCalled();
-        vi.mocked(clack.confirm).mockReset();
-        vi.mocked(clack.confirm).mockResolvedValue(true);
       });
 
       it("--yes with another set active refuses: no deploy, no rule call, no metadata save", async () => {
@@ -2484,7 +2510,7 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
         expect(rules.setActiveReceiptRuleSet).toHaveBeenCalledWith(
           "us-east-1",
           "wraps-inbound-rules",
-          CUSTOMER
+          expect.objectContaining({ expected: CUSTOMER })
         );
       });
 
@@ -2515,7 +2541,7 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
         expect(rules.setActiveReceiptRuleSet).toHaveBeenCalledWith(
           "us-east-1",
           "wraps-inbound-rules",
-          CUSTOMER
+          expect.objectContaining({ expected: CUSTOMER })
         );
         expect(jsonOutput("email.inbound.init")?.success).toBe(true);
       });
@@ -2547,7 +2573,7 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
         expect(rules.setActiveReceiptRuleSet).toHaveBeenCalledWith(
           "us-east-1",
           "wraps-inbound-rules",
-          UNREADABLE
+          expect.objectContaining({ expected: UNREADABLE })
         );
       });
 
@@ -2579,16 +2605,12 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
         expect(events).toEqual([]);
       });
 
-      it("the active set changing after consent: the activation refuses, after the deploy and 14b save, before the final save and any switch", async () => {
+      it("the active set changing after consent: the activation refuses after the deploy and 14b save, names what is in place and the init command that asks again", async () => {
         await freshInitMetadata();
         const rules = await setActiveRead(CUSTOMER);
-        const { errors } = await import("../../../utils/shared/errors.js");
-        vi.mocked(rules.setActiveReceiptRuleSet).mockRejectedValueOnce(
-          errors.receiptRuleSetConflict({
-            region: "us-east-1",
-            active: { readable: true, name: "other-rules" },
-            changedSincePreflight: true,
-          })
+        const actual = await activeSetChangesTo("other-rules");
+        vi.mocked(rules.setActiveReceiptRuleSet).mockImplementationOnce(
+          actual.setActiveReceiptRuleSet
         );
 
         await expect(
@@ -2600,19 +2622,59 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
           })
         ).rejects.toMatchObject({
           code: "RECEIPT_RULE_SET_CONFLICT",
-          message: expect.stringContaining("not the set you agreed to replace"),
+          message:
+            "Receipt rule set other-rules is active in us-east-1, not customer-rules, the set you agreed to replace, so wraps-inbound-rules was not activated",
+          suggestion: expect.stringMatching(
+            /Already in place: the inbound stack is deployed and its configuration saved, and wraps-inbound-rules holds the receipt rule for in\.example\.com but is inactive\. DNS records were not written\.[\s\S]*run:\n {2}wraps email inbound init --domain example\.com --subdomain in --region us-east-1/
+          ),
         });
 
-        expect(rules.setActiveReceiptRuleSet).toHaveBeenCalledWith(
-          "us-east-1",
-          "wraps-inbound-rules",
-          CUSTOMER
-        );
         expect(events).toEqual([
           "command-up",
           "save:ses-lambda-action",
           "rule-write:ses-lambda-action",
         ]);
+      });
+
+      it("--json reports the set it deactivated (deactivatedRuleSet), and the text run says so", async () => {
+        await freshInitMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+        vi.mocked(rules.setActiveReceiptRuleSet).mockResolvedValueOnce(
+          CUSTOMER
+        );
+        setJsonMode(true);
+
+        await inboundInit({
+          domain: "example.com",
+          subdomain: "in",
+          yes: true,
+          json: true,
+          replaceActiveRuleSet: true,
+        });
+
+        expect(jsonOutput("email.inbound.init")?.data.deactivatedRuleSet).toBe(
+          "customer-rules"
+        );
+        const clack = await import("@clack/prompts");
+        expect(vi.mocked(clack.log.warn)).toHaveBeenCalledWith(
+          "Deactivated receipt rule set customer-rules."
+        );
+      });
+
+      it("--json reports deactivatedRuleSet null when nothing was deactivated", async () => {
+        await freshInitMetadata();
+        setJsonMode(true);
+
+        await inboundInit({
+          domain: "example.com",
+          subdomain: "in",
+          yes: true,
+          json: true,
+        });
+
+        expect(
+          jsonOutput("email.inbound.init")?.data.deactivatedRuleSet
+        ).toBeNull();
       });
 
       it("no set active: unchanged, activates without asking", async () => {
@@ -2630,7 +2692,7 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
         expect(rules.setActiveReceiptRuleSet).toHaveBeenCalledWith(
           "us-east-1",
           "wraps-inbound-rules",
-          NO_REPLACEMENT
+          expect.objectContaining({ expected: NO_REPLACEMENT })
         );
       });
 
@@ -2650,7 +2712,7 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
         expect(rules.setActiveReceiptRuleSet).toHaveBeenCalledWith(
           "us-east-1",
           "wraps-inbound-rules",
-          ours
+          expect.objectContaining({ expected: ours })
         );
       });
     });
@@ -2690,7 +2752,7 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
           "support.example.com",
           BUCKET,
           "ses-lambda-action",
-          CUSTOMER
+          expect.objectContaining({ expected: CUSTOMER })
         );
       });
 
@@ -2749,7 +2811,119 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
           "support.example.com",
           BUCKET,
           "ses-lambda-action",
-          NO_REPLACEMENT
+          expect.objectContaining({ expected: NO_REPLACEMENT })
+        );
+      });
+
+      it("rule missing, no --yes and no terminal: refuses naming the set (not NON_INTERACTIVE_INPUT)", async () => {
+        rule = null;
+        await addMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+
+        await expect(
+          inboundAdd({ domain: "example.com", subdomain: "support" })
+        ).rejects.toMatchObject({
+          code: "RECEIPT_RULE_SET_CONFLICT",
+          message: expect.stringContaining("customer-rules"),
+          suggestion: expect.stringContaining(
+            "Nothing was deployed or changed"
+          ),
+        });
+        expect(rules.addDomainToReceiptRule).not.toHaveBeenCalled();
+        expect(events).toEqual([]);
+      });
+
+      it("with reply threading on, the r.mail write gets the consented set too", async () => {
+        rule = null;
+        const { loadConnectionMetadata } = await import(
+          "../../../utils/shared/metadata.js"
+        );
+        vi.mocked(loadConnectionMetadata).mockResolvedValue(
+          cloneMetadata((m) => {
+            (
+              m.services.email.config as Record<string, unknown>
+            ).replyThreading = {
+              enabled: true,
+              domains: [{ domain: "example.com", currentKid: 1 }],
+            };
+          })
+        );
+        const rules = await setActiveRead(CUSTOMER);
+
+        await inboundAdd({
+          domain: "example.com",
+          subdomain: "support",
+          yes: true,
+          replaceActiveRuleSet: true,
+        });
+
+        expect(rules.addDomainToReceiptRule).toHaveBeenCalledTimes(2);
+        expect(rules.addDomainToReceiptRule).toHaveBeenLastCalledWith(
+          "us-east-1",
+          "123456789012",
+          "r.mail.example.com",
+          BUCKET,
+          "ses-lambda-action",
+          expect.objectContaining({ expected: CUSTOMER })
+        );
+      });
+
+      it("the active set changing after consent: refuses, says the set and rule exist but are inactive and the domain wasn't saved, and gives init then the same add", async () => {
+        rule = null;
+        await addMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+        const actual = await activeSetChangesTo("other-rules");
+        vi.mocked(rules.addDomainToReceiptRule).mockImplementationOnce(
+          async (region, _account, _domain, _bucket, _trigger, activation) =>
+            actual.setActiveReceiptRuleSet(
+              region,
+              "wraps-inbound-rules",
+              activation
+            )
+        );
+
+        const error = await inboundAdd({
+          domain: "example.com",
+          subdomain: "support",
+          yes: true,
+          replaceActiveRuleSet: true,
+        }).catch((e: unknown) => e as { code: string; suggestion: string });
+
+        expect(error.code).toBe("RECEIPT_RULE_SET_CONFLICT");
+        expect(error.suggestion).toContain(
+          "Already in place: wraps-inbound-rules and its receipt rule (listing support.example.com) were created but are inactive; support.example.com was not saved and its DNS records were not written."
+        );
+        expect(error.suggestion).toContain(
+          "run:\n  wraps email inbound init --domain example.com --subdomain in --region us-east-1"
+        );
+        expect(error.suggestion).toContain(
+          "Then finish adding support.example.com:\n  wraps email inbound add --domain example.com --subdomain support --region us-east-1"
+        );
+        expect(error.suggestion).not.toContain("Re-run the command");
+        expect(events).toEqual([]);
+      });
+
+      it("reports the set it deactivated: a warning, and deactivatedRuleSet in --json", async () => {
+        rule = null;
+        await addMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+        vi.mocked(rules.addDomainToReceiptRule).mockResolvedValueOnce(CUSTOMER);
+        setJsonMode(true);
+
+        await inboundAdd({
+          domain: "example.com",
+          subdomain: "support",
+          yes: true,
+          json: true,
+          replaceActiveRuleSet: true,
+        });
+
+        expect(jsonOutput("email.inbound.add")?.data.deactivatedRuleSet).toBe(
+          "customer-rules"
+        );
+        const clack = await import("@clack/prompts");
+        expect(vi.mocked(clack.log.warn)).toHaveBeenCalledWith(
+          "Deactivated receipt rule set customer-rules."
         );
       });
 
