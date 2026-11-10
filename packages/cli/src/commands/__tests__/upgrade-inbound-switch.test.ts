@@ -327,6 +327,46 @@ describe("email upgrade: inbound trigger switch", () => {
     expect(saves).toEqual([]);
   });
 
+  it("redeploy --preview on a legacy-trigger deployment says the switch would follow, and applies nothing", async () => {
+    await setupPulumi();
+    vi.mocked(pulumiUtils.previewWithResourceChanges).mockResolvedValue({
+      changeSummary: {},
+      resourceChanges: [],
+    } as any);
+    vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue(connection());
+
+    await upgrade({ action: "redeploy", preview: true });
+
+    expect(pulumiUtils.previewWithResourceChanges).toHaveBeenCalledTimes(1);
+    const infos = vi
+      .mocked(prompts.log.info)
+      .mock.calls.map((c) => String(c[0]))
+      .join("\n");
+    expect(infos).toContain("the inbound trigger switch would run");
+    expect(syncReceiptRuleTrigger).not.toHaveBeenCalled();
+    expect(deployHooks.deploy).not.toHaveBeenCalled();
+    expect(saves).toEqual([]);
+  });
+
+  it("redeploy --preview in the new mode mentions no switch", async () => {
+    await setupPulumi();
+    vi.mocked(pulumiUtils.previewWithResourceChanges).mockResolvedValue({
+      changeSummary: {},
+      resourceChanges: [],
+    } as any);
+    vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue(
+      connection("ses-lambda-action")
+    );
+
+    await upgrade({ action: "redeploy", preview: true });
+
+    const infos = vi
+      .mocked(prompts.log.info)
+      .mock.calls.map((c) => String(c[0]))
+      .join("\n");
+    expect(infos).not.toContain("inbound trigger switch");
+  });
+
   it("a failed sync exits non-zero naming step 2 and leaves the saved preset", async () => {
     await setupPulumi();
     vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue(connection());
@@ -442,9 +482,22 @@ describe("email upgrade: inbound trigger switch", () => {
     }
 
     it("saved ses-lambda-action: deploys the saved config unchanged, no switch, no rule-set activation, no DNS writes", async () => {
+      // Outputs that would drive every DNS writer upgrade has: DKIM records,
+      // CAA (httpsEnabled + customRedirectDomain) and the ACM validation
+      // records (httpsTrackingPending + records + customTrackingDomain).
       await setupPulumi({
         domain: "example.com",
         dkimTokens: ["a", "b", "c"],
+        httpsTrackingPending: true,
+        httpsTrackingEnabled: true,
+        customTrackingDomain: "link.example.com",
+        acmCertificateValidationRecords: [
+          {
+            name: "_x.link.example.com",
+            type: "CNAME",
+            value: "_y.acm-validations.aws",
+          },
+        ],
       });
       const saved = connection("ses-lambda-action");
       saved.services.email.dnsProvider = "cloudflare";
@@ -540,7 +593,7 @@ describe("email upgrade: inbound trigger switch", () => {
       expect(out?.error.code).toBe("INBOUND_TRIGGER_SWITCH_FAILED");
       expect(out?.error.message).toContain("step 2");
       expect(out?.error.suggestion).toContain(
-        "wraps email upgrade --action redeploy"
+        "wraps email upgrade --action redeploy --region us-east-1 --yes"
       );
       expect(trackSpy).toHaveBeenCalledWith(
         "INBOUND_TRIGGER_SWITCH_FAILED",

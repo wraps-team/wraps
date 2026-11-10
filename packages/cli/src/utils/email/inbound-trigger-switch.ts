@@ -22,7 +22,7 @@ import * as clack from "@clack/prompts";
 import { trackError } from "../../telemetry/events.js";
 import type { WrapsEmailConfig } from "../../types/index.js";
 import { WrapsError } from "../shared/errors.js";
-import { isJsonMode, type JsonOutput } from "../shared/json-output.js";
+import { isJsonMode, jsonError } from "../shared/json-output.js";
 import {
   applyConfigUpdates,
   buildEmailStackConfig,
@@ -39,6 +39,15 @@ import {
 
 /** The command that finishes an interrupted switch. */
 export const FINISH_SWITCH_COMMAND = "wraps email upgrade --action redeploy";
+
+/**
+ * The single finishing and repair command, runnable as printed (also from
+ * --json callers): an upgrade that re-applies the saved configuration in
+ * `region` without prompting. `inbound status` prints the same string.
+ */
+export function redeployCommand(region: string): string {
+  return `${FINISH_SWITCH_COMMAND} --region ${region} --yes`;
+}
 
 export type InboundSwitchStep = 1 | 2 | 3 | 4;
 
@@ -76,11 +85,12 @@ export type InboundTriggerSwitchError = WrapsError & {
 export function inboundTriggerSwitchError(
   step: InboundSwitchStep,
   ruleExisted: boolean,
-  cause: unknown
+  cause: unknown,
+  region: string
 ): InboundTriggerSwitchError {
   const causeText = cause instanceof Error ? cause.message : String(cause);
   const message = `Inbound trigger switch did not finish. ${rowText(step, ruleExisted)} Cause: ${causeText}`;
-  const suggestion = `Run ${FINISH_SWITCH_COMMAND} to finish the switch. Everything this command saved before the switch stays saved.`;
+  const suggestion = `Run ${redeployCommand(region)} to finish the switch (add --preview first to see the stack changes). Everything this command saved before the switch stays saved.`;
   const error = new WrapsError(
     message,
     "INBOUND_TRIGGER_SWITCH_FAILED",
@@ -149,7 +159,12 @@ export async function switchInboundTrigger(
   try {
     rule = await describeInboundReceiptRule(region);
   } catch (error) {
-    throw inboundTriggerSwitchError(ctx.skipInitialDeploy ? 2 : 1, true, error);
+    throw inboundTriggerSwitchError(
+      ctx.skipInitialDeploy ? 2 : 1,
+      true,
+      error,
+      region
+    );
   }
   const ruleExisted = rule !== null;
 
@@ -174,7 +189,7 @@ export async function switchInboundTrigger(
             })
         );
       } catch (error) {
-        throw inboundTriggerSwitchError(1, true, error);
+        throw inboundTriggerSwitchError(1, true, error, region);
       }
     }
 
@@ -193,7 +208,7 @@ export async function switchInboundTrigger(
           )
       );
     } catch (error) {
-      throw inboundTriggerSwitchError(2, true, error);
+      throw inboundTriggerSwitchError(2, true, error, region);
     }
   }
 
@@ -207,7 +222,7 @@ export async function switchInboundTrigger(
       await saveConnectionMetadata(metadata);
     });
   } catch (error) {
-    throw inboundTriggerSwitchError(3, ruleExisted, error);
+    throw inboundTriggerSwitchError(3, ruleExisted, error, region);
   }
 
   // 4. Deploy in the new mode: removes the raw/ notification and S3 permission.
@@ -222,7 +237,7 @@ export async function switchInboundTrigger(
       })
     );
   } catch (error) {
-    throw inboundTriggerSwitchError(4, ruleExisted, error);
+    throw inboundTriggerSwitchError(4, ruleExisted, error, region);
   }
 
   return { trigger: "ses-lambda-action", ruleExisted };
@@ -230,7 +245,7 @@ export async function switchInboundTrigger(
 
 /**
  * Report a switch failure the way commands must (plan 041 R1): the §4.4 row
- * and the finishing command, through the JSON error envelope in JSON mode,
+ * and the finishing command, through jsonError in JSON mode,
  * then exit non-zero. `data` rides along in the JSON envelope for values the
  * command must not lose (init's newly generated webhook secret). Non-switch
  * errors are rethrown for `handleCLIError`.
@@ -247,18 +262,16 @@ export function exitOnSwitchFailure(
     step: String(error.step),
   });
   if (isJsonMode()) {
-    const output: JsonOutput = {
-      success: false,
+    jsonError(
       command,
-      error: {
+      {
         code: error.code,
         message: error.message,
         suggestion: error.suggestion,
         docsUrl: error.docsUrl,
       },
-      ...(data ? { data } : {}),
-    };
-    console.log(JSON.stringify(output));
+      data
+    );
   } else {
     clack.log.error(error.message);
     clack.log.info(error.suggestion ?? "");

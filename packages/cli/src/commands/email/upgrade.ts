@@ -260,18 +260,19 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   const inboundOnLegacyTrigger =
     config.inbound?.enabled === true &&
     getInboundTrigger(metadata) === "s3-notification";
+  // "preset" stays first (the highlighted default it has always been).
   upgradeOptions.push(
-    {
-      value: "redeploy",
-      label: "Redeploy the saved configuration",
-      hint: inboundOnLegacyTrigger
-        ? "Changes nothing, then switches inbound to the SES Lambda action"
-        : "Changes nothing; repairs drift (e.g. after an older CLI deployed)",
-    },
     {
       value: "preset",
       label: "Upgrade to a different preset",
       hint: "Starter → Production → Enterprise",
+    },
+    {
+      value: "redeploy",
+      label: "Redeploy the saved configuration",
+      hint: inboundOnLegacyTrigger
+        ? "Re-applies it with this CLI version, then switches inbound to the SES Lambda action"
+        : "Re-applies it with this CLI version; repairs drift (e.g. after an older CLI deployed)",
     },
     {
       value: "archiving",
@@ -384,9 +385,11 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   let newPreset: EmailConfigPreset | undefined =
     metadata.services.email?.preset;
 
-  // `redeploy` deploys the saved config unchanged through the deploy path
-  // below and never writes DNS (no CAA, DKIM or ACM records) or touches the
-  // receipt rule set; the inbound trigger switch after the save still runs.
+  // `redeploy` re-applies the saved config (unchanged) with this CLI version
+  // through the deploy path below. A newer stack program can add or alter
+  // wraps resources, and `up` reverts out-of-band drift. It never writes DNS
+  // (no CAA, DKIM or ACM records) or touches the receipt rule set; the inbound
+  // trigger switch after the save still runs.
   const redeployOnly = upgradeAction === "redeploy";
 
   // 7. Handle upgrade action
@@ -2027,6 +2030,14 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
         costEstimate: costComparison,
         commandName: "wraps email upgrade",
       });
+
+      // The inbound trigger switch runs after any upgrade's save; the stack
+      // preview above can't show it.
+      if (inboundOnLegacyTrigger) {
+        clack.log.info(
+          `After the deploy, the inbound trigger switch would run: move the receipt rule to ${pc.cyan("mail/")} + the SES Lambda action, save, then deploy again to remove the S3 notification.`
+        );
+      }
 
       clack.outro(
         pc.green("Preview complete. Run without --preview to upgrade.")

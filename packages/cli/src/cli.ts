@@ -305,7 +305,7 @@ function showHelp() {
   );
   console.log(`  ${pc.cyan("email upgrade")}           Add features`);
   console.log(
-    `  ${pc.cyan("email upgrade --action redeploy")}  Redeploy the saved configuration unchanged (finishes or repairs the inbound trigger switch)`
+    `  ${pc.cyan("email upgrade --action redeploy")}  Re-apply the saved configuration with this CLI version (finishes or repairs the inbound trigger switch; --preview first)`
   );
   console.log(
     `  ${pc.cyan("email restore")}           Restore original configuration`
