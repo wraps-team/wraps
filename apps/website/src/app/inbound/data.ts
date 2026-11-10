@@ -49,7 +49,7 @@ export const useCases = [
 const ticket = await linear.createIssue({
   title: email.subject,
   description: email.text,
-  teamId: routeToTeam(email.from),
+  teamId: routeToTeam(email.from?.address),
 });`,
   },
   {
@@ -61,7 +61,7 @@ const ticket = await linear.createIssue({
     code: `// Parse order email
 const tracking = extractTracking(email.html);
 await db.orders.update({
-  where: { email: email.from },
+  where: { email: email.from?.address },
   data: { trackingNumber: tracking },
 });`,
   },

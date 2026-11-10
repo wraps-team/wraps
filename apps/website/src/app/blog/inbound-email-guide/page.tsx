@@ -399,10 +399,10 @@ TTL: 3600`}
               deployment receives for, so Bcc and forwarded mail still reach the
               right handler. Mail received before{" "}
               <code>wraps email upgrade</code> does not have it, so fall back to{" "}
-              <code>to</code>. In a trimmed event <code>to</code>,{" "}
-              <code>cc</code> and <code>attachments</code> can be empty or
-              missing: read the full parsed email at <code>parsedS3Key</code>,
-              or guard with <code>?? []</code>.
+              <code>to</code>. In a trimmed event <code>from</code>,{" "}
+              <code>to</code>, <code>cc</code> and <code>attachments</code> can
+              be empty or missing: read the full parsed email at{" "}
+              <code>parsedS3Key</code>, or guard with <code>?? []</code>.
             </p>
 
             <h3 className="mt-8 mb-4 font-semibold text-xl">
