@@ -13,6 +13,8 @@ const lambda = mockClient(LambdaClient);
 const s3 = mockClient(S3Client);
 
 const BUCKET = "wraps-inbound-123456789012-us-east-1";
+const REPAIR =
+  "wraps email inbound init --domain example.com --subdomain inbound --region us-east-1 --yes";
 const NEW_RULE = {
   Name: "wraps-inbound-catch-all",
   Recipients: ["inbound.example.com"],
@@ -74,6 +76,7 @@ describe("checkInboundTrigger", () => {
       region: "us-east-1",
       bucketName: BUCKET,
       savedTrigger: "ses-lambda-action",
+      repairCommand: REPAIR,
     });
 
     expect(result).toEqual({
@@ -106,6 +109,7 @@ describe("checkInboundTrigger", () => {
       region: "us-east-1",
       bucketName: BUCKET,
       savedTrigger: "ses-lambda-action",
+      repairCommand: REPAIR,
     });
 
     expect(result.sesInvokePermission).toBe(false);
@@ -114,9 +118,7 @@ describe("checkInboundTrigger", () => {
       "ses-invoke-permission-missing",
       "bucket-policy-missing-mail",
     ]);
-    expect(
-      result.warnings.every((w) => w.includes("wraps email upgrade"))
-    ).toBe(true);
+    expect(result.warnings.every((w) => w.includes(REPAIR))).toBe(true);
   });
 
   it("treats ResourceNotFound / NoSuchBucketPolicy as absent and AccessDenied as unchecked", async () => {
@@ -128,6 +130,7 @@ describe("checkInboundTrigger", () => {
       region: "us-east-1",
       bucketName: BUCKET,
       savedTrigger: "ses-lambda-action",
+      repairCommand: REPAIR,
     });
     expect(result.ruleTrigger).toBeNull();
     expect(result.sesInvokePermission).toBe(false);
@@ -139,6 +142,7 @@ describe("checkInboundTrigger", () => {
       region: "us-east-1",
       bucketName: BUCKET,
       savedTrigger: "ses-lambda-action",
+      repairCommand: REPAIR,
     });
     expect(unchecked.sesInvokePermission).toBeNull();
     expect(unchecked.bucketPolicyCoversMail).toBeNull();
@@ -149,42 +153,54 @@ describe("checkInboundTrigger", () => {
 describe("compareInboundTrigger", () => {
   it("flags a rule that differs from the saved mode (switch stopped at step 3)", () => {
     expect(
-      compareInboundTrigger({
-        savedTrigger: "s3-notification",
-        ruleTrigger: "ses-lambda-action",
-        sesInvokePermission: true,
-        bucketPolicyCoversMail: true,
-      }).mismatches
+      compareInboundTrigger(
+        {
+          savedTrigger: "s3-notification",
+          ruleTrigger: "ses-lambda-action",
+          sesInvokePermission: true,
+          bucketPolicyCoversMail: true,
+        },
+        REPAIR
+      ).mismatches
     ).toEqual(["rule-differs-from-saved"]);
   });
 
   it("does not flag a missing SES permission while the legacy trigger is fully in use", () => {
     expect(
-      compareInboundTrigger({
-        savedTrigger: "s3-notification",
-        ruleTrigger: "s3-notification",
-        sesInvokePermission: false,
-        bucketPolicyCoversMail: false,
-      }).mismatches
+      compareInboundTrigger(
+        {
+          savedTrigger: "s3-notification",
+          ruleTrigger: "s3-notification",
+          sesInvokePermission: false,
+          bucketPolicyCoversMail: false,
+        },
+        REPAIR
+      ).mismatches
     ).toEqual([]);
   });
 
   it("flags a missing rule and an unrecognized rule", () => {
     expect(
-      compareInboundTrigger({
-        savedTrigger: "ses-lambda-action",
-        ruleTrigger: "missing",
-        sesInvokePermission: true,
-        bucketPolicyCoversMail: true,
-      }).mismatches
+      compareInboundTrigger(
+        {
+          savedTrigger: "ses-lambda-action",
+          ruleTrigger: "missing",
+          sesInvokePermission: true,
+          bucketPolicyCoversMail: true,
+        },
+        REPAIR
+      ).mismatches
     ).toEqual(["rule-missing"]);
     expect(
-      compareInboundTrigger({
-        savedTrigger: "ses-lambda-action",
-        ruleTrigger: "unknown",
-        sesInvokePermission: true,
-        bucketPolicyCoversMail: true,
-      }).mismatches
+      compareInboundTrigger(
+        {
+          savedTrigger: "ses-lambda-action",
+          ruleTrigger: "unknown",
+          sesInvokePermission: true,
+          bucketPolicyCoversMail: true,
+        },
+        REPAIR
+      ).mismatches
     ).toEqual(["rule-unrecognized"]);
   });
 });

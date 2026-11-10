@@ -185,6 +185,29 @@ function reportInboundDNSCleanup(
   }
 }
 
+/**
+ * The `inbound init` re-run that redeploys the stack from the saved config
+ * with the same receiving domain: non-interactive, and with the saved values
+ * it keeps everything (trigger, retention, webhook URL and secret, domains).
+ * Re-running it restores the SES invoke permission and the mail/* bucket
+ * policy, rewrites the rule's actions for the saved mode, and switches a
+ * deployment still on the S3 trigger.
+ */
+export function inboundRepairCommand(
+  inbound: { subdomain?: string; receivingDomain?: string },
+  primaryDomain: string | undefined,
+  region: string
+): string {
+  const label = inbound.subdomain ?? "";
+  const receiving = inbound.receivingDomain ?? "";
+  const parent =
+    label && receiving.startsWith(`${label}.`)
+      ? receiving.slice(label.length + 1)
+      : receiving || primaryDomain || "<domain>";
+  const target = label ? `--subdomain ${label}` : "--root";
+  return `wraps email inbound init --domain ${parent} ${target} --region ${region} --yes`;
+}
+
 /** Human label for an inbound trigger mode. */
 function describeTrigger(trigger: InboundTrigger): string {
   return trigger === "ses-lambda-action"
@@ -1020,10 +1043,16 @@ export async function inboundStatus(
   // and bucket policy agree (read-only).
   const bucketName =
     inbound.bucketName || `wraps-inbound-${identity.accountId}-${region}`;
+  const repairCommand = inboundRepairCommand(
+    inbound,
+    emailConfig.domain,
+    region
+  );
   const triggerCheck = await checkInboundTrigger({
     region,
     bucketName,
     savedTrigger: getInboundTrigger(metadata),
+    repairCommand,
   });
 
   // Build domain list — prefer inboundDomains, fallback to single domain
@@ -1054,6 +1083,7 @@ export async function inboundStatus(
       retention: inbound.retention || null,
       trigger: triggerCheck.savedTrigger,
       triggerCheck: {
+        repairCommand,
         ruleTrigger: triggerCheck.ruleTrigger,
         sesInvokePermission: triggerCheck.sesInvokePermission,
         bucketPolicyCoversMail: triggerCheck.bucketPolicyCoversMail,

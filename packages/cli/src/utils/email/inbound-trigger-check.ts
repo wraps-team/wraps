@@ -127,12 +127,16 @@ async function readRuleTrigger(
   }
 }
 
-const FIX = "Run `wraps email upgrade` to bring the trigger back in line.";
-
-/** Compute the mismatches between the four pieces. Pure; exported for tests. */
+/**
+ * Compute the mismatches between the four pieces. Pure; exported for tests.
+ * `repairCommand` is the command each warning names as the fix (status passes
+ * an `inbound init` re-run built from the saved config).
+ */
 export function compareInboundTrigger(
-  check: Omit<InboundTriggerCheck, "mismatches" | "warnings">
+  check: Omit<InboundTriggerCheck, "mismatches" | "warnings">,
+  repairCommand: string
 ): Pick<InboundTriggerCheck, "mismatches" | "warnings"> {
+  const FIX = `Run \`${repairCommand}\` to redeploy from the saved config and bring the trigger back in line.`;
   const mismatches: InboundTriggerMismatch[] = [];
   const warnings: string[] = [];
   const { savedTrigger, ruleTrigger } = check;
@@ -140,7 +144,7 @@ export function compareInboundTrigger(
   if (ruleTrigger === "missing") {
     mismatches.push("rule-missing");
     warnings.push(
-      "The receipt rule wraps-inbound-catch-all does not exist, so no inbound mail is received. Run `wraps email inbound add` (or `wraps email inbound init`) to recreate it."
+      `The receipt rule wraps-inbound-catch-all does not exist, so no inbound mail is received. Run \`${repairCommand}\` to recreate it.`
     );
   } else if (ruleTrigger === "unknown") {
     mismatches.push("rule-unrecognized");
@@ -177,6 +181,7 @@ export async function checkInboundTrigger(params: {
   region: string;
   bucketName: string;
   savedTrigger: InboundTrigger;
+  repairCommand: string;
 }): Promise<InboundTriggerCheck> {
   const [ruleTrigger, sesInvokePermission, bucketPolicyCoversMail] =
     await Promise.all([
@@ -190,5 +195,5 @@ export async function checkInboundTrigger(params: {
     sesInvokePermission,
     bucketPolicyCoversMail,
   };
-  return { ...pieces, ...compareInboundTrigger(pieces) };
+  return { ...pieces, ...compareInboundTrigger(pieces, params.repairCommand) };
 }

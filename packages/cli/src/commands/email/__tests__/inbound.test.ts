@@ -210,6 +210,11 @@ vi.mock("../../../utils/shared/pulumi.js", () => ({
     .mockImplementation(async (fn: () => Promise<unknown>) => fn()),
 }));
 
+// Only reached when a test runs the Pulumi program (plan 041 repair test).
+vi.mock("../../../infrastructure/email-stack.js", () => ({
+  deployEmailStack: vi.fn().mockResolvedValue({}),
+}));
+
 vi.mock("../../../utils/shared/fs.js", () => ({
   ensurePulumiWorkDir: vi.fn().mockResolvedValue(undefined),
   getPulumiWorkDir: vi.fn().mockReturnValue("/tmp/wraps-test/pulumi"),
@@ -220,6 +225,7 @@ import {
   inboundDestroy,
   inboundInit,
   inboundRemove,
+  inboundRepairCommand,
   inboundStatus,
 } from "../inbound.js";
 
@@ -1422,6 +1428,8 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
   });
 
   const BUCKET = "wraps-inbound-123456789012-us-east-1";
+  const REPAIR =
+    "wraps email inbound init --domain example.com --subdomain in --region us-east-1 --yes";
   const NEW_ACTIONS = [
     { S3Action: { BucketName: BUCKET, ObjectKeyPrefix: "mail/" } },
     {
@@ -1552,6 +1560,86 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
       ]);
       // already in the new mode: no switch
       expect(events).not.toContain("sync:ses-lambda-action");
+    });
+
+    it("the status repair command (init re-run, saved ses-lambda-action) redeploys in that mode with the saved values and no switch", async () => {
+      // An older CLI redeployed: SES permission gone, policy back to raw/*.
+      // The rule still has mail/ + Lambda; metadata still says the new mode.
+      rule = { Recipients: ["in.example.com"], Actions: NEW_ACTIONS };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(
+        cloneMetadata((m) => {
+          Object.assign(m.services.email.config.inbound, {
+            webhookUrl: "https://hooks.example.com/in",
+            webhookSecret: "saved-secret",
+            retention: "90days",
+          });
+        })
+      );
+      const pulumi = await import("@pulumi/pulumi");
+      vi.mocked(
+        pulumi.automation.LocalWorkspace.createOrSelectStack
+      ).mockImplementation(async (args: any) => {
+        await args.program();
+        return {
+          setConfig: vi.fn().mockResolvedValue(undefined),
+          up: vi.fn(async () => {
+            events.push("command-up");
+            return { outputs: {} };
+          }),
+        } as never;
+      });
+      const { deployEmailStack } = await import(
+        "../../../infrastructure/email-stack.js"
+      );
+
+      // exactly the flags inboundRepairCommand prints for this deployment
+      await inboundInit({
+        domain: "example.com",
+        subdomain: "in",
+        region: "us-east-1",
+        yes: true,
+      });
+
+      const deployed = vi.mocked(deployEmailStack).mock.calls[0][0];
+      expect(deployed.emailConfig.inbound).toMatchObject({
+        trigger: "ses-lambda-action",
+        receivingDomain: "in.example.com",
+        webhookUrl: "https://hooks.example.com/in",
+        webhookSecret: "saved-secret",
+        retention: "90days",
+      });
+      expect(events).toEqual([
+        "command-up",
+        "save:ses-lambda-action",
+        "rule-write:ses-lambda-action",
+        "save:ses-lambda-action",
+      ]);
+      expect(rule?.Actions).toEqual(NEW_ACTIONS);
+      expect(
+        saved.at(-1)?.inboundDomains?.map((d) => d.receivingDomain)
+      ).toEqual(["in.example.com"]);
+    });
+
+    it("inboundRepairCommand names the saved label, or --root for the apex", () => {
+      expect(
+        inboundRepairCommand(
+          { subdomain: "in", receivingDomain: "in.example.com" },
+          "example.com",
+          "us-east-1"
+        )
+      ).toBe(REPAIR);
+      expect(
+        inboundRepairCommand(
+          { subdomain: "", receivingDomain: "example.com" },
+          "example.com",
+          "eu-west-1"
+        )
+      ).toBe(
+        "wraps email inbound init --domain example.com --root --region eu-west-1 --yes"
+      );
     });
 
     it("appends a new init domain to the saved inboundDomains", async () => {
@@ -1834,6 +1922,7 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
       const data = jsonOutput("email.inbound.status")?.data;
       expect(data.trigger).toBe("s3-notification");
       expect(data.triggerCheck).toEqual({
+        repairCommand: REPAIR,
         ruleTrigger: "ses-lambda-action",
         sesInvokePermission: true,
         bucketPolicyCoversMail: true,
@@ -1844,6 +1933,7 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
         region: "us-east-1",
         bucketName: BUCKET,
         savedTrigger: "s3-notification",
+        repairCommand: REPAIR,
       });
     });
 
