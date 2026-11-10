@@ -2625,7 +2625,7 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
           message:
             "Receipt rule set other-rules is active in us-east-1, not customer-rules, the set you agreed to replace, so wraps-inbound-rules was not activated",
           suggestion: expect.stringMatching(
-            /Already in place: the inbound stack is deployed and its configuration saved, and wraps-inbound-rules holds the receipt rule for in\.example\.com but is inactive\. DNS records were not written\.[\s\S]*run:\n {2}wraps email inbound init --domain example\.com --subdomain in --region us-east-1/
+            /Already in place: the inbound stack is deployed and its configuration saved, and wraps-inbound-rules holds the receipt rule for in\.example\.com but is inactive\. DNS records were not written\.[\s\S]*\(it re-deploys the inbound stack\):\n {2}wraps email inbound init --domain example\.com --subdomain in --region us-east-1/
           ),
         });
 
@@ -2672,9 +2672,30 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
           json: true,
         });
 
-        expect(
-          jsonOutput("email.inbound.init")?.data.deactivatedRuleSet
-        ).toBeNull();
+        const data = jsonOutput("email.inbound.init")?.data;
+        expect(data.deactivatedRuleSet).toBeNull();
+        expect(data.previousRuleSetUnreadable).toBeNull();
+      });
+
+      it("--json: an unreadable previous set gives deactivatedRuleSet null and previousRuleSetUnreadable the error", async () => {
+        await freshInitMetadata();
+        const rules = await setActiveRead(UNREADABLE);
+        vi.mocked(rules.setActiveReceiptRuleSet).mockResolvedValueOnce(
+          UNREADABLE
+        );
+        setJsonMode(true);
+
+        await inboundInit({
+          domain: "example.com",
+          subdomain: "in",
+          yes: true,
+          json: true,
+          replaceActiveRuleSet: true,
+        });
+
+        const data = jsonOutput("email.inbound.init")?.data;
+        expect(data.deactivatedRuleSet).toBeNull();
+        expect(data.previousRuleSetUnreadable).toBe("AccessDenied");
       });
 
       it("no set active: unchanged, activates without asking", async () => {
@@ -2891,10 +2912,10 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
 
         expect(error.code).toBe("RECEIPT_RULE_SET_CONFLICT");
         expect(error.suggestion).toContain(
-          "Already in place: wraps-inbound-rules and its receipt rule (listing support.example.com) were created but are inactive; support.example.com was not saved and its DNS records were not written."
+          "Already in place: wraps-inbound-rules and its receipt rule (listing support.example.com) exist but are inactive; support.example.com was not saved and its DNS records were not written."
         );
         expect(error.suggestion).toContain(
-          "run:\n  wraps email inbound init --domain example.com --subdomain in --region us-east-1"
+          "(it re-deploys the inbound stack):\n  wraps email inbound init --domain example.com --subdomain in --region us-east-1"
         );
         expect(error.suggestion).toContain(
           "Then finish adding support.example.com:\n  wraps email inbound add --domain example.com --subdomain support --region us-east-1"
@@ -2918,9 +2939,10 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
           replaceActiveRuleSet: true,
         });
 
-        expect(jsonOutput("email.inbound.add")?.data.deactivatedRuleSet).toBe(
-          "customer-rules"
-        );
+        expect(jsonOutput("email.inbound.add")?.data).toMatchObject({
+          deactivatedRuleSet: "customer-rules",
+          previousRuleSetUnreadable: null,
+        });
         const clack = await import("@clack/prompts");
         expect(vi.mocked(clack.log.warn)).toHaveBeenCalledWith(
           "Deactivated receipt rule set customer-rules."

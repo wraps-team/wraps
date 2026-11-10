@@ -753,15 +753,70 @@ describe("replyInit", () => {
         "not customer-rules, the set you agreed to replace"
       );
       expect(error.suggestion).toContain(
-        "Already in place: reply threading for foo.com is saved and its stack deployed (the signing secret is in SSM), and wraps-inbound-rules and its receipt rule (listing r.mail.foo.com) were created but are inactive; DNS records for r.mail.foo.com were not written."
+        "Already in place: reply threading for foo.com is saved and its stack deployed (the signing secret is in SSM), and wraps-inbound-rules and its receipt rule (listing r.mail.foo.com) exist but are inactive; DNS records for r.mail.foo.com were not written."
       );
       expect(error.suggestion).toContain(
-        "run:\n  wraps email inbound init --domain foo.com --subdomain support --region us-east-1"
+        "(it re-deploys the inbound stack):\n  wraps email inbound init --domain foo.com --subdomain support --region us-east-1"
       );
       expect(error.suggestion).toContain(
         "Then add the r.mail.foo.com DNS records"
       );
       expect(error.suggestion).not.toContain("Re-run the command");
+      expect(error.suggestion).not.toContain("reply init --all");
+      expect(deployHooks.deploy).toHaveBeenCalledTimes(1);
+    });
+
+    it("--all: a late refusal on the first domain names the later domains it didn't start and how to finish them", async () => {
+      const rules = await setup(CUSTOMER);
+      const { loadConnectionMetadata } = await import(
+        "../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(
+        cloneMetadata((m) => {
+          m.services.email.config.inboundDomains = [
+            {
+              subdomain: "support",
+              receivingDomain: "support.foo.com",
+              parentDomain: "foo.com",
+              addedAt: "2024-01-01T00:00:00.000Z",
+            },
+            {
+              subdomain: "in",
+              receivingDomain: "in.bar.com",
+              parentDomain: "bar.com",
+              addedAt: "2024-01-01T00:00:00.000Z",
+            },
+          ];
+        })
+      );
+      sesMock
+        .on(DescribeActiveReceiptRuleSetCommand)
+        .resolves({ Metadata: { Name: "other-rules" } });
+      const actual = await vi.importActual<
+        typeof import("../../utils/email/receipt-rules.js")
+      >("../../utils/email/receipt-rules.js");
+      vi.mocked(rules.addDomainToReceiptRule).mockImplementationOnce(
+        async (region, _account, _domain, _bucket, _trigger, activation) =>
+          actual.setActiveReceiptRuleSet(
+            region,
+            "wraps-inbound-rules",
+            activation
+          )
+      );
+
+      const error = await replyInit({
+        all: true,
+        yes: true,
+        replaceActiveRuleSet: true,
+      }).catch((e: unknown) => e as { code: string; suggestion: string });
+
+      expect(error.code).toBe("RECEIPT_RULE_SET_CONFLICT");
+      expect(error.suggestion).toContain(
+        "were not written. Reply threading was not started for bar.com."
+      );
+      expect(error.suggestion).toContain(
+        "Then run wraps email reply init --all --region us-east-1 to enable reply threading for bar.com."
+      );
       expect(deployHooks.deploy).toHaveBeenCalledTimes(1);
     });
 
@@ -785,9 +840,10 @@ describe("replyInit", () => {
             typeof arg === "string" &&
             arg.includes('"command":"email.reply.init"')
         );
-      expect(JSON.parse(line as string).data.deactivatedRuleSet).toBe(
-        "customer-rules"
-      );
+      expect(JSON.parse(line as string).data).toMatchObject({
+        deactivatedRuleSet: "customer-rules",
+        previousRuleSetUnreadable: null,
+      });
       expect(vi.mocked(clack.log.warn)).toHaveBeenCalledWith(
         "Deactivated receipt rule set customer-rules."
       );

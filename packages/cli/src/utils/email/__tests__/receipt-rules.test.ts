@@ -20,6 +20,7 @@ import {
   describeRuleSetDeactivation,
   inboundInitRecoveryCommand,
   inboundRuleActions,
+  previousRuleSetUnreadable,
   RECEIPT_RULE_RETRY_DELAYS_MS,
   REPLACE_NO_RULE_SET,
   readActiveReceiptRuleSet,
@@ -624,11 +625,47 @@ describe("plan 048: activating wraps-inbound-rules only over a consented set", (
       "Already in place: IN-PLACE. Until wraps-inbound-rules is active, no mail reaches Wraps."
     );
     expect(error.suggestion).toContain(
-      `To be asked again, keeping the saved inbound configuration, run:\n  ${RECOVERY}`
+      `To be asked again, keeping the saved inbound configuration, run this from a terminal (it re-deploys the inbound stack):\n  ${RECOVERY}\nAn unattended run needs --yes --replace-active-rule-set added, only after the AWS account owner agrees`
     );
     expect(error.suggestion).toContain("AFTER.");
     expect(error.suggestion).not.toContain("Nothing was deployed");
     expect(error.suggestion).not.toContain("Re-run the command");
+  });
+
+  it("ours active at the preflight, another set by activation: 'became active during this run', never 'agreed to replace'", async () => {
+    ses
+      .on(DescribeActiveReceiptRuleSetCommand)
+      .resolves({ Metadata: { Name: "other-rules" } });
+    ses.on(SetActiveReceiptRuleSetCommand).resolves({});
+
+    const error = await setActiveReceiptRuleSet(
+      REGION,
+      "wraps-inbound-rules",
+      act(OURS)
+    ).catch((e: unknown) => e as { code: string; message: string });
+
+    expect(error.code).toBe("RECEIPT_RULE_SET_CONFLICT");
+    expect(error.message).toBe(
+      "Receipt rule set other-rules became active in us-east-1 during this run, so wraps-inbound-rules was not activated"
+    );
+    expect(error.message).not.toContain("agreed");
+    expect(ses.commandCalls(SetActiveReceiptRuleSetCommand)).toHaveLength(0);
+  });
+
+  it("inboundInitRecoveryCommand leaves --domain out when no parent can be derived", () => {
+    expect(
+      inboundInitRecoveryCommand(REGION, { subdomain: "inbound" }, undefined)
+    ).toBe("wraps email inbound init --subdomain inbound --region us-east-1");
+    expect(inboundInitRecoveryCommand(REGION, undefined, [])).toBe(
+      "wraps email inbound init --root --region us-east-1"
+    );
+  });
+
+  it("previousRuleSetUnreadable gives the read error only for an unreadable previous set", () => {
+    expect(previousRuleSetUnreadable(null)).toBeNull();
+    expect(previousRuleSetUnreadable(CUSTOMER)).toBeNull();
+    expect(previousRuleSetUnreadable(NONE)).toBeNull();
+    expect(previousRuleSetUnreadable(UNREADABLE)).toBe("AccessDenied");
   });
 
   it("inboundInitRecoveryCommand keeps the saved parent and label, or --root", () => {
@@ -724,5 +761,8 @@ describe("plan 048: activating wraps-inbound-rules only over a consented set", (
       "would deactivate the active receipt rule set customer-rules"
     );
     expect(describeRuleSetDeactivation(UNREADABLE)).toContain("AccessDenied");
+    expect(describeRuleSetDeactivation(CUSTOMER)).toContain(
+      "where it can't ask (--yes, --json, or no terminal) it needs --replace-active-rule-set"
+    );
   });
 });
