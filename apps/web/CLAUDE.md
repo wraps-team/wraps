@@ -203,9 +203,10 @@ create it) and needs a working `DATABASE_URL`. Without it, tests fail with
 opaque connection/query errors, not a helpful message.
 
 - The suite runs as **two vitest projects**. `parallel` holds everything and
-  runs files concurrently; `shared-fixtures` holds the ten files that import the
-  fixed-id fixtures in `src/app/api/__tests__/setup.ts` and runs serially,
-  because those ten can delete each other's rows. Isolation everywhere else
+  runs files concurrently; `shared-fixtures` holds the thirteen files that use
+  fixed ids (the fixtures in `src/app/api/__tests__/setup.ts`, or their own
+  hard-coded ones) and runs serially, because those can delete each other's
+  rows. A new file that imports `setup.ts` belongs in `SHARED_FIXTURE_FILES`. Isolation everywhere else
   comes from per-file fixture prefixes (`setupPermissionFixtures`,
   `__tests__/fixtures/real-db.ts`) — **any new DB-touching test must namespace
   its fixtures the same way**, or it will collide under parallelism.

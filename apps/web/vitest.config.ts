@@ -3,18 +3,23 @@ import { loadEnv, type UserConfig } from "vite";
 import { defineConfig } from "vitest/config";
 import { resolveTestDatabaseUrl } from "../../scripts/test-db/resolve-branch.mjs";
 
-// The ten files that import the *fixed*-id fixtures from
+// Suites that insert rows under fixed, hand-written ids and delete them in
+// their own hooks. Two kinds: files that import the shared fixtures from
 // `src/app/api/__tests__/setup.ts` (`test-onboarding-org-1`, slug
-// `onboarding-test-org`, …). Every other DB-touching suite namespaces its
-// fixtures per file — `setupPermissionFixtures` appends a random suffix,
-// `__tests__/fixtures/real-db.ts` prefixes every id — so only these ten can
-// delete each other's rows mid-test. They get their own serial project; the
-// rest of the suite runs in parallel. Migrating this setup to a per-file
-// prefix would let the group fold into the parallel project.
+// `onboarding-test-org`, user `test-onboarding-user-1` — whose `afterAll`
+// deletes those rows), and files that declare their own fixed ids (e.g.
+// `brand-kits`). Every other DB-touching suite namespaces its fixtures per
+// file — `setupPermissionFixtures` appends a random suffix,
+// `__tests__/fixtures/real-db.ts` prefixes every id — so only these can delete
+// each other's rows mid-test. They get their own serial project; the rest of
+// the suite runs in parallel. Add any new file that imports `setup.ts` (grep
+// both `./setup` and `@/app/api/__tests__/setup`). Migrating this setup to a
+// per-file prefix would let the group fold into the parallel project.
 const SHARED_FIXTURE_FILES = [
   "src/app/api/__tests__/activation-status.test.ts",
   "src/app/api/__tests__/ai-generate-code-vision.test.ts",
   "src/app/api/__tests__/aws-connect-rbac-db.test.ts",
+  "src/app/api/__tests__/aws-setup-method-db.test.ts",
   "src/app/api/__tests__/aws-validate.test.ts",
   "src/app/api/__tests__/brand-kits.test.ts",
   "src/app/api/__tests__/onboarding.test.ts",
@@ -22,6 +27,8 @@ const SHARED_FIXTURE_FILES = [
   "src/app/api/__tests__/save-source.test.ts",
   "src/app/api/__tests__/send-test-unsubscribe.test.ts",
   "src/app/api/__tests__/templates.test.ts",
+  "src/lib/usage/__tests__/ai-usage-cached-tokens.test.ts",
+  "src/lib/usage/__tests__/ai-usage.test.ts",
 ];
 
 // Node 25+ turns its webstorage global on by default (24 can too, behind a
