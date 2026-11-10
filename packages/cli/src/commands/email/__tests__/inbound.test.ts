@@ -2579,6 +2579,42 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
         expect(events).toEqual([]);
       });
 
+      it("the active set changing after consent: the activation refuses, after the deploy and 14b save, before the final save and any switch", async () => {
+        await freshInitMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+        const { errors } = await import("../../../utils/shared/errors.js");
+        vi.mocked(rules.setActiveReceiptRuleSet).mockRejectedValueOnce(
+          errors.receiptRuleSetConflict({
+            region: "us-east-1",
+            active: { readable: true, name: "other-rules" },
+            changedSincePreflight: true,
+          })
+        );
+
+        await expect(
+          inboundInit({
+            domain: "example.com",
+            subdomain: "in",
+            yes: true,
+            replaceActiveRuleSet: true,
+          })
+        ).rejects.toMatchObject({
+          code: "RECEIPT_RULE_SET_CONFLICT",
+          message: expect.stringContaining("not the set you agreed to replace"),
+        });
+
+        expect(rules.setActiveReceiptRuleSet).toHaveBeenCalledWith(
+          "us-east-1",
+          "wraps-inbound-rules",
+          CUSTOMER
+        );
+        expect(events).toEqual([
+          "command-up",
+          "save:ses-lambda-action",
+          "rule-write:ses-lambda-action",
+        ]);
+      });
+
       it("no set active: unchanged, activates without asking", async () => {
         await freshInitMetadata();
         const rules = await setActiveRead(NO_REPLACEMENT);
