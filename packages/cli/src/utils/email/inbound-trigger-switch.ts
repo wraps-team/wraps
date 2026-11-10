@@ -19,9 +19,10 @@
  */
 
 import * as clack from "@clack/prompts";
+import { trackError } from "../../telemetry/events.js";
 import type { WrapsEmailConfig } from "../../types/index.js";
 import { WrapsError } from "../shared/errors.js";
-import { isJsonMode, jsonError } from "../shared/json-output.js";
+import { isJsonMode, type JsonOutput } from "../shared/json-output.js";
 import {
   applyConfigUpdates,
   buildEmailStackConfig,
@@ -37,7 +38,7 @@ import {
 } from "./receipt-rules.js";
 
 /** The command that finishes an interrupted switch. */
-export const FINISH_SWITCH_COMMAND = "wraps email upgrade";
+export const FINISH_SWITCH_COMMAND = "wraps email upgrade --action redeploy";
 
 export type InboundSwitchStep = 1 | 2 | 3 | 4;
 
@@ -229,20 +230,35 @@ export async function switchInboundTrigger(
 
 /**
  * Report a switch failure the way commands must (plan 041 R1): the §4.4 row
- * and the finishing command, through `jsonError` in JSON mode, then exit
- * non-zero. Non-switch errors are rethrown for `handleCLIError`.
+ * and the finishing command, through the JSON error envelope in JSON mode,
+ * then exit non-zero. `data` rides along in the JSON envelope for values the
+ * command must not lose (init's newly generated webhook secret). Non-switch
+ * errors are rethrown for `handleCLIError`.
  */
-export function exitOnSwitchFailure(command: string, error: unknown): never {
+export function exitOnSwitchFailure(
+  command: string,
+  error: unknown,
+  data?: Record<string, unknown>
+): never {
   if (!isInboundTriggerSwitchError(error)) {
     throw error;
   }
+  trackError(INBOUND_TRIGGER_SWITCH_FAILED, command, {
+    step: String(error.step),
+  });
   if (isJsonMode()) {
-    jsonError(command, {
-      code: error.code,
-      message: error.message,
-      suggestion: error.suggestion,
-      docsUrl: error.docsUrl,
-    });
+    const output: JsonOutput = {
+      success: false,
+      command,
+      error: {
+        code: error.code,
+        message: error.message,
+        suggestion: error.suggestion,
+        docsUrl: error.docsUrl,
+      },
+      ...(data ? { data } : {}),
+    };
+    console.log(JSON.stringify(output));
   } else {
     clack.log.error(error.message);
     clack.log.info(error.suggestion ?? "");

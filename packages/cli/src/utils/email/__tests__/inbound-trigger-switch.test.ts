@@ -195,7 +195,9 @@ describe("switchInboundTrigger", () => {
       expect(error.step).toBe(1);
       expect(error.message).toContain("old code, old rule");
       expect(error.message).toContain("deploy boom");
-      expect(error.suggestion).toContain("wraps email upgrade");
+      expect(error.suggestion).toContain(
+        "wraps email upgrade --action redeploy"
+      );
       expect(vi.mocked(syncReceiptRuleTrigger)).not.toHaveBeenCalled();
       expect(savedModes).toEqual([]);
       expect(m.services.email?.config.inbound?.trigger).toBeUndefined();

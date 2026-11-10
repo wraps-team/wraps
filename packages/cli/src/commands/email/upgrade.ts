@@ -257,7 +257,17 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
     });
   }
 
+  const inboundOnLegacyTrigger =
+    config.inbound?.enabled === true &&
+    getInboundTrigger(metadata) === "s3-notification";
   upgradeOptions.push(
+    {
+      value: "redeploy",
+      label: "Redeploy the saved configuration",
+      hint: inboundOnLegacyTrigger
+        ? "Changes nothing, then switches inbound to the SES Lambda action"
+        : "Changes nothing; repairs drift (e.g. after an older CLI deployed)",
+    },
     {
       value: "preset",
       label: "Upgrade to a different preset",
@@ -374,8 +384,19 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   let newPreset: EmailConfigPreset | undefined =
     metadata.services.email?.preset;
 
+  // `redeploy` deploys the saved config unchanged through the deploy path
+  // below and never writes DNS (no CAA, DKIM or ACM records) or touches the
+  // receipt rule set; the inbound trigger switch after the save still runs.
+  const redeployOnly = upgradeAction === "redeploy";
+
   // 7. Handle upgrade action
   switch (upgradeAction) {
+    case "redeploy": {
+      updatedConfig = { ...config };
+      newPreset = metadata.services.email?.preset;
+      break;
+    }
+
     case "finish-tracking-domain": {
       // Skip all prompts — use the existing config as-is to re-run deployment
       // The email-stack will check if the ACM certificate is now validated
@@ -1854,6 +1875,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
 
   // 11.5. Ensure CAA records allow Amazon to issue certificates (for HTTPS tracking)
   if (
+    !redeployOnly &&
     updatedConfig.tracking?.httpsEnabled &&
     updatedConfig.tracking.customRedirectDomain
   ) {
@@ -2170,7 +2192,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   // Skip DNS management in JSON mode — non-interactive
   let dnsAutoCreated = false;
   if (
-    !isJsonMode() &&
+    !(redeployOnly || isJsonMode()) &&
     outputs.domain &&
     outputs.dkimTokens &&
     outputs.dkimTokens.length > 0
@@ -2348,6 +2370,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   // Try to create ACM validation DNS records automatically via DNS provider
   let acmDnsAutoCreated = false;
   if (
+    !redeployOnly &&
     outputs.httpsTrackingPending &&
     acmValidationRecords.length > 0 &&
     outputs.customTrackingDomain
@@ -2684,6 +2707,10 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
       configSetName: outputs.configSetName,
       customTrackingDomain: outputs.customTrackingDomain,
       httpsTrackingEnabled: outputs.httpsTrackingEnabled,
+      // Inbound trigger after this run (and after the switch, if it ran).
+      trigger: metadata.services.email?.config.inbound?.enabled
+        ? getInboundTrigger(metadata)
+        : undefined,
     });
     trackServiceUpgrade("email", {
       from_preset: metadata.services.email?.preset,

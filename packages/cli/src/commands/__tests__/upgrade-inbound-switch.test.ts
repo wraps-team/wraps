@@ -68,15 +68,34 @@ vi.mock("../../utils/email/receipt-rules.js", async (importOriginal) => {
     describeInboundReceiptRule: vi.fn(),
     syncReceiptRuleTrigger: vi.fn(),
     createReceiptRule: vi.fn(),
+    createReceiptRuleSet: vi.fn(),
+    setActiveReceiptRuleSet: vi.fn(),
     addDomainToReceiptRule: vi.fn(),
+  };
+});
+// DNS writers upgrade can reach; `--action redeploy` must reach none of them.
+vi.mock("../../utils/dns/credentials.js", () => ({
+  getDNSCredentials: vi.fn().mockResolvedValue({ valid: false }),
+  detectAvailableDNSProviders: vi.fn().mockResolvedValue([]),
+}));
+vi.mock("../../utils/dns/create-records.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../utils/dns/create-records.js")>();
+  return {
+    ...actual,
+    createDNSRecordsForProvider: vi.fn(),
   };
 });
 
 import * as prompts from "@clack/prompts";
 import { deployEmailStack } from "../../infrastructure/email-stack.js";
+import * as telemetry from "../../telemetry/events.js";
+import * as dnsRecords from "../../utils/dns/create-records.js";
+import * as dnsCredentials from "../../utils/dns/credentials.js";
 import { deployHooks } from "../../utils/email/email-stack-deploy.js";
 import {
   describeInboundReceiptRule,
+  setActiveReceiptRuleSet,
   syncReceiptRuleTrigger,
 } from "../../utils/email/receipt-rules.js";
 import * as aws from "../../utils/shared/aws.js";
@@ -408,6 +427,126 @@ describe("email upgrade: inbound trigger switch", () => {
         "save:ses-lambda-action",
         "seam-up:ses-lambda-action",
       ]);
+    });
+  });
+
+  describe("--action redeploy (the finishing and repair command)", () => {
+    function upgradeJson(): Record<string, any> | undefined {
+      const line = logSpy.mock.calls
+        .map((c) => c[0])
+        .find(
+          (a) =>
+            typeof a === "string" && a.includes('"command":"email.upgrade"')
+        );
+      return line ? JSON.parse(line as string) : undefined;
+    }
+
+    it("saved ses-lambda-action: deploys the saved config unchanged, no switch, no rule-set activation, no DNS writes", async () => {
+      await setupPulumi({
+        domain: "example.com",
+        dkimTokens: ["a", "b", "c"],
+      });
+      const saved = connection("ses-lambda-action");
+      saved.services.email.dnsProvider = "cloudflare";
+      saved.services.email.config.tracking = {
+        enabled: true,
+        opens: true,
+        clicks: true,
+        httpsEnabled: true,
+        customRedirectDomain: "link.example.com",
+      };
+      const savedConfig = JSON.parse(
+        JSON.stringify(saved.services.email.config)
+      );
+      vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue(saved);
+
+      await upgrade({ action: "redeploy", yes: true });
+
+      expect(vi.mocked(deployEmailStack)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(deployEmailStack).mock.calls[0][0].emailConfig).toEqual(
+        savedConfig
+      );
+      expect(prompts.select).not.toHaveBeenCalled();
+      expect(syncReceiptRuleTrigger).not.toHaveBeenCalled();
+      expect(deployHooks.deploy).not.toHaveBeenCalled();
+      expect(setActiveReceiptRuleSet).not.toHaveBeenCalled();
+      expect(dnsCredentials.getDNSCredentials).not.toHaveBeenCalled();
+      expect(dnsCredentials.detectAvailableDNSProviders).not.toHaveBeenCalled();
+      expect(dnsRecords.createDNSRecordsForProvider).not.toHaveBeenCalled();
+      expect(saves.at(-1)).toEqual({
+        preset: "starter",
+        trigger: "ses-lambda-action",
+      });
+    });
+
+    it("saved old mode, --json --yes: runs the switch and reports the resulting trigger", async () => {
+      await setupPulumi();
+      vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue(
+        connection()
+      );
+      setJsonMode(true);
+
+      await upgrade({ action: "redeploy", yes: true, json: true });
+
+      expect(order).toEqual([
+        "upgrade-up",
+        "save:absent",
+        "save:absent",
+        "sync:ses-lambda-action",
+        "save:ses-lambda-action",
+        "seam-up:ses-lambda-action",
+      ]);
+      expect(setActiveReceiptRuleSet).not.toHaveBeenCalled();
+      const out = upgradeJson();
+      expect(out?.success).toBe(true);
+      expect(out?.data.action).toBe("redeploy");
+      expect(out?.data.trigger).toBe("ses-lambda-action");
+    });
+
+    it("(b) through redeploy: trigger dropped, rule already mail/ + Lambda: ends single-trigger in the new mode", async () => {
+      await setupPulumi();
+      vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue(
+        connection(undefined)
+      );
+      vi.mocked(describeInboundReceiptRule).mockResolvedValue(SWITCHED_RULE);
+
+      await upgrade({ action: "redeploy", yes: true });
+
+      const deployed = vi.mocked(deployEmailStack).mock.calls[0][0];
+      expect(deployed.emailConfig.inbound?.trigger).toBeUndefined();
+      expect(order.slice(-3)).toEqual([
+        "sync:ses-lambda-action",
+        "save:ses-lambda-action",
+        "seam-up:ses-lambda-action",
+      ]);
+      expect(setActiveReceiptRuleSet).not.toHaveBeenCalled();
+    });
+
+    it("--json switch failure: JSON error envelope naming step and redeploy, exit 1, telemetry", async () => {
+      await setupPulumi();
+      vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue(
+        connection()
+      );
+      vi.mocked(syncReceiptRuleTrigger).mockRejectedValue(new Error("denied"));
+      const trackSpy = vi.spyOn(telemetry, "trackError");
+      setJsonMode(true);
+
+      await expect(
+        upgrade({ action: "redeploy", yes: true, json: true })
+      ).rejects.toThrow("process.exit(1)");
+
+      const out = upgradeJson();
+      expect(out?.success).toBe(false);
+      expect(out?.error.code).toBe("INBOUND_TRIGGER_SWITCH_FAILED");
+      expect(out?.error.message).toContain("step 2");
+      expect(out?.error.suggestion).toContain(
+        "wraps email upgrade --action redeploy"
+      );
+      expect(trackSpy).toHaveBeenCalledWith(
+        "INBOUND_TRIGGER_SWITCH_FAILED",
+        "email.upgrade",
+        { step: "2" }
+      );
     });
   });
 });
