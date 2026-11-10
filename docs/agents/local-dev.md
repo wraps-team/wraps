@@ -54,6 +54,14 @@ is `""`. See `docs/agents/test-database.md` for how it becomes a per-checkout br
 
 If you keep the keys in `.env.local` instead, `vitest` does not read that file for tests.
 
+Node 25+ (and some 24.x builds) ship an experimental `localStorage` global that is
+`undefined` without `--localstorage-file`, shadowing jsdom's, so component tests failed
+with `Cannot read properties of undefined (reading 'clear')`. `apps/web/vitest.config.ts`
+now starts its workers with `--no-experimental-webstorage` when the running Node knows
+the flag; nothing to do locally. A `pnpm --filter <name>` that matches no package now
+exits non-zero (`failIfNoMatch` in `pnpm-workspace.yaml`); pass `--no-fail-if-no-match`
+where an empty match is legitimate.
+
 ## `pnpm check:changed`: the diff-only gate
 
 Use it while iterating; keep `pnpm check:all` for the final pre-merge run. It diffs
