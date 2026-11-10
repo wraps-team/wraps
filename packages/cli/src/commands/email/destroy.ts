@@ -10,6 +10,12 @@ import { trackError, trackServiceRemoved } from "../../telemetry/events.js";
 import type { WrapsEmailConfig } from "../../types/email.js";
 import type { DestroyOptions } from "../../types/index.js";
 import type { EmailDNSCleanupResult } from "../../utils/dns/index.js";
+import {
+  deleteReceiptRule,
+  deleteReceiptRuleSet,
+  RULE_NAME,
+  RULE_SET_NAME,
+} from "../../utils/email/receipt-rules.js";
 import { deleteDNSRecords, findHostedZone } from "../../utils/route53.js";
 import { createAgentApiClient } from "../../utils/shared/agent-api.js";
 import {
@@ -226,6 +232,7 @@ export async function emailDestroy(options: DestroyOptions): Promise<void> {
   const domain = emailConfig?.domain;
   const storedStackName = emailService?.pulumiStackName;
   const agentsToDestroy = selectAgentsToDestroy(emailConfig);
+  const inboundEnabled = emailConfig?.inbound?.enabled === true;
 
   // 4. Confirm destruction (skip if --force or --preview)
   if (!(options.force || options.preview)) {
@@ -377,6 +384,14 @@ export async function emailDestroy(options: DestroyOptions): Promise<void> {
         }
       }
 
+      // The SES receipt rule is managed through the SDK, not the stack, so
+      // the stack preview can't show it.
+      if (inboundEnabled) {
+        clack.log.info(
+          `SES receipt rule ${pc.cyan(RULE_NAME)} and rule set ${pc.cyan(RULE_SET_NAME)} will also be deleted`
+        );
+      }
+
       // Show agent blast radius so the operator sees leashed credentials go too.
       const agentSummaryLines = buildAgentDestroySummaryLines(agentsToDestroy);
       if (agentSummaryLines.length > 0) {
@@ -410,6 +425,31 @@ export async function emailDestroy(options: DestroyOptions): Promise<void> {
   }
 
   // DESTROY MODE - actually remove infrastructure
+
+  // 6b. Delete the inbound receipt rule and rule set before the stack, so no
+  // rule is left pointing at a deleted bucket or function. Abort on any error
+  // other than "already gone" (the helpers ignore RuleDoesNotExist /
+  // RuleSetDoesNotExist): destroying the stack under a live rule would bounce
+  // or drop inbound mail.
+  if (inboundEnabled) {
+    try {
+      await progress.execute("Removing SES receipt rules", async () => {
+        await deleteReceiptRule(region);
+        await deleteReceiptRuleSet(region);
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      trackError("RECEIPT_RULE_DELETE_FAILED", "email destroy", {
+        step: "delete-receipt-rule",
+      });
+      throw new WrapsError(
+        `Could not delete the SES receipt rule ${RULE_NAME} (rule set ${RULE_SET_NAME}): ${msg}. Nothing was destroyed.`,
+        "RECEIPT_RULE_DELETE_FAILED",
+        "Check the credentials have ses:DeleteReceiptRule, ses:DeleteReceiptRuleSet and ses:SetActiveReceiptRuleSet (see `wraps permissions`), then run `wraps email destroy` again.",
+        "https://wraps.dev/docs/guides/aws-setup/permissions"
+      );
+    }
+  }
 
   // 7. Clean up DNS records first (before destroying SES identity)
   if (shouldCleanDNS && hostedZone && domain && dkimTokens.length > 0) {

@@ -59,6 +59,19 @@ vi.mock("../../utils/shared/pulumi.js", async () => {
   return {
     ...actual,
     ensurePulumiInstalled: vi.fn().mockResolvedValue(undefined),
+    previewWithResourceChanges: vi
+      .fn()
+      .mockResolvedValue({ changeSummary: {}, resourceChanges: [] }),
+  };
+});
+// Plan 041: email destroy deletes the inbound receipt rule and rule set.
+vi.mock("../../utils/email/receipt-rules.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../utils/email/receipt-rules.js")>();
+  return {
+    ...actual,
+    deleteReceiptRule: vi.fn().mockResolvedValue(undefined),
+    deleteReceiptRuleSet: vi.fn().mockResolvedValue(undefined),
   };
 });
 vi.mock("../../utils/route53.js");
@@ -67,6 +80,7 @@ vi.mock("../../utils/shared/agent-api.js");
 
 import * as sesv2 from "@aws-sdk/client-sesv2";
 import * as prompts from "@clack/prompts";
+import * as receiptRules from "../../utils/email/receipt-rules.js";
 import * as route53 from "../../utils/route53.js";
 import * as agentApi from "../../utils/shared/agent-api.js";
 import * as aws from "../../utils/shared/aws.js";
@@ -229,6 +243,98 @@ describe("email destroy command", () => {
 
     return mockStack;
   }
+
+  describe("Inbound receipt rule cleanup (plan 041)", () => {
+    function withInbound() {
+      vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue({
+        version: "1.0.0",
+        accountId: "123456789012",
+        region: "us-east-1",
+        provider: "vercel",
+        timestamp: new Date().toISOString(),
+        services: {
+          email: {
+            preset: "production",
+            config: {
+              domain: "example.com",
+              tracking: { enabled: true },
+              inbound: {
+                enabled: true,
+                subdomain: "inbound",
+                receivingDomain: "inbound.example.com",
+                trigger: "ses-lambda-action",
+              },
+            },
+            pulumiStackName: "wraps-email-123456789012-us-east-1",
+            deployedAt: new Date().toISOString(),
+          },
+        },
+      } as never);
+    }
+
+    it("deletes the rule and rule set after the confirmation and before the stack destroy", async () => {
+      withInbound();
+      const stack = await setupPulumiMock();
+
+      await emailDestroy({});
+
+      const confirmAt = vi.mocked(prompts.confirm).mock.invocationCallOrder[0];
+      const ruleAt = vi.mocked(receiptRules.deleteReceiptRule).mock
+        .invocationCallOrder[0];
+      const ruleSetAt = vi.mocked(receiptRules.deleteReceiptRuleSet).mock
+        .invocationCallOrder[0];
+      const destroyAt = stack.destroy.mock.invocationCallOrder[0];
+      expect(receiptRules.deleteReceiptRule).toHaveBeenCalledWith("us-east-1");
+      expect(receiptRules.deleteReceiptRuleSet).toHaveBeenCalledWith(
+        "us-east-1"
+      );
+      expect(confirmAt).toBeLessThan(ruleAt);
+      expect(ruleAt).toBeLessThan(ruleSetAt);
+      expect(ruleSetAt).toBeLessThan(destroyAt);
+    });
+
+    it("leaves receipt rules alone when inbound is not enabled", async () => {
+      await setupPulumiMock();
+      await emailDestroy({ force: true });
+      expect(receiptRules.deleteReceiptRule).not.toHaveBeenCalled();
+      expect(receiptRules.deleteReceiptRuleSet).not.toHaveBeenCalled();
+    });
+
+    it("aborts before the stack destroy when the rule delete fails", async () => {
+      withInbound();
+      const stack = await setupPulumiMock();
+      const denied = new Error("not authorized");
+      denied.name = "AccessDenied";
+      vi.mocked(receiptRules.deleteReceiptRule).mockRejectedValueOnce(denied);
+
+      await expect(emailDestroy({ force: true })).rejects.toMatchObject({
+        code: "RECEIPT_RULE_DELETE_FAILED",
+      });
+      expect(stack.destroy).not.toHaveBeenCalled();
+      expect(metadata.deleteConnectionMetadata).not.toHaveBeenCalled();
+    });
+
+    it("--preview lists the rule and rule set and deletes nothing", async () => {
+      withInbound();
+      const stack = await setupPulumiMock();
+
+      await emailDestroy({ preview: true });
+
+      const infos = vi
+        .mocked(prompts.log.info)
+        .mock.calls.map((c) => String(c[0]));
+      expect(
+        infos.some(
+          (m) =>
+            m.includes("wraps-inbound-catch-all") &&
+            m.includes("wraps-inbound-rules")
+        )
+      ).toBe(true);
+      expect(receiptRules.deleteReceiptRule).not.toHaveBeenCalled();
+      expect(receiptRules.deleteReceiptRuleSet).not.toHaveBeenCalled();
+      expect(stack.destroy).not.toHaveBeenCalled();
+    });
+  });
 
   describe("Core Flow Tests", () => {
     it("should validate AWS credentials", async () => {
