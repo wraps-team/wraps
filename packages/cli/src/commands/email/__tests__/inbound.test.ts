@@ -1,3 +1,7 @@
+import { LambdaClient } from "@aws-sdk/client-lambda";
+import { S3Client } from "@aws-sdk/client-s3";
+import { SESClient } from "@aws-sdk/client-ses";
+import { mockClient } from "aws-sdk-client-mock";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildInboundDNSRecords } from "../../../utils/dns/create-records.js";
 import { setJsonMode } from "../../../utils/shared/json-output.js";
@@ -66,8 +70,20 @@ vi.mock("../../../utils/email/receipt-rules.js", async (importOriginal) => {
     createReceiptRuleSet: vi.fn().mockResolvedValue(undefined),
     createReceiptRule: vi.fn().mockResolvedValue(undefined),
     setActiveReceiptRuleSet: vi.fn().mockResolvedValue(undefined),
+    getActiveReceiptRuleSet: vi.fn().mockResolvedValue("wraps-inbound-rules"),
+    // Plan 041: init reads the rule to tell fresh from existing (null =
+    // fresh, so the default keeps init off the switch path); the switch
+    // reads it again and syncs it.
+    describeInboundReceiptRule: vi.fn().mockResolvedValue(null),
+    syncReceiptRuleTrigger: vi.fn().mockResolvedValue(undefined),
   };
 });
+
+// `inbound status`'s read-only trigger check (Lambda GetPolicy, S3
+// GetBucketPolicy, the rule) — replaced per test.
+vi.mock("../../../utils/email/inbound-trigger-check.js", () => ({
+  checkInboundTrigger: vi.fn(),
+}));
 
 // Mock DNS detection/creation so the command doesn't touch the network
 vi.mock("../../../utils/dns/index.js", async () => {
@@ -204,7 +220,14 @@ import {
   inboundDestroy,
   inboundInit,
   inboundRemove,
+  inboundStatus,
 } from "../inbound.js";
+
+// Backstop: if a receipt-rule or trigger-check export is ever left unmocked,
+// its SDK call lands here instead of on real AWS.
+mockClient(SESClient);
+mockClient(LambdaClient);
+mockClient(S3Client);
 
 const baseMetadata = {
   version: "1.0.0",
@@ -221,6 +244,9 @@ const baseMetadata = {
           subdomain: "in",
           receivingDomain: "in.example.com",
           bucketName: "wraps-inbound-123456789012-us-east-1",
+          // Pinned so the pre-041 tests stay off the trigger-switch path;
+          // the switch has its own tests below.
+          trigger: "ses-lambda-action" as const,
         },
         inboundDomains: [
           {
@@ -1220,6 +1246,649 @@ describe("inboundRemove", () => {
     await expect(inboundRemove({})).rejects.toMatchObject({
       name: "WrapsError",
       code: "NON_INTERACTIVE_INPUT",
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Plan 041: trigger mode, init merge, the add-before-remove switch in init and
+// add, add --preview, status, destroy. A stateful fake stands in for the
+// receipt rule so tests can assert the rule's final actions.
+// ---------------------------------------------------------------------------
+
+describe("plan 041: inbound trigger in init / add / status / destroy", () => {
+  type FakeRule = {
+    Recipients: string[];
+    Actions: Array<Record<string, unknown>>;
+  };
+  let rule: FakeRule | null;
+  const events: string[] = [];
+  const saved: Array<{
+    trigger?: string;
+    inbound?: Record<string, unknown>;
+    inboundDomains?: Array<{ receivingDomain: string }>;
+  }> = [];
+  let originalDeploy: typeof import("../../../utils/email/email-stack-deploy.js")["deployHooks"]["deploy"];
+  let originalPreview: typeof import("../../../utils/email/email-stack-deploy.js")["deployHooks"]["preview"];
+  let exitSpy: ReturnType<typeof vi.spyOn>;
+
+  const LEGACY = (bucket: string) => [
+    { S3Action: { BucketName: bucket, ObjectKeyPrefix: "raw/" } },
+  ];
+
+  function legacyMetadata(
+    overrides?: (m: typeof baseMetadata) => void
+  ): typeof baseMetadata {
+    return cloneMetadata((m) => {
+      // biome-ignore lint/performance/noDelete: legacy metadata has no trigger key
+      delete (m.services.email.config.inbound as { trigger?: string }).trigger;
+      overrides?.(m);
+    });
+  }
+
+  function jsonOutput(command: string): Record<string, any> | undefined {
+    const line = vi
+      .mocked(console.log)
+      .mock.calls.map((c) => c[0])
+      .find(
+        (arg) =>
+          typeof arg === "string" && arg.includes(`"command":"${command}"`)
+      );
+    return line ? JSON.parse(line as string) : undefined;
+  }
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    setJsonMode(false);
+    events.length = 0;
+    saved.length = 0;
+    rule = null;
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    exitSpy = vi.spyOn(process, "exit").mockImplementation(((code: number) => {
+      throw new Error(`process.exit(${code})`);
+    }) as never);
+
+    const actualRules = await vi.importActual<
+      typeof import("../../../utils/email/receipt-rules.js")
+    >("../../../utils/email/receipt-rules.js");
+    const rules = await import("../../../utils/email/receipt-rules.js");
+    vi.mocked(rules.describeInboundReceiptRule).mockImplementation(
+      async () => rule as never
+    );
+    vi.mocked(rules.createReceiptRule).mockImplementation(
+      async (region, account, domain, bucket, trigger) => {
+        const recipients = rule?.Recipients ?? [];
+        rule = {
+          Recipients: recipients.includes(domain)
+            ? recipients
+            : [...recipients, domain],
+          Actions: actualRules.inboundRuleActions(
+            region,
+            account,
+            bucket,
+            trigger
+          ) as FakeRule["Actions"],
+        };
+        events.push(`rule-write:${trigger}`);
+      }
+    );
+    vi.mocked(rules.addDomainToReceiptRule).mockImplementation(
+      async (region, account, domain, bucket, trigger) => {
+        if (rule) {
+          rule = { ...rule, Recipients: [...rule.Recipients, domain] };
+        } else {
+          rule = {
+            Recipients: [domain],
+            Actions: actualRules.inboundRuleActions(
+              region,
+              account,
+              bucket,
+              trigger
+            ) as FakeRule["Actions"],
+          };
+        }
+        events.push(`rule-add:${trigger}`);
+      }
+    );
+    vi.mocked(rules.syncReceiptRuleTrigger).mockImplementation(
+      async (region, account, bucket, trigger) => {
+        if (!rule) {
+          throw new Error("no rule");
+        }
+        rule = {
+          ...rule,
+          Actions: actualRules.inboundRuleActions(
+            region,
+            account,
+            bucket,
+            trigger
+          ) as FakeRule["Actions"],
+        };
+        events.push(`sync:${trigger}`);
+      }
+    );
+
+    const { saveConnectionMetadata } = await import(
+      "../../../utils/shared/metadata.js"
+    );
+    vi.mocked(saveConnectionMetadata).mockImplementation(async (m) => {
+      const config = m.services.email?.config;
+      saved.push(
+        JSON.parse(
+          JSON.stringify({
+            trigger: config?.inbound?.trigger,
+            inbound: config?.inbound,
+            inboundDomains: config?.inboundDomains,
+          })
+        )
+      );
+      events.push(`save:${config?.inbound?.trigger ?? "absent"}`);
+    });
+
+    const pulumi = await import("@pulumi/pulumi");
+    vi.mocked(
+      pulumi.automation.LocalWorkspace.createOrSelectStack
+    ).mockImplementation(
+      async () =>
+        ({
+          setConfig: vi.fn().mockResolvedValue(undefined),
+          up: vi.fn(async () => {
+            events.push("command-up");
+            return { outputs: {} };
+          }),
+        }) as never
+    );
+
+    const seam = await import("../../../utils/email/email-stack-deploy.js");
+    originalDeploy = seam.deployHooks.deploy;
+    originalPreview = seam.deployHooks.preview;
+    seam.deployHooks.deploy = vi.fn(async (params) => {
+      events.push(
+        `seam-up:${params.stackConfig.emailConfig.inbound?.trigger ?? "s3-notification"}`
+      );
+    });
+    seam.deployHooks.preview = vi.fn(async () => ({
+      changeSummary: { delete: 2, update: 3 },
+      resourceChanges: [],
+    })) as never;
+  });
+
+  afterEach(async () => {
+    const seam = await import("../../../utils/email/email-stack-deploy.js");
+    seam.deployHooks.deploy = originalDeploy;
+    seam.deployHooks.preview = originalPreview;
+    exitSpy.mockRestore();
+    setJsonMode(false);
+  });
+
+  const BUCKET = "wraps-inbound-123456789012-us-east-1";
+  const NEW_ACTIONS = [
+    { S3Action: { BucketName: BUCKET, ObjectKeyPrefix: "mail/" } },
+    {
+      LambdaAction: {
+        FunctionArn:
+          "arn:aws:lambda:us-east-1:123456789012:function:wraps-inbound-email-processor",
+        InvocationType: "Event",
+      },
+    },
+  ];
+
+  /** No rule write with a raw/ action happens after the sync. */
+  function noLegacyWriteAfterSync(): boolean {
+    const syncAt = events.indexOf("sync:ses-lambda-action");
+    return !events
+      .slice(syncAt + 1)
+      .some(
+        (e) =>
+          e === "rule-write:s3-notification" || e === "rule-add:s3-notification"
+      );
+  }
+
+  describe("inbound init", () => {
+    it("fresh (no rule): saves the inbound block with the new trigger right after the deploy, then creates the rule with mail/ + LambdaAction; no switch", async () => {
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(
+        legacyMetadata((m) => {
+          (m.services.email.config as { inbound?: unknown }).inbound =
+            undefined;
+          (
+            m.services.email.config as { inboundDomains?: unknown }
+          ).inboundDomains = undefined;
+        })
+      );
+
+      await inboundInit({ domain: "example.com", subdomain: "in", yes: true });
+
+      expect(events).toEqual([
+        "command-up",
+        "save:ses-lambda-action",
+        "rule-write:ses-lambda-action",
+        "save:ses-lambda-action",
+      ]);
+      expect(saved[0].inbound).toMatchObject({
+        enabled: true,
+        trigger: "ses-lambda-action",
+      });
+      expect(rule?.Actions).toEqual(NEW_ACTIONS);
+    });
+
+    it("existing S3-notification deployment: rule write in the saved mode, final save, then the switch (sync, save, up #2) as the last step", async () => {
+      rule = { Recipients: ["in.example.com"], Actions: LEGACY(BUCKET) };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(legacyMetadata());
+
+      await inboundInit({ domain: "example.com", subdomain: "in", yes: true });
+
+      expect(events).toEqual([
+        "command-up",
+        "save:absent",
+        "rule-write:s3-notification",
+        "save:absent",
+        "sync:ses-lambda-action",
+        "save:ses-lambda-action",
+        "seam-up:ses-lambda-action",
+      ]);
+      expect(saved.at(-1)?.trigger).toBe("ses-lambda-action");
+      expect(rule?.Actions).toEqual(NEW_ACTIONS);
+      expect(noLegacyWriteAfterSync()).toBe(true);
+    });
+
+    it("rule already switched but metadata still old (design §4.4 row 3): the init rule write reverts it, and the switch's own sync moves it back to mail/ + LambdaAction", async () => {
+      rule = { Recipients: ["in.example.com"], Actions: NEW_ACTIONS };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(legacyMetadata());
+
+      await inboundInit({ domain: "example.com", subdomain: "in", yes: true });
+
+      expect(events.indexOf("sync:ses-lambda-action")).toBeGreaterThan(
+        events.indexOf("rule-write:s3-notification")
+      );
+      expect(rule?.Actions).toEqual(NEW_ACTIONS);
+      expect(saved.at(-1)?.trigger).toBe("ses-lambda-action");
+    });
+
+    it("re-run keeps trigger, retention, the webhook secret and inboundDomains (never r.mail.* from the rule)", async () => {
+      rule = {
+        Recipients: ["in.example.com", "r.mail.example.com"],
+        Actions: NEW_ACTIONS,
+      };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(
+        cloneMetadata((m) => {
+          Object.assign(m.services.email.config.inbound, {
+            retention: "90days",
+            webhookUrl: "https://hooks.example.com/in",
+            webhookSecret: "saved-secret",
+          });
+          m.services.email.config.inboundDomains.push({
+            subdomain: "support",
+            receivingDomain: "support.example.com",
+            parentDomain: "example.com",
+            addedAt: "2024-02-01T00:00:00.000Z",
+          });
+        })
+      );
+
+      await inboundInit({ domain: "example.com", subdomain: "in", yes: true });
+
+      const last = saved.at(-1);
+      expect(last?.inbound).toMatchObject({
+        trigger: "ses-lambda-action",
+        retention: "90days",
+        webhookSecret: "saved-secret",
+        webhookUrl: "https://hooks.example.com/in",
+      });
+      expect(last?.inboundDomains?.map((d) => d.receivingDomain)).toEqual([
+        "in.example.com",
+        "support.example.com",
+      ]);
+      // already in the new mode: no switch
+      expect(events).not.toContain("sync:ses-lambda-action");
+    });
+
+    it("appends a new init domain to the saved inboundDomains", async () => {
+      rule = { Recipients: ["in.example.com"], Actions: NEW_ACTIONS };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(cloneMetadata());
+
+      await inboundInit({
+        domain: "example.com",
+        subdomain: "support",
+        yes: true,
+      });
+
+      expect(
+        saved.at(-1)?.inboundDomains?.map((d) => d.receivingDomain)
+      ).toEqual(["in.example.com", "support.example.com"]);
+    });
+
+    it.each([
+      ["receivingDomain", { subdomain: "support" }, "support.example.com"],
+      ["subdomain", { subdomain: "support" }, "support"],
+      ["bucketName", { subdomain: "in" }, BUCKET],
+    ] as const)(
+      "merges %s from the init run into the saved block",
+      async (field, flags, expected) => {
+        rule = { Recipients: ["in.example.com"], Actions: NEW_ACTIONS };
+        const { loadConnectionMetadata } = await import(
+          "../../../utils/shared/metadata.js"
+        );
+        vi.mocked(loadConnectionMetadata).mockResolvedValue(
+          cloneMetadata((m) => {
+            Object.assign(m.services.email.config.inbound, {
+              bucketName: "stale-bucket-name",
+              webhookSecret: "saved-secret",
+            });
+          })
+        );
+
+        await inboundInit({ domain: "example.com", yes: true, ...flags });
+
+        expect(saved.at(-1)?.inbound?.[field]).toBe(expected);
+        expect(saved.at(-1)?.inbound?.webhookSecret).toBe("saved-secret");
+      }
+    );
+
+    it("merges webhookUrl: the flag wins over the saved URL", async () => {
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(
+        cloneMetadata((m) => {
+          Object.assign(m.services.email.config.inbound, {
+            webhookUrl: "https://old.example.com/in",
+            webhookSecret: "saved-secret",
+          });
+        })
+      );
+
+      await inboundInit({
+        domain: "example.com",
+        subdomain: "in",
+        yes: true,
+        webhookUrl: "https://new.example.com/in",
+      });
+
+      expect(saved.at(-1)?.inbound?.webhookUrl).toBe(
+        "https://new.example.com/in"
+      );
+    });
+
+    it("prints and returns in --json the secret actually saved (not a fresh one)", async () => {
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(
+        cloneMetadata((m) => {
+          Object.assign(m.services.email.config.inbound, {
+            webhookUrl: "https://hooks.example.com/in",
+            webhookSecret: "saved-secret",
+          });
+        })
+      );
+      const clack = await import("@clack/prompts");
+
+      await inboundInit({ domain: "example.com", subdomain: "in", yes: true });
+      const note = vi
+        .mocked(clack.note)
+        .mock.calls.map((c) => String(c[0]))
+        .find((n) => n.includes("X-Wraps-Inbound-Key"));
+      expect(note).toContain("saved-secret");
+
+      setJsonMode(true);
+      await inboundInit({ domain: "example.com", subdomain: "in", yes: true });
+      expect(jsonOutput("email.inbound.init")?.data.webhookSecret).toBe(
+        "saved-secret"
+      );
+      expect(saved.at(-1)?.inbound?.webhookSecret).toBe("saved-secret");
+    });
+
+    it("--json mode runs the switch and reports the resulting trigger", async () => {
+      rule = { Recipients: ["in.example.com"], Actions: LEGACY(BUCKET) };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(legacyMetadata());
+      setJsonMode(true);
+
+      await inboundInit({ domain: "example.com", subdomain: "in", yes: true });
+
+      expect(events).toContain("sync:ses-lambda-action");
+      expect(jsonOutput("email.inbound.init")?.data.trigger).toBe(
+        "ses-lambda-action"
+      );
+    });
+
+    it("--json switch failure goes through jsonError with the step and the finishing command, exits 1, keeps the saves", async () => {
+      rule = { Recipients: ["in.example.com"], Actions: LEGACY(BUCKET) };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(legacyMetadata());
+      const rules = await import("../../../utils/email/receipt-rules.js");
+      vi.mocked(rules.syncReceiptRuleTrigger).mockRejectedValueOnce(
+        new Error("AccessDenied")
+      );
+      setJsonMode(true);
+
+      await expect(
+        inboundInit({ domain: "example.com", subdomain: "in", yes: true })
+      ).rejects.toThrow("process.exit(1)");
+
+      const out = jsonOutput("email.inbound.init");
+      expect(out?.success).toBe(false);
+      expect(out?.error.code).toBe("INBOUND_TRIGGER_SWITCH_FAILED");
+      expect(out?.error.message).toContain("step 2");
+      expect(out?.error.suggestion).toContain("wraps email upgrade");
+      // init's own saves happened before the switch
+      expect(saved.length).toBe(2);
+    });
+  });
+
+  describe("inbound add", () => {
+    it("S3-notification deployment: rule write, save, then the full switch; final trigger is new and reported in --json", async () => {
+      rule = { Recipients: ["in.example.com"], Actions: LEGACY(BUCKET) };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(legacyMetadata());
+      setJsonMode(true);
+
+      await inboundAdd({
+        domain: "example.com",
+        subdomain: "support",
+        yes: true,
+      });
+
+      expect(events).toEqual([
+        "rule-add:s3-notification",
+        "save:absent",
+        "seam-up:s3-notification",
+        "sync:ses-lambda-action",
+        "save:ses-lambda-action",
+        "seam-up:ses-lambda-action",
+      ]);
+      expect(rule?.Actions).toEqual(NEW_ACTIONS);
+      expect(noLegacyWriteAfterSync()).toBe(true);
+      expect(jsonOutput("email.inbound.add")?.data.trigger).toBe(
+        "ses-lambda-action"
+      );
+    });
+
+    it("no rule at switch time: saves the new mode and runs up #2 only", async () => {
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(legacyMetadata());
+      const rules = await import("../../../utils/email/receipt-rules.js");
+      // the add's rule write is a no-op here, so the switch finds no rule
+      vi.mocked(rules.addDomainToReceiptRule).mockImplementationOnce(
+        async () => {
+          events.push("rule-add:skipped");
+        }
+      );
+
+      await inboundAdd({
+        domain: "example.com",
+        subdomain: "support",
+        yes: true,
+      });
+
+      expect(events).toEqual([
+        "rule-add:skipped",
+        "save:absent",
+        "save:ses-lambda-action",
+        "seam-up:ses-lambda-action",
+      ]);
+    });
+
+    it("already in the new mode: no switch, no deploy", async () => {
+      rule = { Recipients: ["in.example.com"], Actions: NEW_ACTIONS };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(cloneMetadata());
+
+      await inboundAdd({
+        domain: "example.com",
+        subdomain: "support",
+        yes: true,
+      });
+
+      expect(events).toEqual([
+        "rule-add:ses-lambda-action",
+        "save:ses-lambda-action",
+      ]);
+      expect(rule?.Actions).toEqual(NEW_ACTIONS);
+    });
+
+    it("--preview previews the switch and applies nothing", async () => {
+      rule = { Recipients: ["in.example.com"], Actions: LEGACY(BUCKET) };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(legacyMetadata());
+      const seam = await import("../../../utils/email/email-stack-deploy.js");
+      const dns = await import("../../../utils/dns/index.js");
+
+      await inboundAdd({
+        domain: "example.com",
+        subdomain: "support",
+        yes: true,
+        preview: true,
+      });
+
+      expect(events).toEqual([]);
+      expect(seam.deployHooks.preview).toHaveBeenCalledTimes(1);
+      const previewed = vi.mocked(seam.deployHooks.preview).mock.calls[0][0];
+      expect(previewed.stackConfig.emailConfig.inbound.trigger).toBe(
+        "ses-lambda-action"
+      );
+      expect(dns.createInboundDNSRecordsForProvider).not.toHaveBeenCalled();
+      expect(rule?.Actions).toEqual(LEGACY(BUCKET));
+    });
+
+    it("--preview with a stray value names --preview, before any AWS call", async () => {
+      const aws = await import("../../../utils/shared/aws.js");
+      await expect(
+        inboundAdd({ preview: true, unexpectedArg: "now" })
+      ).rejects.toMatchObject({
+        code: "INVALID_FLAG_USAGE",
+        suggestion: expect.stringContaining("--preview takes no value"),
+      });
+      expect(aws.validateAWSCredentials).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("inbound status", () => {
+    it("puts the trigger and the mismatch flags in --json", async () => {
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(legacyMetadata());
+      const check = await import(
+        "../../../utils/email/inbound-trigger-check.js"
+      );
+      vi.mocked(check.checkInboundTrigger).mockResolvedValue({
+        savedTrigger: "s3-notification",
+        ruleTrigger: "ses-lambda-action",
+        sesInvokePermission: true,
+        bucketPolicyCoversMail: true,
+        mismatches: ["rule-differs-from-saved"],
+        warnings: ["The receipt rule uses the ses-lambda-action trigger..."],
+      });
+      setJsonMode(true);
+
+      await inboundStatus({});
+
+      const data = jsonOutput("email.inbound.status")?.data;
+      expect(data.trigger).toBe("s3-notification");
+      expect(data.triggerCheck).toEqual({
+        ruleTrigger: "ses-lambda-action",
+        sesInvokePermission: true,
+        bucketPolicyCoversMail: true,
+        mismatches: ["rule-differs-from-saved"],
+        warnings: ["The receipt rule uses the ses-lambda-action trigger..."],
+      });
+      expect(vi.mocked(check.checkInboundTrigger)).toHaveBeenCalledWith({
+        region: "us-east-1",
+        bucketName: BUCKET,
+        savedTrigger: "s3-notification",
+      });
+    });
+
+    it("shows the mode and warns on a mismatch", async () => {
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(cloneMetadata());
+      const check = await import(
+        "../../../utils/email/inbound-trigger-check.js"
+      );
+      vi.mocked(check.checkInboundTrigger).mockResolvedValue({
+        savedTrigger: "ses-lambda-action",
+        ruleTrigger: "ses-lambda-action",
+        sesInvokePermission: false,
+        bucketPolicyCoversMail: true,
+        mismatches: ["ses-invoke-permission-missing"],
+        warnings: ["The processor has no wraps-inbound-ses-invoke permission"],
+      });
+      const clack = await import("@clack/prompts");
+
+      await inboundStatus({});
+
+      const printed = vi
+        .mocked(console.log)
+        .mock.calls.map((c) => String(c[0]))
+        .join("\n");
+      expect(printed).toContain("SES Lambda action");
+      expect(vi.mocked(clack.log.warn)).toHaveBeenCalledWith(
+        "The processor has no wraps-inbound-ses-invoke permission"
+      );
+    });
+  });
+
+  describe("inbound destroy", () => {
+    it("clears inbound.trigger with the rest of the inbound config", async () => {
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(cloneMetadata());
+
+      await inboundDestroy({ force: true });
+
+      expect(saved.at(-1)?.inbound).toBeUndefined();
+      expect(saved.at(-1)?.trigger).toBeUndefined();
     });
   });
 });

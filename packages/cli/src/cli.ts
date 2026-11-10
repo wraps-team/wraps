@@ -338,7 +338,7 @@ function showHelp() {
     `  ${pc.cyan("email inbound test")}      Send test email and verify receipt`
   );
   console.log(
-    `  ${pc.cyan("email inbound add")}       Add an inbound receiving domain`
+    `  ${pc.cyan("email inbound add")}       Add an inbound receiving domain (--preview: show what would change, including the trigger switch, without applying it)`
   );
   console.log(
     `  ${pc.cyan("email inbound remove")}    Remove an inbound receiving domain`
@@ -1254,6 +1254,7 @@ async function run() {
                 root: flags.root,
                 domain: flags.domain,
                 yes: flags.yes,
+                preview: flags.preview,
                 json: flags.json,
                 unexpectedArg: sub[3],
               });

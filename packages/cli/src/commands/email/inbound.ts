@@ -13,15 +13,24 @@ import type {
   EmailInboundTestOptions,
   EmailInboundVerifyOptions,
   InboundDomain,
+  InboundTrigger,
 } from "../../types/index.js";
 import { SES_RECEIVING_REGIONS } from "../../types/index.js";
+import { runEmailStackPreview } from "../../utils/email/email-stack-deploy.js";
+import { checkInboundTrigger } from "../../utils/email/inbound-trigger-check.js";
+import {
+  exitOnSwitchFailure,
+  switchInboundTrigger,
+} from "../../utils/email/inbound-trigger-switch.js";
 import {
   addDomainToReceiptRule,
   createReceiptRule,
   createReceiptRuleSet,
   deleteReceiptRule,
   deleteReceiptRuleSet,
+  describeInboundReceiptRule,
   getActiveReceiptRuleSet,
+  RULE_NAME,
   RULE_SET_NAME,
   removeDomainFromReceiptRule,
   setActiveReceiptRuleSet,
@@ -42,6 +51,7 @@ import {
   type ConnectionMetadata,
   getAllTrackedDomains,
   getInboundTrigger,
+  inboundTriggerOf,
   loadConnectionMetadata,
   removeInboundDomainFromMetadata,
   saveConnectionMetadata,
@@ -175,16 +185,29 @@ function reportInboundDNSCleanup(
   }
 }
 
+/** Human label for an inbound trigger mode. */
+function describeTrigger(trigger: InboundTrigger): string {
+  return trigger === "ses-lambda-action"
+    ? "SES Lambda action (records envelope recipients)"
+    : "S3 notification (legacy; no envelope recipients)";
+}
+
 // Fail fast on flag misuse, before any AWS call.
 function assertValidInboundFlags(options: {
   unexpectedArg?: string;
   root?: boolean;
   subdomain?: string;
+  preview?: boolean;
 }): void {
   if (options.unexpectedArg) {
+    // A stray positional is almost always a value given to a boolean flag;
+    // name the flag that was actually passed.
+    const flag = options.root ? "--root" : options.preview ? "--preview" : null;
     throw errors.invalidFlagUsage(
       `Unexpected argument: ${options.unexpectedArg}`,
-      `--root takes no value: "--root ${options.unexpectedArg}" (or "--root=${options.unexpectedArg}") sets --root and discards "${options.unexpectedArg}". To name the parent domain use --domain <domain>; to pick the label use --subdomain <label>.`
+      flag
+        ? `${flag} takes no value: "${flag} ${options.unexpectedArg}" (or "${flag}=${options.unexpectedArg}") sets ${flag} and discards "${options.unexpectedArg}". To name the parent domain use --domain <domain>; to pick the label use --subdomain <label>.`
+        : `Remove "${options.unexpectedArg}". To name the parent domain use --domain <domain>; to pick the label use --subdomain <label>.`
     );
   }
   if (options.root && options.subdomain) {
@@ -315,12 +338,18 @@ export async function inboundInit(
     );
   }
 
-  // 7. Prompt for webhook URL
+  // 7. Resolve the webhook URL once: flag, else prompt, else the saved one.
+  // The save, the --json output and the printed note all read these locals.
+  const savedInbound = emailConfig.inbound;
   const webhookUrl =
-    options.webhookUrl || (options.yes ? undefined : await promptWebhookUrl());
+    options.webhookUrl ||
+    (options.yes ? undefined : await promptWebhookUrl()) ||
+    savedInbound?.webhookUrl;
 
-  // 8. Generate webhook secret
-  const webhookSecret = randomBytes(32).toString("hex");
+  // 8. Webhook secret: keep the saved one (rotating it would break the
+  // receiver), else generate one.
+  const webhookSecret =
+    savedInbound?.webhookSecret ?? randomBytes(32).toString("hex");
 
   // 9. Show cost estimate
   clack.log.info(
@@ -353,25 +382,46 @@ export async function inboundInit(
   const stackName =
     emailService.pulumiStackName || `wraps-${identity.accountId}-${region}`;
 
-  // 12. Update email config with inbound settings
+  // 12. Fresh = no receipt rule: no mail is flowing, so deploy straight into
+  // the SES Lambda-action trigger. Otherwise keep the saved trigger and switch
+  // after the final save (plan 041 R1).
+  const existingRule = await describeInboundReceiptRule(region);
+  const fresh = existingRule === null;
+  const trigger: InboundTrigger | undefined = fresh
+    ? "ses-lambda-action"
+    : savedInbound?.trigger;
+
+  // Merge into the saved inbound config instead of rebuilding it: trigger and
+  // retention always come from the saved block (or the fresh mode above).
+  const savedInboundDomains = emailConfig.inboundDomains ?? [];
+  const inboundDomains = savedInboundDomains.some(
+    (d) => d.receivingDomain === receivingDomain
+  )
+    ? savedInboundDomains
+    : [
+        ...savedInboundDomains,
+        {
+          subdomain,
+          receivingDomain,
+          parentDomain: domain,
+          addedAt: new Date().toISOString(),
+        },
+      ];
+
   const updatedEmailConfig = {
     ...emailConfig,
     inbound: {
+      ...savedInbound,
       enabled: true,
       subdomain,
       receivingDomain,
       bucketName: `wraps-inbound-${identity.accountId}-${region}`,
       webhookUrl,
       webhookSecret,
+      retention: savedInbound?.retention,
+      trigger,
     },
-    inboundDomains: [
-      {
-        subdomain,
-        receivingDomain,
-        parentDomain: domain,
-        addedAt: new Date().toISOString(),
-      },
-    ],
+    inboundDomains,
   };
 
   const stackConfig = buildEmailStackConfig(metadata, region, {
@@ -413,6 +463,11 @@ export async function inboundInit(
     clack.log.info(
       `Not covered by the preview: the SES receipt rule for ${pc.cyan(receivingDomain)} and its DNS records.`
     );
+    if (inboundTriggerOf(updatedEmailConfig) === "s3-notification") {
+      clack.log.info(
+        "Not covered either: this deployment still uses the S3-notification trigger, so init would then switch it to the SES Lambda action (receipt rule update and a second deploy that removes the S3 notification)."
+      );
+    }
     clack.outro(pc.green("Preview complete. Run without --preview to deploy."));
     return;
   }
@@ -443,6 +498,19 @@ export async function inboundInit(
         }),
       { accountId: identity.accountId, region, autoConfirm: options.yes }
     );
+  });
+
+  // 14b. Save the inbound block (enabled, trigger) as soon as the stack is
+  // deployed with it, before the rule write: the rule writer below reads the
+  // trigger the most recent deploy used from saved metadata (plan 041 R2).
+  await progress.execute("Saving inbound configuration", async () => {
+    metadata.services.email = {
+      ...emailService,
+      config: updatedEmailConfig,
+      deployedAt: new Date().toISOString(),
+    };
+    metadata.timestamp = new Date().toISOString();
+    await saveConnectionMetadata(metadata);
   });
 
   // 15. Create SES Receipt Rules via AWS SDK
@@ -603,6 +671,26 @@ export async function inboundInit(
     await saveConnectionMetadata(metadata);
   });
 
+  // 16b. Switch an existing S3-notification deployment to the SES Lambda
+  // action: the command's last mutating step, after its own save (plan 041
+  // R1). Init's deploy above was step 1. Runs in --json mode too.
+  if (getInboundTrigger(metadata) === "s3-notification") {
+    try {
+      await switchInboundTrigger({
+        metadata,
+        accountId: identity.accountId,
+        region,
+        stackName,
+        autoConfirm: options.yes,
+        skipInitialDeploy: true,
+        progress,
+      });
+    } catch (error) {
+      exitOnSwitchFailure("email.inbound.init", error);
+    }
+  }
+  const finalTrigger = getInboundTrigger(metadata);
+
   // 17. Display success
   if (isJsonMode()) {
     jsonSuccess("email.inbound.init", {
@@ -614,6 +702,7 @@ export async function inboundInit(
       webhookHeader: webhookUrl ? "X-Wraps-Inbound-Key" : null,
       dnsAutoCreated,
       region,
+      trigger: finalTrigger,
     });
     return;
   }
@@ -624,6 +713,9 @@ export async function inboundInit(
   console.log(`  ${pc.dim("Receiving domain:")} ${pc.cyan(receivingDomain)}`);
   console.log(
     `  ${pc.dim("S3 bucket:")}        ${pc.cyan(`wraps-inbound-${identity.accountId}-${region}`)}`
+  );
+  console.log(
+    `  ${pc.dim("Trigger:")}          ${pc.cyan(describeTrigger(finalTrigger))}`
   );
   if (webhookUrl) {
     console.log(`  ${pc.dim("Webhook URL:")}      ${pc.cyan(webhookUrl)}`);
@@ -924,6 +1016,16 @@ export async function inboundStatus(
   // 4. Check receipt rule status
   const activeRuleSet = await getActiveReceiptRuleSet(region);
 
+  // 4b. Trigger mode, and whether the rule, metadata, SES invoke permission
+  // and bucket policy agree (read-only).
+  const bucketName =
+    inbound.bucketName || `wraps-inbound-${identity.accountId}-${region}`;
+  const triggerCheck = await checkInboundTrigger({
+    region,
+    bucketName,
+    savedTrigger: getInboundTrigger(metadata),
+  });
+
   // Build domain list — prefer inboundDomains, fallback to single domain
   const domainList =
     inboundDomains.length > 0
@@ -950,6 +1052,14 @@ export async function inboundStatus(
           : null,
       receiptRuleSetActive: activeRuleSet === RULE_SET_NAME,
       retention: inbound.retention || null,
+      trigger: triggerCheck.savedTrigger,
+      triggerCheck: {
+        ruleTrigger: triggerCheck.ruleTrigger,
+        sesInvokePermission: triggerCheck.sesInvokePermission,
+        bucketPolicyCoversMail: triggerCheck.bucketPolicyCoversMail,
+        mismatches: triggerCheck.mismatches,
+        warnings: triggerCheck.warnings,
+      },
     });
     return;
   }
@@ -992,7 +1102,30 @@ export async function inboundStatus(
   console.log(
     `  ${pc.dim("Retention:")}         ${inbound.retention ? pc.cyan(inbound.retention) : pc.dim("indefinite")}`
   );
+  console.log(
+    `  ${pc.dim("Trigger:")}           ${pc.cyan(describeTrigger(triggerCheck.savedTrigger))}`
+  );
   console.log();
+  if (triggerCheck.savedTrigger === "s3-notification") {
+    clack.log.info(
+      `Run ${pc.cyan("wraps email upgrade")} to switch to the SES Lambda action and start recording envelope recipients.`
+    );
+  }
+  for (const warning of triggerCheck.warnings) {
+    clack.log.warn(warning);
+  }
+  const unchecked = [
+    triggerCheck.ruleTrigger === null ? "the receipt rule" : null,
+    triggerCheck.sesInvokePermission === null
+      ? "the processor's SES invoke permission"
+      : null,
+    triggerCheck.bucketPolicyCoversMail === null ? "the bucket policy" : null,
+  ].filter((x): x is string => x !== null);
+  if (unchecked.length > 0) {
+    clack.log.info(
+      pc.dim(`Couldn't read ${unchecked.join(", ")} to check the trigger.`)
+    );
+  }
 }
 
 /**
@@ -1566,6 +1699,102 @@ export async function inboundAdd(
     emailConfig.replyThreading?.enabled === true &&
     (emailConfig.replyThreading?.domains?.length ?? 0) > 0;
 
+  // A deployment still on the S3-notification trigger is switched to the SES
+  // Lambda action after this command's own rule write and save (plan 041 R1).
+  const needsSwitch = getInboundTrigger(metadata) === "s3-notification";
+  const stackName =
+    metadata.services.email.pulumiStackName ||
+    `wraps-${identity.accountId}-${region}`;
+
+  if (needsSwitch) {
+    await progress.execute("Checking prerequisites", async () =>
+      ensurePulumiInstalled()
+    );
+  }
+
+  // 8b. Preview: show what would change, including the trigger switch, and
+  // apply nothing (no rule write, DNS write, deploy or metadata save).
+  if (options.preview) {
+    const ruleDomains = [
+      receivingDomain,
+      ...(replyThreadingEnabled ? [`r.mail.${parentDomain}`] : []),
+    ];
+    const { buildInboundDNSRecords: buildRecordsForPreview } = await import(
+      "../../utils/dns/index.js"
+    );
+    const dnsRecords = buildRecordsForPreview(receivingDomain, region);
+
+    let previewResult:
+      | Awaited<ReturnType<typeof runEmailStackPreview>>
+      | undefined;
+    if (needsSwitch) {
+      const previewMetadata = structuredClone(metadata);
+      if (previewMetadata.services.email?.config.inbound) {
+        previewMetadata.services.email.config.inbound.trigger =
+          "ses-lambda-action";
+      }
+      previewResult = await progress.execute(
+        "Generating trigger switch preview",
+        async () =>
+          runEmailStackPreview({
+            accountId: identity.accountId,
+            region,
+            stackName,
+            stackConfig: buildEmailStackConfig(previewMetadata, region),
+          })
+      );
+    }
+
+    if (isJsonMode()) {
+      jsonSuccess("email.inbound.add", {
+        preview: true,
+        receivingDomain,
+        subdomain,
+        parentDomain,
+        receiptRuleDomains: ruleDomains,
+        dnsRecords: dnsRecords.map((r) => ({
+          type: r.type,
+          name: r.name,
+          value: r.value,
+          priority: r.priority ?? null,
+        })),
+        triggerSwitch: needsSwitch,
+        trigger: getInboundTrigger(metadata),
+        region,
+      });
+      return;
+    }
+
+    clack.log.info(
+      `Would add ${ruleDomains.map((d) => pc.cyan(d)).join(" and ")} to receipt rule ${pc.cyan(RULE_NAME)}.`
+    );
+    if (dnsRecords.length > 0) {
+      clack.log.info(pc.bold("DNS records that would be created:"));
+      for (const record of dnsRecords) {
+        const value = record.priority
+          ? `${record.priority} ${record.value}`
+          : record.value;
+        clack.log.info(pc.dim(`  ${record.type} ${record.name} → ${value}`));
+      }
+    }
+    if (previewResult) {
+      clack.log.info(
+        `Would switch the inbound trigger to the SES Lambda action: deploy the new processor and SES invoke permission, move the receipt rule to ${pc.cyan("mail/")} + Lambda action, save, then deploy again to remove the S3 notification. Net stack change:`
+      );
+      displayPreview({
+        changeSummary: previewResult.changeSummary,
+        resourceChanges: previewResult.resourceChanges,
+        commandName: "wraps email inbound add",
+      });
+    } else {
+      clack.log.info(
+        `Trigger: already ${describeTrigger("ses-lambda-action")}; no stack change.`
+      );
+    }
+    clack.outro(pc.green("Preview complete. Run without --preview to apply."));
+    return;
+  }
+
   await progress.execute("Updating SES receipt rule", async () => {
     await addDomainToReceiptRule(
       region,
@@ -1759,6 +1988,23 @@ export async function inboundAdd(
     await saveConnectionMetadata(metadata);
   });
 
+  // 12. Switch the trigger: last mutating step, after the rule write and the
+  // save above (plan 041 R1).
+  if (needsSwitch) {
+    try {
+      await switchInboundTrigger({
+        metadata,
+        accountId: identity.accountId,
+        region,
+        stackName,
+        autoConfirm: options.yes,
+        progress,
+      });
+    } catch (error) {
+      exitOnSwitchFailure("email.inbound.add", error);
+    }
+  }
+
   if (isJsonMode()) {
     jsonSuccess("email.inbound.add", {
       receivingDomain,
@@ -1766,6 +2012,7 @@ export async function inboundAdd(
       parentDomain,
       dnsAutoCreated,
       region,
+      trigger: getInboundTrigger(metadata),
     });
     return;
   }
