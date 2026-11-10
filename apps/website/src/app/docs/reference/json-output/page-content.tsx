@@ -170,7 +170,7 @@ ${usageExamplesCode}
 | \`aws doctor\` | \`aws.doctor\` | \`checks[]\`, \`summary\`, \`suggestions\` |
 | \`platform connect\` | \`platform.connect\` | \`accountId\`, \`connectionId\` |
 | \`platform update-role\` | \`platform.update-role\` | \`updated\`, \`roleArn\` |
-| \`permissions\` | \`permissions\` | \`policy\` (IAM policy document) |`,
+| \`permissions\` | \`permissions\` | \`policies[]\` (\`{ name, policy }\`, one per \`wraps-deployer-<n>\`, each fits a managed policy), \`policy\` (merged; can exceed 6,144 characters), \`written[]\`/\`removed[]\` (absolute paths, with \`--policy-dir\`) |`,
 
   errorHandling: `## Error Handling
 
@@ -837,7 +837,8 @@ export default function PageContent() {
                 {
                   cli: "permissions",
                   command: "permissions",
-                  dataFields: "policy (IAM policy document)",
+                  dataFields:
+                    "policies[] ({ name, policy }, one per wraps-deployer-<n>, each fits a managed policy), policy (merged; can exceed 6,144 characters), written[]/removed[] (absolute paths, with --policy-dir)",
                 },
               ]}
             />

@@ -738,7 +738,7 @@ wraps permissions --json
 
 IAM caps a managed policy at 6,144 characters (whitespace not counted), and the full Wraps policy is larger. `--policy-dir` splits it into files that each fit one managed policy. It creates the folder if needed, and removes older `wraps-deployer-<n>.json` files numbered above the new count; it touches nothing else in the folder.
 
-`--json` prints `{ "success", "command", "data" }`. `data.policies` is the split: one `{ name, policy }` per `wraps-deployer-<n>`. `data.policy` is the merged document; it can exceed 6,144 characters, so it only fits as an inline role policy (10,240). With `--policy-dir`, `data.written` and `data.removed` list the absolute paths of the files written and removed.
+`--json` prints `{ "success", "command", "data" }`. `data.policies` is the split: one `{ name, policy }` per `wraps-deployer-<n>`. `data.policy` is the merged document; it can exceed 6,144 characters, so it only fits as a role's inline policy (10,240 characters across all of that role's inline policies). With `--policy-dir`, `data.written` and `data.removed` list the absolute paths of the files written and removed.
 
 ### Minimum Permissions by Preset
 
@@ -780,6 +780,8 @@ These permissions enhance functionality but are not required:
    - Name it after the file: `wraps-deployer-1`
    - Repeat for each file
 
+   IAM policy names are unique per account. If different users or roles in one account need different scopes, add a suffix, such as `wraps-deployer-email-1`.
+
 3. Attach all of them to your IAM user or role:
    - Go to IAM > Users (or Roles)
    - Select your user/role
@@ -792,9 +794,9 @@ Each user takes up to 10 managed policies by default (20 per role, 10 per group)
 
 A new Wraps version can add permissions or move a statement to a different file. When it does:
 
-1. Re-run `wraps permissions --policy-dir ./wraps-policy` with the same `--service` and `--preset` you used before.
+1. Re-run `wraps permissions --policy-dir ./wraps-policy` into the same folder as last time, with the same `--service` and `--preset` you used before.
 2. Update every `wraps-deployer-<n>` policy: Edit > JSON, paste its file. IAM keeps up to 5 versions of a managed policy; when you save a sixth, the console asks you to delete an old one.
-3. Create and attach a policy for each new file. The CLI lists the files it removed: detach and delete the policies named after them.
+3. Create and attach a policy for each new file. The CLI lists the files it removed from the folder: detach and delete the policies named after them. If you used a new folder, delete any `wraps-deployer-<n>` policy numbered above the new file count.
 4. If you attached a single `WrapsDeploymentPolicy` before, attach the `wraps-deployer-<n>` policies, then detach it.
 
 ### Using AWS Organizations / Permission Boundaries

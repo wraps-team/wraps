@@ -266,7 +266,8 @@ export default function PermissionsPageContent() {
                   data.policy
                 </code>{" "}
                 is the merged document: it can exceed 6,144 characters, so it
-                only fits as an inline role policy (10,240).
+                only fits as a role&apos;s inline policy (10,240 characters
+                across all of that role&apos;s inline policies).
               </p>
               <CodeBlock
                 className="h-auto"
@@ -611,6 +612,15 @@ export default function PermissionsPageContent() {
                       wraps-deployer-1
                     </code>
                   </p>
+                  <p className="mt-1 text-muted-foreground text-sm">
+                    IAM policy names are unique per account. If different users
+                    or roles in one account need different scopes, add a suffix,
+                    such as{" "}
+                    <code className="rounded bg-muted px-1.5 py-0.5">
+                      wraps-deployer-email-1
+                    </code>
+                    .
+                  </p>
                 </div>
               </li>
             </ol>
@@ -714,7 +724,7 @@ export default function PermissionsPageContent() {
                     <code className="rounded bg-muted px-1.5 py-0.5">
                       wraps permissions --policy-dir ./wraps-policy
                     </code>{" "}
-                    with the same{" "}
+                    into the same folder as last time, with the same{" "}
                     <code className="rounded bg-muted px-1.5 py-0.5">
                       --service
                     </code>{" "}
@@ -747,8 +757,13 @@ export default function PermissionsPageContent() {
                   <strong>Match the number of files</strong>
                   <p className="text-muted-foreground text-sm">
                     Create and attach a policy for each new file. The CLI lists
-                    the files it removed: detach and delete the policies named
-                    after them.
+                    the files it removed from the folder: detach and delete the
+                    policies named after them. If you used a new folder, delete
+                    any{" "}
+                    <code className="rounded bg-muted px-1.5 py-0.5">
+                      wraps-deployer-&lt;n&gt;
+                    </code>{" "}
+                    policy numbered above the new file count.
                   </p>
                 </div>
               </li>
