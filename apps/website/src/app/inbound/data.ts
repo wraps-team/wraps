@@ -209,7 +209,8 @@ export const handler = async (event: EventBridgeEvent) => {
   // Route on who SES delivered to (covers Bcc and forwards).
   // Mail from before the upgrade has no envelopeRecipients.
   const recipients =
-    email.envelopeRecipients ?? email.to.map((t) => t.address.toLowerCase());
+    email.envelopeRecipients ??
+    (email.to ?? []).map((t) => t.address.toLowerCase());
   if (recipients.some((r) => r.startsWith('support@'))) {
     await createSupportTicket(email);
   } else if (recipients.some((r) => r.startsWith('sales@'))) {
@@ -217,7 +218,7 @@ export const handler = async (event: EventBridgeEvent) => {
   }
 
   // Process attachments
-  if (email.attachments.length > 0) {
+  if (email.attachments?.length) {
     await processAttachments(email);
   }
 

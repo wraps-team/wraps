@@ -353,13 +353,14 @@ export const handler = async (event) => {
   // Route on who SES delivered to (covers Bcc and forwards).
   // Mail from before the upgrade has no envelopeRecipients.
   const recipients =
-    email.envelopeRecipients ?? email.to.map((t) => t.address.toLowerCase());
+    email.envelopeRecipients ??
+    (email.to ?? []).map((t) => t.address.toLowerCase());
   if (recipients.some((r) => r.startsWith('support@'))) {
     await createSupportTicket(email);
   }
 
   // Process attachments
-  if (email.attachments.length > 0) {
+  if (email.attachments?.length) {
     await processAttachments(email);
   }
 

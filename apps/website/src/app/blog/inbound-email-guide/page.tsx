@@ -395,10 +395,14 @@ TTL: 3600`}
 
             <p className="mt-4 mb-6 text-foreground/80 leading-relaxed">
               Route on <code>envelopeRecipients</code>, not <code>to</code>: it
-              lists the addresses SES delivered to, so Bcc and forwarded mail
-              still reach the right handler. Mail received before{" "}
+              lists the addresses SES delivered to, limited to addresses this
+              deployment receives for, so Bcc and forwarded mail still reach the
+              right handler. Mail received before{" "}
               <code>wraps email upgrade</code> does not have it, so fall back to{" "}
-              <code>to</code>.
+              <code>to</code>. In a trimmed event <code>to</code>,{" "}
+              <code>cc</code> and <code>attachments</code> can be empty or
+              missing: read the full parsed email at <code>parsedS3Key</code>,
+              or guard with <code>?? []</code>.
             </p>
 
             <h3 className="mt-8 mb-4 font-semibold text-xl">

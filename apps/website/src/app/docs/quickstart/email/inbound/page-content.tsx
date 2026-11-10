@@ -145,10 +145,15 @@ export async function handler(event: EventBridgeEvent) {
   console.log('New email from:', email.from.address);
   console.log('Subject:', email.subject);
 
-  // Route to appropriate handler based on recipient
-  if (email.to.some(r => r.address.includes('support@'))) {
+  // Route on who SES delivered to (covers Bcc and forwards).
+  // Mail from before the upgrade has no envelopeRecipients.
+  // A trimmed event can lack to/cc: read parsedS3Key for the full email.
+  const recipients =
+    email.envelopeRecipients ??
+    (email.to ?? []).map((t) => t.address.toLowerCase());
+  if (recipients.some(r => r.startsWith('support@'))) {
     await createSupportTicket(email);
-  } else if (email.to.some(r => r.address.includes('orders@'))) {
+  } else if (recipients.some(r => r.startsWith('orders@'))) {
     await processOrderEmail(email);
   }
 }`;
@@ -640,11 +645,15 @@ TTL: 300`,
           <code className="rounded bg-muted px-1.5 py-0.5">
             envelopeRecipients
           </code>{" "}
-          lists the addresses SES actually delivered to, which can differ from{" "}
+          lists the addresses SES delivered to, limited to addresses this
+          deployment receives for. It can differ from{" "}
           <code className="rounded bg-muted px-1.5 py-0.5">to</code>. Use it to
           route on Bcc recipients, forwards and aliases. It is absent on mail
-          received before <code>wraps email upgrade</code>. Events are delivered
-          at least once, so deduplicate on{" "}
+          received before <code>wraps email upgrade</code>. In a trimmed event{" "}
+          <code>to</code>, <code>cc</code> and <code>attachments</code> can be
+          empty or missing: read the full parsed email at{" "}
+          <code>parsedS3Key</code>, or guard with <code>?? []</code>. Events are
+          delivered at least once, so deduplicate on{" "}
           <code className="rounded bg-muted px-1.5 py-0.5">emailId</code>.
         </p>
 

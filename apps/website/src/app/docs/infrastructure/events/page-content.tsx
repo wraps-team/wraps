@@ -366,9 +366,10 @@ const inboundPayload = `{
   "region": "us-east-1",
   "resources": [],
   "detail": {
+    "emailId": "inb_a1b2c3d4",
     "messageId": "abcdef12-3456-7890-abcd-ef1234567890",
-    "from": "sender@external.com",
-    "to": ["inbox@yourapp.com"],
+    "from": { "name": "", "address": "sender@external.com" },
+    "to": [{ "name": "", "address": "inbox@yourapp.com" }],
     "envelopeRecipients": ["inbox@yourapp.com"],
     "subject": "Re: Your recent order",
     "date": "2025-01-15T14:00:00.000Z",
@@ -1540,7 +1541,7 @@ export default function InfrastructureEventsPageContent() {
                             </code>
                           </td>
                           <td className="p-3 text-muted-foreground">
-                            Sender email address
+                            Sender: an object with address and name
                           </td>
                         </tr>
                         <tr className="border-b">
@@ -1550,7 +1551,8 @@ export default function InfrastructureEventsPageContent() {
                             </code>
                           </td>
                           <td className="p-3 text-muted-foreground">
-                            Array of recipient addresses
+                            Array of recipient objects, each with address and
+                            name
                           </td>
                         </tr>
                         <tr className="border-b">
@@ -1561,7 +1563,9 @@ export default function InfrastructureEventsPageContent() {
                           </td>
                           <td className="p-3 text-muted-foreground">
                             Lowercased SMTP envelope recipients SES delivered
-                            to, Bcc included. Absent on mail received before{" "}
+                            to, Bcc included, limited to addresses this
+                            deployment receives for. Absent on mail received
+                            before{" "}
                             <code className="rounded bg-muted px-1 py-0.5">
                               wraps email upgrade
                             </code>
