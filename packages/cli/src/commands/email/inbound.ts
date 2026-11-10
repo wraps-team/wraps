@@ -195,15 +195,31 @@ function reportInboundDNSCleanup(
  */
 export function inboundRepairCommand(
   inbound: { subdomain?: string; receivingDomain?: string },
+  inboundDomains: InboundDomain[],
   primaryDomain: string | undefined,
   region: string
 ): string {
-  const label = inbound.subdomain ?? "";
-  const receiving = inbound.receivingDomain ?? "";
-  const parent =
-    label && receiving.startsWith(`${label}.`)
-      ? receiving.slice(label.length + 1)
-      : receiving || primaryDomain || "<domain>";
+  // Build from a domain that is still configured: `inbound remove` filters
+  // inboundDomains but leaves inbound.receivingDomain (init's domain) as is,
+  // and re-running init for a removed domain would add it back.
+  const live =
+    inboundDomains.find((d) => d.receivingDomain === inbound.receivingDomain) ??
+    inboundDomains[0];
+  const label = live ? live.subdomain : (inbound.subdomain ?? "");
+  const receiving = live
+    ? live.receivingDomain
+    : (inbound.receivingDomain ?? "");
+  const parentMatches =
+    live?.parentDomain &&
+    receiving === (label ? `${label}.${live.parentDomain}` : live.parentDomain);
+  let parent: string;
+  if (parentMatches && live) {
+    parent = live.parentDomain;
+  } else if (label && receiving.startsWith(`${label}.`)) {
+    parent = receiving.slice(label.length + 1);
+  } else {
+    parent = receiving || primaryDomain || "<domain>";
+  }
   const target = label ? `--subdomain ${label}` : "--root";
   return `wraps email inbound init --domain ${parent} ${target} --region ${region} --yes`;
 }
@@ -1045,6 +1061,7 @@ export async function inboundStatus(
     inbound.bucketName || `wraps-inbound-${identity.accountId}-${region}`;
   const repairCommand = inboundRepairCommand(
     inbound,
+    inboundDomains,
     emailConfig.domain,
     region
   );

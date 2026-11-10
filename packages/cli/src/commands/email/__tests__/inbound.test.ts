@@ -1624,9 +1624,18 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
     });
 
     it("inboundRepairCommand names the saved label, or --root for the apex", () => {
+      const entry = (subdomain: string, parentDomain: string) => ({
+        subdomain,
+        receivingDomain: subdomain
+          ? `${subdomain}.${parentDomain}`
+          : parentDomain,
+        parentDomain,
+        addedAt: "2024-01-01T00:00:00.000Z",
+      });
       expect(
         inboundRepairCommand(
           { subdomain: "in", receivingDomain: "in.example.com" },
+          [entry("in", "example.com")],
           "example.com",
           "us-east-1"
         )
@@ -1634,11 +1643,52 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
       expect(
         inboundRepairCommand(
           { subdomain: "", receivingDomain: "example.com" },
+          [entry("", "example.com")],
           "example.com",
           "eu-west-1"
         )
       ).toBe(
         "wraps email inbound init --domain example.com --root --region eu-west-1 --yes"
+      );
+    });
+
+    it("inboundRepairCommand never names a removed domain: init on in., add support., remove in.", async () => {
+      // inbound remove filters inboundDomains but leaves inbound.receivingDomain
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      const metadata = cloneMetadata((m) => {
+        m.services.email.config.inboundDomains.push({
+          subdomain: "support",
+          receivingDomain: "support.example.com",
+          parentDomain: "example.com",
+          addedAt: "2024-02-01T00:00:00.000Z",
+        });
+      });
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(metadata);
+      vi.mocked(console.log).mockImplementation(() => undefined);
+      await inboundRemove({ domain: "in.example.com", yes: true });
+      const afterRemove = vi
+        .mocked(
+          (await import("../../../utils/shared/metadata.js"))
+            .saveConnectionMetadata
+        )
+        .mock.calls.at(-1)?.[0];
+      expect(afterRemove?.services.email?.config.inbound?.receivingDomain).toBe(
+        "in.example.com"
+      );
+
+      const config = afterRemove?.services.email?.config;
+      expect(
+        inboundRepairCommand(
+          // biome-ignore lint/style/noNonNullAssertion: set above
+          config!.inbound!,
+          config?.inboundDomains ?? [],
+          "example.com",
+          "us-east-1"
+        )
+      ).toBe(
+        "wraps email inbound init --domain example.com --subdomain support --region us-east-1 --yes"
       );
     });
 
