@@ -46,6 +46,7 @@ export type SMSMetricName = (typeof SMS_METRICS)[keyof typeof SMS_METRICS];
 
 type GetSMSMetricsParams = {
   awsAccountId: string;
+  organizationId: string;
   metric: SMSMetricName;
   period: number;
   startTime: Date;
@@ -62,6 +63,7 @@ export async function getSMSCloudWatchMetrics(
 ): Promise<MetricDataResult[]> {
   const {
     awsAccountId,
+    organizationId,
     metric,
     period,
     startTime,
@@ -70,7 +72,8 @@ export async function getSMSCloudWatchMetrics(
   } = params;
 
   const account = await db.query.awsAccount.findFirst({
-    where: (a, { eq }) => eq(a.id, awsAccountId),
+    where: (a, { and, eq }) =>
+      and(eq(a.id, awsAccountId), eq(a.organizationId, organizationId)),
   });
 
   if (!account) {
@@ -126,11 +129,15 @@ export async function getSMSCloudWatchMetrics(
 /**
  * Gets SMS account attributes (send limits, voice enabled, etc.)
  */
-export async function getSMSAccountAttributes(
-  awsAccountId: string
-): Promise<AccountAttribute[]> {
+export async function getSMSAccountAttributes(params: {
+  awsAccountId: string;
+  organizationId: string;
+}): Promise<AccountAttribute[]> {
+  const { awsAccountId, organizationId } = params;
+
   const account = await db.query.awsAccount.findFirst({
-    where: (a, { eq }) => eq(a.id, awsAccountId),
+    where: (a, { and, eq }) =>
+      and(eq(a.id, awsAccountId), eq(a.organizationId, organizationId)),
   });
 
   if (!account) {
@@ -170,11 +177,15 @@ export async function getSMSAccountAttributes(
 /**
  * Gets SMS spend limits (monthly spend limit, etc.)
  */
-export async function getSMSSpendLimits(
-  awsAccountId: string
-): Promise<SpendLimit[]> {
+export async function getSMSSpendLimits(params: {
+  awsAccountId: string;
+  organizationId: string;
+}): Promise<SpendLimit[]> {
+  const { awsAccountId, organizationId } = params;
+
   const account = await db.query.awsAccount.findFirst({
-    where: (a, { eq }) => eq(a.id, awsAccountId),
+    where: (a, { and, eq }) =>
+      and(eq(a.id, awsAccountId), eq(a.organizationId, organizationId)),
   });
 
   if (!account) {
@@ -216,11 +227,15 @@ export async function getSMSSpendLimits(
 /**
  * Gets SMS phone numbers
  */
-export async function getSMSPhoneNumbers(
-  awsAccountId: string
-): Promise<PhoneNumberInformation[]> {
+export async function getSMSPhoneNumbers(params: {
+  awsAccountId: string;
+  organizationId: string;
+}): Promise<PhoneNumberInformation[]> {
+  const { awsAccountId, organizationId } = params;
+
   const account = await db.query.awsAccount.findFirst({
-    where: (a, { eq }) => eq(a.id, awsAccountId),
+    where: (a, { and, eq }) =>
+      and(eq(a.id, awsAccountId), eq(a.organizationId, organizationId)),
   });
 
   if (!account) {
@@ -249,11 +264,15 @@ export async function getSMSPhoneNumbers(
 /**
  * Gets SMS configuration sets
  */
-export async function getSMSConfigurationSets(
-  awsAccountId: string
-): Promise<ConfigurationSetInformation[]> {
+export async function getSMSConfigurationSets(params: {
+  awsAccountId: string;
+  organizationId: string;
+}): Promise<ConfigurationSetInformation[]> {
+  const { awsAccountId, organizationId } = params;
+
   const account = await db.query.awsAccount.findFirst({
-    where: (a, { eq }) => eq(a.id, awsAccountId),
+    where: (a, { and, eq }) =>
+      and(eq(a.id, awsAccountId), eq(a.organizationId, organizationId)),
   });
 
   if (!account) {
@@ -293,11 +312,15 @@ export async function getSMSConfigurationSets(
 /**
  * Gets SMS registrations (toll-free, 10DLC, etc.)
  */
-export async function getSMSRegistrations(
-  awsAccountId: string
-): Promise<RegistrationInformation[]> {
+export async function getSMSRegistrations(params: {
+  awsAccountId: string;
+  organizationId: string;
+}): Promise<RegistrationInformation[]> {
+  const { awsAccountId, organizationId } = params;
+
   const account = await db.query.awsAccount.findFirst({
-    where: (a, { eq }) => eq(a.id, awsAccountId),
+    where: (a, { and, eq }) =>
+      and(eq(a.id, awsAccountId), eq(a.organizationId, organizationId)),
   });
 
   if (!account) {
@@ -341,6 +364,7 @@ export async function getSMSRegistrations(
  */
 export async function getSMSMetricsSummary(params: {
   awsAccountId: string;
+  organizationId: string;
   startTime: Date;
   endTime: Date;
   period?: number;
@@ -350,11 +374,18 @@ export async function getSMSMetricsSummary(params: {
   queued: MetricDataResult[];
   delivered: MetricDataResult[];
 }> {
-  const { awsAccountId, startTime, endTime, period = 3600 } = params;
+  const {
+    awsAccountId,
+    organizationId,
+    startTime,
+    endTime,
+    period = 3600,
+  } = params;
 
   const [successful, failed, queued, delivered] = await Promise.all([
     getSMSCloudWatchMetrics({
       awsAccountId,
+      organizationId,
       metric: SMS_METRICS.TEXT_MESSAGE_PARTS_SUCCESSFUL,
       period,
       startTime,
@@ -362,6 +393,7 @@ export async function getSMSMetricsSummary(params: {
     }),
     getSMSCloudWatchMetrics({
       awsAccountId,
+      organizationId,
       metric: SMS_METRICS.TEXT_MESSAGE_PARTS_FAILED,
       period,
       startTime,
@@ -369,6 +401,7 @@ export async function getSMSMetricsSummary(params: {
     }),
     getSMSCloudWatchMetrics({
       awsAccountId,
+      organizationId,
       metric: SMS_METRICS.TEXT_MESSAGE_PARTS_QUEUED,
       period,
       startTime,
@@ -376,6 +409,7 @@ export async function getSMSMetricsSummary(params: {
     }),
     getSMSCloudWatchMetrics({
       awsAccountId,
+      organizationId,
       metric: SMS_METRICS.TEXT_MESSAGE_PARTS_DELIVERED,
       period,
       startTime,
@@ -408,6 +442,7 @@ export type SMSEvent = {
 
 type QuerySMSEventsParams = {
   awsAccountId: string;
+  organizationId: string;
   startTime: Date;
   endTime: Date;
   limit?: number;
@@ -441,11 +476,18 @@ function normalizeEventStatus(eventType: string): string {
 export async function querySMSEvents(
   params: QuerySMSEventsParams
 ): Promise<SMSEvent[]> {
-  const { awsAccountId, startTime, endTime, limit = 1000 } = params;
+  const {
+    awsAccountId,
+    organizationId,
+    startTime,
+    endTime,
+    limit = 1000,
+  } = params;
 
   // Get AWS account details from database
   const account = await db.query.awsAccount.findFirst({
-    where: (a, { eq }) => eq(a.id, awsAccountId),
+    where: (a, { and, eq }) =>
+      and(eq(a.id, awsAccountId), eq(a.organizationId, organizationId)),
   });
 
   if (!account) {
@@ -519,6 +561,7 @@ export async function querySMSEvents(
  */
 export async function getRecentSMSActivity(params: {
   awsAccountId: string;
+  organizationId: string;
   limit?: number;
 }): Promise<
   Array<{
@@ -531,7 +574,7 @@ export async function getRecentSMSActivity(params: {
     priceInUsd?: number;
   }>
 > {
-  const { awsAccountId, limit = 50 } = params;
+  const { awsAccountId, organizationId, limit = 50 } = params;
 
   // Query last 7 days of activity
   const endTime = new Date();
@@ -539,6 +582,7 @@ export async function getRecentSMSActivity(params: {
 
   const events = await querySMSEvents({
     awsAccountId,
+    organizationId,
     startTime,
     endTime,
     limit,

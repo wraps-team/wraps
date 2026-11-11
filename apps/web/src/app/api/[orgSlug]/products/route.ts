@@ -32,11 +32,15 @@ export type ProductsStatusResponse = {
  * Returns true if any account has phone numbers registered.
  */
 async function checkSMSInfrastructure(
-  accountIds: string[]
+  accountIds: string[],
+  organizationId: string
 ): Promise<{ hasInfrastructure: boolean; needsRoleUpdate: boolean }> {
   for (const accountId of accountIds) {
     try {
-      const phoneNumbers = await getSMSPhoneNumbers(accountId);
+      const phoneNumbers = await getSMSPhoneNumbers({
+        awsAccountId: accountId,
+        organizationId,
+      });
       if (phoneNumbers.length > 0) {
         return { hasInfrastructure: true, needsRoleUpdate: false };
       }
@@ -177,7 +181,7 @@ export async function GET(_request: Request, context: RouteContext) {
     const [emailStatus, smsStatus] = await Promise.all([
       checkEmailInfrastructure(accountIds),
       smsAccountIds.length > 0
-        ? checkSMSInfrastructure(smsAccountIds)
+        ? checkSMSInfrastructure(smsAccountIds, orgWithMembership.id)
         : Promise.resolve({ hasInfrastructure: false, needsRoleUpdate: false }),
     ]);
 

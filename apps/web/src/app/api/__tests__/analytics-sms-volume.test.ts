@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { cacheStore } = vi.hoisted(() => ({
+// The org the session's membership check resolves the slug to. Distinct from
+// any literal elsewhere, so an assertion on it traces back to the session.
+const { cacheStore, SESSION_ORG_ID, mockFindMany } = vi.hoisted(() => ({
   cacheStore: new Map<string, unknown>(),
+  SESSION_ORG_ID: "org-sms-volume-session",
+  mockFindMany: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({
@@ -49,7 +53,7 @@ vi.mock("@wraps/auth", () => ({
 
 vi.mock("@/lib/organization", () => ({
   getOrganizationWithMembership: vi.fn(async () => ({
-    id: "org-1",
+    id: SESSION_ORG_ID,
     name: "Test Org",
     slug: "test-org",
   })),
@@ -64,10 +68,7 @@ vi.mock("@wraps/db", () => ({
   db: {
     query: {
       awsAccount: {
-        findMany: vi.fn(async () => [
-          { id: "acc-1", organizationId: "org-1" },
-          { id: "acc-2", organizationId: "org-1" },
-        ]),
+        findMany: (...args: unknown[]) => mockFindMany(...args),
       },
     },
   },
@@ -77,7 +78,9 @@ vi.mock("@wraps/db/schema/app", () => ({
   awsAccount: { organizationId: "organizationId" },
 }));
 
-vi.mock("drizzle-orm", () => ({ eq: () => ({}) }));
+vi.mock("drizzle-orm", () => ({
+  eq: (column: unknown, value: unknown) => ["eq", column, value],
+}));
 
 vi.mock("@/lib/logger", () => ({
   createRequestLogger: () => ({
@@ -106,6 +109,10 @@ describe("SMS volume route caching", () => {
   beforeEach(() => {
     cacheStore.clear();
     vi.clearAllMocks();
+    mockFindMany.mockResolvedValue([
+      { id: "acc-1", organizationId: SESSION_ORG_ID },
+      { id: "acc-2", organizationId: SESSION_ORG_ID },
+    ]);
     // Two events per account: one delivered, one failed.
     mockQuerySMSEvents.mockResolvedValue([
       { sentAt: TODAY.toISOString(), eventStatus: "DELIVERED" },
@@ -127,6 +134,23 @@ describe("SMS volume route caching", () => {
 
     const day = firstBody.find((d: { date: string }) => d.date === DAY_KEY);
     expect(day).toMatchObject({ sent: 4, delivered: 2, failed: 2 });
+  });
+
+  it("scopes each account read by the org it filtered accounts by", async () => {
+    await callVolume();
+
+    expect(mockFindMany).toHaveBeenCalledWith({
+      where: ["eq", "organizationId", SESSION_ORG_ID],
+    });
+    expect(mockQuerySMSEvents).toHaveBeenCalledTimes(2);
+    for (const awsAccountId of ["acc-1", "acc-2"]) {
+      expect(mockQuerySMSEvents).toHaveBeenCalledWith(
+        expect.objectContaining({
+          awsAccountId,
+          organizationId: SESSION_ORG_ID,
+        })
+      );
+    }
   });
 
   it("reports unauthorized without touching AWS", async () => {

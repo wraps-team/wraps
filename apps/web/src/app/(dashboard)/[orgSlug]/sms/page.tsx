@@ -91,6 +91,7 @@ async function fetchSMSMessages(
         try {
           return await querySMSEvents({
             awsAccountId: account.id,
+            organizationId,
             startTime,
             endTime,
             limit: 500,
