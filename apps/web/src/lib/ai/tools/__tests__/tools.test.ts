@@ -39,6 +39,7 @@ vi.mock("@/lib/analytics-fallback", () => ({
 
 const { ASSISTANT_TOOLS } = await import("../definitions");
 const { buildAssistantTools } = await import("../index");
+const { getSetupStatus } = await import("@/lib/setup-status");
 
 const TEST_CTX = { organizationId: "org-1", orgSlug: "org-1" };
 
@@ -59,6 +60,16 @@ describe("ASSISTANT_TOOLS", () => {
     const result = await def!.execute({}, TEST_CTX);
     expect(JSON.stringify(result)).not.toContain("SUPER-SECRET-VALUE");
     expect(result).not.toHaveProperty("webhookSecret");
+  });
+
+  it("get_setup_status reads the request's organization, which scopes its AWS account reads", async () => {
+    // getSetupStatus filters AWS accounts by this org and passes the same org
+    // to every account lookup, so the tool must hand it the context's org.
+    const def = ASSISTANT_TOOLS.find((t) => t.name === "get_setup_status");
+    vi.mocked(getSetupStatus).mockClear();
+    await def!.execute({}, { organizationId: "org-tools-ctx", orgSlug: "x" });
+    expect(getSetupStatus).toHaveBeenCalledTimes(1);
+    expect(getSetupStatus).toHaveBeenCalledWith("org-tools-ctx");
   });
 
   it("list_recent_sends drops metadata and ids", async () => {

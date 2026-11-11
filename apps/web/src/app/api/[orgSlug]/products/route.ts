@@ -70,7 +70,8 @@ async function checkSMSInfrastructure(
  * Tries to query the wraps-email-history DynamoDB table to detect infrastructure.
  */
 async function checkEmailInfrastructure(
-  accountIds: string[]
+  accountIds: string[],
+  organizationId: string
 ): Promise<{ hasInfrastructure: boolean; needsRoleUpdate: boolean }> {
   for (const accountId of accountIds) {
     try {
@@ -81,6 +82,7 @@ async function checkEmailInfrastructure(
       const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       await queryEmailEvents({
         awsAccountId: accountId,
+        organizationId,
         startTime: oneDayAgo,
         endTime: now,
         limit: 1, // Just check if we can query, don't need actual data
@@ -179,7 +181,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
     // Check infrastructure for each product
     const [emailStatus, smsStatus] = await Promise.all([
-      checkEmailInfrastructure(accountIds),
+      checkEmailInfrastructure(accountIds, orgWithMembership.id),
       smsAccountIds.length > 0
         ? checkSMSInfrastructure(smsAccountIds, orgWithMembership.id)
         : Promise.resolve({ hasInfrastructure: false, needsRoleUpdate: false }),

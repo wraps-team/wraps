@@ -25,6 +25,7 @@ type EmailEvent = {
 
 type QueryEmailEventsParams = {
   awsAccountId: string;
+  organizationId: string;
   startTime: Date;
   endTime: Date;
   limit?: number;
@@ -71,11 +72,18 @@ function normalizeRecipients(to: string[] | Set<string> | undefined): string[] {
 export async function queryEmailEvents(
   params: QueryEmailEventsParams
 ): Promise<QueriedEmailEvent[]> {
-  const { awsAccountId, startTime, endTime, limit = 1000 } = params;
+  const {
+    awsAccountId,
+    organizationId,
+    startTime,
+    endTime,
+    limit = 1000,
+  } = params;
 
   // Get AWS account details from database
   const account = await db.query.awsAccount.findFirst({
-    where: (a, { eq }) => eq(a.id, awsAccountId),
+    where: (a, { and, eq }) =>
+      and(eq(a.id, awsAccountId), eq(a.organizationId, organizationId)),
   });
 
   if (!account) {
@@ -148,15 +156,17 @@ export async function queryEmailEvents(
  */
 export async function queryEventsByMessageIds(params: {
   awsAccountId: string;
+  organizationId: string;
   messageIds: string[];
 }): Promise<QueriedEmailEvent[]> {
-  const { awsAccountId, messageIds } = params;
+  const { awsAccountId, organizationId, messageIds } = params;
   if (messageIds.length === 0) {
     return [];
   }
 
   const account = await db.query.awsAccount.findFirst({
-    where: (a, { eq }) => eq(a.id, awsAccountId),
+    where: (a, { and, eq }) =>
+      and(eq(a.id, awsAccountId), eq(a.organizationId, organizationId)),
   });
 
   if (!account) {
@@ -300,6 +310,7 @@ export function aggregateEmailEngagementMetrics(
  */
 export async function getRecentEmailActivity(params: {
   awsAccountId: string;
+  organizationId: string;
   limit?: number;
 }): Promise<
   Array<{
@@ -311,7 +322,7 @@ export async function getRecentEmailActivity(params: {
     metadata?: Record<string, unknown>;
   }>
 > {
-  const { awsAccountId, limit = 50 } = params;
+  const { awsAccountId, organizationId, limit = 50 } = params;
 
   // Query last 7 days of activity
   const endTime = new Date();
@@ -319,6 +330,7 @@ export async function getRecentEmailActivity(params: {
 
   const events = await queryEmailEvents({
     awsAccountId,
+    organizationId,
     startTime,
     endTime,
     limit,

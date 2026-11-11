@@ -86,7 +86,9 @@ type AwsAccountRow = {
   features?: { email?: { archivingEnabled?: boolean } };
 };
 
-const findAwsAccountsMock = vi.fn<() => Promise<AwsAccountRow[]>>(async () => [
+const findAwsAccountsMock = vi.fn<
+  (..._args: unknown[]) => Promise<AwsAccountRow[]>
+>(async () => [
   { id: "acc-1", accountId: "123456789012", organizationId: ORG_ID },
 ]);
 const selectMessageSendMock = vi.fn(async () => [] as unknown[]);
@@ -95,7 +97,7 @@ vi.mock("@wraps/db", () => ({
   db: {
     query: {
       awsAccount: {
-        findMany: () => findAwsAccountsMock(),
+        findMany: (...args: unknown[]) => findAwsAccountsMock(...args),
       },
     },
     select: () => ({
@@ -454,6 +456,7 @@ describe("Email detail page — resolution order", () => {
 
     expect(queryEventsByMessageIdsMock).toHaveBeenCalledWith({
       awsAccountId: "acc-1",
+      organizationId: ORG_ID,
       messageIds: [RAW_MESSAGE_ID],
     });
     expect(screen.getByText(RAW_MESSAGE_ID)).toBeInTheDocument();
@@ -468,6 +471,7 @@ describe("Email detail page — resolution order", () => {
     expect(queryEmailEventsMock).not.toHaveBeenCalled();
     expect(queryEventsByMessageIdsMock).toHaveBeenCalledWith({
       awsAccountId: "acc-1",
+      organizationId: ORG_ID,
       messageIds: [RAW_MESSAGE_ID],
     });
     expect(screen.getByText(RAW_MESSAGE_ID)).toBeInTheDocument();
@@ -485,6 +489,24 @@ describe("Email detail page — resolution order", () => {
     expect(screen.getByText("Sent outside Wraps")).toBeInTheDocument();
     expect(queryEmailEventsMock).toHaveBeenCalledWith(
       expect.objectContaining({ limit: 1000 })
+    );
+  });
+
+  it("scopes both DynamoDB reads by the org it filtered accounts by", async () => {
+    // ORG_ID is what the membership mock resolves the slug to.
+    // The PK read finds nothing, so the page falls through to the window scan
+    // as well, and both reads run in one render.
+    selectMessageSendMock.mockResolvedValue([SENT_PG_RECORD]);
+    await renderDetailPage();
+
+    expect(findAwsAccountsMock).toHaveBeenCalledWith({
+      where: { op: "eq", col: "organizationId", val: ORG_ID },
+    });
+    expect(queryEventsByMessageIdsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ awsAccountId: "acc-1", organizationId: ORG_ID })
+    );
+    expect(queryEmailEventsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ awsAccountId: "acc-1", organizationId: ORG_ID })
     );
   });
 

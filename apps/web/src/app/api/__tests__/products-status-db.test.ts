@@ -276,5 +276,9 @@ describe("Products status API - SMS probe gating", () => {
     );
     expect(emailProbedIds).toContain(BOTH_EMAIL_ONLY_ACCOUNT);
     expect(emailProbedIds).toContain(BOTH_SMS_ACCOUNT);
+    // Every email probe carries the org the route filtered accounts by.
+    for (const call of mockQueryEmailEvents.mock.calls) {
+      expect(call[0]).toMatchObject({ organizationId: BOTH_ORG_ID });
+    }
   });
 });

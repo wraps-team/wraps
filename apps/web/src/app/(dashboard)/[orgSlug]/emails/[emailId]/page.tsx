@@ -235,6 +235,7 @@ async function fetchEmail(
       try {
         const dynEvents = await queryEventsByMessageIds({
           awsAccountId: pgAccount.id,
+          organizationId,
           messageIds: [realMessageId],
         });
         if (dynEvents.length > 0) {
@@ -274,6 +275,7 @@ async function fetchEmail(
         try {
           const events = await queryEmailEvents({
             awsAccountId: account.id,
+            organizationId,
             startTime,
             endTime,
             limit: 1000,
