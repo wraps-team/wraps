@@ -72,6 +72,7 @@ export async function GET(request: Request, context: RouteContext) {
         try {
           return await getSMSMetricsSummary({
             awsAccountId: account.id,
+            organizationId: orgWithMembership.id,
             startTime,
             endTime,
             period: 3600, // 1 hour aggregation

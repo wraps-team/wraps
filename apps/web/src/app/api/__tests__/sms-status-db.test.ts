@@ -74,9 +74,9 @@ const mockGetSMSPhoneNumbers = vi.fn();
 const mockGetSMSRegistrations = vi.fn();
 const mockGetSMSSpendLimits = vi.fn();
 vi.mock("@/lib/aws/sms-voice", () => ({
-  getSMSPhoneNumbers: (id: string) => mockGetSMSPhoneNumbers(id),
-  getSMSRegistrations: (id: string) => mockGetSMSRegistrations(id),
-  getSMSSpendLimits: (id: string) => mockGetSMSSpendLimits(id),
+  getSMSPhoneNumbers: (...args: unknown[]) => mockGetSMSPhoneNumbers(...args),
+  getSMSRegistrations: (...args: unknown[]) => mockGetSMSRegistrations(...args),
+  getSMSSpendLimits: (...args: unknown[]) => mockGetSMSSpendLimits(...args),
 }));
 
 async function callStatus(orgSlug: string) {
@@ -164,7 +164,7 @@ describe("SMS status API - SMS probe gating", () => {
     });
   });
 
-  it("describes only the SMS-enabled account when an org has both", async () => {
+  it("describes only the SMS-enabled account when an org has both, scoped by the session org", async () => {
     mockGetSMSPhoneNumbers.mockResolvedValue([
       { PhoneNumber: "+15555550100", PhoneNumberArn: "arn:phone" },
     ]);
@@ -178,7 +178,12 @@ describe("SMS status API - SMS probe gating", () => {
       mockGetSMSSpendLimits,
     ]) {
       expect(probe).toHaveBeenCalledTimes(1);
-      expect(probe).toHaveBeenCalledWith(BOTH_SMS_ACCOUNT);
+      // BOTH_ORG_ID is what the membership mock resolves BOTH_ORG_SLUG to, and
+      // the org the route filtered the seeded accounts by.
+      expect(probe).toHaveBeenCalledWith({
+        awsAccountId: BOTH_SMS_ACCOUNT,
+        organizationId: BOTH_ORG_ID,
+      });
     }
     expect(body.hasSMSInfrastructure).toBe(true);
     expect(body.phoneNumbers).toHaveLength(1);

@@ -75,6 +75,7 @@ export async function GET(_request: Request, context: RouteContext) {
       try {
         const events = await queryEmailEvents({
           awsAccountId: account.id,
+          organizationId: orgWithMembership.id,
           startTime,
           endTime,
           limit: 1000,

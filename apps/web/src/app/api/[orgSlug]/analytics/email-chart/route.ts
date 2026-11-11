@@ -67,7 +67,10 @@ function buildEmailChartData(orgId: string, days: number, timezone: string) {
       const reputationResults = await Promise.all(
         accounts.map(async (account) => {
           try {
-            return await getSESReputationMetrics(account.id);
+            return await getSESReputationMetrics({
+              awsAccountId: account.id,
+              organizationId: orgId,
+            });
           } catch (error) {
             const kind: CloudWatchErrorKind = getCloudWatchErrorKind(error);
             log.warn(

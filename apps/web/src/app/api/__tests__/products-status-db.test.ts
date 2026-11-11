@@ -90,7 +90,7 @@ vi.mock("@/lib/logger", () => ({
 
 const mockGetSMSPhoneNumbers = vi.fn();
 vi.mock("@/lib/aws/sms-voice", () => ({
-  getSMSPhoneNumbers: (id: string) => mockGetSMSPhoneNumbers(id),
+  getSMSPhoneNumbers: (...args: unknown[]) => mockGetSMSPhoneNumbers(...args),
 }));
 
 const mockQueryEmailEvents = vi.fn();
@@ -248,7 +248,10 @@ describe("Products status API - SMS probe gating", () => {
       (p: { id: string }) => p.id === "sms"
     );
     expect(smsProduct.needsRoleUpdate).toBe(true);
-    expect(mockGetSMSPhoneNumbers).toHaveBeenCalledWith(SMS_ACCOUNT);
+    expect(mockGetSMSPhoneNumbers).toHaveBeenCalledWith({
+      awsAccountId: SMS_ACCOUNT,
+      organizationId: SMS_ORG_ID,
+    });
   });
 
   it("probes only the SMS-enabled account when an org has both", async () => {
@@ -264,11 +267,18 @@ describe("Products status API - SMS probe gating", () => {
 
     expect(response.status).toBe(200);
     expect(mockGetSMSPhoneNumbers).toHaveBeenCalledTimes(1);
-    expect(mockGetSMSPhoneNumbers).toHaveBeenCalledWith(BOTH_SMS_ACCOUNT);
+    expect(mockGetSMSPhoneNumbers).toHaveBeenCalledWith({
+      awsAccountId: BOTH_SMS_ACCOUNT,
+      organizationId: BOTH_ORG_ID,
+    });
     const emailProbedIds = mockQueryEmailEvents.mock.calls.map(
       (call) => (call[0] as { awsAccountId: string }).awsAccountId
     );
     expect(emailProbedIds).toContain(BOTH_EMAIL_ONLY_ACCOUNT);
     expect(emailProbedIds).toContain(BOTH_SMS_ACCOUNT);
+    // Every email probe carries the org the route filtered accounts by.
+    for (const call of mockQueryEmailEvents.mock.calls) {
+      expect(call[0]).toMatchObject({ organizationId: BOTH_ORG_ID });
+    }
   });
 });

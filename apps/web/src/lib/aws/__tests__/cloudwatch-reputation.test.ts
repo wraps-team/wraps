@@ -17,7 +17,13 @@ vi.mock("@aws-sdk/client-cloudwatch", () => ({
 
 const mockFindFirst = vi.fn();
 vi.mock("@wraps/db", () => ({
-  db: { query: { awsAccount: { findFirst: () => mockFindFirst() } } },
+  db: {
+    query: {
+      awsAccount: {
+        findFirst: (...args: unknown[]) => mockFindFirst(...args),
+      },
+    },
+  },
 }));
 
 vi.mock("../credential-cache", () => ({
@@ -53,7 +59,34 @@ function reply(
 
 async function readReputation() {
   const { getSESReputationMetrics } = await import("../cloudwatch");
-  return getSESReputationMetrics("acc-1");
+  return getSESReputationMetrics({
+    awsAccountId: "acc-1",
+    organizationId: "org-1",
+  });
+}
+
+type WhereCallback = (
+  columns: { id: string; organizationId: string },
+  operators: {
+    eq: (column: string, value: string) => unknown;
+    and: (...conditions: unknown[]) => unknown;
+  }
+) => unknown;
+
+/**
+ * Evaluate the `where` callback passed to `findFirst` with stub columns and
+ * recording operators, so the test sees which columns the real query compares
+ * (the mocked `findFirst` never evaluates it).
+ */
+function evaluateAccountWhere(): unknown {
+  const { where } = mockFindFirst.mock.calls[0][0] as { where: WhereCallback };
+  return where(
+    { id: "col:id", organizationId: "col:org" },
+    {
+      eq: (column, value) => ["eq", column, value],
+      and: (...conditions) => ["and", ...conditions],
+    }
+  );
 }
 
 describe("getSESReputationMetrics", () => {
@@ -65,6 +98,20 @@ describe("getSESReputationMetrics", () => {
       externalId: "ext",
       region: "eu-west-1",
     });
+  });
+
+  it("scopes the account lookup by id and organization", async () => {
+    mockFindFirst.mockResolvedValue(null);
+
+    await expect(readReputation()).rejects.toThrow("AWS account not found");
+
+    expect(mockFindFirst).toHaveBeenCalledTimes(1);
+    expect(evaluateAccountWhere()).toEqual([
+      "and",
+      ["eq", "col:id", "acc-1"],
+      ["eq", "col:org", "org-1"],
+    ]);
+    expect(mockSend).not.toHaveBeenCalled();
   });
 
   it("looks back far enough to outlast an ordinary sending pause", async () => {

@@ -107,9 +107,18 @@ export async function GET(_request: Request, context: RouteContext) {
       accounts.map(async (account) => {
         try {
           const [phoneNumbers, registrations, spendLimits] = await Promise.all([
-            getSMSPhoneNumbers(account.id),
-            getSMSRegistrations(account.id),
-            getSMSSpendLimits(account.id),
+            getSMSPhoneNumbers({
+              awsAccountId: account.id,
+              organizationId: orgWithMembership.id,
+            }),
+            getSMSRegistrations({
+              awsAccountId: account.id,
+              organizationId: orgWithMembership.id,
+            }),
+            getSMSSpendLimits({
+              awsAccountId: account.id,
+              organizationId: orgWithMembership.id,
+            }),
           ]);
           return { phoneNumbers, registrations, spendLimits };
         } catch (error) {

@@ -57,6 +57,7 @@ function buildSMSVolume(orgId: string, days: number) {
           try {
             return await querySMSEvents({
               awsAccountId: account.id,
+              organizationId: orgId,
               startTime,
               endTime,
               limit: 10_000,

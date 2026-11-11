@@ -1,5 +1,100 @@
-import { describe, expect, it } from "vitest";
-import { aggregateEmailEngagementMetrics } from "../dynamodb";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mockFindFirst = vi.fn();
+vi.mock("@wraps/db", () => ({
+  db: {
+    query: {
+      awsAccount: {
+        findFirst: (...args: unknown[]) => mockFindFirst(...args),
+      },
+    },
+  },
+}));
+
+const mockGetOrAssumeRole = vi.fn();
+vi.mock("../credential-cache", () => ({
+  getOrAssumeRole: (...args: unknown[]) => mockGetOrAssumeRole(...args),
+}));
+
+import {
+  aggregateEmailEngagementMetrics,
+  getEmailEngagementMetrics,
+  getRecentEmailActivity,
+  queryEmailEvents,
+  queryEventsByMessageIds,
+} from "../dynamodb";
+
+type WhereCallback = (
+  columns: { id: string; organizationId: string },
+  operators: {
+    eq: (column: string, value: string) => unknown;
+    and: (...conditions: unknown[]) => unknown;
+  }
+) => unknown;
+
+/**
+ * Evaluate the `where` callback the helper passed to `findFirst` with stub
+ * columns and recording operators, so the test sees which columns the real
+ * query compares (the mocked `findFirst` never evaluates it).
+ */
+function evaluateAccountWhere(): unknown {
+  const { where } = mockFindFirst.mock.calls[0][0] as { where: WhereCallback };
+  return where(
+    { id: "col:id", organizationId: "col:org" },
+    {
+      eq: (column, value) => ["eq", column, value],
+      and: (...conditions) => ["and", ...conditions],
+    }
+  );
+}
+
+const SCOPED_WHERE = [
+  "and",
+  ["eq", "col:id", "acc-1"],
+  ["eq", "col:org", "org-1"],
+];
+
+const ids = { awsAccountId: "acc-1", organizationId: "org-1" };
+const timeWindow = {
+  startTime: new Date("2026-11-01T00:00:00.000Z"),
+  endTime: new Date("2026-11-02T00:00:00.000Z"),
+};
+
+describe("dynamodb account lookup", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFindFirst.mockResolvedValue(null);
+  });
+
+  it.each([
+    ["queryEmailEvents", () => queryEmailEvents({ ...ids, ...timeWindow })],
+    [
+      "getEmailEngagementMetrics",
+      () => getEmailEngagementMetrics({ ...ids, ...timeWindow }),
+    ],
+    ["getRecentEmailActivity", () => getRecentEmailActivity(ids)],
+  ])(
+    "%s scopes the account lookup by id and organization",
+    async (_name, call) => {
+      await expect(call()).rejects.toThrow("AWS account not found");
+
+      expect(mockFindFirst).toHaveBeenCalledTimes(1);
+      expect(evaluateAccountWhere()).toEqual(SCOPED_WHERE);
+      expect(mockGetOrAssumeRole).not.toHaveBeenCalled();
+    }
+  );
+
+  it("queryEventsByMessageIds scopes the account lookup and returns no events when it misses", async () => {
+    // An empty messageIds list returns before the lookup, so pass one id.
+    await expect(
+      queryEventsByMessageIds({ ...ids, messageIds: ["msg-1"] })
+    ).resolves.toEqual([]);
+
+    expect(mockFindFirst).toHaveBeenCalledTimes(1);
+    expect(evaluateAccountWhere()).toEqual(SCOPED_WHERE);
+    expect(mockGetOrAssumeRole).not.toHaveBeenCalled();
+  });
+});
 
 type EmailEvent = Parameters<typeof aggregateEmailEngagementMetrics>[0][number];
 

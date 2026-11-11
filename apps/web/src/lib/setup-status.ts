@@ -125,7 +125,8 @@ function getDomainsAndRegion(accounts: AwsAccountRecord[]): {
 
 /** Check if any emails have been sent across verified accounts */
 async function checkEmailsSent(
-  accounts: AwsAccountRecord[]
+  accounts: AwsAccountRecord[],
+  organizationId: string
 ): Promise<{ hasSentEmail: boolean; emailCount: number }> {
   for (const account of accounts) {
     if (!account.isVerified) {
@@ -135,6 +136,7 @@ async function checkEmailsSent(
     try {
       const events = await queryEmailEvents({
         awsAccountId: account.id,
+        organizationId,
         startTime: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
         endTime: new Date(),
         limit: 10,
@@ -310,7 +312,7 @@ export async function getSetupStatus(organizationId: string): Promise<{
   // Check email, template, broadcast, contact, and workflow status in parallel
   const [emailStatus, hasTemplate, hasBroadcast, hasContact, hasWorkflow] =
     await Promise.all([
-      checkEmailsSent(accounts),
+      checkEmailsSent(accounts, organizationId),
       checkHasTemplates(organizationId),
       checkHasBroadcasts(organizationId),
       checkHasContacts(organizationId),

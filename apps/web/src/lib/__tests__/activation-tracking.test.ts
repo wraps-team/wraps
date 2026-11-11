@@ -875,6 +875,8 @@ describe("activation-tracking: emit() calls to Wraps platform", () => {
     // Total expected: 5
     const { score, milestones } = await computeActivationScore("org-123");
 
+    // getSetupStatus scopes its AWS account reads by the org it is given.
+    expect(mockGetSetupStatus).toHaveBeenCalledWith("org-123");
     expect(score).toBe(5);
     expect(milestones).toEqual({
       hasTemplate: true,

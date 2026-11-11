@@ -70,6 +70,7 @@ export async function GET(request: Request, context: RouteContext) {
         try {
           return await querySMSEvents({
             awsAccountId: account.id,
+            organizationId: orgWithMembership.id,
             startTime,
             endTime,
             limit: limit * 2, // Get extra to merge and sort

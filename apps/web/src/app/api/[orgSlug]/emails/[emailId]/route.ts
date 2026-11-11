@@ -92,6 +92,7 @@ export async function GET(_request: Request, context: RouteContext) {
         try {
           return await queryEmailEvents({
             awsAccountId: account.id,
+            organizationId: orgWithMembership.id,
             startTime,
             endTime,
             limit: 1000,
@@ -146,6 +147,7 @@ export async function GET(_request: Request, context: RouteContext) {
         try {
           const dynEvents = await queryEventsByMessageIds({
             awsAccountId: pgAccount.id,
+            organizationId: orgWithMembership.id,
             messageIds: [realMessageId],
           });
           emailEvents = dynEvents;
