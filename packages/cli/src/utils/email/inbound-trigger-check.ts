@@ -82,6 +82,14 @@ function servicePrincipals(statement: PolicyStatement): string[] {
   return asList(principal.Service);
 }
 
+/** Exact match on a service principal (e.g. "ses.amazonaws.com"). */
+function hasServicePrincipal(
+  statement: PolicyStatement,
+  service: string
+): boolean {
+  return servicePrincipals(statement).some((name) => name === service);
+}
+
 function errorName(error: unknown): string {
   return error instanceof Error ? error.name : "";
 }
@@ -98,7 +106,7 @@ async function checkSesInvokePermission(
     return statements.some(
       (s) =>
         s.Sid === INBOUND_SES_INVOKE_PERMISSION ||
-        (servicePrincipals(s).includes("ses.amazonaws.com") &&
+        (hasServicePrincipal(s, "ses.amazonaws.com") &&
           asList(s.Action).includes("lambda:InvokeFunction"))
     );
   } catch (error) {
@@ -124,7 +132,7 @@ async function checkBucketPolicyCoversMail(
     return statements.some(
       (s) =>
         s.Effect === "Allow" &&
-        servicePrincipals(s).includes("ses.amazonaws.com") &&
+        hasServicePrincipal(s, "ses.amazonaws.com") &&
         asList(s.Action).includes("s3:PutObject") &&
         asList(s.Resource).includes(mailResource)
     );
