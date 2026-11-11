@@ -1284,7 +1284,7 @@ export default function CLIReferenceEmailPageContent() {
             <code className="rounded bg-muted px-1 py-0.5">inbound add</code>{" "}
             and{" "}
             <code className="rounded bg-muted px-1 py-0.5">email upgrade</code>{" "}
-            all move it to the new one. Deploy with this CLI version or later
+            all move it to the new one. Deploy with CLI v3.21.0 or later
             everywhere. An older CLI that deploys the stack afterwards removes
             the <code>wraps-inbound-ses-invoke</code> permission and narrows the
             bucket policy to <code>raw/*</code>, while the receipt rule still
