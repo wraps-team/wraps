@@ -1,3 +1,16 @@
+import { promises as dnsPromises } from "node:dns";
+import { LambdaClient } from "@aws-sdk/client-lambda";
+import { S3Client } from "@aws-sdk/client-s3";
+import {
+  DescribeActiveReceiptRuleSetCommand,
+  SESClient,
+} from "@aws-sdk/client-ses";
+import {
+  GetQueueAttributesCommand,
+  GetQueueUrlCommand,
+  SQSClient,
+} from "@aws-sdk/client-sqs";
+import { mockClient } from "aws-sdk-client-mock";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildInboundDNSRecords } from "../../../utils/dns/create-records.js";
 import { setJsonMode } from "../../../utils/shared/json-output.js";
@@ -65,9 +78,27 @@ vi.mock("../../../utils/email/receipt-rules.js", async (importOriginal) => {
     // doesn't fall through to the real AWS SDK client.
     createReceiptRuleSet: vi.fn().mockResolvedValue(undefined),
     createReceiptRule: vi.fn().mockResolvedValue(undefined),
-    setActiveReceiptRuleSet: vi.fn().mockResolvedValue(undefined),
+    // Returns the read taken just before activating (plan 048).
+    setActiveReceiptRuleSet: vi
+      .fn()
+      .mockResolvedValue({ readable: true, name: "wraps-inbound-rules" }),
+    getActiveReceiptRuleSet: vi.fn().mockResolvedValue("wraps-inbound-rules"),
+    readActiveReceiptRuleSet: vi
+      .fn()
+      .mockResolvedValue({ readable: true, name: "wraps-inbound-rules" }),
+    // Plan 041: init reads the rule to tell fresh from existing (null =
+    // fresh, so the default keeps init off the switch path); the switch
+    // reads it again and syncs it.
+    describeInboundReceiptRule: vi.fn().mockResolvedValue(null),
+    syncReceiptRuleTrigger: vi.fn().mockResolvedValue(undefined),
   };
 });
+
+// `inbound status`'s read-only trigger check (Lambda GetPolicy, S3
+// GetBucketPolicy, the rule) — replaced per test.
+vi.mock("../../../utils/email/inbound-trigger-check.js", () => ({
+  checkInboundTrigger: vi.fn(),
+}));
 
 // Mock DNS detection/creation so the command doesn't touch the network
 vi.mock("../../../utils/dns/index.js", async () => {
@@ -194,6 +225,11 @@ vi.mock("../../../utils/shared/pulumi.js", () => ({
     .mockImplementation(async (fn: () => Promise<unknown>) => fn()),
 }));
 
+// Only reached when a test runs the Pulumi program (plan 041 repair test).
+vi.mock("../../../infrastructure/email-stack.js", () => ({
+  deployEmailStack: vi.fn().mockResolvedValue({}),
+}));
+
 vi.mock("../../../utils/shared/fs.js", () => ({
   ensurePulumiWorkDir: vi.fn().mockResolvedValue(undefined),
   getPulumiWorkDir: vi.fn().mockReturnValue("/tmp/wraps-test/pulumi"),
@@ -204,7 +240,18 @@ import {
   inboundDestroy,
   inboundInit,
   inboundRemove,
+  inboundRepairCommand,
+  inboundStatus,
+  inboundVerify,
 } from "../inbound.js";
+
+// Backstop: if a receipt-rule or trigger-check export is ever left unmocked,
+// its SDK call lands here instead of on real AWS.
+const sesBackstop = mockClient(SESClient);
+const lambdaBackstop = mockClient(LambdaClient);
+const s3Backstop = mockClient(S3Client);
+// `inbound status` reads the DLQ depth through SQS.
+const sqsBackstop = mockClient(SQSClient);
 
 const baseMetadata = {
   version: "1.0.0",
@@ -221,6 +268,9 @@ const baseMetadata = {
           subdomain: "in",
           receivingDomain: "in.example.com",
           bucketName: "wraps-inbound-123456789012-us-east-1",
+          // Pinned so the pre-041 tests stay off the trigger-switch path;
+          // the switch has its own tests below.
+          trigger: "ses-lambda-action" as const,
         },
         inboundDomains: [
           {
@@ -1220,6 +1270,1749 @@ describe("inboundRemove", () => {
     await expect(inboundRemove({})).rejects.toMatchObject({
       name: "WrapsError",
       code: "NON_INTERACTIVE_INPUT",
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Plan 041: trigger mode, init merge, the add-before-remove switch in init and
+// add, add --preview, status, destroy. A stateful fake stands in for the
+// receipt rule so tests can assert the rule's final actions.
+// ---------------------------------------------------------------------------
+
+describe("plan 041: inbound trigger in init / add / status / destroy", () => {
+  type FakeRule = {
+    Recipients: string[];
+    Actions: Array<Record<string, unknown>>;
+  };
+  let rule: FakeRule | null;
+  const events: string[] = [];
+  const saved: Array<{
+    trigger?: string;
+    inbound?: Record<string, unknown>;
+    inboundDomains?: Array<{ receivingDomain: string }>;
+  }> = [];
+  let originalDeploy: typeof import("../../../utils/email/email-stack-deploy.js")["deployHooks"]["deploy"];
+  let originalPreview: typeof import("../../../utils/email/email-stack-deploy.js")["deployHooks"]["preview"];
+  let exitSpy: ReturnType<typeof vi.spyOn>;
+
+  const LEGACY = (bucket: string) => [
+    { S3Action: { BucketName: bucket, ObjectKeyPrefix: "raw/" } },
+  ];
+
+  function legacyMetadata(
+    overrides?: (m: typeof baseMetadata) => void
+  ): typeof baseMetadata {
+    return cloneMetadata((m) => {
+      // biome-ignore lint/performance/noDelete: legacy metadata has no trigger key
+      delete (m.services.email.config.inbound as { trigger?: string }).trigger;
+      overrides?.(m);
+    });
+  }
+
+  function jsonOutput(command: string): Record<string, any> | undefined {
+    const line = vi
+      .mocked(console.log)
+      .mock.calls.map((c) => c[0])
+      .find(
+        (arg) =>
+          typeof arg === "string" && arg.includes(`"command":"${command}"`)
+      );
+    return line ? JSON.parse(line as string) : undefined;
+  }
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    setJsonMode(false);
+    events.length = 0;
+    saved.length = 0;
+    rule = null;
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    exitSpy = vi.spyOn(process, "exit").mockImplementation(((code: number) => {
+      throw new Error(`process.exit(${code})`);
+    }) as never);
+
+    const actualRules = await vi.importActual<
+      typeof import("../../../utils/email/receipt-rules.js")
+    >("../../../utils/email/receipt-rules.js");
+    const rules = await import("../../../utils/email/receipt-rules.js");
+    vi.mocked(rules.describeInboundReceiptRule).mockImplementation(
+      async () => rule as never
+    );
+    vi.mocked(rules.createReceiptRule).mockImplementation(
+      async (region, account, domain, bucket, trigger) => {
+        const recipients = rule?.Recipients ?? [];
+        rule = {
+          Recipients: recipients.includes(domain)
+            ? recipients
+            : [...recipients, domain],
+          Actions: actualRules.inboundRuleActions(
+            region,
+            account,
+            bucket,
+            trigger
+          ) as FakeRule["Actions"],
+        };
+        events.push(`rule-write:${trigger}`);
+      }
+    );
+    vi.mocked(rules.addDomainToReceiptRule).mockImplementation(
+      async (region, account, domain, bucket, trigger) => {
+        if (rule) {
+          rule = { ...rule, Recipients: [...rule.Recipients, domain] };
+        } else {
+          rule = {
+            Recipients: [domain],
+            Actions: actualRules.inboundRuleActions(
+              region,
+              account,
+              bucket,
+              trigger
+            ) as FakeRule["Actions"],
+          };
+        }
+        events.push(`rule-add:${trigger}`);
+      }
+    );
+    vi.mocked(rules.syncReceiptRuleTrigger).mockImplementation(
+      async (region, account, bucket, trigger) => {
+        if (!rule) {
+          throw new Error("no rule");
+        }
+        rule = {
+          ...rule,
+          Actions: actualRules.inboundRuleActions(
+            region,
+            account,
+            bucket,
+            trigger
+          ) as FakeRule["Actions"],
+        };
+        events.push(`sync:${trigger}`);
+      }
+    );
+
+    const { saveConnectionMetadata } = await import(
+      "../../../utils/shared/metadata.js"
+    );
+    vi.mocked(saveConnectionMetadata).mockImplementation(async (m) => {
+      const config = m.services.email?.config;
+      saved.push(
+        JSON.parse(
+          JSON.stringify({
+            trigger: config?.inbound?.trigger,
+            inbound: config?.inbound,
+            inboundDomains: config?.inboundDomains,
+          })
+        )
+      );
+      events.push(`save:${config?.inbound?.trigger ?? "absent"}`);
+    });
+
+    const pulumi = await import("@pulumi/pulumi");
+    vi.mocked(
+      pulumi.automation.LocalWorkspace.createOrSelectStack
+    ).mockImplementation(
+      async () =>
+        ({
+          setConfig: vi.fn().mockResolvedValue(undefined),
+          up: vi.fn(async () => {
+            events.push("command-up");
+            return { outputs: {} };
+          }),
+        }) as never
+    );
+
+    const seam = await import("../../../utils/email/email-stack-deploy.js");
+    originalDeploy = seam.deployHooks.deploy;
+    originalPreview = seam.deployHooks.preview;
+    seam.deployHooks.deploy = vi.fn(async (params) => {
+      events.push(
+        `seam-up:${params.stackConfig.emailConfig.inbound?.trigger ?? "s3-notification"}`
+      );
+    });
+    seam.deployHooks.preview = vi.fn(async () => ({
+      changeSummary: { delete: 2, update: 3 },
+      resourceChanges: [],
+    })) as never;
+  });
+
+  afterEach(async () => {
+    const seam = await import("../../../utils/email/email-stack-deploy.js");
+    seam.deployHooks.deploy = originalDeploy;
+    seam.deployHooks.preview = originalPreview;
+    exitSpy.mockRestore();
+    setJsonMode(false);
+  });
+
+  const BUCKET = "wraps-inbound-123456789012-us-east-1";
+  const REPAIR =
+    "wraps email upgrade --action redeploy --region us-east-1 --yes";
+  const NEW_ACTIONS = [
+    { S3Action: { BucketName: BUCKET, ObjectKeyPrefix: "mail/" } },
+    {
+      LambdaAction: {
+        FunctionArn:
+          "arn:aws:lambda:us-east-1:123456789012:function:wraps-inbound-email-processor",
+        InvocationType: "Event",
+      },
+    },
+  ];
+
+  /** No rule write with a raw/ action happens after the sync. */
+  function noLegacyWriteAfterSync(): boolean {
+    const syncAt = events.indexOf("sync:ses-lambda-action");
+    return !events
+      .slice(syncAt + 1)
+      .some(
+        (e) =>
+          e === "rule-write:s3-notification" || e === "rule-add:s3-notification"
+      );
+  }
+
+  describe("inbound init", () => {
+    it("fresh (no rule): saves the inbound block with the new trigger right after the deploy, then creates the rule with mail/ + LambdaAction; no switch", async () => {
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(
+        legacyMetadata((m) => {
+          (m.services.email.config as { inbound?: unknown }).inbound =
+            undefined;
+          (
+            m.services.email.config as { inboundDomains?: unknown }
+          ).inboundDomains = undefined;
+        })
+      );
+
+      await inboundInit({ domain: "example.com", subdomain: "in", yes: true });
+
+      expect(events).toEqual([
+        "command-up",
+        "save:ses-lambda-action",
+        "rule-write:ses-lambda-action",
+        "save:ses-lambda-action",
+      ]);
+      expect(saved[0].inbound).toMatchObject({
+        enabled: true,
+        trigger: "ses-lambda-action",
+      });
+      expect(rule?.Actions).toEqual(NEW_ACTIONS);
+    });
+
+    it("existing S3-notification deployment: rule write in the saved mode, final save, then the switch (sync, save, up #2) as the last step", async () => {
+      rule = { Recipients: ["in.example.com"], Actions: LEGACY(BUCKET) };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(legacyMetadata());
+
+      await inboundInit({ domain: "example.com", subdomain: "in", yes: true });
+
+      expect(events).toEqual([
+        "command-up",
+        "save:absent",
+        "rule-write:s3-notification",
+        "save:absent",
+        "sync:ses-lambda-action",
+        "save:ses-lambda-action",
+        "seam-up:ses-lambda-action",
+      ]);
+      expect(saved.at(-1)?.trigger).toBe("ses-lambda-action");
+      expect(rule?.Actions).toEqual(NEW_ACTIONS);
+      expect(noLegacyWriteAfterSync()).toBe(true);
+    });
+
+    it("rule already switched but metadata still old (design §4.4 row 3): the init rule write reverts it, and the switch's own sync moves it back to mail/ + LambdaAction", async () => {
+      rule = { Recipients: ["in.example.com"], Actions: NEW_ACTIONS };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(legacyMetadata());
+
+      await inboundInit({ domain: "example.com", subdomain: "in", yes: true });
+
+      expect(events.indexOf("sync:ses-lambda-action")).toBeGreaterThan(
+        events.indexOf("rule-write:s3-notification")
+      );
+      expect(rule?.Actions).toEqual(NEW_ACTIONS);
+      expect(saved.at(-1)?.trigger).toBe("ses-lambda-action");
+    });
+
+    it("re-run keeps trigger, retention, the webhook secret and inboundDomains (never r.mail.* from the rule)", async () => {
+      rule = {
+        Recipients: ["in.example.com", "r.mail.example.com"],
+        Actions: NEW_ACTIONS,
+      };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(
+        cloneMetadata((m) => {
+          Object.assign(m.services.email.config.inbound, {
+            retention: "90days",
+            webhookUrl: "https://hooks.example.com/in",
+            webhookSecret: "saved-secret",
+          });
+          m.services.email.config.inboundDomains.push({
+            subdomain: "support",
+            receivingDomain: "support.example.com",
+            parentDomain: "example.com",
+            addedAt: "2024-02-01T00:00:00.000Z",
+          });
+        })
+      );
+
+      await inboundInit({ domain: "example.com", subdomain: "in", yes: true });
+
+      const last = saved.at(-1);
+      expect(last?.inbound).toMatchObject({
+        trigger: "ses-lambda-action",
+        retention: "90days",
+        webhookSecret: "saved-secret",
+        webhookUrl: "https://hooks.example.com/in",
+      });
+      expect(last?.inboundDomains?.map((d) => d.receivingDomain)).toEqual([
+        "in.example.com",
+        "support.example.com",
+      ]);
+      // already in the new mode: no switch
+      expect(events).not.toContain("sync:ses-lambda-action");
+    });
+
+    it("init re-run with a saved ses-lambda-action redeploys in that mode with the saved values and no switch", async () => {
+      // An older CLI redeployed: SES permission gone, policy back to raw/*.
+      // The rule still has mail/ + Lambda; metadata still says the new mode.
+      rule = { Recipients: ["in.example.com"], Actions: NEW_ACTIONS };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(
+        cloneMetadata((m) => {
+          Object.assign(m.services.email.config.inbound, {
+            webhookUrl: "https://hooks.example.com/in",
+            webhookSecret: "saved-secret",
+            retention: "90days",
+          });
+        })
+      );
+      const pulumi = await import("@pulumi/pulumi");
+      vi.mocked(
+        pulumi.automation.LocalWorkspace.createOrSelectStack
+      ).mockImplementation(async (args: any) => {
+        await args.program();
+        return {
+          setConfig: vi.fn().mockResolvedValue(undefined),
+          up: vi.fn(async () => {
+            events.push("command-up");
+            return { outputs: {} };
+          }),
+        } as never;
+      });
+      const { deployEmailStack } = await import(
+        "../../../infrastructure/email-stack.js"
+      );
+
+      await inboundInit({
+        domain: "example.com",
+        subdomain: "in",
+        region: "us-east-1",
+        yes: true,
+      });
+
+      const deployed = vi.mocked(deployEmailStack).mock.calls[0][0];
+      expect(deployed.emailConfig.inbound).toMatchObject({
+        trigger: "ses-lambda-action",
+        receivingDomain: "in.example.com",
+        webhookUrl: "https://hooks.example.com/in",
+        webhookSecret: "saved-secret",
+        retention: "90days",
+      });
+      expect(events).toEqual([
+        "command-up",
+        "save:ses-lambda-action",
+        "rule-write:ses-lambda-action",
+        "save:ses-lambda-action",
+      ]);
+      expect(rule?.Actions).toEqual(NEW_ACTIONS);
+      expect(
+        saved.at(-1)?.inboundDomains?.map((d) => d.receivingDomain)
+      ).toEqual(["in.example.com"]);
+    });
+
+    it("the status repair command is an upgrade redeploy, never an init re-run", () => {
+      expect(inboundRepairCommand("us-east-1")).toBe(REPAIR);
+    });
+
+    it("a failed switch in --json returns a webhook secret generated in this run", async () => {
+      // stale rule left behind, no saved inbound block: init generates a secret
+      rule = { Recipients: ["old.example.com"], Actions: LEGACY(BUCKET) };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(
+        legacyMetadata((m) => {
+          (m.services.email.config as { inbound?: unknown }).inbound =
+            undefined;
+          (
+            m.services.email.config as { inboundDomains?: unknown }
+          ).inboundDomains = undefined;
+        })
+      );
+      const rules = await import("../../../utils/email/receipt-rules.js");
+      vi.mocked(rules.syncReceiptRuleTrigger).mockRejectedValueOnce(
+        new Error("AccessDenied")
+      );
+      setJsonMode(true);
+
+      await expect(
+        inboundInit({
+          domain: "example.com",
+          subdomain: "in",
+          yes: true,
+          webhookUrl: "https://hooks.example.com/in",
+        })
+      ).rejects.toThrow("process.exit(1)");
+
+      const out = jsonOutput("email.inbound.init");
+      expect(out?.success).toBe(false);
+      expect(out?.data.webhookSecret).toMatch(/^[0-9a-f]{64}$/);
+      expect(out?.data.webhookSecret).toBe(
+        saved.at(-1)?.inbound?.webhookSecret
+      );
+    });
+
+    it("appends a new init domain to the saved inboundDomains", async () => {
+      rule = { Recipients: ["in.example.com"], Actions: NEW_ACTIONS };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(cloneMetadata());
+
+      await inboundInit({
+        domain: "example.com",
+        subdomain: "support",
+        yes: true,
+      });
+
+      expect(
+        saved.at(-1)?.inboundDomains?.map((d) => d.receivingDomain)
+      ).toEqual(["in.example.com", "support.example.com"]);
+    });
+
+    it.each([
+      ["receivingDomain", { subdomain: "support" }, "support.example.com"],
+      ["subdomain", { subdomain: "support" }, "support"],
+      ["bucketName", { subdomain: "in" }, BUCKET],
+    ] as const)(
+      "merges %s from the init run into the saved block",
+      async (field, flags, expected) => {
+        rule = { Recipients: ["in.example.com"], Actions: NEW_ACTIONS };
+        const { loadConnectionMetadata } = await import(
+          "../../../utils/shared/metadata.js"
+        );
+        vi.mocked(loadConnectionMetadata).mockResolvedValue(
+          cloneMetadata((m) => {
+            Object.assign(m.services.email.config.inbound, {
+              bucketName: "stale-bucket-name",
+              webhookSecret: "saved-secret",
+            });
+          })
+        );
+
+        await inboundInit({ domain: "example.com", yes: true, ...flags });
+
+        expect(saved.at(-1)?.inbound?.[field]).toBe(expected);
+        expect(saved.at(-1)?.inbound?.webhookSecret).toBe("saved-secret");
+      }
+    );
+
+    it("merges webhookUrl: the flag wins over the saved URL", async () => {
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(
+        cloneMetadata((m) => {
+          Object.assign(m.services.email.config.inbound, {
+            webhookUrl: "https://old.example.com/in",
+            webhookSecret: "saved-secret",
+          });
+        })
+      );
+
+      await inboundInit({
+        domain: "example.com",
+        subdomain: "in",
+        yes: true,
+        webhookUrl: "https://new.example.com/in",
+      });
+
+      expect(saved.at(-1)?.inbound?.webhookUrl).toBe(
+        "https://new.example.com/in"
+      );
+    });
+
+    it("prints and returns in --json the secret actually saved (not a fresh one)", async () => {
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(
+        cloneMetadata((m) => {
+          Object.assign(m.services.email.config.inbound, {
+            webhookUrl: "https://hooks.example.com/in",
+            webhookSecret: "saved-secret",
+          });
+        })
+      );
+      const clack = await import("@clack/prompts");
+
+      await inboundInit({ domain: "example.com", subdomain: "in", yes: true });
+      const note = vi
+        .mocked(clack.note)
+        .mock.calls.map((c) => String(c[0]))
+        .find((n) => n.includes("X-Wraps-Inbound-Key"));
+      expect(note).toContain("saved-secret");
+
+      setJsonMode(true);
+      await inboundInit({ domain: "example.com", subdomain: "in", yes: true });
+      expect(jsonOutput("email.inbound.init")?.data.webhookSecret).toBe(
+        "saved-secret"
+      );
+      expect(saved.at(-1)?.inbound?.webhookSecret).toBe("saved-secret");
+    });
+
+    it("--json mode runs the switch and reports the resulting trigger", async () => {
+      rule = { Recipients: ["in.example.com"], Actions: LEGACY(BUCKET) };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(legacyMetadata());
+      setJsonMode(true);
+
+      await inboundInit({ domain: "example.com", subdomain: "in", yes: true });
+
+      expect(events).toContain("sync:ses-lambda-action");
+      expect(jsonOutput("email.inbound.init")?.data.trigger).toBe(
+        "ses-lambda-action"
+      );
+    });
+
+    it("--json switch failure goes through jsonError with the step and the finishing command, exits 1, keeps the saves", async () => {
+      rule = { Recipients: ["in.example.com"], Actions: LEGACY(BUCKET) };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(legacyMetadata());
+      const rules = await import("../../../utils/email/receipt-rules.js");
+      vi.mocked(rules.syncReceiptRuleTrigger).mockRejectedValueOnce(
+        new Error("AccessDenied")
+      );
+      setJsonMode(true);
+
+      await expect(
+        inboundInit({ domain: "example.com", subdomain: "in", yes: true })
+      ).rejects.toThrow("process.exit(1)");
+
+      const out = jsonOutput("email.inbound.init");
+      expect(out?.success).toBe(false);
+      expect(out?.error.code).toBe("INBOUND_TRIGGER_SWITCH_FAILED");
+      expect(out?.error.message).toContain("step 2");
+      expect(out?.error.suggestion).toContain("wraps email upgrade");
+      // init's own saves happened before the switch
+      expect(saved.length).toBe(2);
+    });
+  });
+
+  describe("inbound add", () => {
+    it("S3-notification deployment: rule write, save, then the full switch; final trigger is new and reported in --json", async () => {
+      rule = { Recipients: ["in.example.com"], Actions: LEGACY(BUCKET) };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(legacyMetadata());
+      setJsonMode(true);
+
+      await inboundAdd({
+        domain: "example.com",
+        subdomain: "support",
+        yes: true,
+      });
+
+      expect(events).toEqual([
+        "rule-add:s3-notification",
+        "save:absent",
+        "seam-up:s3-notification",
+        "sync:ses-lambda-action",
+        "save:ses-lambda-action",
+        "seam-up:ses-lambda-action",
+      ]);
+      expect(rule?.Actions).toEqual(NEW_ACTIONS);
+      expect(noLegacyWriteAfterSync()).toBe(true);
+      expect(jsonOutput("email.inbound.add")?.data.trigger).toBe(
+        "ses-lambda-action"
+      );
+    });
+
+    it("no rule at switch time: saves the new mode and runs up #2 only", async () => {
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(legacyMetadata());
+      const rules = await import("../../../utils/email/receipt-rules.js");
+      // the add's rule write is a no-op here, so the switch finds no rule
+      vi.mocked(rules.addDomainToReceiptRule).mockImplementationOnce(
+        async () => {
+          events.push("rule-add:skipped");
+        }
+      );
+
+      await inboundAdd({
+        domain: "example.com",
+        subdomain: "support",
+        yes: true,
+      });
+
+      expect(events).toEqual([
+        "rule-add:skipped",
+        "save:absent",
+        "save:ses-lambda-action",
+        "seam-up:ses-lambda-action",
+      ]);
+    });
+
+    it("already in the new mode: no switch, no deploy", async () => {
+      rule = { Recipients: ["in.example.com"], Actions: NEW_ACTIONS };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(cloneMetadata());
+
+      await inboundAdd({
+        domain: "example.com",
+        subdomain: "support",
+        yes: true,
+      });
+
+      expect(events).toEqual([
+        "rule-add:ses-lambda-action",
+        "save:ses-lambda-action",
+      ]);
+      expect(rule?.Actions).toEqual(NEW_ACTIONS);
+    });
+
+    it("--preview previews the switch and applies nothing", async () => {
+      rule = { Recipients: ["in.example.com"], Actions: LEGACY(BUCKET) };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(legacyMetadata());
+      const seam = await import("../../../utils/email/email-stack-deploy.js");
+      const dns = await import("../../../utils/dns/index.js");
+
+      await inboundAdd({
+        domain: "example.com",
+        subdomain: "support",
+        yes: true,
+        preview: true,
+      });
+
+      expect(events).toEqual([]);
+      expect(seam.deployHooks.preview).toHaveBeenCalledTimes(1);
+      const previewed = vi.mocked(seam.deployHooks.preview).mock.calls[0][0];
+      expect(previewed.stackConfig.emailConfig.inbound.trigger).toBe(
+        "ses-lambda-action"
+      );
+      expect(dns.createInboundDNSRecordsForProvider).not.toHaveBeenCalled();
+      expect(rule?.Actions).toEqual(LEGACY(BUCKET));
+    });
+
+    it("asks before the switch's deploys, and a no writes nothing", async () => {
+      rule = { Recipients: ["in.example.com"], Actions: LEGACY(BUCKET) };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(legacyMetadata());
+      const clack = await import("@clack/prompts");
+      vi.mocked(clack.confirm).mockResolvedValueOnce(false);
+      const stdin = process.stdin.isTTY;
+      const stdout = process.stdout.isTTY;
+      Object.defineProperty(process.stdin, "isTTY", {
+        value: true,
+        configurable: true,
+      });
+      Object.defineProperty(process.stdout, "isTTY", {
+        value: true,
+        configurable: true,
+      });
+      try {
+        await expect(
+          inboundAdd({ domain: "example.com", subdomain: "support" })
+        ).rejects.toThrow("process.exit(0)");
+      } finally {
+        Object.defineProperty(process.stdin, "isTTY", {
+          value: stdin,
+          configurable: true,
+        });
+        Object.defineProperty(process.stdout, "isTTY", {
+          value: stdout,
+          configurable: true,
+        });
+      }
+
+      expect(vi.mocked(clack.confirm)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining("two stack deploys"),
+        })
+      );
+      expect(events).toEqual([]);
+      expect(rule?.Actions).toEqual(LEGACY(BUCKET));
+    });
+
+    it("--yes skips that confirmation", async () => {
+      rule = { Recipients: ["in.example.com"], Actions: LEGACY(BUCKET) };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(legacyMetadata());
+      const clack = await import("@clack/prompts");
+
+      await inboundAdd({
+        domain: "example.com",
+        subdomain: "support",
+        yes: true,
+      });
+
+      expect(vi.mocked(clack.confirm)).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining("two stack deploys"),
+        })
+      );
+      expect(events).toContain("sync:ses-lambda-action");
+    });
+
+    it("--json switch failure goes through the JSON error envelope, exits 1 and keeps the add's save", async () => {
+      rule = { Recipients: ["in.example.com"], Actions: LEGACY(BUCKET) };
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(legacyMetadata());
+      const seam = await import("../../../utils/email/email-stack-deploy.js");
+      vi.mocked(seam.deployHooks.deploy).mockRejectedValueOnce(
+        new Error("stack locked")
+      );
+      const telemetry = await import("../../../telemetry/events.js");
+      const trackSpy = vi.spyOn(telemetry, "trackError");
+      setJsonMode(true);
+
+      await expect(
+        inboundAdd({ domain: "example.com", subdomain: "support", yes: true })
+      ).rejects.toThrow("process.exit(1)");
+
+      const out = jsonOutput("email.inbound.add");
+      expect(out?.success).toBe(false);
+      expect(out?.error.code).toBe("INBOUND_TRIGGER_SWITCH_FAILED");
+      expect(out?.error.message).toContain("step 1");
+      expect(out?.error.suggestion).toContain(
+        "wraps email upgrade --action redeploy"
+      );
+      expect(saved.map((x) => x.inboundDomains?.length)).toEqual([2]);
+      expect(trackSpy).toHaveBeenCalledWith(
+        "INBOUND_TRIGGER_SWITCH_FAILED",
+        "email.inbound.add",
+        { step: "1" }
+      );
+    });
+
+    it("--preview with a stray value names --preview, before any AWS call", async () => {
+      const aws = await import("../../../utils/shared/aws.js");
+      await expect(
+        inboundAdd({ preview: true, unexpectedArg: "now" })
+      ).rejects.toMatchObject({
+        code: "INVALID_FLAG_USAGE",
+        suggestion: expect.stringContaining("--preview takes no value"),
+      });
+      expect(aws.validateAWSCredentials).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("inbound status", () => {
+    it("puts the trigger and the mismatch flags in --json", async () => {
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(legacyMetadata());
+      const check = await import(
+        "../../../utils/email/inbound-trigger-check.js"
+      );
+      vi.mocked(check.checkInboundTrigger).mockResolvedValue({
+        savedTrigger: "s3-notification",
+        ruleTrigger: "ses-lambda-action",
+        ruleEnabled: true,
+        activeRuleSet: "wraps-inbound-rules",
+        activeRuleSetReadable: true,
+        ruleSetInactive: false,
+        sesInvokePermission: true,
+        bucketPolicyCoversMail: true,
+        mismatches: ["rule-differs-from-saved"],
+        warnings: ["The receipt rule uses the ses-lambda-action trigger..."],
+      });
+      setJsonMode(true);
+
+      await inboundStatus({});
+
+      const data = jsonOutput("email.inbound.status")?.data;
+      expect(data.trigger).toBe("s3-notification");
+      expect(data.activeRuleSet).toBe("wraps-inbound-rules");
+      expect(data.triggerCheck).toEqual({
+        repairCommand: REPAIR,
+        ruleSetInactive: false,
+        ruleEnabled: true,
+        ruleTrigger: "ses-lambda-action",
+        sesInvokePermission: true,
+        bucketPolicyCoversMail: true,
+        mismatches: ["rule-differs-from-saved"],
+        warnings: ["The receipt rule uses the ses-lambda-action trigger..."],
+      });
+      expect(vi.mocked(check.checkInboundTrigger)).toHaveBeenCalledWith({
+        region: "us-east-1",
+        bucketName: BUCKET,
+        savedTrigger: "s3-notification",
+        repairCommand: REPAIR,
+        activeRuleSetRead: { readable: true, name: "wraps-inbound-rules" },
+      });
+    });
+
+    it("shows the mode and warns on a mismatch", async () => {
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(cloneMetadata());
+      const check = await import(
+        "../../../utils/email/inbound-trigger-check.js"
+      );
+      vi.mocked(check.checkInboundTrigger).mockResolvedValue({
+        savedTrigger: "ses-lambda-action",
+        ruleTrigger: "ses-lambda-action",
+        ruleEnabled: true,
+        activeRuleSet: "wraps-inbound-rules",
+        activeRuleSetReadable: true,
+        ruleSetInactive: false,
+        sesInvokePermission: false,
+        bucketPolicyCoversMail: true,
+        mismatches: ["ses-invoke-permission-missing"],
+        warnings: ["The processor has no wraps-inbound-ses-invoke permission"],
+      });
+      const clack = await import("@clack/prompts");
+
+      await inboundStatus({});
+
+      const printed = vi
+        .mocked(console.log)
+        .mock.calls.map((c) => String(c[0]))
+        .join("\n");
+      expect(printed).toContain("SES Lambda action");
+      expect(vi.mocked(clack.log.warn)).toHaveBeenCalledWith(
+        "The processor has no wraps-inbound-ses-invoke permission"
+      );
+    });
+  });
+
+  describe("inbound status DLQ depth (plan 044)", () => {
+    const QUEUE_URL =
+      "https://sqs.us-east-1.amazonaws.com/123456789012/wraps-inbound-events-dlq";
+
+    async function arrange() {
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(cloneMetadata());
+      const check = await import(
+        "../../../utils/email/inbound-trigger-check.js"
+      );
+      vi.mocked(check.checkInboundTrigger).mockResolvedValue({
+        savedTrigger: "ses-lambda-action",
+        ruleTrigger: "ses-lambda-action",
+        ruleEnabled: true,
+        activeRuleSet: "wraps-inbound-rules",
+        activeRuleSetReadable: true,
+        ruleSetInactive: false,
+        sesInvokePermission: true,
+        bucketPolicyCoversMail: true,
+        mismatches: [],
+        warnings: [],
+      });
+    }
+
+    function stubDepth(depth: string) {
+      sqsBackstop.reset();
+      sqsBackstop.on(GetQueueUrlCommand).resolves({ QueueUrl: QUEUE_URL });
+      sqsBackstop.on(GetQueueAttributesCommand).resolves({
+        Attributes: { ApproximateNumberOfMessages: depth },
+      });
+    }
+
+    it("shows the depth and the reprocess hint when it is non-zero", async () => {
+      await arrange();
+      stubDepth("3");
+      const clack = await import("@clack/prompts");
+
+      await inboundStatus({});
+
+      const printed = vi
+        .mocked(console.log)
+        .mock.calls.map((c) => String(c[0]))
+        .join("\n");
+      expect(printed).toContain("Dead-letter queue:");
+      expect(printed).toContain("3 messages");
+      expect(vi.mocked(clack.log.warn)).toHaveBeenCalledWith(
+        expect.stringContaining("wraps email inbound reprocess")
+      );
+      expect(
+        sqsBackstop.commandCalls(GetQueueAttributesCommand)[0].args[0].input
+      ).toEqual({
+        QueueUrl: QUEUE_URL,
+        AttributeNames: ["ApproximateNumberOfMessages"],
+      });
+    });
+
+    it("says empty and gives no hint at depth zero", async () => {
+      await arrange();
+      stubDepth("0");
+      const clack = await import("@clack/prompts");
+
+      await inboundStatus({});
+
+      const printed = vi
+        .mocked(console.log)
+        .mock.calls.map((c) => String(c[0]))
+        .join("\n");
+      expect(printed).toContain("empty");
+      expect(vi.mocked(clack.log.warn)).not.toHaveBeenCalledWith(
+        expect.stringContaining("reprocess")
+      );
+    });
+
+    it("puts the depth in --json, and null when the queue can't be read", async () => {
+      await arrange();
+      stubDepth("2");
+      setJsonMode(true);
+      await inboundStatus({});
+      expect(jsonOutput("email.inbound.status")?.data.dlq).toEqual({
+        name: "wraps-inbound-events-dlq",
+        depth: 2,
+        reprocessCommand: "wraps email inbound reprocess",
+      });
+
+      vi.mocked(console.log).mockClear();
+      sqsBackstop.reset();
+      sqsBackstop
+        .on(GetQueueUrlCommand)
+        .rejects(new Error("AccessDenied: sqs:GetQueueUrl"));
+      await inboundStatus({});
+      const dlq = jsonOutput("email.inbound.status")?.data.dlq;
+      expect(dlq.depth).toBeNull();
+      expect(dlq.error).toBe("unreadable");
+    });
+
+    it("tells a missing queue from an access denial, in text and in --json", async () => {
+      await arrange();
+      sqsBackstop.reset();
+      sqsBackstop
+        .on(GetQueueUrlCommand)
+        .rejects(
+          Object.assign(new Error("nope"), { name: "QueueDoesNotExist" })
+        );
+      await inboundStatus({});
+      let printed = vi
+        .mocked(console.log)
+        .mock.calls.map((c) => String(c[0]))
+        .join("\n");
+      expect(printed).toContain("not found");
+
+      vi.mocked(console.log).mockClear();
+      sqsBackstop.reset();
+      sqsBackstop
+        .on(GetQueueUrlCommand)
+        .rejects(Object.assign(new Error("no"), { name: "AccessDenied" }));
+      await inboundStatus({});
+      printed = vi
+        .mocked(console.log)
+        .mock.calls.map((c) => String(c[0]))
+        .join("\n");
+      expect(printed).toContain("access denied");
+
+      vi.mocked(console.log).mockClear();
+      setJsonMode(true);
+      await inboundStatus({});
+      expect(jsonOutput("email.inbound.status")?.data.dlq.error).toBe(
+        "access-denied"
+      );
+    });
+  });
+
+  describe("inbound status with another active rule set (review 1 finding 1)", () => {
+    it("names the active set, flags it in --json, and offers no command that would activate wraps-inbound-rules", async () => {
+      rule = { Recipients: ["in.example.com"], Actions: NEW_ACTIONS };
+      (rule as { Enabled?: boolean }).Enabled = true;
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(cloneMetadata());
+      const rules = await import("../../../utils/email/receipt-rules.js");
+      vi.mocked(rules.readActiveReceiptRuleSet).mockResolvedValueOnce({
+        readable: true,
+        name: "customer-rules",
+      });
+      const check = await import(
+        "../../../utils/email/inbound-trigger-check.js"
+      );
+      const actualCheck = await vi.importActual<
+        typeof import("../../../utils/email/inbound-trigger-check.js")
+      >("../../../utils/email/inbound-trigger-check.js");
+      vi.mocked(check.checkInboundTrigger).mockImplementationOnce(
+        actualCheck.checkInboundTrigger
+      );
+      lambdaBackstop.reset();
+      s3Backstop.reset();
+      lambdaBackstop.onAnyCommand().resolves({
+        Policy: JSON.stringify({
+          Statement: [
+            {
+              Sid: "wraps-inbound-ses-invoke",
+              Principal: { Service: "ses.amazonaws.com" },
+              Action: "lambda:InvokeFunction",
+            },
+          ],
+        }),
+      });
+      s3Backstop.onAnyCommand().resolves({
+        Policy: JSON.stringify({
+          Statement: [
+            {
+              Sid: "AllowSESPut",
+              Effect: "Allow",
+              Principal: { Service: "ses.amazonaws.com" },
+              Action: "s3:PutObject",
+              Resource: [
+                `arn:aws:s3:::${BUCKET}/raw/*`,
+                `arn:aws:s3:::${BUCKET}/mail/*`,
+              ],
+            },
+          ],
+        }),
+      });
+      setJsonMode(true);
+
+      await inboundStatus({});
+
+      const data = jsonOutput("email.inbound.status")?.data;
+      expect(data.activeRuleSet).toBe("customer-rules");
+      expect(data.receiptRuleSetActive).toBe(false);
+      expect(data.triggerCheck.ruleSetInactive).toBe(true);
+      expect(data.triggerCheck.mismatches).toEqual(["rule-set-inactive"]);
+      const text = JSON.stringify(data);
+      expect(text).toContain("customer-rules");
+      expect(text).not.toMatch(/inbound init --/);
+      expect(text).not.toMatch(/Run `wraps email inbound/);
+    });
+  });
+
+  describe("inbound destroy", () => {
+    it("clears inbound.trigger with the rest of the inbound config", async () => {
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(cloneMetadata());
+
+      await inboundDestroy({ force: true });
+
+      expect(saved.at(-1)?.inbound).toBeUndefined();
+      expect(saved.at(-1)?.trigger).toBeUndefined();
+    });
+  });
+
+  describe("plan 048: rule-set activation consent", () => {
+    const CUSTOMER = { readable: true, name: "customer-rules" } as const;
+    const UNREADABLE = { readable: false, error: "AccessDenied" } as const;
+    const NO_REPLACEMENT = { readable: true, name: null } as const;
+
+    // isInteractive() also needs CI unset; GitHub Actions sets it.
+    async function withTTY<T>(fn: () => Promise<T>): Promise<T> {
+      const stdin = process.stdin.isTTY;
+      const stdout = process.stdout.isTTY;
+      const ci = process.env.CI;
+      // biome-ignore lint/performance/noDelete: an unset env var, not an empty one
+      delete process.env.CI;
+      Object.defineProperty(process.stdin, "isTTY", {
+        value: true,
+        configurable: true,
+      });
+      Object.defineProperty(process.stdout, "isTTY", {
+        value: true,
+        configurable: true,
+      });
+      try {
+        return await fn();
+      } finally {
+        if (ci !== undefined) {
+          process.env.CI = ci;
+        }
+        Object.defineProperty(process.stdin, "isTTY", {
+          value: stdin,
+          configurable: true,
+        });
+        Object.defineProperty(process.stdout, "isTTY", {
+          value: stdout,
+          configurable: true,
+        });
+      }
+    }
+
+    async function setActiveRead(read: unknown) {
+      const rules = await import("../../../utils/email/receipt-rules.js");
+      vi.mocked(rules.readActiveReceiptRuleSet).mockResolvedValue(
+        read as never
+      );
+      return rules;
+    }
+
+    async function freshInitMetadata() {
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(
+        cloneMetadata((m) => {
+          (m.services.email.config as { inbound?: unknown }).inbound =
+            undefined;
+          (
+            m.services.email.config as { inboundDomains?: unknown }
+          ).inboundDomains = undefined;
+        })
+      );
+    }
+
+    async function addMetadata() {
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(cloneMetadata());
+    }
+
+    function consentPrompt() {
+      return expect.objectContaining({
+        message: expect.stringContaining("rules stop applying"),
+        initialValue: false,
+      });
+    }
+
+    afterEach(async () => {
+      // Back to the file defaults (ours active; every confirm says yes) for
+      // the tests that follow, even when a test failed midway.
+      await setActiveRead({ readable: true, name: "wraps-inbound-rules" });
+      const clack = await import("@clack/prompts");
+      vi.mocked(clack.confirm).mockReset();
+      vi.mocked(clack.confirm).mockResolvedValue(true);
+      sesBackstop.reset();
+    });
+
+    /**
+     * Let the command's (mocked) activation run the real setActiveReceiptRuleSet
+     * against the SES backstop, which reports `name` as active by then.
+     */
+    async function activeSetChangesTo(name: string) {
+      sesBackstop
+        .on(DescribeActiveReceiptRuleSetCommand)
+        .resolves({ Metadata: { Name: name } });
+      return vi.importActual<
+        typeof import("../../../utils/email/receipt-rules.js")
+      >("../../../utils/email/receipt-rules.js");
+    }
+
+    describe("inbound init", () => {
+      it("interactive, another set active: asks (default No) naming the set; yes activates over that set", async () => {
+        await freshInitMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+        const clack = await import("@clack/prompts");
+
+        await withTTY(() =>
+          inboundInit({ domain: "example.com", subdomain: "in" })
+        );
+
+        expect(vi.mocked(clack.confirm)).toHaveBeenCalledWith(consentPrompt());
+        expect(vi.mocked(clack.confirm)).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: expect.stringContaining("customer-rules"),
+          })
+        );
+        expect(rules.setActiveReceiptRuleSet).toHaveBeenCalledWith(
+          "us-east-1",
+          "wraps-inbound-rules",
+          expect.objectContaining({ expected: CUSTOMER })
+        );
+        expect(events[0]).toBe("command-up");
+      });
+
+      it("interactive, another set active: no exits before any deploy, rule write or save", async () => {
+        await freshInitMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+        const clack = await import("@clack/prompts");
+        // Every other prompt says yes; the deactivation prompt says no.
+        vi.mocked(clack.confirm).mockImplementation(
+          async (opts: { message: string }) =>
+            !opts.message.includes("rules stop applying")
+        );
+
+        await expect(
+          withTTY(() => inboundInit({ domain: "example.com", subdomain: "in" }))
+        ).rejects.toThrow("process.exit(0)");
+
+        expect(vi.mocked(clack.confirm)).toHaveBeenLastCalledWith(
+          consentPrompt()
+        );
+        expect(events).toEqual([]);
+        expect(rules.createReceiptRule).not.toHaveBeenCalled();
+        expect(rules.setActiveReceiptRuleSet).not.toHaveBeenCalled();
+      });
+
+      it("--yes with another set active refuses: no deploy, no rule call, no metadata save", async () => {
+        await freshInitMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+        const pulumi = await import("@pulumi/pulumi");
+
+        await expect(
+          inboundInit({ domain: "example.com", subdomain: "in", yes: true })
+        ).rejects.toMatchObject({
+          code: "RECEIPT_RULE_SET_CONFLICT",
+          message: expect.stringContaining("customer-rules"),
+          suggestion: expect.stringContaining("--replace-active-rule-set"),
+        });
+
+        expect(events).toEqual([]);
+        expect(
+          pulumi.automation.LocalWorkspace.createOrSelectStack
+        ).not.toHaveBeenCalled();
+        expect(rules.createReceiptRuleSet).not.toHaveBeenCalled();
+        expect(rules.createReceiptRule).not.toHaveBeenCalled();
+        expect(rules.setActiveReceiptRuleSet).not.toHaveBeenCalled();
+      });
+
+      it("--yes --replace-active-rule-set proceeds and passes the consented set to the activation", async () => {
+        await freshInitMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+        const clack = await import("@clack/prompts");
+
+        await inboundInit({
+          domain: "example.com",
+          subdomain: "in",
+          yes: true,
+          replaceActiveRuleSet: true,
+        });
+
+        expect(vi.mocked(clack.confirm)).not.toHaveBeenCalled();
+        expect(rules.setActiveReceiptRuleSet).toHaveBeenCalledWith(
+          "us-east-1",
+          "wraps-inbound-rules",
+          expect.objectContaining({ expected: CUSTOMER })
+        );
+      });
+
+      // Init's deploy confirmation already needs --yes in JSON mode, so
+      // --json --yes is the only JSON run that reaches the guard.
+      it("--json --yes refuses without the flag and proceeds with it", async () => {
+        await freshInitMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+        setJsonMode(true);
+
+        await expect(
+          inboundInit({
+            domain: "example.com",
+            subdomain: "in",
+            json: true,
+            yes: true,
+          })
+        ).rejects.toMatchObject({ code: "RECEIPT_RULE_SET_CONFLICT" });
+        expect(events).toEqual([]);
+
+        await inboundInit({
+          domain: "example.com",
+          subdomain: "in",
+          json: true,
+          yes: true,
+          replaceActiveRuleSet: true,
+        });
+        expect(rules.setActiveReceiptRuleSet).toHaveBeenCalledWith(
+          "us-east-1",
+          "wraps-inbound-rules",
+          expect.objectContaining({ expected: CUSTOMER })
+        );
+        expect(jsonOutput("email.inbound.init")?.success).toBe(true);
+      });
+
+      it("an unreadable active set (AccessDenied) is treated like another set: --yes refuses, interactive asks", async () => {
+        await freshInitMetadata();
+        const rules = await setActiveRead(UNREADABLE);
+        const clack = await import("@clack/prompts");
+
+        await expect(
+          inboundInit({ domain: "example.com", subdomain: "in", yes: true })
+        ).rejects.toMatchObject({
+          code: "RECEIPT_RULE_SET_CONFLICT",
+          message: expect.stringContaining("AccessDenied"),
+        });
+        expect(events).toEqual([]);
+
+        await withTTY(() =>
+          inboundInit({ domain: "example.com", subdomain: "in" })
+        );
+        expect(vi.mocked(clack.confirm)).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: expect.stringContaining(
+              "Could not read the active receipt rule set in us-east-1 (AccessDenied)"
+            ),
+            initialValue: false,
+          })
+        );
+        expect(rules.setActiveReceiptRuleSet).toHaveBeenCalledWith(
+          "us-east-1",
+          "wraps-inbound-rules",
+          expect.objectContaining({ expected: UNREADABLE })
+        );
+      });
+
+      it("--preview names the set applying would deactivate, without asking or refusing", async () => {
+        await freshInitMetadata();
+        await setActiveRead(CUSTOMER);
+        const clack = await import("@clack/prompts");
+        const { previewWithResourceChanges } = await import(
+          "../../../utils/shared/pulumi.js"
+        );
+        vi.mocked(previewWithResourceChanges).mockResolvedValueOnce({
+          changeSummary: {},
+          resourceChanges: [],
+        } as never);
+
+        await inboundInit({
+          domain: "example.com",
+          subdomain: "in",
+          preview: true,
+          yes: true,
+        });
+
+        expect(vi.mocked(clack.log.warn)).toHaveBeenCalledWith(
+          expect.stringContaining(
+            "would deactivate the active receipt rule set customer-rules"
+          )
+        );
+        expect(vi.mocked(clack.log.warn)).toHaveBeenCalledWith(
+          expect.stringContaining(
+            "where inbound init stops with NON_INTERACTIVE_INPUT unless --yes is passed too"
+          )
+        );
+        expect(vi.mocked(clack.confirm)).not.toHaveBeenCalled();
+        expect(events).toEqual([]);
+      });
+
+      it("the active set changing after consent: the activation refuses after the deploy and 14b save, names what is in place and the init command that asks again", async () => {
+        await freshInitMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+        const actual = await activeSetChangesTo("other-rules");
+        vi.mocked(rules.setActiveReceiptRuleSet).mockImplementationOnce(
+          actual.setActiveReceiptRuleSet
+        );
+
+        await expect(
+          inboundInit({
+            domain: "example.com",
+            subdomain: "in",
+            yes: true,
+            replaceActiveRuleSet: true,
+          })
+        ).rejects.toMatchObject({
+          code: "RECEIPT_RULE_SET_CONFLICT",
+          message:
+            "Receipt rule set other-rules is active in us-east-1, not customer-rules, the set you agreed to replace, so wraps-inbound-rules was not activated",
+          suggestion: expect.stringMatching(
+            /Already in place: the inbound stack is deployed and its configuration saved, and wraps-inbound-rules holds the receipt rule for in\.example\.com but is inactive\. DNS records were not written\.[\s\S]*\(it re-deploys the inbound stack\):\n {2}wraps email inbound init --domain example\.com --subdomain in --region us-east-1/
+          ),
+        });
+
+        expect(events).toEqual([
+          "command-up",
+          "save:ses-lambda-action",
+          "rule-write:ses-lambda-action",
+        ]);
+      });
+
+      it("--json reports the set it deactivated (deactivatedRuleSet), and the text run says so", async () => {
+        await freshInitMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+        vi.mocked(rules.setActiveReceiptRuleSet).mockResolvedValueOnce(
+          CUSTOMER
+        );
+        setJsonMode(true);
+
+        await inboundInit({
+          domain: "example.com",
+          subdomain: "in",
+          yes: true,
+          json: true,
+          replaceActiveRuleSet: true,
+        });
+
+        expect(jsonOutput("email.inbound.init")?.data.deactivatedRuleSet).toBe(
+          "customer-rules"
+        );
+        const clack = await import("@clack/prompts");
+        expect(vi.mocked(clack.log.warn)).toHaveBeenCalledWith(
+          "Deactivated receipt rule set customer-rules."
+        );
+      });
+
+      it("--json reports deactivatedRuleSet null when nothing was deactivated", async () => {
+        await freshInitMetadata();
+        setJsonMode(true);
+
+        await inboundInit({
+          domain: "example.com",
+          subdomain: "in",
+          yes: true,
+          json: true,
+        });
+
+        const data = jsonOutput("email.inbound.init")?.data;
+        expect(data.deactivatedRuleSet).toBeNull();
+        expect(data.previousRuleSetUnreadable).toBeNull();
+      });
+
+      it("--json: an unreadable previous set gives deactivatedRuleSet null and previousRuleSetUnreadable the error", async () => {
+        await freshInitMetadata();
+        const rules = await setActiveRead(UNREADABLE);
+        vi.mocked(rules.setActiveReceiptRuleSet).mockResolvedValueOnce(
+          UNREADABLE
+        );
+        setJsonMode(true);
+
+        await inboundInit({
+          domain: "example.com",
+          subdomain: "in",
+          yes: true,
+          json: true,
+          replaceActiveRuleSet: true,
+        });
+
+        const data = jsonOutput("email.inbound.init")?.data;
+        expect(data.deactivatedRuleSet).toBeNull();
+        expect(data.previousRuleSetUnreadable).toBe("AccessDenied");
+      });
+
+      it("no set active: unchanged, activates without asking", async () => {
+        await freshInitMetadata();
+        const rules = await setActiveRead(NO_REPLACEMENT);
+        const clack = await import("@clack/prompts");
+
+        await inboundInit({
+          domain: "example.com",
+          subdomain: "in",
+          yes: true,
+        });
+
+        expect(vi.mocked(clack.confirm)).not.toHaveBeenCalled();
+        expect(rules.setActiveReceiptRuleSet).toHaveBeenCalledWith(
+          "us-east-1",
+          "wraps-inbound-rules",
+          expect.objectContaining({ expected: NO_REPLACEMENT })
+        );
+      });
+
+      it("ours already active: unchanged, no prompt", async () => {
+        await freshInitMetadata();
+        const ours = { readable: true, name: "wraps-inbound-rules" };
+        const rules = await setActiveRead(ours);
+        const clack = await import("@clack/prompts");
+
+        await withTTY(() =>
+          inboundInit({ domain: "example.com", subdomain: "in" })
+        );
+
+        expect(vi.mocked(clack.confirm)).not.toHaveBeenCalledWith(
+          consentPrompt()
+        );
+        expect(rules.setActiveReceiptRuleSet).toHaveBeenCalledWith(
+          "us-east-1",
+          "wraps-inbound-rules",
+          expect.objectContaining({ expected: ours })
+        );
+      });
+    });
+
+    describe("inbound verify", () => {
+      it("another set active: the hint says init asks first and needs --replace-active-rule-set with --yes (not --json)", async () => {
+        await addMetadata();
+        const rules = await import("../../../utils/email/receipt-rules.js");
+        vi.mocked(rules.getActiveReceiptRuleSet).mockResolvedValueOnce(
+          "customer-rules"
+        );
+        const notFound = Object.assign(new Error("not found"), {
+          code: "ENOTFOUND",
+        });
+        const mx = vi
+          .spyOn(dnsPromises, "resolveMx")
+          .mockRejectedValue(notFound);
+        const txt = vi
+          .spyOn(dnsPromises, "resolveTxt")
+          .mockRejectedValue(notFound);
+        const clack = await import("@clack/prompts");
+
+        try {
+          await inboundVerify({});
+        } finally {
+          mx.mockRestore();
+          txt.mockRestore();
+        }
+
+        const hint = vi
+          .mocked(clack.log.error)
+          .mock.calls.map((c) => String(c[0]))
+          .find((m) => m.includes("Receipt rule set"));
+        expect(hint).toContain("customer-rules");
+        expect(hint).toContain("init asks first, and with --yes needs");
+        expect(hint).toContain("--replace-active-rule-set");
+        expect(hint).not.toContain("--json");
+      });
+    });
+
+    describe("inbound add", () => {
+      it("rule missing, another set active, --yes: refuses before the rule write, DNS or save", async () => {
+        rule = null;
+        await addMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+
+        await expect(
+          inboundAdd({ domain: "example.com", subdomain: "support", yes: true })
+        ).rejects.toMatchObject({
+          code: "RECEIPT_RULE_SET_CONFLICT",
+          message: expect.stringContaining("customer-rules"),
+        });
+
+        expect(rules.addDomainToReceiptRule).not.toHaveBeenCalled();
+        expect(events).toEqual([]);
+      });
+
+      it("rule missing, --yes --replace-active-rule-set: the rule write gets the consented set", async () => {
+        rule = null;
+        await addMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+
+        await inboundAdd({
+          domain: "example.com",
+          subdomain: "support",
+          yes: true,
+          replaceActiveRuleSet: true,
+        });
+
+        expect(rules.addDomainToReceiptRule).toHaveBeenCalledWith(
+          "us-east-1",
+          "123456789012",
+          "support.example.com",
+          BUCKET,
+          "ses-lambda-action",
+          expect.objectContaining({ expected: CUSTOMER })
+        );
+      });
+
+      it("rule missing, --json: refuses without the flag", async () => {
+        rule = null;
+        await addMetadata();
+        const rules = await setActiveRead(UNREADABLE);
+        setJsonMode(true);
+
+        await expect(
+          inboundAdd({
+            domain: "example.com",
+            subdomain: "support",
+            json: true,
+          })
+        ).rejects.toMatchObject({
+          code: "RECEIPT_RULE_SET_CONFLICT",
+          message: expect.stringContaining("AccessDenied"),
+        });
+        expect(rules.addDomainToReceiptRule).not.toHaveBeenCalled();
+      });
+
+      it("rule missing, interactive: no exits before any write", async () => {
+        rule = null;
+        await addMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+        const clack = await import("@clack/prompts");
+        vi.mocked(clack.confirm).mockResolvedValueOnce(false);
+
+        await expect(
+          withTTY(() =>
+            inboundAdd({ domain: "example.com", subdomain: "support" })
+          )
+        ).rejects.toThrow("process.exit(0)");
+
+        expect(vi.mocked(clack.confirm)).toHaveBeenCalledWith(consentPrompt());
+        expect(rules.addDomainToReceiptRule).not.toHaveBeenCalled();
+        expect(events).toEqual([]);
+      });
+
+      it("rule in place: nothing is activated, so no read, no prompt, and the write may replace no set", async () => {
+        rule = { Recipients: ["in.example.com"], Actions: NEW_ACTIONS };
+        await addMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+
+        await inboundAdd({
+          domain: "example.com",
+          subdomain: "support",
+          yes: true,
+        });
+
+        expect(rules.readActiveReceiptRuleSet).not.toHaveBeenCalled();
+        expect(rules.addDomainToReceiptRule).toHaveBeenCalledWith(
+          "us-east-1",
+          "123456789012",
+          "support.example.com",
+          BUCKET,
+          "ses-lambda-action",
+          expect.objectContaining({ expected: NO_REPLACEMENT })
+        );
+      });
+
+      it("rule missing, no --yes and no terminal: refuses naming the set (not NON_INTERACTIVE_INPUT)", async () => {
+        rule = null;
+        await addMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+
+        await expect(
+          inboundAdd({ domain: "example.com", subdomain: "support" })
+        ).rejects.toMatchObject({
+          code: "RECEIPT_RULE_SET_CONFLICT",
+          message: expect.stringContaining("customer-rules"),
+          suggestion: expect.stringContaining(
+            "Nothing was deployed or changed"
+          ),
+        });
+        expect(rules.addDomainToReceiptRule).not.toHaveBeenCalled();
+        expect(events).toEqual([]);
+      });
+
+      it("with reply threading on, the r.mail write gets the consented set too", async () => {
+        rule = null;
+        const { loadConnectionMetadata } = await import(
+          "../../../utils/shared/metadata.js"
+        );
+        vi.mocked(loadConnectionMetadata).mockResolvedValue(
+          cloneMetadata((m) => {
+            (
+              m.services.email.config as Record<string, unknown>
+            ).replyThreading = {
+              enabled: true,
+              domains: [{ domain: "example.com", currentKid: 1 }],
+            };
+          })
+        );
+        const rules = await setActiveRead(CUSTOMER);
+
+        await inboundAdd({
+          domain: "example.com",
+          subdomain: "support",
+          yes: true,
+          replaceActiveRuleSet: true,
+        });
+
+        expect(rules.addDomainToReceiptRule).toHaveBeenCalledTimes(2);
+        expect(rules.addDomainToReceiptRule).toHaveBeenLastCalledWith(
+          "us-east-1",
+          "123456789012",
+          "r.mail.example.com",
+          BUCKET,
+          "ses-lambda-action",
+          expect.objectContaining({ expected: CUSTOMER })
+        );
+      });
+
+      it("the active set changing after consent: refuses, says the set and rule exist but are inactive and the domain wasn't saved, and gives init then the same add", async () => {
+        rule = null;
+        await addMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+        const actual = await activeSetChangesTo("other-rules");
+        vi.mocked(rules.addDomainToReceiptRule).mockImplementationOnce(
+          async (region, _account, _domain, _bucket, _trigger, activation) =>
+            actual.setActiveReceiptRuleSet(
+              region,
+              "wraps-inbound-rules",
+              activation
+            )
+        );
+
+        const error = await inboundAdd({
+          domain: "example.com",
+          subdomain: "support",
+          yes: true,
+          replaceActiveRuleSet: true,
+        }).catch((e: unknown) => e as { code: string; suggestion: string });
+
+        expect(error.code).toBe("RECEIPT_RULE_SET_CONFLICT");
+        expect(error.suggestion).toContain(
+          "Already in place: wraps-inbound-rules and its receipt rule (listing support.example.com) exist but are inactive; support.example.com was not saved and its DNS records were not written."
+        );
+        expect(error.suggestion).toContain(
+          "(it re-deploys the inbound stack):\n  wraps email inbound init --domain example.com --subdomain in --region us-east-1"
+        );
+        expect(error.suggestion).toContain(
+          "Then finish adding support.example.com:\n  wraps email inbound add --domain example.com --subdomain support --region us-east-1"
+        );
+        expect(error.suggestion).not.toContain("Re-run the command");
+        expect(error.suggestion).toContain(
+          "Run unattended, inbound init needs both --yes and --replace-active-rule-set"
+        );
+        expect(events).toEqual([]);
+      });
+
+      it("reports the set it deactivated: a warning, and deactivatedRuleSet in --json", async () => {
+        rule = null;
+        await addMetadata();
+        const rules = await setActiveRead(CUSTOMER);
+        vi.mocked(rules.addDomainToReceiptRule).mockResolvedValueOnce(CUSTOMER);
+        setJsonMode(true);
+
+        await inboundAdd({
+          domain: "example.com",
+          subdomain: "support",
+          yes: true,
+          json: true,
+          replaceActiveRuleSet: true,
+        });
+
+        expect(jsonOutput("email.inbound.add")?.data).toMatchObject({
+          deactivatedRuleSet: "customer-rules",
+          previousRuleSetUnreadable: null,
+        });
+        const clack = await import("@clack/prompts");
+        expect(vi.mocked(clack.log.warn)).toHaveBeenCalledWith(
+          "Deactivated receipt rule set customer-rules."
+        );
+      });
+
+      it("--preview --json reports wouldDeactivateRuleSet", async () => {
+        rule = null;
+        await addMetadata();
+        await setActiveRead(CUSTOMER);
+        setJsonMode(true);
+
+        await inboundAdd({
+          domain: "example.com",
+          subdomain: "support",
+          preview: true,
+          json: true,
+        });
+
+        const data = jsonOutput("email.inbound.add")?.data;
+        expect(data.wouldDeactivateRuleSet).toBe("customer-rules");
+        expect(data.activeRuleSetUnreadable).toBeNull();
+        expect(events).toEqual([]);
+      });
     });
   });
 });

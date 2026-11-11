@@ -1011,6 +1011,19 @@ export default function CLIReferenceEmailPageContent() {
           </h3>
           <p className="mb-4 text-muted-foreground text-sm">
             Deploy inbound email receiving infrastructure to your AWS account.
+            SES allows one active receipt rule set per region, and init
+            activates <code>wraps-inbound-rules</code>. If another set is
+            active, or the active set can&apos;t be read, init asks before
+            deploying anything, because activating the Wraps set stops the other
+            set&apos;s rules from applying. With <code>--yes</code> it refuses
+            with <code>RECEIPT_RULE_SET_CONFLICT</code> unless you also pass{" "}
+            <code>--replace-active-rule-set</code>. Without <code>--yes</code>,
+            a run that can&apos;t prompt (<code>--json</code> or no terminal)
+            stops earlier with <code>NON_INTERACTIVE_INPUT</code>, at the first
+            input it would ask for (the domain, the subdomain, the webhook URL
+            or the deploy confirmation). <code>--json</code> reports{" "}
+            <code>deactivatedRuleSet</code> and{" "}
+            <code>previousRuleSetUnreadable</code>.
           </p>
           <Card className="mb-4">
             <CardHeader>
@@ -1059,6 +1072,27 @@ export default function CLIReferenceEmailPageContent() {
                 </li>
                 <li>
                   <code className="rounded bg-muted px-2 py-1">
+                    --replace-active-rule-set
+                  </code>{" "}
+                  <span className="text-muted-foreground">
+                    Deactivate another active SES receipt rule set when
+                    activating wraps-inbound-rules. SES allows one active set
+                    per region, so that set&apos;s rules stop applying to
+                    incoming mail. Without it the command asks first (default
+                    No), and with --yes it refuses. Pass it only after the AWS
+                    account owner agrees.
+                  </span>
+                </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">-y, --yes</code>{" "}
+                  <span className="text-muted-foreground">
+                    Skip prompts and use defaults (the primary tracked domain,
+                    subdomain inbound, the saved webhook URL if any). Not the
+                    receipt rule set consent; see --replace-active-rule-set
+                  </span>
+                </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">
                     -r, --region &lt;region&gt;
                   </code>{" "}
                   <span className="text-muted-foreground">
@@ -1091,7 +1125,33 @@ export default function CLIReferenceEmailPageContent() {
           </h3>
           <p className="mb-4 text-muted-foreground text-sm">
             Display the status of inbound email infrastructure, including MX
-            records and receipt rules.
+            records and receipt rules. Also shows the trigger mode (how the
+            receipt rule starts the processor) and warns when the
+            deployment&apos;s trigger pieces (receipt rule, permission, bucket
+            policy, saved mode) disagree. Where a redeploy fixes a mismatch (the
+            receipt rule does not match the saved mode, the SES invoke
+            permission or the <code>mail/*</code> bucket policy is missing, or
+            the deployment is still on the old trigger), it prints the repair
+            command,{" "}
+            <code>
+              wraps email upgrade --action redeploy --region &lt;r&gt; --yes
+            </code>{" "}
+            (add <code>--preview</code> first to see the stack changes). A
+            missing or disabled receipt rule, or an inactive rule set, is
+            reported without that command because a redeploy does not fix it. If
+            a different receipt rule set is active in the region, status warns
+            that <code>inbound init</code> (and <code>inbound add</code>, when
+            it has to recreate the missing rule) would deactivate it by
+            activating the Wraps set; those commands ask first, and with{" "}
+            <code>--yes</code> need <code>--replace-active-rule-set</code>.
+            Wraps leaves the other set as it finds it. If no set is active it
+            says so, and if the active set cannot be read it reports unknown
+            rather than inactive. Status also shows the inbound dead-letter
+            queue depth and, when it is above zero, the{" "}
+            <code>inbound reprocess</code> command. <code>--json</code> always
+            includes <code>triggerCheck.repairCommand</code>,{" "}
+            <code>dlq.reprocessCommand</code> and{" "}
+            <code>activeRuleSetReadable</code>.
           </p>
           <Card>
             <CardHeader>
@@ -1219,7 +1279,25 @@ export default function CLIReferenceEmailPageContent() {
               wraps email inbound init
             </code>
             . Updates the SES receipt rule and optionally auto-creates DNS
-            records.
+            records. If the deployment still uses the old trigger,{" "}
+            <code className="rounded bg-muted px-1 py-0.5">inbound init</code>,{" "}
+            <code className="rounded bg-muted px-1 py-0.5">inbound add</code>{" "}
+            and{" "}
+            <code className="rounded bg-muted px-1 py-0.5">email upgrade</code>{" "}
+            all move it to the new one. Deploy with this CLI version or later
+            everywhere. An older CLI that deploys the stack afterwards removes
+            the <code>wraps-inbound-ses-invoke</code> permission and narrows the
+            bucket policy to <code>raw/*</code>, while the receipt rule still
+            sends new mail to <code>mail/</code>. New inbound mail then stops
+            being processed, and may not be stored.{" "}
+            <code className="rounded bg-muted px-1 py-0.5">
+              wraps email inbound status
+            </code>{" "}
+            flags the mismatch, and{" "}
+            <code className="rounded bg-muted px-1 py-0.5">
+              wraps email upgrade --action redeploy
+            </code>{" "}
+            with the new CLI repairs it.
           </p>
           <Card className="mb-4">
             <CardHeader>
@@ -1266,9 +1344,33 @@ export default function CLIReferenceEmailPageContent() {
                   </span>
                 </li>
                 <li>
+                  <code className="rounded bg-muted px-2 py-1">--preview</code>{" "}
+                  <span className="text-muted-foreground">
+                    Show what would change, including a trigger switch, without
+                    applying anything
+                  </span>
+                </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">
+                    --replace-active-rule-set
+                  </code>{" "}
+                  <span className="text-muted-foreground">
+                    Deactivate another active SES receipt rule set when
+                    activating wraps-inbound-rules. SES allows one active set
+                    per region, so that set&apos;s rules stop applying to
+                    incoming mail. Without it the command asks first (default
+                    No). With --yes it refuses, and so does a --json or
+                    no-terminal run once add&apos;s other inputs (--domain,
+                    --subdomain or --root) are given. Only needed when the
+                    receipt rule is missing and add recreates it. Pass it only
+                    after the AWS account owner agrees.
+                  </span>
+                </li>
+                <li>
                   <code className="rounded bg-muted px-2 py-1">-y, --yes</code>{" "}
                   <span className="text-muted-foreground">
-                    Skip confirmation prompts
+                    Skip confirmation prompts (not the receipt rule set consent;
+                    see --replace-active-rule-set)
                   </span>
                 </li>
               </ul>
@@ -1451,7 +1553,12 @@ export default function CLIReferenceEmailPageContent() {
           <p className="mb-4 text-muted-foreground text-sm">
             Show one inbound email: headers, text body, HTML body and attachment
             metadata. Pass the emailId from{" "}
-            <code>wraps email inbound list</code>.
+            <code>wraps email inbound list</code>. When the email has{" "}
+            <code>envelopeRecipients</code> (the addresses SES delivered to, Bcc
+            included, limited to addresses this deployment receives for), a
+            &quot;Delivered to&quot; line lists them when the list holds an
+            address To and Cc do not show; <code>--json</code> returns the field
+            whenever it is present.
           </p>
           <Card className="mb-4">
             <CardHeader>
@@ -1480,6 +1587,82 @@ export default function CLIReferenceEmailPageContent() {
                   <code className="rounded bg-muted px-2 py-1">--json</code>{" "}
                   <span className="text-muted-foreground">
                     Print the JSON envelope. Use it to read the html field
+                  </span>
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* inbound reprocess */}
+        <div className="mb-8 ml-4">
+          <h3 className="mb-3 font-semibold text-xl">
+            wraps email inbound reprocess
+          </h3>
+          <p className="mb-4 text-muted-foreground text-sm">
+            Replay inbound emails that failed every Lambda retry and landed in
+            the dead-letter queue (<code>wraps-inbound-events-dlq</code>, kept
+            14 days). Each message is handed back to the processor and deleted
+            from the queue once Lambda accepts the hand-off. Accepting is not
+            processing: a replay that fails again returns to the queue later as
+            a new message. A message Lambda does not accept stays queued. If
+            Lambda accepts a message but the delete fails, the run reports it as
+            replayed but not deleted (<code>replayed-not-deleted</code> in{" "}
+            <code>--json</code>) and the message stays in the queue. The
+            processor already has it, but the next run takes it from the queue
+            and replays it again, so the email is delivered twice. Delete it
+            from the SQS console (<code>wraps-inbound-events-dlq</code>, Send
+            and receive messages, poll, find the id) before running reprocess
+            again, or leave it to expire: any run before the 14 days are up
+            replays it. The run lists the ids at its end; if it stopped early,
+            they are in the <code>--json</code> error <code>data</code>. The run
+            stops at the first denied <code>lambda:InvokeFunction</code> or{" "}
+            <code>sqs:DeleteMessage</code>, or if the processor is missing;
+            messages not handed off stay queued.
+          </p>
+          <Card className="mb-4">
+            <CardHeader>
+              <CardTitle className="text-lg">Usage</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CLICommand command="npx @wraps.dev/cli email inbound reprocess [options]" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Options</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">--dry-run</code>{" "}
+                  <span className="text-muted-foreground">
+                    List what would be replayed (time, key, envelope recipient
+                    count); changes nothing
+                  </span>
+                </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">
+                    --max &lt;n&gt;
+                  </code>{" "}
+                  <span className="text-muted-foreground">
+                    Most messages to handle in one run (default 100)
+                  </span>
+                </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">-y, --yes</code>{" "}
+                  <span className="text-muted-foreground">
+                    Skip the confirmation prompt. Required in non-interactive
+                    shells and with --json, not with --dry-run
+                  </span>
+                </li>
+                <li>
+                  <code className="rounded bg-muted px-2 py-1">--json</code>{" "}
+                  <span className="text-muted-foreground">
+                    Machine-readable output with the counts found, replayed,
+                    replayedNotDeleted and failed, and one entry per message
+                    (outcome, sentTime, keys). A stopped run is an error whose
+                    data lists handedOff and handedOffNotDeleted message ids
                   </span>
                 </li>
               </ul>
@@ -1597,6 +1780,12 @@ export default function CLIReferenceEmailPageContent() {
         <p className="mb-4 text-muted-foreground">
           Add additional features to your existing Wraps deployment. Upgrade
           from Starter to Production, or add individual features incrementally.
+          If inbound email is enabled and still uses the old trigger, it also
+          moves inbound to the new one (see{" "}
+          <code className="rounded bg-muted px-1 py-0.5">
+            wraps email inbound add
+          </code>
+          ).
         </p>
 
         <Card className="mb-4">
@@ -1644,6 +1833,20 @@ export default function CLIReferenceEmailPageContent() {
               <li>
                 <code>--action managed-dedicated-ips</code>: Toggle an SES
                 managed dedicated IP pool and show the cost for your SES plan
+              </li>
+              <li>
+                <code>--action redeploy</code>: Redeploy the saved
+                configuration. Re-applies it with the current CLI version (a
+                newer stack program can add or change Wraps resources, and the
+                deploy reverts out-of-band drift in them) and moves a deployment
+                still on the old inbound trigger to the new one. The CLI&apos;s
+                own DNS steps (CAA, DKIM, ACM validation records) are skipped,
+                and it never activates a receipt rule set. Works with{" "}
+                <code>--yes</code>; <code>--preview</code> shows the stack
+                changes first and notes a pending trigger switch. With{" "}
+                <code>--json</code> it reports <code>trigger</code> when inbound
+                is enabled. Use it to finish a failed switch, or to repair a
+                deployment an older CLI redeployed.
               </li>
             </ul>
           </CardContent>

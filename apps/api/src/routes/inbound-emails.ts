@@ -49,6 +49,7 @@ const summarySchema = t.Object({
   attachmentCount: t.Number(),
   spamVerdict: nullableString,
   virusVerdict: nullableString,
+  envelopeRecipients: t.Optional(t.Array(t.String())),
 });
 
 const listResponseSchema = t.Object({
@@ -86,6 +87,7 @@ const detailSchema = t.Object({
   virusVerdict: nullableString,
   rawS3Key: t.String(),
   receivedAt: t.String(),
+  envelopeRecipients: t.Optional(t.Array(t.String())),
 });
 
 export const inboundEmailsRoutes = createAuthenticatedRoutes(
@@ -144,7 +146,7 @@ export const inboundEmailsRoutes = createAuthenticatedRoutes(
         tags: ["Inbound"],
         summary: "List inbound emails",
         description:
-          "Lists parsed inbound emails from the S3 inbound bucket in each connected AWS account. Emails are read live from the customer's account; nothing is stored in Wraps. Results come in S3 key order (by the email's storage key), not received time, so the newest email is not necessarily first. A page can span several accounts, and each entry carries its awsAccountId. limit defaults to 20 and is capped at 100. A page can hold fewer entries than limit, including none while nextCursor is set, because non-email objects are skipped. To get the next page, pass nextCursor back unchanged as cursor; it is null on the last page. Without awsAccountId every account with an inbound bucket is read; with it, only that account (404 if it is not in this org). Accounts that deny access are listed in deniedAccountIds and skipped; accounts that cannot be read are listed in unreachableAccountIds. Attachments are not downloadable through the API: the list carries only hasAttachments and attachmentCount. Requires authentication only.",
+          "Lists parsed inbound emails from the S3 inbound bucket in each connected AWS account. Emails are read live from the customer's account; nothing is stored in Wraps. Results come in S3 key order (by the email's storage key), not received time, so the newest email is not necessarily first. A page can span several accounts, and each entry carries its awsAccountId. limit defaults to 20 and is capped at 100. A page can hold fewer entries than limit, including none while nextCursor is set, because non-email objects are skipped. To get the next page, pass nextCursor back unchanged as cursor; it is null on the last page. Without awsAccountId every account with an inbound bucket is read; with it, only that account (404 if it is not in this org). Accounts that deny access are listed in deniedAccountIds and skipped; accounts that cannot be read are listed in unreachableAccountIds. Attachments are not downloadable through the API: the list carries only hasAttachments and attachmentCount. envelopeRecipients, when present, lists the lowercased SMTP envelope recipients SES delivered to (Bcc included); it is absent for mail received before the inbound trigger upgrade, which means unknown. Requires authentication only.",
       },
     }
   )
@@ -190,7 +192,7 @@ export const inboundEmailsRoutes = createAuthenticatedRoutes(
         tags: ["Inbound"],
         summary: "Get an inbound email",
         description:
-          "Returns one parsed inbound email by emailId, as listed by GET /v1/email/inbound. Without awsAccountId every account with an inbound bucket is tried in account id order and the first match is returned; with it, only that account. Returns 404 when the email is not in any account read, or when awsAccountId is not in this org. Accounts that deny access or cannot be read are skipped, so a 404 can also mean the email sits in an account this key could not read. htmlTruncated: true means the HTML body was longer than the 200 KB cap (204,800 characters, counted as JavaScript string length) when the email was received and was cut to that prefix, so html may be incomplete markup. html is null when the email had no HTML part. The response carries the message headers, text body and attachment metadata. Attachments are metadata only: each has an s3Key, but there is no endpoint that downloads attachment contents. Requires authentication only.",
+          "Returns one parsed inbound email by emailId, as listed by GET /v1/email/inbound. Without awsAccountId every account with an inbound bucket is tried in account id order and the first match is returned; with it, only that account. Returns 404 when the email is not in any account read, or when awsAccountId is not in this org. Accounts that deny access or cannot be read are skipped, so a 404 can also mean the email sits in an account this key could not read. htmlTruncated: true means the HTML body was longer than the 200 KB cap (204,800 characters, counted as JavaScript string length) when the email was received and was cut to that prefix, so html may be incomplete markup. html is null when the email had no HTML part. The response carries the message headers, text body and attachment metadata. Attachments are metadata only: each has an s3Key, but there is no endpoint that downloads attachment contents. envelopeRecipients, when present, lists the lowercased SMTP envelope recipients SES delivered to (Bcc included); it is absent for mail received before the inbound trigger upgrade, which means unknown. Requires authentication only.",
       },
     }
   );

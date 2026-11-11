@@ -5,13 +5,18 @@ import {
 } from "@aws-sdk/client-eventbridge";
 import {
   GetObjectCommand,
+  type GetObjectCommandOutput,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
 import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
-import type { Context, S3Event } from "aws-lambda";
+import type { Context, S3Event, SESEvent } from "aws-lambda";
 import { simpleParser } from "mailparser";
+import {
+  INBOUND_LEGACY_PREFIX,
+  INBOUND_MAIL_PREFIX,
+} from "../../src/constants.js";
 import {
   type DecodedReplyToken,
   decodeReplyToken,
@@ -109,7 +114,18 @@ type TrimmableEmail = {
   receivedAt: string;
   replyToken: unknown;
   autoReply: boolean;
+  /** Absent for mail from the legacy S3-notification trigger. */
+  envelopeRecipients?: string[];
 };
+
+/**
+ * Addresses of `envelopeRecipients` kept in the event detail at the last
+ * resort. SES documents no per-message receiving recipient limit (only 500
+ * recipients per receipt rule), so the event caps the list. The parsed JSON
+ * keeps all of them.
+ * https://docs.aws.amazon.com/ses/latest/dg/quotas.html
+ */
+const MAX_EVENT_ENVELOPE_RECIPIENTS = 100;
 
 /**
  * Build the `email.received` Detail string so the entry fits under `maxBytes`.
@@ -121,7 +137,10 @@ type TrimmableEmail = {
  *   2. attachments → [] (attachmentCount keeps the number)
  *   3. to/cc → [] (toCount/ccCount kept), subject cut to 1000 characters
  *   4. last resort ("envelope"): only emailId, rawS3Key, parsedS3Key,
- *      receivedAt, replyToken and autoReply, which are all bounded
+ *      receivedAt, replyToken and autoReply, which are all bounded, plus
+ *      envelopeRecipients (when present) cut to the first 100 addresses; a
+ *      cut adds envelopeRecipientCount and lists "envelopeRecipients" in
+ *      truncatedFields. Every earlier stage keeps envelopeRecipients whole.
  * Ties keep the html, text, headers order; fields that are already empty
  * are skipped. A trimmed detail carries
  * `truncated: true`, `truncatedFields`, and `parsedS3Key`, the key of the
@@ -223,16 +242,29 @@ export function buildEventDetail(
   // bounded fields only, so the event can never exceed the limit.
   if (sizeOf(detail) > maxBytes) {
     truncatedFields.push("envelope");
-    detail = JSON.stringify({
+    const envelope: Record<string, unknown> = {
       emailId: email.emailId,
       rawS3Key: email.rawS3Key,
       parsedS3Key,
       receivedAt: email.receivedAt,
       replyToken: email.replyToken,
       autoReply: email.autoReply,
-      truncated: true,
-      truncatedFields,
-    });
+    };
+    if (email.envelopeRecipients) {
+      if (email.envelopeRecipients.length > MAX_EVENT_ENVELOPE_RECIPIENTS) {
+        envelope.envelopeRecipients = email.envelopeRecipients.slice(
+          0,
+          MAX_EVENT_ENVELOPE_RECIPIENTS
+        );
+        envelope.envelopeRecipientCount = email.envelopeRecipients.length;
+        truncatedFields.push("envelopeRecipients");
+      } else {
+        envelope.envelopeRecipients = email.envelopeRecipients;
+      }
+    }
+    envelope.truncated = true;
+    envelope.truncatedFields = truncatedFields;
+    detail = JSON.stringify(envelope);
   }
   return { detail, truncatedFields, fullBytes };
 }
@@ -345,18 +377,24 @@ type RecipientAddr = { address: string };
 function findReplyRecipient(
   headers: Record<string, unknown>,
   toAddresses: RecipientAddr[],
-  ccAddresses: RecipientAddr[]
+  ccAddresses: RecipientAddr[],
+  envelopeRecipients: string[] = []
 ): { address: string; replyDomain: string; sendingDomain: string } | null {
   const xOriginalTo =
     typeof headers["x-original-to"] === "string"
       ? (headers["x-original-to"] as string).trim()
       : null;
-  const candidates: string[] = xOriginalTo
-    ? [xOriginalTo]
-    : [
-        ...toAddresses.map((a) => a.address),
-        ...ccAddresses.map((a) => a.address),
-      ];
+  // The SES envelope comes first: it holds the address the rule matched even
+  // when no header names it (Bcc, lists). Then X-Original-To, To, Cc.
+  const candidates: string[] = [
+    ...envelopeRecipients,
+    ...(xOriginalTo
+      ? [xOriginalTo]
+      : [
+          ...toAddresses.map((a) => a.address),
+          ...ccAddresses.map((a) => a.address),
+        ]),
+  ];
   for (const addr of candidates) {
     if (!addr) {
       continue;
@@ -407,20 +445,92 @@ function detectAutoReply(headers: Record<string, unknown>): boolean {
   return false;
 }
 
+type S3EventRecord = S3Event["Records"][number];
+type SESEventRecord = SESEvent["Records"][number];
+
+type InboundSource = {
+  bucket: string;
+  key: string;
+  receivedAt: string;
+  /** Lowercased, in SES order. Absent for the legacy S3 trigger. */
+  envelopeRecipients?: string[];
+  /**
+   * The same addresses as SES gave them. Reply-token local parts are
+   * base64url, so case matters when decoding; only the recorded field is
+   * lowercased.
+   */
+  rawEnvelopeRecipients?: string[];
+};
+
+/** SES writes this object under the action prefix when it validates an S3 action. */
+const SES_SETUP_NOTIFICATION_KEY = "AMAZON_SES_SETUP_NOTIFICATION";
+
+function stripInboundPrefix(key: string): string {
+  for (const prefix of [INBOUND_LEGACY_PREFIX, INBOUND_MAIL_PREFIX]) {
+    if (key.startsWith(prefix)) {
+      return key.slice(prefix.length);
+    }
+  }
+  return key;
+}
+
 /**
- * Lambda handler for processing inbound emails from S3 (via SES Receipt Rule)
+ * Normalise one event record into the raw object to read. Returns null for
+ * the SES setup notification, which is not an email. Throws on a malformed
+ * record, so the caller logs it like any other failure.
+ */
+function normaliseRecord(
+  record: S3EventRecord | SESEventRecord
+): InboundSource | null {
+  if ("eventSource" in record && record.eventSource === "aws:ses") {
+    const { mail, receipt } = (record as SESEventRecord).ses;
+    return {
+      bucket: BUCKET_NAME,
+      key: INBOUND_MAIL_PREFIX + mail.messageId,
+      // SES's receipt timestamp is identical across retries.
+      receivedAt: new Date(receipt.timestamp).toISOString(),
+      envelopeRecipients: receipt.recipients.map((r) => r.toLowerCase()),
+      rawEnvelopeRecipients: receipt.recipients,
+    };
+  }
+  const s3Record = record as S3EventRecord;
+  const key = decodeURIComponent(s3Record.s3.object.key.replace(/\+/g, " "));
+  if (key.endsWith(SES_SETUP_NOTIFICATION_KEY)) {
+    return null;
+  }
+  return {
+    bucket: s3Record.s3.bucket.name,
+    key,
+    // S3 event time is identical across retries; new Date() would differ per attempt.
+    receivedAt: s3Record.eventTime
+      ? new Date(s3Record.eventTime).toISOString()
+      : new Date().toISOString(),
+  };
+}
+
+/**
+ * Lambda handler for processing inbound emails (via SES Receipt Rule)
+ *
+ * Two triggers, both supported indefinitely:
+ * - S3 notification on raw/ (legacy): the record names the raw object. No
+ *   envelope recipients are known, so the field is absent.
+ * - SES Lambda action (after an S3 action to mail/): the record carries the
+ *   message id and the envelope recipients the rule matched.
  *
  * Flow:
- * 1. SES receives email → stores raw MIME in S3 (raw/{messageId})
- * 2. S3 notification triggers this Lambda
+ * 1. SES receives email → stores raw MIME in S3 (raw/{messageId} or mail/{messageId})
+ * 2. S3 notification or SES Lambda action triggers this Lambda
  * 3. Parse MIME → extract headers, body, attachments
  * 4. Store attachments → S3 (attachments/{emailId}/{attId}-{filename})
  * 5. Store parsed JSON → S3 (parsed/{emailId}.json)
  * 6. Put event → EventBridge (source: "wraps.inbound", detail-type: "email.received").
  *    If the full parsed email does not fit the PutEvents size limit, the
  *    detail is trimmed (see buildEventDetail) and points at parsed/{emailId}.json.
+ *
+ * A raw object that can't be read is not retried in-function; the run throws
+ * and Lambda's async retries and the DLQ apply.
  */
-export async function handler(event: S3Event, context: Context) {
+export async function handler(event: S3Event | SESEvent, context: Context) {
   const requestId = context.awsRequestId;
   const batchId = randomUUID().slice(0, 8);
 
@@ -447,21 +557,33 @@ export async function handler(event: S3Event, context: Context) {
     recordCount: event.Records.length,
   });
 
-  for (const record of event.Records) {
-    const s3Key = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
-    const bucket = record.s3.bucket.name;
-    // S3 event time is identical across retries; new Date() would differ per attempt.
-    const receivedAt = record.eventTime
-      ? new Date(record.eventTime).toISOString()
-      : new Date().toISOString();
-
+  for (const record of event.Records as (S3EventRecord | SESEventRecord)[]) {
+    let s3Key = "";
     try {
+      const source = normaliseRecord(record);
+      if (source === null) {
+        log("Skipping SES setup notification", {
+          key: (record as S3EventRecord).s3?.object?.key,
+        });
+        continue;
+      }
+      const { bucket, receivedAt, envelopeRecipients, rawEnvelopeRecipients } =
+        source;
+      s3Key = source.key;
       log("Processing raw email", { bucket, key: s3Key });
 
-      // 1. Read raw MIME from S3
-      const rawResponse = await s3.send(
-        new GetObjectCommand({ Bucket: bucket, Key: s3Key })
-      );
+      // 1. Read raw MIME from S3. A missing object is not retried here (the
+      // role has no s3:ListBucket, so it surfaces as AccessDenied): rethrow
+      // and let Lambda's async retries and the DLQ apply.
+      let rawResponse: GetObjectCommandOutput;
+      try {
+        rawResponse = await s3.send(
+          new GetObjectCommand({ Bucket: bucket, Key: s3Key })
+        );
+      } catch (error) {
+        logError("raw object not readable", error, { bucket, key: s3Key });
+        throw error;
+      }
       const rawBody = await rawResponse.Body?.transformToString();
       if (!rawBody) {
         throw new Error(`Empty or missing S3 object body: ${bucket}/${s3Key}`);
@@ -591,16 +713,18 @@ export async function handler(event: S3Event, context: Context) {
           }
         : { address: "", name: "" };
 
-      // Prefer X-Original-To for recipient derivation (SES envelope),
-      // then fall back to scanning To + CC for r.mail.* recipients.
+      // Check the SES envelope recipients first (SES event only), then
+      // X-Original-To, then scan To + CC for r.mail.* recipients.
       const replyRecipient = findReplyRecipient(
         headers,
         toAddresses,
-        ccAddresses
+        ccAddresses,
+        rawEnvelopeRecipients
       );
 
       const receivingDomain =
         replyRecipient?.replyDomain ||
+        envelopeRecipients?.[0]?.split("@")[1] ||
         toAddresses[0]?.address?.split("@")[1] ||
         null;
 
@@ -661,7 +785,7 @@ export async function handler(event: S3Event, context: Context) {
 
       const parsedEmail = {
         emailId,
-        messageId: parsed.messageId || s3Key.replace("raw/", ""),
+        messageId: parsed.messageId || stripInboundPrefix(s3Key),
         receivingDomain,
         from: fromAddress,
         to: toAddresses,
@@ -679,6 +803,7 @@ export async function handler(event: S3Event, context: Context) {
         receivedAt,
         replyToken,
         autoReply,
+        ...(envelopeRecipients ? { envelopeRecipients } : {}),
       };
 
       // 7. Store parsed JSON at parsed/{emailId}.json

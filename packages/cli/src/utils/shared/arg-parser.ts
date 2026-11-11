@@ -45,6 +45,7 @@ export type CliFlags = {
 
   // Permissions
   service?: string;
+  policyDir?: string;
 
   // Templates / workflows
   template?: string;
@@ -59,6 +60,8 @@ export type CliFlags = {
   subdomain?: string;
   root?: boolean;
   all?: boolean;
+  /** inbound init/add, reply init: consent to deactivate another active receipt rule set. */
+  replaceActiveRuleSet?: boolean;
 
   // Email agent
   name?: string;
@@ -99,6 +102,8 @@ export type CliFlags = {
   // Email logs
   status?: string;
   limit?: string;
+  /** `email inbound reprocess --max`: most DLQ messages to handle in one run. */
+  max?: string;
   cursor?: string;
   reason?: string;
   acknowledgeComplaint?: boolean;
@@ -274,6 +279,7 @@ const STRING_FLAGS = [
   "app-url",
   "status",
   "limit",
+  "max",
   "reason",
   "cursor",
   "set",
@@ -330,6 +336,7 @@ const STRING_FLAGS = [
   "last-name",
   "out-dir",
   "phone",
+  "policy-dir",
   "preferred-channel",
   "preview-text",
   "properties",
@@ -398,6 +405,7 @@ const BOOLEAN_FLAGS = [
   "acknowledge-complaint",
   "draft",
   "root",
+  "replace-active-rule-set",
   "cleanup",
   "reveal-secret",
   "opens",
@@ -500,6 +508,28 @@ export function resolveNegatableFlag(
     return value;
   }
   return argv.includes(negatedArg) ? false : undefined;
+}
+
+/**
+ * Resolve a string flag that the user may have passed with no value.
+ *
+ * `parseCliArgs` drops a string flag whose value is empty (`--policy-dir` at
+ * the end, `--policy-dir --json`, `--policy-dir=`), so the handler can't tell
+ * it from an absent flag. This returns `""` in that case, so the handler can
+ * reject it instead of silently ignoring it. Pass the flag as `--name`.
+ */
+export function resolveValuedFlag(
+  value: string | undefined,
+  flag: string,
+  argv: string[] = process.argv
+): string | undefined {
+  if (value !== undefined) {
+    return value;
+  }
+  const passed = argv.some(
+    (token) => token === flag || token.startsWith(`${flag}=`)
+  );
+  return passed ? "" : undefined;
 }
 
 /**

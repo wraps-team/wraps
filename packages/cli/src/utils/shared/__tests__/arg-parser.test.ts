@@ -5,6 +5,7 @@ import {
   KNOWN_FLAG_KEYS,
   parseCliArgs,
   resolveNegatableFlag,
+  resolveValuedFlag,
 } from "../arg-parser.js";
 
 describe("parseCliArgs — --tracking-domain", () => {
@@ -340,4 +341,63 @@ describe("parseCliArgs — negative numeric values", () => {
       expect(JSON.stringify(result)).not.toContain("\uE000");
     }
   );
+});
+
+describe("--policy-dir (wraps permissions)", () => {
+  const argv = (...rest: string[]) => ["node", "wraps", "permissions", ...rest];
+  const policyDir = (args: string[]) =>
+    resolveValuedFlag(parseCliArgs(args).flags.policyDir, "--policy-dir", args);
+
+  it.each([
+    [["--policy-dir", "./x"]],
+    [["--policy-dir=./x"]],
+    [["--json", "--policy-dir", "./x"]],
+    [["--policy-dir", "./x", "--service", "email"]],
+  ])("reads the folder from %j", (rest) => {
+    const args = argv(...rest);
+    expect(parseCliArgs(args).flags.policyDir).toBe("./x");
+    expect(policyDir(args)).toBe("./x");
+  });
+
+  it.each([
+    [["--policy-dir"]],
+    [["--policy-dir", "--json"]],
+    [["--json", "--policy-dir"]],
+    [["--policy-dir="]],
+  ])(
+    "%j: the parser drops the empty value; resolveValuedFlag returns ''",
+    (rest) => {
+      const args = argv(...rest);
+      expect(parseCliArgs(args).flags.policyDir).toBeUndefined();
+      expect(policyDir(args)).toBe("");
+    }
+  );
+
+  it("is undefined when the flag is absent, and a longer flag name doesn't count", () => {
+    expect(policyDir(argv("--json"))).toBeUndefined();
+    expect(
+      resolveValuedFlag(undefined, "--policy-dir", argv("--policy-dir-x"))
+    ).toBeUndefined();
+  });
+});
+
+describe("parseCliArgs — --replace-active-rule-set (plan 048)", () => {
+  it("is a boolean that does not swallow the next flag's value", () => {
+    const { flags, sub } = parseCliArgs([
+      "node",
+      "wraps",
+      "email",
+      "inbound",
+      "init",
+      "--replace-active-rule-set",
+      "--subdomain",
+      "support",
+      "--yes",
+    ]);
+
+    expect(flags.replaceActiveRuleSet).toBe(true);
+    expect(flags.subdomain).toBe("support");
+    expect(flags.yes).toBe(true);
+    expect(sub).toEqual(["email", "inbound", "init"]);
+  });
 });

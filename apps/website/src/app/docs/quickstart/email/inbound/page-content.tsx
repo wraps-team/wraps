@@ -119,10 +119,11 @@ const eventBridgeEventCode = `// EventBridge event payload (email.received)
     "messageId": "<message-id@mail.example.com>",
     "from": { "name": "John Doe", "address": "john@example.com" },
     "to": [{ "name": "", "address": "support@yourdomain.com" }],
+    "envelopeRecipients": ["support@yourdomain.com"],
     "subject": "Help with my order",
     "html": "<p>Email body...</p>",
     "text": "Email body...",
-    "receivedAt": 1706745600000,
+    "receivedAt": "2024-02-01T00:00:00.000Z",
     "spamVerdict": "PASS",
     "virusVerdict": "PASS",
     "attachments": [
@@ -141,13 +142,18 @@ const eventBridgeRuleCode = `// Example: Lambda handler for email.received event
 export async function handler(event: EventBridgeEvent) {
   const email = event.detail;
 
-  console.log('New email from:', email.from.address);
+  console.log('New email from:', email.from?.address);
   console.log('Subject:', email.subject);
 
-  // Route to appropriate handler based on recipient
-  if (email.to.some(r => r.address.includes('support@'))) {
+  // Route on who SES delivered to (covers Bcc and forwards).
+  // Mail from before the upgrade has no envelopeRecipients.
+  // A trimmed event can lack from/to/cc: read parsedS3Key for the full email.
+  const recipients =
+    email.envelopeRecipients ??
+    (email.to ?? []).map((t) => t.address.toLowerCase());
+  if (recipients.some(r => r.startsWith('support@'))) {
     await createSupportTicket(email);
-  } else if (email.to.some(r => r.address.includes('orders@'))) {
+  } else if (recipients.some(r => r.startsWith('orders@'))) {
     await processOrderEmail(email);
   }
 }`;
@@ -634,6 +640,22 @@ TTL: 300`,
             </div>
           </CardContent>
         </Card>
+
+        <p className="mb-4 text-muted-foreground text-sm">
+          <code className="rounded bg-muted px-1.5 py-0.5">
+            envelopeRecipients
+          </code>{" "}
+          lists the addresses SES delivered to, limited to addresses this
+          deployment receives for. It can differ from{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">to</code>. Use it to
+          route on Bcc recipients, forwards and aliases. It is absent on mail
+          received before <code>wraps email upgrade</code>. In a trimmed event{" "}
+          <code>from</code>, <code>to</code>, <code>cc</code> and{" "}
+          <code>attachments</code> can be empty or missing: read the full parsed
+          email at <code>parsedS3Key</code>, or guard with <code>?? []</code>.
+          Events are delivered at least once, so deduplicate on{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5">emailId</code>.
+        </p>
 
         <p className="mb-2 font-medium text-sm">Event Payload Example</p>
         <CodeBlock

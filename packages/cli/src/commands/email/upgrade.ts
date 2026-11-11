@@ -22,6 +22,10 @@ import {
 } from "../../utils/dns/credentials.js";
 import { calculateCosts, formatCost } from "../../utils/email/costs.js";
 import { checkEventPipeline } from "../../utils/email/event-pipeline-check.js";
+import {
+  exitOnSwitchFailure,
+  switchInboundTrigger,
+} from "../../utils/email/inbound-trigger-switch.js";
 import { confirmManagedDedicatedIps } from "../../utils/email/managed-dedicated-ips.js";
 import { getAllPresetInfo, getPreset } from "../../utils/email/presets.js";
 import { resolveDashboardUrl } from "../../utils/selfhost/dashboard-url.js";
@@ -40,6 +44,7 @@ import {
   buildEmailStackConfig,
   generateWebhookSecret,
   getAllTrackedDomains,
+  getInboundTrigger,
   loadConnectionMetadata,
   saveConnectionMetadata,
   updateEmailConfig,
@@ -252,11 +257,22 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
     });
   }
 
+  const inboundOnLegacyTrigger =
+    config.inbound?.enabled === true &&
+    getInboundTrigger(metadata) === "s3-notification";
+  // "preset" stays first (the highlighted default it has always been).
   upgradeOptions.push(
     {
       value: "preset",
       label: "Upgrade to a different preset",
       hint: "Starter → Production → Enterprise",
+    },
+    {
+      value: "redeploy",
+      label: "Redeploy the saved configuration",
+      hint: inboundOnLegacyTrigger
+        ? "Re-applies it with this CLI version, then switches inbound to the SES Lambda action"
+        : "Re-applies it with this CLI version; repairs drift (e.g. after an older CLI deployed)",
     },
     {
       value: "archiving",
@@ -369,8 +385,21 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   let newPreset: EmailConfigPreset | undefined =
     metadata.services.email?.preset;
 
+  // `redeploy` re-applies the saved config (unchanged) with this CLI version
+  // through the deploy path below. A newer stack program can add or alter
+  // wraps resources, and `up` reverts out-of-band drift. It never writes DNS
+  // (no CAA, DKIM or ACM records) or touches the receipt rule set; the inbound
+  // trigger switch after the save still runs.
+  const redeployOnly = upgradeAction === "redeploy";
+
   // 7. Handle upgrade action
   switch (upgradeAction) {
+    case "redeploy": {
+      updatedConfig = { ...config };
+      newPreset = metadata.services.email?.preset;
+      break;
+    }
+
     case "finish-tracking-domain": {
       // Skip all prompts — use the existing config as-is to re-run deployment
       // The email-stack will check if the ACM certificate is now validated
@@ -1849,6 +1878,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
 
   // 11.5. Ensure CAA records allow Amazon to issue certificates (for HTTPS tracking)
   if (
+    !redeployOnly &&
     updatedConfig.tracking?.httpsEnabled &&
     updatedConfig.tracking.customRedirectDomain
   ) {
@@ -2000,6 +2030,14 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
         costEstimate: costComparison,
         commandName: "wraps email upgrade",
       });
+
+      // The inbound trigger switch runs after any upgrade's save; the stack
+      // preview above can't show it.
+      if (inboundOnLegacyTrigger) {
+        clack.log.info(
+          `After the deploy, the inbound trigger switch would run: move the receipt rule to ${pc.cyan("mail/")} + the SES Lambda action, save, then deploy again to remove the S3 notification.`
+        );
+      }
 
       clack.outro(
         pc.green("Preview complete. Run without --preview to upgrade.")
@@ -2165,7 +2203,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   // Skip DNS management in JSON mode — non-interactive
   let dnsAutoCreated = false;
   if (
-    !isJsonMode() &&
+    !(redeployOnly || isJsonMode()) &&
     outputs.domain &&
     outputs.dkimTokens &&
     outputs.dkimTokens.length > 0
@@ -2343,6 +2381,7 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   // Try to create ACM validation DNS records automatically via DNS provider
   let acmDnsAutoCreated = false;
   if (
+    !redeployOnly &&
     outputs.httpsTrackingPending &&
     acmValidationRecords.length > 0 &&
     outputs.customTrackingDomain
@@ -2609,6 +2648,32 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
   // Always persist metadata after all upgrade actions
   await saveConnectionMetadata(metadata);
 
+  // Switch an inbound deployment still on the S3-notification trigger to the
+  // SES Lambda action (design §4.4 steps 2-4; the deploy above was step 1).
+  // The command's last mutating step, after both of upgrade's saves and after
+  // the once-shown SMTP credentials are printed, never inside a Pulumi
+  // program and never in --preview (which returned earlier). Plan 041 R1.
+  if (
+    metadata.services.email?.config.inbound?.enabled &&
+    getInboundTrigger(metadata) === "s3-notification"
+  ) {
+    try {
+      await switchInboundTrigger({
+        metadata,
+        accountId: identity.accountId,
+        region,
+        stackName:
+          metadata.services.email.pulumiStackName ||
+          `wraps-${identity.accountId}-${region}`,
+        autoConfirm: options.yes,
+        skipInitialDeploy: true,
+        progress,
+      });
+    } catch (error) {
+      exitOnSwitchFailure("email.upgrade", error);
+    }
+  }
+
   // Post-deploy pipeline check (warn-only): verify SES events can actually
   // reach the event log/dashboard after this deploy. Never fails the
   // command — a checker crash or slow AWS call must not undo a successful
@@ -2653,6 +2718,10 @@ export async function upgrade(options: UpgradeOptions): Promise<void> {
       configSetName: outputs.configSetName,
       customTrackingDomain: outputs.customTrackingDomain,
       httpsTrackingEnabled: outputs.httpsTrackingEnabled,
+      // Inbound trigger after this run (and after the switch, if it ran).
+      trigger: metadata.services.email?.config.inbound?.enabled
+        ? getInboundTrigger(metadata)
+        : undefined,
     });
     trackServiceUpgrade("email", {
       from_preset: metadata.services.email?.preset,

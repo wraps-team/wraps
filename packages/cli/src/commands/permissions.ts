@@ -6,6 +6,12 @@
 import * as clack from "@clack/prompts";
 import pc from "picocolors";
 import { trackCommand } from "../telemetry/events.js";
+import { errors } from "../utils/shared/errors.js";
+import {
+  type PolicyDirResult,
+  splitPolicy,
+  writePolicyDir,
+} from "../utils/shared/iam-policy-split.js";
 import { isJsonMode, jsonSuccess } from "../utils/shared/json-output.js";
 
 /**
@@ -18,6 +24,12 @@ export type PermissionsOptions = {
   preset?: "starter" | "production" | "enterprise";
   /** Service to show permissions for */
   service?: "email" | "sms" | "cdn";
+  /**
+   * Folder to write the policy into as `wraps-deployer-<n>.json` files, each
+   * small enough for one IAM managed policy. `""` means the flag was passed
+   * with no value.
+   */
+  policyDir?: string;
 };
 
 /**
@@ -28,6 +40,8 @@ type IAMStatement = {
   Effect: "Allow" | "Deny";
   Action: string[];
   Resource: string | string[];
+  /** IAM condition block, copied as-is into the policy JSON */
+  Condition?: Record<string, Record<string, string | string[]>>;
 };
 
 /**
@@ -142,6 +156,113 @@ function getEventBridgeStatements(): IAMStatement[] {
 }
 
 /**
+ * Get EventBridge connection and API destination statements for webhooks.
+ *
+ * The event-tracking webhooks (platform, user, self-hosted) and the inbound
+ * webhook each create an `aws.cloudwatch.EventConnection` and
+ * `EventApiDestination` named `wraps-*-connection` / `wraps-*-destination`.
+ *
+ * EventBridge stores a connection's auth parameters in a Secrets Manager
+ * secret it creates under `events!connection/<name>/...`, using the caller's
+ * permissions. The five Secrets Manager actions are the ones AWS grants for
+ * this in AmazonEventBridgeFullAccess (v7, Sid
+ * SecretsManagerAccessForApiDestinations), narrowed from `secret:events!*` to
+ * our connections.
+ *
+ * The first CreateConnection in an account also creates the API-destinations
+ * service-linked role. That statement is copied from the same managed policy
+ * (Sid IAMCreateServiceLinkedRoleForApiDestinations), condition included.
+ */
+function getEventBridgeWebhookStatements(): IAMStatement[] {
+  return [
+    {
+      Sid: "EventBridgeWebhookDestinations",
+      Effect: "Allow",
+      Action: [
+        "events:CreateConnection",
+        "events:DescribeConnection",
+        "events:UpdateConnection",
+        "events:DeleteConnection",
+        "events:CreateApiDestination",
+        "events:DescribeApiDestination",
+        "events:UpdateApiDestination",
+        "events:DeleteApiDestination",
+      ],
+      Resource: [
+        "arn:aws:events:*:*:connection/wraps-*",
+        "arn:aws:events:*:*:api-destination/wraps-*",
+      ],
+    },
+    {
+      // Invariant 2 exception: EventBridge names and owns these secrets
+      // (`events!connection/...`), so they can't carry `wraps-`. Scoped to our
+      // connections' names, the narrowest ARN AWS allows.
+      Sid: "EventBridgeConnectionSecrets",
+      Effect: "Allow",
+      Action: [
+        "secretsmanager:CreateSecret",
+        "secretsmanager:UpdateSecret",
+        "secretsmanager:DeleteSecret",
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:PutSecretValue",
+      ],
+      Resource: ["arn:aws:secretsmanager:*:*:secret:events!connection/wraps-*"],
+    },
+    {
+      // Invariant 2 exception: AWS fixes this role's name. Scoped to that one
+      // role ARN plus AWS's iam:AWSServiceName condition.
+      Sid: "EventBridgeApiDestinationsServiceRole",
+      Effect: "Allow",
+      Action: ["iam:CreateServiceLinkedRole"],
+      Resource:
+        "arn:aws:iam::*:role/aws-service-role/apidestinations.events.amazonaws.com/AWSServiceRoleForAmazonEventBridgeApiDestinations",
+      Condition: {
+        StringEquals: {
+          "iam:AWSServiceName": "apidestinations.events.amazonaws.com",
+        },
+      },
+    },
+  ];
+}
+
+/**
+ * Get statements for the reply-threading signing secret, an SSM SecureString
+ * at `/wraps/email/reply-secret/{domain}` (`resources/reply-secret.ts`).
+ *
+ * Pulumi's `aws.ssm.Parameter` (terraform-provider-aws `aws_ssm_parameter`)
+ * calls PutParameter, GetParameter, DescribeParameters, DeleteParameter and
+ * the tag APIs; `wraps email reply` calls GetParameter and PutParameter.
+ * DescribeParameters has no resource type in the AWS service reference, so it
+ * sits alone on `*`. It returns parameter metadata only, never values.
+ *
+ * The parameter uses the AWS managed key `alias/aws/ssm`. Its key policy
+ * already lets account principals use it through SSM, so no KMS grant here.
+ */
+function getReplyThreadingStatements(): IAMStatement[] {
+  return [
+    {
+      Sid: "ReplyThreadingSecret",
+      Effect: "Allow",
+      Action: [
+        "ssm:PutParameter",
+        "ssm:GetParameter",
+        "ssm:DeleteParameter",
+        "ssm:AddTagsToResource",
+        "ssm:RemoveTagsFromResource",
+        "ssm:ListTagsForResource",
+      ],
+      Resource: ["arn:aws:ssm:*:*:parameter/wraps/email/reply-secret/*"],
+    },
+    {
+      Sid: "ReplyThreadingSecretDescribe",
+      Effect: "Allow",
+      Action: ["ssm:DescribeParameters"],
+      Resource: "*",
+    },
+  ];
+}
+
+/**
  * Get SQS statements for event queuing
  */
 function getSQSStatements(): IAMStatement[] {
@@ -226,6 +347,107 @@ function getLambdaStatements(): IAMStatement[] {
         "lambda:ListEventSourceMappings",
       ],
       Resource: "*",
+    },
+  ];
+}
+
+/**
+ * Get inbound email statements (receipt rules and the inbound bucket).
+ *
+ * Receipt-rule actions take no resource ARN: the AWS service reference
+ * (https://servicereference.us-east-1.amazonaws.com/v1/ses/ses.json) lists no
+ * resource type for any of them, so an ARN-scoped statement would deny them.
+ * The bucket statement covers what the CLI and Pulumi's bucket resources call
+ * on `wraps-inbound-*`, including the reads Pulumi's bucket refresh makes.
+ */
+function getInboundStatements(): IAMStatement[] {
+  return [
+    {
+      Sid: "InboundReceiptRules",
+      Effect: "Allow",
+      Action: [
+        "ses:CreateReceiptRuleSet",
+        "ses:DeleteReceiptRuleSet",
+        "ses:CreateReceiptRule",
+        "ses:UpdateReceiptRule",
+        "ses:DescribeReceiptRule",
+        "ses:DeleteReceiptRule",
+        "ses:DescribeActiveReceiptRuleSet",
+        "ses:SetActiveReceiptRuleSet",
+      ],
+      Resource: "*",
+    },
+    {
+      Sid: "InboundBucket",
+      Effect: "Allow",
+      Action: [
+        "s3:CreateBucket",
+        "s3:DeleteBucket",
+        "s3:PutBucketPublicAccessBlock",
+        "s3:GetBucketPublicAccessBlock",
+        "s3:PutEncryptionConfiguration",
+        "s3:GetEncryptionConfiguration",
+        "s3:PutLifecycleConfiguration",
+        "s3:GetLifecycleConfiguration",
+        "s3:PutBucketTagging",
+        "s3:GetBucketTagging",
+        "s3:PutBucketPolicy",
+        "s3:GetBucketPolicy",
+        "s3:DeleteBucketPolicy",
+        "s3:PutBucketNotification",
+        "s3:GetBucketNotification",
+        "s3:ListBucket",
+        "s3:ListBucketVersions",
+        // Read by Pulumi's bucket resource on create and refresh (the
+        // provider fails on AccessDenied for each of these).
+        "s3:GetBucketAcl",
+        "s3:GetBucketCORS",
+        "s3:GetBucketWebsite",
+        "s3:GetBucketVersioning",
+        "s3:GetAccelerateConfiguration",
+        "s3:GetBucketRequestPayment",
+        "s3:GetBucketLogging",
+        "s3:GetReplicationConfiguration",
+        "s3:GetBucketObjectLockConfiguration",
+      ],
+      Resource: ["arn:aws:s3:::wraps-inbound-*"],
+    },
+    {
+      Sid: "InboundBucketObjects",
+      Effect: "Allow",
+      Action: [
+        // Pulumi forceDestroy empties the bucket before deleting it.
+        "s3:DeleteObject",
+        "s3:DeleteObjectVersion",
+      ],
+      Resource: ["arn:aws:s3:::wraps-inbound-*/*"],
+    },
+    {
+      // `wraps email inbound test` and the local console read parsed
+      // messages back. Raw MIME (raw/, mail/) and attachments/ stay out of
+      // the deployer's reach.
+      Sid: "InboundParsedRead",
+      Effect: "Allow",
+      Action: ["s3:GetObject"],
+      Resource: ["arn:aws:s3:::wraps-inbound-*/parsed/*"],
+    },
+    {
+      // `wraps email inbound reprocess` replays the processor's dead-letter
+      // queue: receive and delete its messages, and hand each event back to
+      // the processor as an async invoke. `sqs:GetQueueAttributes` and
+      // `GetQueueUrl` (status depth line, queue lookup) are already in
+      // SQSManagement.
+      Sid: "InboundReprocess",
+      Effect: "Allow",
+      Action: [
+        "sqs:ReceiveMessage",
+        "sqs:DeleteMessage",
+        "lambda:InvokeFunction",
+      ],
+      Resource: [
+        "arn:aws:sqs:*:*:wraps-inbound-events-dlq",
+        "arn:aws:lambda:*:*:function:wraps-inbound-email-processor",
+      ],
     },
   ];
 }
@@ -465,12 +687,15 @@ function getSMSStatements(): IAMStatement[] {
 }
 
 /**
- * Build IAM policy based on service and preset
+ * Every statement the service and preset need, in policy order, before
+ * deduplication. Email and SMS both add the DynamoDB and Lambda statements;
+ * `buildPolicy` keeps the first of each `Sid`. Exported for the test that
+ * checks the copies it drops are identical to the ones it keeps.
  */
-function buildPolicy(
+export function collectPolicyStatements(
   service?: "email" | "sms" | "cdn",
   preset?: "starter" | "production" | "enterprise"
-): IAMPolicy {
+): IAMStatement[] {
   const statements: IAMStatement[] = [
     ...getBaseStatements(),
     ...getS3StateStatements(),
@@ -483,9 +708,15 @@ function buildPolicy(
     // Event tracking (Production and Enterprise)
     if (!preset || preset === "production" || preset === "enterprise") {
       statements.push(...getEventBridgeStatements());
+      // Webhook connections and reply threading need event tracking or
+      // inbound, which starter lacks
+      statements.push(...getEventBridgeWebhookStatements());
+      statements.push(...getReplyThreadingStatements());
       statements.push(...getSQSStatements());
       statements.push(...getDynamoDBStatements());
       statements.push(...getLambdaStatements());
+      // Inbound needs Lambda, which starter lacks
+      statements.push(...getInboundStatements());
     }
 
     // SMTP credentials and advanced features
@@ -514,6 +745,19 @@ function buildPolicy(
     statements.push(...getRoute53Statements());
   }
 
+  return statements;
+}
+
+/**
+ * Build IAM policy based on service and preset. Exported for the
+ * `--policy-dir` split tests; the command file's one command is `permissions`.
+ */
+export function buildPolicy(
+  service?: "email" | "sms" | "cdn",
+  preset?: "starter" | "production" | "enterprise"
+): IAMPolicy {
+  const statements = collectPolicyStatements(service, preset);
+
   // Deduplicate statements by Sid
   const uniqueStatements = statements.reduce((acc, stmt) => {
     if (!acc.find((s) => s.Sid === stmt.Sid)) {
@@ -526,6 +770,84 @@ function buildPolicy(
     Version: "2012-10-17",
     Statement: uniqueStatements,
   };
+}
+
+/** Default folder the hints suggest for `--policy-dir`. */
+const DEFAULT_POLICY_DIR = "./wraps-policy";
+
+/** `wraps permissions [--service s] [--preset p] --policy-dir ./wraps-policy` */
+function policyDirCommand(
+  service?: "email" | "sms" | "cdn",
+  preset?: "starter" | "production" | "enterprise"
+): string {
+  const flags = [
+    service ? `--service ${service}` : undefined,
+    preset ? `--preset ${preset}` : undefined,
+    `--policy-dir ${DEFAULT_POLICY_DIR}`,
+  ].filter(Boolean);
+  return `wraps permissions ${flags.join(" ")}`;
+}
+
+/** Print how to create, attach and update the managed policies. */
+function printAttachSteps(): void {
+  console.log(pc.bold("Attach them in AWS:\n"));
+  console.log(
+    "1. For each file: IAM > Policies > Create policy > JSON, paste the file,"
+  );
+  console.log(
+    `   and name the policy after the file ${pc.dim("(wraps-deployer-1, wraps-deployer-2, ...)")}`
+  );
+  console.log(
+    "2. Attach every wraps-deployer-<n> policy to the IAM user or role that runs wraps"
+  );
+  console.log(
+    pc.dim(
+      "   A user takes 10 managed policies by default (a role 20, a group 10), including ones already attached\n"
+    )
+  );
+  console.log(pc.bold("When you update Wraps:\n"));
+  console.log(
+    "- Re-run this command and paste each file over its policy (Edit policy > JSON)."
+  );
+  console.log(
+    pc.dim(
+      "  IAM keeps 5 versions of a policy; the console asks you to delete an old one."
+    )
+  );
+  console.log(
+    "- Create or delete wraps-deployer-<n> policies when the number of files changes."
+  );
+  console.log(
+    "- If you attached a single WrapsDeploymentPolicy before, detach it once these are attached.\n"
+  );
+}
+
+/** Human output for `--policy-dir`: the files and the attach steps. */
+function displayPolicyDirResult(result: PolicyDirResult): void {
+  clack.intro(pc.bold("Wraps IAM Policies"));
+  const count = result.written.length;
+  console.log(
+    `\nWrote ${count} IAM ${count === 1 ? "policy" : "policies"} to ${pc.cyan(result.dir)}:`
+  );
+  for (const path of result.written) {
+    console.log(`  ${pc.green("+")} ${path}`);
+  }
+  if (result.removed.length > 0) {
+    console.log("\nRemoved stale files:");
+    for (const path of result.removed) {
+      console.log(`  ${pc.red("-")} ${path}`);
+    }
+    console.log(
+      pc.yellow(
+        "  Detach and delete the IAM policies named after these files; they are no longer needed."
+      )
+    );
+  }
+  console.log("");
+  printAttachSteps();
+  clack.outro(
+    pc.green("Each file fits one IAM managed policy (6,144 characters)")
+  );
 }
 
 /**
@@ -574,6 +896,9 @@ function displaySummary(
       console.log(
         `  ${pc.green("+")} ${pc.bold("DynamoDB")} - Email history (Production+)`
       );
+      console.log(
+        `  ${pc.green("+")} ${pc.bold("SES receipt rules + S3")} - Inbound email ${pc.dim("(wraps-inbound-* buckets)")} (Production+)`
+      );
     }
 
     console.log(
@@ -603,8 +928,11 @@ function displaySummary(
     );
   }
 
-  console.log(`\n${pc.dim("Get full IAM policy JSON:")}`);
-  console.log(`  ${pc.cyan("wraps permissions --json")}`);
+  console.log(`\n${pc.dim("Write the IAM policies to attach:")}`);
+  console.log(`  ${pc.cyan(policyDirCommand(service, preset))}`);
+  console.log(
+    `${pc.dim("JSON for scripts and agents (not a policy to paste):")} ${pc.cyan("wraps permissions --json")}`
+  );
 
   if (service) {
     console.log(`\n${pc.dim("Get permissions for all services:")}`);
@@ -623,28 +951,51 @@ function displaySummary(
 export async function permissions(options: PermissionsOptions): Promise<void> {
   const startTime = Date.now();
 
+  if (options.policyDir !== undefined && options.policyDir.trim() === "") {
+    throw errors.invalidFlagUsage(
+      "--policy-dir needs a directory",
+      `Pass the folder to write the policies to: ${policyDirCommand(options.service, options.preset)}`
+    );
+  }
+
   const policy = buildPolicy(options.service, options.preset);
+  // Each part fits one managed policy (6,144 characters, whitespace not
+  // counted). `policy` itself only fits as a role's inline policy (10,240
+  // characters across all of that role's inline policies).
+  const policies = splitPolicy(policy);
+  const written =
+    options.policyDir === undefined
+      ? undefined
+      : writePolicyDir(options.policyDir, policies);
 
   if (isJsonMode()) {
     jsonSuccess("permissions", {
       policy: policy as unknown as Record<string, unknown>,
+      policies,
+      ...(written && { written: written.written, removed: written.removed }),
     });
+  } else if (written) {
+    displayPolicyDirResult(written);
   } else {
     // Display human-readable summary
     displaySummary(options.service, options.preset);
 
-    // Show how to create the policy
+    // Show how to create the policies
     console.log(pc.bold("Quick Setup:\n"));
-    console.log("1. Copy the IAM policy:");
+    console.log("1. Write the IAM policies (one file per managed policy):");
     console.log(
-      `   ${pc.cyan("wraps permissions --json > wraps-policy.json")}\n`
+      `   ${pc.cyan(policyDirCommand(options.service, options.preset))}\n`
     );
-    console.log("2. Create the policy in AWS Console:");
-    console.log("   IAM > Policies > Create Policy > JSON\n");
-    console.log("3. Attach to your IAM user/role\n");
+    console.log("2. Create one policy per file in AWS Console:");
+    console.log(
+      "   IAM > Policies > Create Policy > JSON, named after the file\n"
+    );
+    console.log("3. Attach all of them to your IAM user/role\n");
 
     clack.outro(
-      pc.green("Run with --json to get the full IAM policy document")
+      pc.green(
+        "Run with --policy-dir <dir> to write the IAM policy files to attach"
+      )
     );
   }
 
@@ -658,5 +1009,8 @@ export async function permissions(options: PermissionsOptions): Promise<void> {
     json: options.json,
     preset: options.preset,
     service: options.service,
+    // Never the path: it can carry a home-directory user name.
+    policy_dir: options.policyDir !== undefined,
+    policy_count: policies.length,
   });
 }

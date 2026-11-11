@@ -99,7 +99,7 @@ ${envelopeTypeCode}
 
 - \`success\`: Always present. \`true\` for successful operations, \`false\` for errors.
 - \`command\`: Dot-notation identifier for the command (e.g. \`email.status\`, \`sms.init\`).
-- \`data\`: Present on success. Contains command-specific output fields.
+- \`data\`: Present on success. Contains command-specific output fields. On a few failures it also carries values the command must not lose, for example \`inbound init\`'s newly generated webhook secret or the message ids from a stopped \`inbound reprocess\` run.
 - \`error\`: Present on failure. Contains structured error details.`,
 
   usage: `## Usage
@@ -126,8 +126,8 @@ ${usageExamplesCode}
 | \`email domains verify\` | \`email.domains.verify\` | \`domain\`, \`verified\` |
 | \`email domains get-dkim\` | \`email.domains.get-dkim\` | \`domain\`, \`dkimTokens\` |
 | \`email domains remove\` | \`email.domains.remove\` | \`domain\`, \`removed\` |
-| \`email inbound init\` | \`email.inbound.init\` | \`receivingDomain\`, \`bucketName\` |
-| \`email inbound status\` | \`email.inbound.status\` | \`enabled\`, \`receivingDomain\`, \`bucketName\` |
+| \`email inbound init\` | \`email.inbound.init\` | \`receivingDomain\`, \`bucketName\`, \`deactivatedRuleSet\`, \`previousRuleSetUnreadable\` |
+| \`email inbound status\` | \`email.inbound.status\` | \`enabled\`, \`receivingDomain\`, \`bucketName\`, \`activeRuleSetReadable\`, \`triggerCheck\`, \`dlq\` |
 | \`email inbound verify\` | \`email.inbound.verify\` | \`verified\`, \`receivingDomain\` |
 | \`email inbound test\` | \`email.inbound.test\` | \`messageId\`, \`receivingDomain\` |
 | \`email inbound destroy\` | \`email.inbound.destroy\` | \`destroyed\` |
@@ -170,7 +170,7 @@ ${usageExamplesCode}
 | \`aws doctor\` | \`aws.doctor\` | \`checks[]\`, \`summary\`, \`suggestions\` |
 | \`platform connect\` | \`platform.connect\` | \`accountId\`, \`connectionId\` |
 | \`platform update-role\` | \`platform.update-role\` | \`updated\`, \`roleArn\` |
-| \`permissions\` | \`permissions\` | \`policy\` (IAM policy document) |`,
+| \`permissions\` | \`permissions\` | \`policies[]\` (\`{ name, policy }\`, one per \`wraps-deployer-<n>\`, each fits a managed policy), \`policy\` (merged; can exceed 6,144 characters), \`written[]\`/\`removed[]\` (absolute paths, with \`--policy-dir\`) |`,
 
   errorHandling: `## Error Handling
 
@@ -416,7 +416,10 @@ export default function PageContent() {
                       <td className="px-4 py-2">object | undefined</td>
                       <td className="px-4 py-2">
                         Present on success. Contains command-specific output
-                        fields.
+                        fields. On a few failures it also carries values the
+                        command must not lose, for example inbound init&apos;s
+                        newly generated webhook secret or the message ids from a
+                        stopped inbound reprocess run.
                       </td>
                     </tr>
                     <tr>
@@ -620,12 +623,14 @@ export default function PageContent() {
                   {
                     cli: "email inbound init",
                     command: "email.inbound.init",
-                    dataFields: "receivingDomain, bucketName",
+                    dataFields:
+                      "receivingDomain, bucketName, deactivatedRuleSet, previousRuleSetUnreadable",
                   },
                   {
                     cli: "email inbound status",
                     command: "email.inbound.status",
-                    dataFields: "enabled, receivingDomain, bucketName",
+                    dataFields:
+                      "enabled, receivingDomain, bucketName, activeRuleSetReadable, triggerCheck, dlq",
                   },
                   {
                     cli: "email inbound verify",
@@ -837,7 +842,8 @@ export default function PageContent() {
                 {
                   cli: "permissions",
                   command: "permissions",
-                  dataFields: "policy (IAM policy document)",
+                  dataFields:
+                    "policies[] ({ name, policy }, one per wraps-deployer-<n>, each fits a managed policy), policy (merged; can exceed 6,144 characters), written[]/removed[] (absolute paths, with --policy-dir)",
                 },
               ]}
             />

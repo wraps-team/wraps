@@ -49,6 +49,7 @@ export default async function InboundEmailDetailPage({
     try {
       email = await getInboundEmail({
         awsAccountId: account.id,
+        organizationId: orgWithMembership.id,
         emailId: inboundEmailId,
       });
       if (email) {

@@ -74,6 +74,15 @@ export type EmailDomainsConfigOptions = {
 };
 
 /**
+ * What invokes the inbound processor (design: plans/inbound-envelope §4.1).
+ * - "s3-notification": the receipt rule stores mail under `raw/` and a bucket
+ *   notification on `raw/` invokes the processor (every legacy deployment).
+ * - "ses-lambda-action": the receipt rule stores mail under `mail/`, then a
+ *   Lambda action invokes the processor with the SES event (envelope included).
+ */
+export type InboundTrigger = "s3-notification" | "ses-lambda-action";
+
+/**
  * An inbound receiving domain managed via `wraps email inbound add`
  */
 export type InboundDomain = {
@@ -191,6 +200,11 @@ export type WrapsEmailConfig = {
     retention?: ArchiveRetention;
     webhookUrl?: string; // user's webhook endpoint for email.received
     webhookSecret?: string; // generated API key for webhook auth
+    /**
+     * What invokes the inbound processor. Absent means "s3-notification"
+     * (every deployment made before the SES Lambda action existed).
+     */
+    trigger?: InboundTrigger;
   };
 
   // Agent mailboxes: per-agent scoped send credentials behind an enforcer Lambda
@@ -551,6 +565,11 @@ export type EmailInboundInitOptions = {
   preview?: boolean;
   json?: boolean;
   unexpectedArg?: string;
+  /**
+   * Consent to deactivate another active receipt rule set when activating
+   * wraps-inbound-rules (required with --yes/--json when one is active).
+   */
+  replaceActiveRuleSet?: boolean;
 };
 
 /**
@@ -561,6 +580,18 @@ export type EmailInboundDestroyOptions = {
   force?: boolean;
   preview?: boolean;
   json?: boolean;
+};
+
+/**
+ * Command options for email inbound reprocess
+ */
+export type EmailInboundReprocessOptions = {
+  region?: string;
+  json?: boolean;
+  dryRun?: boolean;
+  yes?: boolean;
+  /** Raw `--max` value; validated by the command. */
+  max?: string;
 };
 
 /**
@@ -589,8 +620,14 @@ export type EmailInboundAddOptions = {
   root?: boolean;
   domain?: string; // parent domain
   yes?: boolean;
+  preview?: boolean;
   json?: boolean;
   unexpectedArg?: string;
+  /**
+   * Consent to deactivate another active receipt rule set when activating
+   * wraps-inbound-rules (required with --yes/--json when one is active).
+   */
+  replaceActiveRuleSet?: boolean;
 };
 
 /**
@@ -651,6 +688,11 @@ export type EmailReplyInitOptions = {
   yes?: boolean;
   preview?: boolean;
   json?: boolean;
+  /**
+   * Consent to deactivate another active receipt rule set when activating
+   * wraps-inbound-rules (required with --yes/--json when one is active).
+   */
+  replaceActiveRuleSet?: boolean;
 };
 
 /**

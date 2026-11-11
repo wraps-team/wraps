@@ -20,9 +20,22 @@ import type {
 } from "../../types/index.js";
 import { SES_RECEIVING_REGIONS } from "../../types/index.js";
 import type { InboundDNSCleanupResult } from "../../utils/dns/index.js";
+import { runEmailStackDeploy } from "../../utils/email/email-stack-deploy.js";
 import {
+  type ActiveRuleSetRead,
   addDomainToReceiptRule,
+  confirmRuleSetActivation,
+  deactivatedRuleSetName,
+  describeInboundReceiptRule,
+  describeRuleSetActivation,
+  describeRuleSetDeactivation,
+  type ExpectedActiveRuleSet,
   getReceiptRuleDomains,
+  inboundInitRecoveryCommand,
+  previousRuleSetUnreadable,
+  REPLACE_NO_RULE_SET,
+  type RuleSetActivation,
+  readActiveReceiptRuleSet,
   removeDomainFromReceiptRule,
 } from "../../utils/email/receipt-rules.js";
 import {
@@ -37,6 +50,7 @@ import {
 import { isJsonMode, jsonSuccess } from "../../utils/shared/json-output.js";
 import {
   buildEmailStackConfig,
+  getInboundTrigger,
   loadConnectionMetadata,
   saveConnectionMetadata,
 } from "../../utils/shared/metadata.js";
@@ -47,12 +61,7 @@ import {
 import {
   ensurePulumiInstalled,
   previewWithResourceChanges,
-  withLockRetry,
 } from "../../utils/shared/pulumi.js";
-import {
-  DEFAULT_PULUMI_TIMEOUT_MS,
-  withTimeout,
-} from "../../utils/shared/timeout.js";
 
 // ---------------------------------------------------------------------------
 // Private helpers
@@ -68,86 +77,13 @@ type ReplyThreadingConfig = NonNullable<
 
 type ReplyDomainEntry = NonNullable<ReplyThreadingConfig>["domains"][number];
 
-/**
- * Deploy helper indirection — tests replace `deployHooks.deploy` so the full
- * Pulumi workspace + AWS credential resolution path is skipped without having
- * to mock every leaf module.
- */
-export const deployHooks = {
-  // biome-ignore lint/suspicious/noExplicitAny: test override hook
-  deploy: (params: any) => runEmailStackDeployImpl(params),
-};
-
-/**
- * Deploy the email stack via Pulumi. Exported for test-time monkey-patching;
- * tests mock this so they don't spin up a real Pulumi workspace.
- */
-export async function runEmailStackDeploy(params: {
-  accountId: string;
-  region: string;
-  stackName: string;
-  stackConfig: Parameters<typeof deployEmailStack>[0];
-  autoConfirm?: boolean;
-}): Promise<void> {
-  return deployHooks.deploy(params);
-}
-
-async function runEmailStackDeployImpl(params: {
-  accountId: string;
-  region: string;
-  stackName: string;
-  stackConfig: Parameters<typeof deployEmailStack>[0];
-  autoConfirm?: boolean;
-}): Promise<void> {
-  await ensurePulumiWorkDir({
-    accountId: params.accountId,
-    region: params.region,
-  });
-  const pulumiWorkDir = getPulumiWorkDir();
-
-  const stack = await pulumi.automation.LocalWorkspace.createOrSelectStack(
-    {
-      stackName: params.stackName,
-      projectName: "wraps-email",
-      program: async () => {
-        const result = await deployEmailStack(params.stackConfig);
-        return result as Record<string, unknown>;
-      },
-    },
-    {
-      workDir: pulumiWorkDir,
-    }
-  );
-
-  await stack.setConfig("aws:region", { value: params.region });
-
-  const pulumiOutput: string[] = [];
-  await withLockRetry(
-    () =>
-      withTimeout(
-        stack.up({
-          onOutput: (msg) => {
-            pulumiOutput.push(msg);
-          },
-        }),
-        DEFAULT_PULUMI_TIMEOUT_MS,
-        "Pulumi deployment"
-      ).catch((error: unknown) => {
-        if (pulumiOutput.length > 0) {
-          const fullOutput = pulumiOutput.join("");
-          clack.log.error("Pulumi deployment output:");
-          // biome-ignore lint/suspicious/noConsole: Pulumi failure diagnostic
-          console.error(fullOutput);
-        }
-        throw error;
-      }),
-    {
-      accountId: params.accountId,
-      region: params.region,
-      autoConfirm: params.autoConfirm,
-    }
-  );
-}
+// The deploy seam lives in `utils/email/email-stack-deploy.ts` (shared with
+// the inbound trigger switch). Re-exported so existing imports and tests that
+// replace `deployHooks.deploy` keep working on the same object.
+export {
+  deployHooks,
+  runEmailStackDeploy,
+} from "../../utils/email/email-stack-deploy.js";
 
 /**
  * Fetch the SSM parameter ARN + name for a given sending domain.
@@ -218,10 +154,16 @@ async function replyInitForSingleDomain(params: {
   stackName: string;
   autoConfirm?: boolean;
   progress: DeploymentProgress;
+  /** What the receipt-rule fallback may deactivate, agreed in replyInit's preflight. */
+  expectedActive: ExpectedActiveRuleSet;
+  /** Target domains after this one (`--all`), not started if this one's activation refuses. */
+  laterDomains: string[];
 }): Promise<{
   parameterArn: string;
   parameterName: string;
   dnsAutoCreated: boolean;
+  /** The active-set read taken before this domain's rule write activated wraps-inbound-rules, or null. */
+  activationRead: ActiveRuleSetRead | null;
 }> {
   const {
     domain,
@@ -263,7 +205,7 @@ async function replyInitForSingleDomain(params: {
   // Save metadata BEFORE deploying so that Pulumi reads the initialSecret from
   // the stack config we pass in (buildEmailStackConfig uses the config object).
   metadata.timestamp = new Date().toISOString();
-  await saveConnectionMetadata(metadata);
+  await saveConnectionMetadata(metadata); // baseline:allow-early-save — initialSecret must be in metadata before the deploy reads it
 
   // Build stack config from the updated metadata.
   const stackConfig = buildEmailStackConfig(metadata, region);
@@ -310,15 +252,44 @@ async function replyInitForSingleDomain(params: {
     ],
   };
   metadata.timestamp = new Date().toISOString();
-  await saveConnectionMetadata(metadata);
+  await saveConnectionMetadata(metadata); // baseline:allow-early-save — runs after runEmailStackDeploy above, which the file-level check doesn't recognise as a deploy
 
   // Register r.mail.{domain} in the catch-all receipt rule.
   const bucketName =
     emailConfig.inbound?.bucketName || `wraps-inbound-${accountId}-${region}`;
+  // The fallback write recreates and activates the set when the rule is
+  // missing. If the active set changed by then, this domain is already saved
+  // and deployed, so a reply init re-run can't reach the activation: the
+  // recovery re-activates through inbound init.
+  const activation: RuleSetActivation = {
+    expected: params.expectedActive,
+    inPlace: `reply threading for ${domain} is saved and its stack deployed (the signing secret is in SSM), and wraps-inbound-rules and its receipt rule (listing r.mail.${domain}) exist but are inactive; DNS records for r.mail.${domain} were not written.${params.laterDomains.length > 0 ? ` Reply threading was not started for ${params.laterDomains.join(", ")}.` : ""}`,
+    recovery: inboundInitRecoveryCommand(
+      region,
+      emailConfig.inbound,
+      emailConfig.inboundDomains
+    ),
+    afterRecovery: [
+      `Then add the r.mail.${domain} DNS records (MX 10 inbound-smtp.${region}.amazonaws.com, and TXT "v=spf1 include:amazonses.com ~all"); wraps email reply status checks the MX record.`,
+      ...(params.laterDomains.length > 0
+        ? [
+            `Then run wraps email reply init --all --region ${region} to enable reply threading for ${params.laterDomains.join(", ")}.`,
+          ]
+        : []),
+    ].join("\n"),
+  };
+  let activationRead: ActiveRuleSetRead | null = null;
   await progress.execute(
     `Adding r.mail.${domain} to receipt rule`,
     async () => {
-      await addDomainToReceiptRule(region, `r.mail.${domain}`, bucketName);
+      activationRead = await addDomainToReceiptRule(
+        region,
+        accountId,
+        `r.mail.${domain}`,
+        bucketName,
+        getInboundTrigger(metadata),
+        activation
+      );
     }
   );
 
@@ -413,6 +384,7 @@ async function replyInitForSingleDomain(params: {
     parameterArn: paramInfo.parameterArn,
     parameterName: paramInfo.parameterName,
     dnsAutoCreated,
+    activationRead,
   };
 }
 
@@ -521,6 +493,16 @@ export async function replyInit(options: EmailReplyInitOptions): Promise<void> {
   const stackName =
     emailService.pulumiStackName || `wraps-${identity.accountId}-${region}`;
 
+  // Each domain's receipt-rule write recreates and activates
+  // wraps-inbound-rules when the rule is missing. That write comes after the
+  // per-domain metadata save and deploy, so decide here, once, before the
+  // loop's first mutation: read the active set so a run that would
+  // deactivate another set asks first or refuses (plan 048).
+  const ruleMissing = (await describeInboundReceiptRule(region)) === null;
+  const activeRuleSetRead: ActiveRuleSetRead = ruleMissing
+    ? await readActiveReceiptRuleSet(region)
+    : REPLACE_NO_RULE_SET;
+
   // Preview mode — show what Pulumi would create across all target domains,
   // using placeholder secrets (nothing is saved to disk or deployed).
   if (options.preview) {
@@ -577,17 +559,31 @@ export async function replyInit(options: EmailReplyInitOptions): Promise<void> {
       resourceChanges: previewResult.resourceChanges,
       commandName: "wraps email reply init",
     });
+    const deactivation = describeRuleSetDeactivation(activeRuleSetRead);
+    if (deactivation) {
+      clack.log.warn(deactivation);
+    }
     clack.outro(pc.green("Preview complete. Run without --preview to deploy."));
     return;
   }
+
+  // Consent (prompt, or refuse under --yes/--json without
+  // --replace-active-rule-set) before any domain is saved or deployed.
+  const expectedActive = await confirmRuleSetActivation({
+    region,
+    read: activeRuleSetRead,
+    yes: options.yes,
+    replaceActiveRuleSet: options.replaceActiveRuleSet,
+  });
 
   const results: Array<{
     domain: string;
     parameterArn: string;
     parameterName: string;
     dnsAutoCreated: boolean;
+    activationRead: ActiveRuleSetRead | null;
   }> = [];
-  for (const domain of targetDomains) {
+  for (const [index, domain] of targetDomains.entries()) {
     // Reload metadata between domains (the earlier loop iteration saves to
     // disk) so we preserve the write-history of each per-domain init.
     const fresh = await loadConnectionMetadata(identity.accountId, region);
@@ -602,8 +598,19 @@ export async function replyInit(options: EmailReplyInitOptions): Promise<void> {
       stackName,
       autoConfirm: options.yes,
       progress,
+      expectedActive,
+      laterDomains: targetDomains.slice(index + 1),
     });
     results.push({ domain, ...result });
+  }
+
+  // At most one domain's write activates the set (the first that finds the
+  // rule missing); the rest find it in place.
+  const activationRead =
+    results.find((r) => r.activationRead !== null)?.activationRead ?? null;
+  const activationNote = describeRuleSetActivation(activationRead);
+  if (activationNote) {
+    clack.log.warn(activationNote);
   }
 
   if (isJsonMode()) {
@@ -615,6 +622,8 @@ export async function replyInit(options: EmailReplyInitOptions): Promise<void> {
         dnsAutoCreated: r.dnsAutoCreated,
       })),
       region,
+      deactivatedRuleSet: deactivatedRuleSetName(activationRead),
+      previousRuleSetUnreadable: previousRuleSetUnreadable(activationRead),
     });
     return;
   }

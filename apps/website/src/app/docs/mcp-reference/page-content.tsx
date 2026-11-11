@@ -499,13 +499,13 @@ const tools = [
     name: "list_inbound_emails",
     write: false,
     description:
-      "List one page of parsed inbound emails that the customer's SES inbound bucket received, across the organization's connected AWS accounts.",
+      "List one page of parsed inbound emails that the customer's SES inbound bucket received, across the organization's connected AWS accounts. Each entry carries envelope recipients (when recorded).",
   },
   {
     name: "get_inbound_email",
     write: false,
     description:
-      "Get one parsed inbound email from the customer's SES inbound bucket by emailId, with its from/to/cc, subject, date, headers, text body, HTML body and attachment metadata.",
+      "Get one parsed inbound email from the customer's SES inbound bucket by emailId, with its from/to/cc, subject, date, headers, text body, HTML body, attachment metadata and envelope recipients (when recorded).",
   },
   {
     name: "get_account_health",

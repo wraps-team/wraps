@@ -1,5 +1,11 @@
 import * as aws from "@pulumi/aws";
 import * as pulumi from "@pulumi/pulumi";
+import type { InboundTrigger } from "../../types/index.js";
+import {
+  INBOUND_PROCESSOR_FUNCTION_NAME,
+  INBOUND_SES_INVOKE_PERMISSION,
+  inboundReceiptRuleArn,
+} from "../../utils/email/inbound-names.js";
 import { getLambdaCode } from "./lambda.js";
 
 /**
@@ -18,6 +24,12 @@ export type LambdaInboundConfig = {
    * fetch per-domain signing secrets for reply-threading verification.
    */
   replyThreadingEnabled?: boolean;
+  /**
+   * What invokes the processor (design §4.3). The SES permission exists in
+   * both modes, so a switch can move the rule to the Lambda action before the
+   * S3 notification and its permission are removed.
+   */
+  trigger: InboundTrigger;
 };
 
 /**
@@ -25,14 +37,19 @@ export type LambdaInboundConfig = {
  */
 export type LambdaInboundResources = {
   lambdaFunction: aws.lambda.Function;
-  s3InvokePermission: aws.lambda.Permission;
+  sesInvokePermission: aws.lambda.Permission;
+  /** Only in "s3-notification" mode. */
+  s3InvokePermission?: aws.lambda.Permission;
 };
 
 /**
  * Deploy Lambda function for inbound email processing
  *
- * Architecture:
- * S3 (raw/) notification -> Lambda -> S3 (parsed/, attachments/) + EventBridge
+ * Architecture, by trigger mode:
+ * - "ses-lambda-action": SES receipt rule -> S3 (mail/) then Lambda action
+ *   (SES event, envelope included) -> S3 (parsed/, attachments/) + EventBridge
+ * - "s3-notification" (legacy): SES receipt rule -> S3 (raw/) -> bucket
+ *   notification -> Lambda -> S3 (parsed/, attachments/) + EventBridge
  */
 export async function deployInboundLambda(
   config: LambdaInboundConfig
@@ -74,9 +91,11 @@ export async function deployInboundLambda(
       .apply(([bucketArn, dlqArn]) => {
         const statements: Record<string, unknown>[] = [
           {
-            // S3 read (raw/) and write (parsed/, attachments/)
+            // S3 read (raw/, mail/) and write (parsed/, attachments/).
+            // GetObject also authorizes HeadObject; "s3:HeadObject" is not
+            // an IAM action.
             Effect: "Allow",
-            Action: ["s3:GetObject", "s3:PutObject", "s3:HeadObject"],
+            Action: ["s3:GetObject", "s3:PutObject"],
             Resource: `${bucketArn}/*`,
           },
           {
@@ -111,7 +130,7 @@ export async function deployInboundLambda(
       }),
   });
 
-  const functionName = "wraps-inbound-email-processor";
+  const functionName = INBOUND_PROCESSOR_FUNCTION_NAME;
 
   // Create inbound processor Lambda
   const lambdaFunction = new aws.lambda.Function(functionName, {
@@ -142,20 +161,36 @@ export async function deployInboundLambda(
     },
   });
 
-  // Allow S3 to invoke the Lambda function
-  const s3InvokePermission = new aws.lambda.Permission(
-    "wraps-inbound-s3-invoke",
+  // Allow SES to invoke the Lambda function from the wraps receipt rule.
+  // Created in both modes: the trigger switch needs it in place before the
+  // rule gets its Lambda action (SES checks the permission on rule writes).
+  const sesInvokePermission = new aws.lambda.Permission(
+    INBOUND_SES_INVOKE_PERMISSION,
     {
+      statementId: INBOUND_SES_INVOKE_PERMISSION,
       action: "lambda:InvokeFunction",
       function: lambdaFunction.name,
-      principal: "s3.amazonaws.com",
-      sourceArn: config.bucketArn,
+      principal: "ses.amazonaws.com",
       sourceAccount: config.accountId,
+      sourceArn: inboundReceiptRuleArn(config.region, config.accountId),
     }
   );
 
+  // Allow S3 to invoke the Lambda function (legacy trigger only)
+  const s3InvokePermission =
+    config.trigger === "s3-notification"
+      ? new aws.lambda.Permission("wraps-inbound-s3-invoke", {
+          action: "lambda:InvokeFunction",
+          function: lambdaFunction.name,
+          principal: "s3.amazonaws.com",
+          sourceArn: config.bucketArn,
+          sourceAccount: config.accountId,
+        })
+      : undefined;
+
   return {
     lambdaFunction,
+    sesInvokePermission,
     s3InvokePermission,
   };
 }

@@ -62,6 +62,8 @@ Exception: The inbound processor re-throws errors to trigger Lambda retry/DLQ.
 | `RESOURCE_PREFIX` | `"wraps-email"` |
 | `ALL_EVENT_TYPES` | All 10 SES event types |
 | `DEFAULT_EVENT_TYPES` | Common subset |
+| `INBOUND_LEGACY_PREFIX` | `"raw/"` (S3-notification trigger) |
+| `INBOUND_MAIL_PREFIX` | `"mail/"` (SES Lambda-action trigger) |
 | `DEFAULT_CONFIG_SET_NAME` | Default SES config set name |
 | `DEFAULT_HISTORY_RETENTION` | Default retention period |
 | `VERCEL_OIDC_URL` | Vercel OIDC provider URL |
@@ -107,7 +109,7 @@ These resolve to the pre-bundled Lambda code location for Pulumi/CDK to deploy.
 **Env vars**: `TABLE_NAME`, `RETENTION_DAYS`
 
 ### Inbound Processor (`lambda/inbound-processor/`)
-**Trigger**: S3 (raw email stored by SES/MailManager)
+**Trigger**: either S3 notification on `raw/` (legacy `s3-notification` mode, every existing deployment) or the SES Lambda action after an S3 action to `mail/` (`ses-lambda-action` mode). The handler takes `S3Event | SESEvent` and keeps both indefinitely. Prefixes are `INBOUND_LEGACY_PREFIX` / `INBOUND_MAIL_PREFIX` in `src/constants.ts`.
 **Purpose**: Parse MIME → store parsed email + attachments → emit EventBridge event
 
 - Uses `mailparser` to parse raw MIME
@@ -122,6 +124,12 @@ These resolve to the pre-bundled Lambda code location for Pulumi/CDK to deploy.
   `truncatedFields` and `parsedS3Key`. Small mail is sent unchanged.
 - Throws when PutEvents returns `FailedEntryCount > 0`
 - Extracts SES spam/virus verdicts from headers
+- SES-event records add `envelopeRecipients` (lowercased, SES order) to the parsed JSON and the event;
+  absent (not `[]`) for S3-notification mail. `findReplyRecipient` checks it first (with SES's original
+  case: reply tokens are case-sensitive), and `receivingDomain` falls back to its first domain. Every
+  `buildEventDetail` stage keeps it; the last resort keeps the first 100 and adds `envelopeRecipientCount`
+  and `"envelopeRecipients"` in `truncatedFields` when it cuts. Skips the `AMAZON_SES_SETUP_NOTIFICATION` key.
+  An unreadable raw object is logged ("raw object not readable") and rethrown; no in-function retry.
 - **Re-throws errors** (unlike other processors) to trigger retry/DLQ
 
 **Env vars**: `BUCKET_NAME`, `INBOUND_EVENT_SOURCE` (default `wraps.inbound`), `REPLY_SECRET_PARAMETER_PREFIX` (optional), `AWS_REGION`
