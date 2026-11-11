@@ -151,6 +151,27 @@ describe("Email Chart API", () => {
     mockGetEmailMetricsFromPostgres.mockResolvedValue(new Map());
   });
 
+  it("scopes each reputation read by the session's org", async () => {
+    // A distinct org id from the membership check, so the assertion can only
+    // pass if the route forwards the org it resolved for this session.
+    const { getOrganizationWithMembership } = await import(
+      "@/lib/organization"
+    );
+    vi.mocked(getOrganizationWithMembership).mockResolvedValueOnce({
+      id: "org-session-reputation",
+      name: "Session Org",
+      slug: "test-org",
+    } as never);
+
+    await callRoute();
+
+    expect(mockGetSESReputationMetrics).toHaveBeenCalledTimes(1);
+    expect(mockGetSESReputationMetrics).toHaveBeenCalledWith({
+      awsAccountId: "acc-1",
+      organizationId: "org-session-reputation",
+    });
+  });
+
   it("computes deliveryRate against sends that actually left, excluding failures", async () => {
     // 124 attempted, 13 of them rendering failures — Postgres reports the 111
     // that were not failed as `sent`, so the rate is 110/111.

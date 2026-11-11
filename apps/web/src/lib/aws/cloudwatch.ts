@@ -151,11 +151,15 @@ export type SESReputationMetrics = {
  * Rates and `asOf` are null if SES hasn't published data (new accounts, or an
  * account that has not sent for the whole lookback).
  */
-export async function getSESReputationMetrics(
-  awsAccountId: string
-): Promise<SESReputationMetrics> {
+export async function getSESReputationMetrics(params: {
+  awsAccountId: string;
+  organizationId: string;
+}): Promise<SESReputationMetrics> {
+  const { awsAccountId, organizationId } = params;
+
   const account = await db.query.awsAccount.findFirst({
-    where: (a, { eq }) => eq(a.id, awsAccountId),
+    where: (a, { and, eq }) =>
+      and(eq(a.id, awsAccountId), eq(a.organizationId, organizationId)),
   });
 
   if (!account) {

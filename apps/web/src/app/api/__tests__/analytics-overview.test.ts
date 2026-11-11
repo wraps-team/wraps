@@ -119,6 +119,27 @@ describe("Analytics Overview API", () => {
     });
   });
 
+  it("scopes each reputation read by the session's org", async () => {
+    // A distinct org id from the membership check, so the assertion can only
+    // pass if the route forwards the org it resolved for this session.
+    const { getOrganizationWithMembership } = await import(
+      "@/lib/organization"
+    );
+    vi.mocked(getOrganizationWithMembership).mockResolvedValueOnce({
+      id: "org-session-reputation",
+      name: "Session Org",
+      slug: "test-org",
+    } as never);
+
+    await callOverview();
+
+    expect(mockGetSESReputationMetrics).toHaveBeenCalledTimes(1);
+    expect(mockGetSESReputationMetrics).toHaveBeenCalledWith({
+      awsAccountId: "acc-1",
+      organizationId: "org-session-reputation",
+    });
+  });
+
   it("reads totals from Postgres, never from account-wide CloudWatch", async () => {
     mockGetEmailMetricsFromPostgres.mockResolvedValueOnce(
       makeDay({

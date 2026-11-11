@@ -66,10 +66,13 @@ CloudWatch is read for exactly one thing: SES account-level reputation.
 ```typescript
 import { getSESReputationMetrics } from '@/lib/aws';
 
-const { bounceRate, complaintRate } = await getSESReputationMetrics(
-  'aws-account-uuid-from-db'
-);
+const { bounceRate, complaintRate } = await getSESReputationMetrics({
+  awsAccountId: 'aws-account-uuid-from-db',
+  organizationId: 'org-id-the-account-was-filtered-by',
+});
 // Decimal rates (0-1), or null when SES has not published one yet.
+// The account lookup matches both ids, so an account from another org is
+// "AWS account not found". The sms-voice and dynamodb helpers work the same way.
 ```
 
 These are account-lifetime rolling rates covering the whole AWS account, so
