@@ -113,6 +113,81 @@ export const Code = ({ children }: { children: ReactNode }) => (
 
 export const releases: Release[] = [
   {
+    slug: "inbound-email-records-envelope-recipients",
+    title: "Inbound email records who it was delivered to",
+    date: "2026-11-11",
+    tags: ["cli", "dashboard", "api"],
+    summary:
+      "Inbound emails carry the SMTP envelope recipients SES delivered to, Bcc included, so you can route mail that never names your address in To or Cc.",
+    icon: Inbox,
+    versions: ["CLI v3.21.0"],
+    items: [
+      <>
+        Run <Code>wraps email upgrade</Code> to move inbound to the new trigger.
+        New mail then carries <Code>envelopeRecipients</Code> on the{" "}
+        <Code>email.received</Code> event, in the parsed JSON, in{" "}
+        <Code>GET /v1/email/inbound</Code>, in the dashboard (&quot;Delivered
+        to&quot;) and in <Code>wraps email inbound get</Code>. Mail received
+        before the upgrade has no field, which means unknown
+      </>,
+      <>
+        Deploy with CLI v3.21.0 or later everywhere, laptops and CI included. An
+        older CLI deploying after the upgrade stops new inbound mail from being
+        processed; <Code>wraps email inbound status</Code> flags it and{" "}
+        <Code>wraps email upgrade --action redeploy</Code> repairs it. New mail
+        is stored under <Code>mail/</Code>: if your code reads <Code>raw/</Code>{" "}
+        by prefix, read <Code>rawS3Key</Code> instead
+      </>,
+      <>
+        Expect <Code>inbound init</Code> and <Code>inbound add</Code> to ask
+        before they deactivate another active receipt rule set in the region.
+        With <Code>--yes</Code> or <Code>--json</Code> they refuse unless you
+        pass <Code>--replace-active-rule-set</Code>
+      </>,
+      <>
+        Replay failed inbound mail from the dead-letter queue with{" "}
+        <Code>wraps email inbound reprocess</Code>; <Code>inbound status</Code>{" "}
+        shows the queue depth. Deduplicate events on <Code>emailId</Code>:
+        delivery is at least once
+      </>,
+    ],
+    docs: "/docs/cli-reference/email",
+    alsoFixed: [
+      "inbound init no longer emits a junk email.received event for SES's setup-notification test object.",
+    ],
+  },
+  {
+    slug: "permissions-policy-dir-writes-iam-policies-that-fit",
+    title: "IAM policies that fit the managed-policy size limit",
+    date: "2026-11-11",
+    tags: ["cli"],
+    summary:
+      "wraps permissions --policy-dir writes the deployer policy as files that each fit an IAM managed policy, ready to paste.",
+    icon: ShieldCheck,
+    versions: ["CLI v3.21.0"],
+    items: [
+      <>
+        Run <Code>wraps permissions --policy-dir ./wraps-policy</Code> to get{" "}
+        <Code>wraps-deployer-1.json</Code>, <Code>-2.json</Code> and so on, each
+        under IAM&apos;s 6,144-character limit. Create one managed policy per
+        file and attach them all; detach an older single{" "}
+        <Code>WrapsDeploymentPolicy</Code> once they are attached
+      </>,
+      <>
+        Re-run it after upgrading and paste each file over its policy. The
+        deployer policy now covers event-tracking webhooks (EventBridge
+        connections and API destinations) and{" "}
+        <Code>wraps email reply init</Code>
+      </>,
+      <>
+        Use <Code>--json</Code> for agents: <Code>data.policies</Code> holds the
+        split, and <Code>data.policy</Code> is the merged document, which only
+        fits an inline role policy
+      </>,
+    ],
+    docs: "/docs/guides/aws-setup/permissions",
+  },
+  {
     slug: "template-deletes-check-drafts-and-suppression-removal-restores-contacts",
     title:
       "Template deletes check drafts, and suppression removal restores contacts",
