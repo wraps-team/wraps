@@ -6,6 +6,7 @@
  * assertion parses the single console.log envelope.
  */
 
+import { stripVTControlCharacters } from "node:util";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setJsonMode } from "../../../utils/shared/json-output.js";
 
@@ -488,7 +489,10 @@ describe("wraps email inbound", () => {
         vi.mocked(note).mockClear();
         fetchMock.mockResolvedValueOnce(res(200, { ...DETAIL, ...extra }));
         await inboundEmailsGet({ emailId: "em_1" });
-        return String(vi.mocked(note).mock.calls[0][0]);
+        // CI forces colour on; strip it so the label regex reads plain text.
+        return stripVTControlCharacters(
+          String(vi.mocked(note).mock.calls[0][0])
+        );
       };
 
       // Adds a Bcc address: shown, with the label.

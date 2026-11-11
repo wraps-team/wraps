@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
+import { stripVTControlCharacters } from "node:util";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { trackCommand } from "../../telemetry/events.js";
 import { WrapsError } from "../../utils/shared/errors.js";
@@ -414,10 +415,13 @@ async function runHuman(
   const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
   const out = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
   await permissions(options);
-  const text = [
-    ...log.mock.calls.map((c) => String(c[0])),
-    ...out.mock.calls.map((c) => String(c[0])),
-  ].join("\n");
+  // CI forces colour on; strip it so the assertions read plain text.
+  const text = stripVTControlCharacters(
+    [
+      ...log.mock.calls.map((c) => String(c[0])),
+      ...out.mock.calls.map((c) => String(c[0])),
+    ].join("\n")
+  );
   log.mockRestore();
   out.mockRestore();
   return text;
