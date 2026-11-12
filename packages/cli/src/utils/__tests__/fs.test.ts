@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,6 +11,11 @@ vi.mock("node:fs", () => ({
 
 vi.mock("node:fs/promises", () => ({
   mkdir: vi.fn(),
+  readFile: vi.fn(),
+  writeFile: vi.fn(),
+  rename: vi.fn(),
+  rm: vi.fn(),
+  readdir: vi.fn(),
 }));
 
 vi.mock("node:os", () => ({
@@ -61,6 +66,11 @@ describe("fs utilities", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(homedir).mockReturnValue(mockHomeDir);
+    // Pulumi.yaml already points at the work dir, so the repair is a no-op
+    // and never reaches its warn path (covered in pulumi-project-main.test.ts).
+    vi.mocked(readFile).mockResolvedValue(
+      `name: wraps-email\nruntime: nodejs\nmain: ${expectedPulumiDir}\n` as never
+    );
     process.env.PULUMI_BACKEND_URL = undefined;
     process.env.PULUMI_CONFIG_PASSPHRASE = undefined;
     process.env.WRAPS_LOCAL_ONLY = undefined;

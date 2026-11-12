@@ -1,7 +1,16 @@
 import { existsSync } from "node:fs";
-import { mkdir, readdir, rm } from "node:fs/promises";
+import {
+  mkdir,
+  readdir,
+  readFile,
+  rename,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { CORE_SCHEMA, dump, load } from "js-yaml";
+import { isJsonMode } from "./json-output.js";
 
 /**
  * Get the Wraps configuration directory
@@ -58,6 +67,95 @@ export async function clearLocalStackLocks(): Promise<number> {
 }
 
 /**
+ * Warn without corrupting `--json` stdout: clack writes to stdout, so in JSON
+ * mode the message goes to stderr instead.
+ */
+async function warnUser(message: string): Promise<void> {
+  if (isJsonMode()) {
+    console.error(message);
+    return;
+  }
+  const clack = await import("@clack/prompts");
+  clack.log.warn(message);
+}
+
+let repairWarned = false;
+
+/**
+ * Repair a stale `main` in ~/.wraps/pulumi/Pulumi.yaml.
+ *
+ * Pulumi's automation API writes this file once, with `main: process.cwd()` of
+ * whichever directory the CLI first ran from, and never rewrites it. If that
+ * directory is later deleted or moved, every Pulumi call fails with
+ * "project 'main' could not be read". This points `main` at the work dir.
+ *
+ * Never writes or derives `name`: the file is shared by all services and its
+ * `name` is the project directory the state backend stores stacks under.
+ * Never creates the file: Pulumi does that on its first call. Never throws.
+ */
+export async function repairPulumiProjectMain(): Promise<void> {
+  const pulumiDir = getPulumiWorkDir();
+  const projectFile = join(pulumiDir, "Pulumi.yaml");
+  // No Pulumi.yaml (including a Pulumi.yml / Pulumi.json in its place, which
+  // Pulumi never writes): nothing to repair, and we must not create one.
+  if (!existsSync(projectFile)) {
+    return;
+  }
+
+  let tempFile: string | undefined;
+  try {
+    const parsed = load(await readFile(projectFile, "utf-8"), {
+      schema: CORE_SCHEMA,
+    });
+    if (
+      parsed === null ||
+      typeof parsed !== "object" ||
+      Array.isArray(parsed)
+    ) {
+      throw new Error("not a YAML mapping");
+    }
+    const settings = parsed as Record<string, unknown>;
+    // Pulumi writes name, runtime, main in that order and not atomically, so a
+    // torn read lacks `main` (or has a truncated `name`). Write back only a
+    // complete file; a file with no `main` has nothing stale (Pulumi defaults
+    // to the project dir).
+    if (
+      typeof settings.name !== "string" ||
+      typeof settings.main !== "string" ||
+      settings.main === pulumiDir
+    ) {
+      return;
+    }
+    settings.main = pulumiDir;
+
+    // Write atomically: concurrent Pulumi processes share this file and must
+    // never read it half-written.
+    tempFile = join(
+      pulumiDir,
+      `.Pulumi.yaml.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`
+    );
+    await writeFile(
+      tempFile,
+      dump(settings, { lineWidth: -1, schema: CORE_SCHEMA }),
+      "utf-8"
+    );
+    await rename(tempFile, projectFile);
+    tempFile = undefined;
+  } catch (error) {
+    if (tempFile) {
+      await rm(tempFile, { force: true }).catch(() => {});
+    }
+    // Several commands call ensurePulumiWorkDir twice; warn once per process.
+    if (!repairWarned) {
+      repairWarned = true;
+      await warnUser(
+        `Could not repair ${projectFile} (${error instanceof Error ? error.message : error}). Pulumi may fail to read the project.`
+      );
+    }
+  }
+}
+
+/**
  * Ensure the Pulumi workspace directory exists and configure backend.
  *
  * When accountId and region are provided (and WRAPS_LOCAL_ONLY is not set),
@@ -73,6 +171,9 @@ export async function ensurePulumiWorkDir(options?: {
   if (!existsSync(pulumiDir)) {
     await mkdir(pulumiDir, { recursive: true });
   }
+
+  // Before any Pulumi call (including the S3 migration below).
+  await repairPulumiProjectMain();
 
   // Always set passphrase
   process.env.PULUMI_CONFIG_PASSPHRASE = "";
@@ -132,8 +233,7 @@ export async function ensurePulumiWorkDir(options?: {
       return;
     } catch (error) {
       // Graceful fallback to local
-      const clack = await import("@clack/prompts");
-      clack.log.warn(
+      await warnUser(
         `S3 state backend unavailable (${error instanceof Error ? error.message : error}). Using local state.`
       );
     }
