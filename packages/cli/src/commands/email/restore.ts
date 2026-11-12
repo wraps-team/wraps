@@ -5,10 +5,10 @@ import { trackError, trackServiceRemoved } from "../../telemetry/events.js";
 import type { EmailRestoreOptions } from "../../types/index.js";
 import { domainToConfigSetName } from "../../utils/email/config-set-slug.js";
 import { validateAWSCredentials } from "../../utils/shared/aws.js";
-import { WrapsError } from "../../utils/shared/errors.js";
+import { errors, WrapsError } from "../../utils/shared/errors.js";
 import {
+  ensurePulumiWorkDir,
   getPulumiWorkDir,
-  repairPulumiProjectMain,
 } from "../../utils/shared/fs.js";
 import { isJsonMode, jsonSuccess } from "../../utils/shared/json-output.js";
 import {
@@ -24,6 +24,31 @@ import {
   previewWithResourceChanges,
 } from "../../utils/shared/pulumi.js";
 import { resolveRegionForCommand } from "../../utils/shared/region-resolver.js";
+
+/**
+ * Point Pulumi at the account's state backend, and refuse to continue on local
+ * state. ensurePulumiWorkDir falls back to the local file backend when S3 is
+ * unreachable; a migrated account still has a stale local stack, so destroying
+ * from it would orphan resources created since. Fail closed instead.
+ */
+async function ensureStateBackend(
+  accountId: string,
+  region: string
+): Promise<void> {
+  await ensurePulumiWorkDir({ accountId, region });
+  if (
+    process.env.WRAPS_LOCAL_ONLY !== "1" &&
+    !process.env.PULUMI_BACKEND_URL?.startsWith("s3://")
+  ) {
+    throw errors.stateBackendUnreachable(accountId, region);
+  }
+}
+
+function isStateBackendUnreachable(error: unknown): boolean {
+  return (
+    error instanceof WrapsError && error.code === "STATE_BACKEND_UNREACHABLE"
+  );
+}
 
 /**
  * Restore command - Remove Wraps infrastructure (alias for destroy)
@@ -141,8 +166,7 @@ export async function restore(options: EmailRestoreOptions): Promise<void> {
         const previewResult = await progress.execute(
           "Generating removal preview",
           async () => {
-            // restore never calls ensurePulumiWorkDir; fix a stale Pulumi.yaml main
-            await repairPulumiProjectMain();
+            await ensureStateBackend(identity.accountId, region);
             const stack = await pulumi.automation.LocalWorkspace.selectStack(
               {
                 stackName: pulumiStackName,
@@ -188,6 +212,9 @@ export async function restore(options: EmailRestoreOptions): Promise<void> {
         });
         return;
       } catch (error) {
+        if (isStateBackendUnreachable(error)) {
+          throw error; // keep its suggestion; don't wrap in "Preview failed"
+        }
         trackError("PREVIEW_FAILED", "email:restore", { step: "preview" });
         const msg = error instanceof Error ? error.message : String(error);
         throw new Error(`Preview failed: ${msg}`);
@@ -204,8 +231,7 @@ export async function restore(options: EmailRestoreOptions): Promise<void> {
           throw new Error("No Pulumi stack name found in metadata");
         }
 
-        // restore never calls ensurePulumiWorkDir; fix a stale Pulumi.yaml main
-        await repairPulumiProjectMain();
+        await ensureStateBackend(identity.accountId, region);
 
         const stack = await pulumi.automation.LocalWorkspace.selectStack(
           {
@@ -231,6 +257,9 @@ export async function restore(options: EmailRestoreOptions): Promise<void> {
           metadata.services.email.pulumiStackName
         );
       } catch (error) {
+        if (isStateBackendUnreachable(error)) {
+          throw error; // keep its suggestion; don't wrap
+        }
         trackError("DESTROY_FAILED", "email:restore", { step: "destroy" });
         const msg = error instanceof Error ? error.message : String(error);
         throw new Error(`Failed to destroy Pulumi stack: ${msg}`);

@@ -1357,6 +1357,14 @@ export const errors = {
       "https://wraps.dev/docs/guides/aws-setup/permissions"
     ),
 
+  stateBackendUnreachable: (accountId: string, region: string) =>
+    new WrapsError(
+      "Restore won't remove infrastructure using local state while the S3 state backend is unreachable",
+      "STATE_BACKEND_UNREACHABLE",
+      `Fix access to the state bucket wraps-state-${accountId}-${region}, then run the command again.\n\nTo use local state on purpose:\n  WRAPS_LOCAL_ONLY=1 wraps email restore`,
+      "https://wraps.dev/docs/guides/aws-setup/permissions"
+    ),
+
   stateMigrationFailed: () =>
     new WrapsError(
       "Failed to migrate Pulumi state to S3",
