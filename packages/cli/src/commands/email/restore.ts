@@ -24,6 +24,7 @@ import {
   previewWithResourceChanges,
 } from "../../utils/shared/pulumi.js";
 import { resolveRegionForCommand } from "../../utils/shared/region-resolver.js";
+import { getS3BackendUrl } from "../../utils/shared/s3-state.js";
 
 /**
  * Point Pulumi at the account's state backend, and refuse to continue on local
@@ -38,7 +39,7 @@ async function ensureStateBackend(
   await ensurePulumiWorkDir({ accountId, region });
   if (
     process.env.WRAPS_LOCAL_ONLY !== "1" &&
-    !process.env.PULUMI_BACKEND_URL?.startsWith("s3://")
+    process.env.PULUMI_BACKEND_URL !== getS3BackendUrl(accountId, region)
   ) {
     throw errors.stateBackendUnreachable(accountId, region);
   }
