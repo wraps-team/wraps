@@ -36,6 +36,15 @@ vi.mock("../shared/s3-state.js", () => ({
     mockMigrateLocalPulumiState(...args),
 }));
 
+// The project check lists the (empty) state bucket after backend setup.
+vi.mock("@aws-sdk/client-s3", () => ({
+  S3Client: class {
+    send = vi.fn().mockResolvedValue({});
+  },
+  ListObjectsV2Command: class {},
+  GetObjectCommand: class {},
+}));
+
 // Mock @clack/prompts
 vi.mock("@clack/prompts", () => ({
   log: {
