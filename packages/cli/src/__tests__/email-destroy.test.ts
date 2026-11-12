@@ -1,4 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// Plan 057: destroy refuses local state unless the account never used S3. These
+// tests mock fs.js (no backend URL is set), so opt in to local state.
+beforeEach(() => {
+  vi.stubEnv("WRAPS_LOCAL_ONLY", "1");
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 import { emailDestroy } from "../commands/email/destroy.js";
 
 /**

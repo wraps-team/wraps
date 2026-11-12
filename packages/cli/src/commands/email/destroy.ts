@@ -23,10 +23,7 @@ import {
   validateAWSCredentials,
 } from "../../utils/shared/aws.js";
 import { isAWSNotFoundError, WrapsError } from "../../utils/shared/errors.js";
-import {
-  ensurePulumiWorkDir,
-  getPulumiWorkDir,
-} from "../../utils/shared/fs.js";
+import { getPulumiWorkDir } from "../../utils/shared/fs.js";
 import { isJsonMode, jsonSuccess } from "../../utils/shared/json-output.js";
 import {
   deleteConnectionMetadata,
@@ -41,6 +38,7 @@ import {
   previewWithResourceChanges,
   withLockRetry,
 } from "../../utils/shared/pulumi.js";
+import { requireAccountStateBackend } from "../../utils/shared/state-backend.js";
 import {
   DEFAULT_PULUMI_TIMEOUT_MS,
   withTimeout,
@@ -335,12 +333,14 @@ export async function emailDestroy(options: DestroyOptions): Promise<void> {
   // 6. Preview or Destroy infrastructure using Pulumi
   if (options.preview) {
     // PREVIEW MODE - show what would be destroyed without actually destroying
+    // Outside the try below so STATE_BACKEND_UNREACHABLE reaches the user unwrapped.
+    await progress.execute("Checking state backend", () =>
+      requireAccountStateBackend(identity.accountId, region)
+    );
     try {
       const previewResult = await progress.execute(
         "Generating destruction preview",
         async () => {
-          await ensurePulumiWorkDir({ accountId: identity.accountId, region });
-
           // Use stored stack name from metadata, fallback to generated name
           // Note: init.ts creates stacks as `wraps-${accountId}-${region}` (without -email- prefix)
           const stackName =
@@ -426,6 +426,15 @@ export async function emailDestroy(options: DestroyOptions): Promise<void> {
 
   // DESTROY MODE - actually remove infrastructure
 
+  // Fail closed before the first delete. Every prompt is behind us (the guard
+  // may create the state bucket), and receipt rules, DNS records and the stack
+  // all go after this. Outside every try/catch below: the destroy catches mark
+  // the run partly failed and carry on deleting, which must never happen on
+  // stale local state.
+  await progress.execute("Checking state backend", () =>
+    requireAccountStateBackend(identity.accountId, region)
+  );
+
   // 6b. Delete the inbound receipt rule and rule set before the stack, so no
   // rule is left pointing at a deleted bucket or function. Abort on any error
   // other than "already gone" (the helpers ignore RuleDoesNotExist /
@@ -486,9 +495,6 @@ export async function emailDestroy(options: DestroyOptions): Promise<void> {
     await progress.execute(
       "Destroying email infrastructure (this may take 2-3 minutes)",
       async () => {
-        // Ensure Pulumi workspace directory exists
-        await ensurePulumiWorkDir({ accountId: identity.accountId, region });
-
         // Use stored stack name from metadata, fallback to generated name
         // Note: init.ts creates stacks as `wraps-${accountId}-${region}` (without -email- prefix)
         const stackName =
