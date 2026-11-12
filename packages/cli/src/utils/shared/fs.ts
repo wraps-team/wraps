@@ -113,7 +113,7 @@ export async function repairPulumiProjectMain(): Promise<void> {
     tempFile = undefined;
   } catch (error) {
     if (tempFile) {
-      await rm(tempFile, { force: true }).catch(() => undefined);
+      await rm(tempFile, { force: true }).catch(() => {});
     }
     const clack = await import("@clack/prompts");
     clack.log.warn(
