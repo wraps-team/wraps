@@ -307,7 +307,7 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
       {
         code: "STATE_BACKEND_UNREACHABLE",
         message:
-          "Restore won't use local state while the S3 state backend is unreachable",
+          "Wraps won't remove infrastructure using local state while the S3 state backend is unreachable",
         solution:
           "Fix S3 access to wraps-state-<account>-<region>. Local state is stale after migration; set WRAPS_LOCAL_ONLY=1 for that one run, only if state was never migrated",
       },
