@@ -209,6 +209,38 @@ describe("restore command", () => {
     });
   });
 
+  describe("Pulumi.yaml repair ordering", () => {
+    it("repairs Pulumi.yaml main before selecting the stack when destroying", async () => {
+      await setupPulumiMock();
+      await restore({ force: true });
+
+      const pulumi = await import("@pulumi/pulumi");
+      const repair = vi.mocked(fsUtils.repairPulumiProjectMain);
+      const select = vi.mocked(pulumi.automation.LocalWorkspace.selectStack);
+      expect(repair).toHaveBeenCalledTimes(1);
+      expect(select).toHaveBeenCalledTimes(1);
+      expect(repair.mock.invocationCallOrder[0]).toBeLessThan(
+        select.mock.invocationCallOrder[0]
+      );
+    });
+
+    it("repairs Pulumi.yaml main before selecting the stack when previewing", async () => {
+      await setupPulumiMock(true); // select throws; ordering is all we assert
+      await expect(restore({ preview: true })).rejects.toThrow(
+        "Preview failed"
+      );
+
+      const pulumi = await import("@pulumi/pulumi");
+      const repair = vi.mocked(fsUtils.repairPulumiProjectMain);
+      const select = vi.mocked(pulumi.automation.LocalWorkspace.selectStack);
+      expect(repair).toHaveBeenCalledTimes(1);
+      expect(select).toHaveBeenCalledTimes(1);
+      expect(repair.mock.invocationCallOrder[0]).toBeLessThan(
+        select.mock.invocationCallOrder[0]
+      );
+    });
+  });
+
   describe("Error Handling Tests", () => {
     it("should handle user cancellation", async () => {
       await setupPulumiMock();
