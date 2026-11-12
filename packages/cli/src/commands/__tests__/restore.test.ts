@@ -346,6 +346,51 @@ describe("restore command", () => {
       expect(metadata.deleteConnectionMetadata).not.toHaveBeenCalled();
     });
 
+    it.each([
+      [
+        "STACK_PROJECT_CONFLICT",
+        () =>
+          errors.stackProjectConflict({
+            location: "s3://bucket",
+            projects: { "wraps-email": ["a"], "wraps-sms": ["a"] },
+          }),
+      ],
+      [
+        "PULUMI_PROJECT_MISMATCH",
+        () =>
+          errors.pulumiProjectMismatch({
+            location: "s3://bucket",
+            localName: "wraps-sms",
+            accountProject: "wraps-email",
+            projectFile: "/h/.wraps/pulumi/Pulumi.yaml",
+          }),
+      ],
+      [
+        "STATE_BACKEND_LIST_FAILED",
+        () =>
+          errors.stateBackendListFailed({
+            bucket: "wraps-state-1-us-east-1",
+            operation: "list",
+            errorName: "AccessDenied",
+            accessDenied: true,
+          }),
+      ],
+    ])(
+      "passes %s through unwrapped and destroys nothing",
+      async (code, make) => {
+        const mockStack = await setupPulumiMock();
+        vi.mocked(fsUtils.ensurePulumiWorkDir).mockRejectedValue(make());
+
+        const error = await restore({ force: true }).catch((e) => e);
+
+        expect(error).toBeInstanceOf(WrapsError);
+        expect(error.code).toBe(code);
+        expect(await selectMock()).not.toHaveBeenCalled();
+        expect(mockStack.destroy).not.toHaveBeenCalled();
+        expect(metadata.deleteConnectionMetadata).not.toHaveBeenCalled();
+      }
+    );
+
     it("fails closed when the S3 backend is unreachable while previewing", async () => {
       const mockStack = await setupPulumiMock();
       useLocalBackend();
