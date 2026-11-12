@@ -309,7 +309,7 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
         message:
           "Restore won't use local state while the S3 state backend is unreachable",
         solution:
-          "Fix S3 access to wraps-state-<account>-<region>. Local state is stale after migration; export WRAPS_LOCAL_ONLY=1 only if state was never migrated",
+          "Fix S3 access to wraps-state-<account>-<region>. Local state is stale after migration; set WRAPS_LOCAL_ONLY=1 for that one run, only if state was never migrated",
       },
       {
         code: "SELFHOST_NO_LOG_GROUPS",
