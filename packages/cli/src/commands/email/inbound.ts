@@ -992,19 +992,19 @@ export async function inboundDestroy(
     return;
   }
 
-  // 7. Delete SES receipt rules
-  await progress.execute("Removing SES receipt rules", async () => {
-    await deleteReceiptRule(region);
-    await deleteReceiptRuleSet(region);
-  });
-
-  // 8. Ensure Pulumi work directory
+  // 7. Ensure Pulumi work directory (before any change: a project refusal must come first)
   await progress.execute("Preparing workspace", async () =>
     ensurePulumiWorkDir({
       accountId: identity.accountId,
       region,
     })
   );
+
+  // 8. Delete SES receipt rules
+  await progress.execute("Removing SES receipt rules", async () => {
+    await deleteReceiptRule(region);
+    await deleteReceiptRuleSet(region);
+  });
 
   // 9. Redeploy with inbound disabled
   await progress.execute("Removing inbound infrastructure", async () => {

@@ -2329,6 +2329,28 @@ describe("plan 041: inbound trigger in init / add / status / destroy", () => {
       expect(saved.at(-1)?.inbound).toBeUndefined();
       expect(saved.at(-1)?.trigger).toBeUndefined();
     });
+
+    it("refuses on a project conflict before deleting the receipt rules", async () => {
+      const { loadConnectionMetadata } = await import(
+        "../../../utils/shared/metadata.js"
+      );
+      vi.mocked(loadConnectionMetadata).mockResolvedValue(cloneMetadata());
+      const fs = await import("../../../utils/shared/fs.js");
+      const rules = await import("../../../utils/email/receipt-rules.js");
+      const { WrapsError } = await import("../../../utils/shared/errors.js");
+      vi.mocked(rules.deleteReceiptRule).mockClear();
+      vi.mocked(rules.deleteReceiptRuleSet).mockClear();
+      vi.mocked(fs.ensurePulumiWorkDir).mockRejectedValueOnce(
+        new WrapsError("split", "STACK_PROJECT_CONFLICT")
+      );
+
+      await expect(inboundDestroy({ force: true })).rejects.toMatchObject({
+        code: "STACK_PROJECT_CONFLICT",
+      });
+
+      expect(rules.deleteReceiptRule).not.toHaveBeenCalled();
+      expect(rules.deleteReceiptRuleSet).not.toHaveBeenCalled();
+    });
   });
 
   describe("plan 048: rule-set activation consent", () => {
