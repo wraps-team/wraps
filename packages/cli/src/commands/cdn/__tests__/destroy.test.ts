@@ -53,7 +53,10 @@ vi.mock("../../../utils/shared/aws.js");
 vi.mock("../../../utils/shared/fs.js");
 vi.mock("../../../utils/shared/metadata.js");
 vi.mock("../../../utils/shared/s3-state.js", () => ({
-  getS3BackendUrl: vi.fn(() => "s3://wraps-state-123456789012-us-east-1"),
+  getS3BackendUrl: vi.fn(
+    (accountId: string, region: string) =>
+      `s3://wraps-state-${accountId}-${region}`
+  ),
 }));
 vi.mock("../../../utils/shared/pulumi.js", () => ({
   ensurePulumiInstalled: vi.fn().mockResolvedValue(false),
@@ -71,6 +74,7 @@ import { findHostedZone } from "../../../utils/route53.js";
 import * as aws from "../../../utils/shared/aws.js";
 import { WrapsError } from "../../../utils/shared/errors.js";
 import * as fsUtils from "../../../utils/shared/fs.js";
+import { setJsonMode } from "../../../utils/shared/json-output.js";
 import * as metadata from "../../../utils/shared/metadata.js";
 import { cdnDestroy } from "../destroy.js";
 
@@ -105,8 +109,7 @@ describe("cdn destroy fails closed on local state (plan 057)", () => {
     vi.mocked(fsUtils.getPulumiWorkDir).mockReturnValue("/mock/.wraps/pulumi");
     // The S3 backend is unreachable: ensurePulumiWorkDir falls back to file://.
     vi.mocked(fsUtils.ensurePulumiWorkDir).mockImplementation(async () => {
-      process.env.PULUMI_BACKEND_URL = LOCAL_URL;
-      return undefined as never;
+      vi.stubEnv("PULUMI_BACKEND_URL", LOCAL_URL);
     });
     // A custom domain with a hosted zone turns on the DNS deletes.
     vi.mocked(findHostedZone).mockResolvedValue({
@@ -132,7 +135,7 @@ describe("cdn destroy fails closed on local state (plan 057)", () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
-    delete process.env.PULUMI_BACKEND_URL;
+    setJsonMode(false);
   });
 
   it("preview with the S3 fallback throws unwrapped and selects no stack", async () => {
@@ -177,10 +180,60 @@ describe("cdn destroy fails closed on local state (plan 057)", () => {
     expect(s3Sdk.S3Client).toHaveBeenCalled();
   });
 
+  it("--json --force with the S3 fallback throws and prints no cdn.destroy envelope", async () => {
+    const stack = mockStack();
+    setJsonMode(true);
+    const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    try {
+      const error = await cdnDestroy({
+        force: true,
+        json: true,
+        region: "us-east-1",
+      }).catch((e) => e);
+
+      expect(error).toBeInstanceOf(WrapsError);
+      expect(error.code).toBe("STATE_BACKEND_UNREACHABLE");
+      expect(s3Sdk.S3Client).not.toHaveBeenCalled();
+      expect(route53Sdk.Route53Client).not.toHaveBeenCalled();
+      expect(stack.destroy).not.toHaveBeenCalled();
+      expect(
+        consoleLogSpy.mock.calls.some((c) =>
+          String(c[0]).includes("cdn.destroy")
+        )
+      ).toBe(false);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it("guards the caller's account and region, not the metadata's", async () => {
+    vi.mocked(aws.validateAWSCredentials).mockResolvedValue({
+      accountId: "999999999999",
+      userId: "AIDAEXAMPLE",
+      arn: "arn:aws:iam::999999999999:user/test",
+    });
+    vi.mocked(fsUtils.ensurePulumiWorkDir).mockImplementation(
+      async (options) => {
+        vi.stubEnv(
+          "PULUMI_BACKEND_URL",
+          `s3://wraps-state-${options?.accountId}-${options?.region}`
+        );
+      }
+    );
+    mockStack();
+
+    await cdnDestroy({ force: true, region: "eu-west-1" });
+
+    expect(fsUtils.ensurePulumiWorkDir).toHaveBeenCalledWith({
+      accountId: "999999999999",
+      region: "eu-west-1",
+    });
+  });
+
   it("an S3 backend proceeds without WRAPS_LOCAL_ONLY", async () => {
     vi.mocked(fsUtils.ensurePulumiWorkDir).mockImplementation(async () => {
-      process.env.PULUMI_BACKEND_URL = S3_URL;
-      return undefined as never;
+      vi.stubEnv("PULUMI_BACKEND_URL", S3_URL);
     });
     const stack = mockStack();
 

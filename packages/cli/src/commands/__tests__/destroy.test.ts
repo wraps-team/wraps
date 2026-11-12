@@ -25,7 +25,10 @@ vi.mock("@aws-sdk/client-sqs", () => ({
 
 vi.mock("../../utils/shared/s3-state.js", () => ({
   getStateBucketName: vi.fn(() => "wraps-state-123456789012-us-east-1"),
-  getS3BackendUrl: vi.fn(() => "s3://wraps-state-123456789012-us-east-1"),
+  getS3BackendUrl: vi.fn(
+    (accountId: string, region: string) =>
+      `s3://wraps-state-${accountId}-${region}`
+  ),
   stateBucketExists: vi.fn().mockResolvedValue(false),
   ensureStateBucket: vi.fn().mockResolvedValue(undefined),
   uploadMetadata: vi.fn().mockResolvedValue(undefined),
@@ -96,6 +99,10 @@ import {
 } from "../email/destroy.js";
 import { destroy } from "../shared/destroy.js";
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe("email destroy command", () => {
   let mockSpinner: {
     start: ReturnType<typeof vi.fn>;
@@ -134,11 +141,15 @@ describe("email destroy command", () => {
     vi.mocked(aws.getAWSRegion).mockResolvedValue("us-east-1");
 
     // Mock filesystem utilities
-    vi.mocked(fsUtils.ensurePulumiWorkDir).mockImplementation(async () => {
-      process.env.PULUMI_BACKEND_URL =
-        "s3://wraps-state-123456789012-us-east-1";
-      return undefined as never;
-    });
+    // Like the real function on the happy path: point Pulumi at the S3 backend.
+    vi.mocked(fsUtils.ensurePulumiWorkDir).mockImplementation(
+      async (options) => {
+        vi.stubEnv(
+          "PULUMI_BACKEND_URL",
+          `s3://wraps-state-${options?.accountId}-${options?.region}`
+        );
+      }
+    );
     vi.mocked(fsUtils.getPulumiWorkDir).mockReturnValue("/mock/.wraps/pulumi");
 
     // Mock metadata utilities
@@ -601,8 +612,7 @@ describe("email destroy command", () => {
       vi.stubEnv("AWS_DEFAULT_REGION", "");
       // The S3 backend is unreachable: ensurePulumiWorkDir falls back to file://.
       vi.mocked(fsUtils.ensurePulumiWorkDir).mockImplementation(async () => {
-        process.env.PULUMI_BACKEND_URL = LOCAL_URL;
-        return undefined as never;
+        vi.stubEnv("PULUMI_BACKEND_URL", LOCAL_URL);
       });
       // Turn on every delete that runs before the Pulumi block.
       vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue({
@@ -618,6 +628,13 @@ describe("email destroy command", () => {
                 receivingDomain: "inbound.example.com",
                 trigger: "ses-lambda-action",
               },
+              // Turns on the per-domain config set delete.
+              additionalDomains: [
+                {
+                  domain: "two.example.com",
+                  configSetName: "wraps-two-example-com",
+                },
+              ],
             },
           },
         },
@@ -636,11 +653,6 @@ describe("email destroy command", () => {
       });
     });
 
-    afterEach(() => {
-      vi.unstubAllEnvs();
-      delete process.env.PULUMI_BACKEND_URL;
-    });
-
     function expectNothingDeleted(stack: {
       destroy: ReturnType<typeof vi.fn>;
       workspace: { removeStack: ReturnType<typeof vi.fn> };
@@ -651,6 +663,7 @@ describe("email destroy command", () => {
       expect(stack.destroy).not.toHaveBeenCalled();
       expect(stack.workspace.removeStack).not.toHaveBeenCalled();
       expect(sqs.SQSClient).not.toHaveBeenCalled();
+      expect(sesv2.DeleteConfigurationSetCommand).not.toHaveBeenCalled();
       expect(metadata.deleteConnectionMetadata).not.toHaveBeenCalled();
     }
 
@@ -708,6 +721,34 @@ describe("email destroy command", () => {
 
       expect(stack.destroy).toHaveBeenCalled();
       expect(receiptRules.deleteReceiptRule).toHaveBeenCalled();
+      expect(sesv2.DeleteConfigurationSetCommand).toHaveBeenCalledWith({
+        ConfigurationSetName: "wraps-two-example-com",
+      });
+    });
+
+    it("guards the caller's account and region, not the metadata's", async () => {
+      vi.stubEnv("WRAPS_LOCAL_ONLY", "");
+      vi.mocked(aws.validateAWSCredentials).mockResolvedValue({
+        accountId: "999999999999",
+        userId: "AIDAEXAMPLE",
+        arn: "arn:aws:iam::999999999999:user/test",
+      });
+      vi.mocked(fsUtils.ensurePulumiWorkDir).mockImplementation(
+        async (options) => {
+          vi.stubEnv(
+            "PULUMI_BACKEND_URL",
+            `s3://wraps-state-${options?.accountId}-${options?.region}`
+          );
+        }
+      );
+      await setupPulumiMock();
+
+      await emailDestroy({ force: true, region: "eu-west-1" });
+
+      expect(fsUtils.ensurePulumiWorkDir).toHaveBeenCalledWith({
+        accountId: "999999999999",
+        region: "eu-west-1",
+      });
     });
 
     it("checks the backend after the last prompt and before the first delete", async () => {
@@ -1187,11 +1228,15 @@ describe("global destroy command", () => {
     vi.mocked(aws.getAWSRegion).mockResolvedValue("us-east-1");
 
     // Mock filesystem utilities
-    vi.mocked(fsUtils.ensurePulumiWorkDir).mockImplementation(async () => {
-      process.env.PULUMI_BACKEND_URL =
-        "s3://wraps-state-123456789012-us-east-1";
-      return undefined as never;
-    });
+    // Like the real function on the happy path: point Pulumi at the S3 backend.
+    vi.mocked(fsUtils.ensurePulumiWorkDir).mockImplementation(
+      async (options) => {
+        vi.stubEnv(
+          "PULUMI_BACKEND_URL",
+          `s3://wraps-state-${options?.accountId}-${options?.region}`
+        );
+      }
+    );
     vi.mocked(fsUtils.getPulumiWorkDir).mockReturnValue("/mock/.wraps/pulumi");
 
     // Mock metadata utilities
