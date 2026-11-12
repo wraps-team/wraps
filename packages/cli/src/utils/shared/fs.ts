@@ -9,7 +9,8 @@ import {
 } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { dump, load } from "js-yaml";
+import { CORE_SCHEMA, dump, load } from "js-yaml";
+import { isJsonMode } from "./json-output.js";
 
 /**
  * Get the Wraps configuration directory
@@ -66,6 +67,21 @@ export async function clearLocalStackLocks(): Promise<number> {
 }
 
 /**
+ * Warn without corrupting `--json` stdout: clack writes to stdout, so in JSON
+ * mode the message goes to stderr instead.
+ */
+async function warnUser(message: string): Promise<void> {
+  if (isJsonMode()) {
+    console.error(message);
+    return;
+  }
+  const clack = await import("@clack/prompts");
+  clack.log.warn(message);
+}
+
+let repairWarned = false;
+
+/**
  * Repair a stale `main` in ~/.wraps/pulumi/Pulumi.yaml.
  *
  * Pulumi's automation API writes this file once, with `main: process.cwd()` of
@@ -88,7 +104,9 @@ export async function repairPulumiProjectMain(): Promise<void> {
 
   let tempFile: string | undefined;
   try {
-    const parsed = load(await readFile(projectFile, "utf-8"));
+    const parsed = load(await readFile(projectFile, "utf-8"), {
+      schema: CORE_SCHEMA,
+    });
     if (
       parsed === null ||
       typeof parsed !== "object" ||
@@ -97,7 +115,15 @@ export async function repairPulumiProjectMain(): Promise<void> {
       throw new Error("not a YAML mapping");
     }
     const settings = parsed as Record<string, unknown>;
-    if (settings.main === pulumiDir) {
+    // Pulumi writes name, runtime, main in that order and not atomically, so a
+    // torn read lacks `main` (or has a truncated `name`). Write back only a
+    // complete file; a file with no `main` has nothing stale (Pulumi defaults
+    // to the project dir).
+    if (
+      typeof settings.name !== "string" ||
+      typeof settings.main !== "string" ||
+      settings.main === pulumiDir
+    ) {
       return;
     }
     settings.main = pulumiDir;
@@ -108,17 +134,24 @@ export async function repairPulumiProjectMain(): Promise<void> {
       pulumiDir,
       `.Pulumi.yaml.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`
     );
-    await writeFile(tempFile, dump(settings, { lineWidth: -1 }), "utf-8");
+    await writeFile(
+      tempFile,
+      dump(settings, { lineWidth: -1, schema: CORE_SCHEMA }),
+      "utf-8"
+    );
     await rename(tempFile, projectFile);
     tempFile = undefined;
   } catch (error) {
     if (tempFile) {
       await rm(tempFile, { force: true }).catch(() => {});
     }
-    const clack = await import("@clack/prompts");
-    clack.log.warn(
-      `Could not repair ${projectFile} (${error instanceof Error ? error.message : error}). Pulumi may fail to read the project.`
-    );
+    // Several commands call ensurePulumiWorkDir twice; warn once per process.
+    if (!repairWarned) {
+      repairWarned = true;
+      await warnUser(
+        `Could not repair ${projectFile} (${error instanceof Error ? error.message : error}). Pulumi may fail to read the project.`
+      );
+    }
   }
 }
 
@@ -200,8 +233,7 @@ export async function ensurePulumiWorkDir(options?: {
       return;
     } catch (error) {
       // Graceful fallback to local
-      const clack = await import("@clack/prompts");
-      clack.log.warn(
+      await warnUser(
         `S3 state backend unavailable (${error instanceof Error ? error.message : error}). Using local state.`
       );
     }

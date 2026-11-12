@@ -39,11 +39,11 @@ vi.mock("../shared/aws.js", () => ({
   resolveAWSCredentialsToEnv: vi.fn().mockResolvedValue(undefined),
 }));
 
-import {
-  ensurePulumiWorkDir,
-  getPulumiWorkDir,
-  repairPulumiProjectMain,
-} from "../shared/fs.js";
+// The warning is once-per-process module state, so load fresh modules per test.
+let ensurePulumiWorkDir: typeof import("../shared/fs.js").ensurePulumiWorkDir;
+let getPulumiWorkDir: typeof import("../shared/fs.js").getPulumiWorkDir;
+let repairPulumiProjectMain: typeof import("../shared/fs.js").repairPulumiProjectMain;
+let setJsonMode: typeof import("../shared/json-output.js").setJsonMode;
 
 describe("repairPulumiProjectMain", () => {
   let home: string;
@@ -54,6 +54,10 @@ describe("repairPulumiProjectMain", () => {
     load(readFileSync(yamlPath, "utf-8")) as Record<string, unknown>;
 
   beforeEach(async () => {
+    vi.resetModules();
+    ({ ensurePulumiWorkDir, getPulumiWorkDir, repairPulumiProjectMain } =
+      await import("../shared/fs.js"));
+    ({ setJsonMode } = await import("../shared/json-output.js"));
     home = await mkdtemp(join(tmpdir(), "wraps-pulumi-main-"));
     fakeHome = home;
     workDir = getPulumiWorkDir();
@@ -66,6 +70,8 @@ describe("repairPulumiProjectMain", () => {
   });
 
   afterEach(async () => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
     await rm(home, { recursive: true, force: true });
   });
 
@@ -139,7 +145,7 @@ describe("repairPulumiProjectMain", () => {
   it("parses and repairs a folded multi-line main", async () => {
     await writeFile(
       yamlPath,
-      `name: wraps-email\nruntime: nodejs\nmain: >-\n  /tmp/claude-1000/-home-jarod-Projects-wraps/a4b60100-e670-4e15-abdd-e1bf18f0254e/scratchpad\n`
+      `name: wraps-email\nruntime: nodejs\nmain: >-\n  /tmp/wraps-gone/a-long-directory-name-that-makes-the-yaml-writer-fold-this-path-onto-its-own-line\n`
     );
     await repairPulumiProjectMain();
     expect(readYaml()).toEqual({
@@ -194,12 +200,91 @@ describe("repairPulumiProjectMain", () => {
       yamlPath,
       `name: wraps-email\nruntime: nodejs\nmain: /nope\n`
     );
-    delete process.env.WRAPS_LOCAL_ONLY;
+    vi.stubEnv("WRAPS_LOCAL_ONLY", "");
+    vi.stubEnv("PULUMI_BACKEND_URL", "");
+    vi.stubEnv("PULUMI_CONFIG_PASSPHRASE", "");
     await ensurePulumiWorkDir({
       accountId: "123456789012",
       region: "us-east-1",
     });
     expect(callOrder).toEqual(["needsMigration", "migrateLocalPulumiState"]);
     expect(migrationSeenMain).toEqual([workDir]);
+    // Service-agnostic entry point: SMS / CDN commands reach the repair here.
+    expect(readYaml().name).toBe("wraps-email");
+  });
+
+  it("does not write when there is no main (nothing stale, or a torn file)", async () => {
+    const content = "name: wraps-email\nruntime: nodejs\n";
+    await writeFile(yamlPath, content);
+    await repairPulumiProjectMain();
+    expect(readFileSync(yamlPath, "utf-8")).toBe(content);
+    expect(readdirSync(workDir)).toEqual(["Pulumi.yaml"]);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("does not write a torn file that was cut off mid-name", async () => {
+    await writeFile(yamlPath, "name: wraps-em");
+    await repairPulumiProjectMain();
+    expect(readFileSync(yamlPath, "utf-8")).toBe("name: wraps-em");
+    expect(readdirSync(workDir)).toEqual(["Pulumi.yaml"]);
+  });
+
+  it("keeps a date-like extra key's value unchanged", async () => {
+    await writeFile(
+      yamlPath,
+      "name: wraps-email\nruntime: nodejs\nmain: /nope\ndescription: 2026-11-12\n"
+    );
+    await repairPulumiProjectMain();
+    expect(readFileSync(yamlPath, "utf-8")).toContain(
+      "description: 2026-11-12\n"
+    );
+    expect(readFileSync(yamlPath, "utf-8")).not.toContain("T00:00:00");
+  });
+
+  it("warns at most once per process", async () => {
+    await writeFile(yamlPath, "name: [unclosed\n");
+    await repairPulumiProjectMain();
+    await repairPulumiProjectMain();
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("in JSON mode warns on stderr only, never through clack or stdout", async () => {
+    setJsonMode(true);
+    try {
+      await writeFile(yamlPath, "name: [unclosed\n");
+      const stdout = vi.spyOn(process.stdout, "write");
+      const stderr = vi.spyOn(console, "error").mockImplementation(() => {});
+      await repairPulumiProjectMain();
+      expect(warn).not.toHaveBeenCalled();
+      expect(stdout).not.toHaveBeenCalled();
+      expect(stderr).toHaveBeenCalledTimes(1);
+      expect(String(stderr.mock.calls[0][0])).toContain("Could not repair");
+    } finally {
+      setJsonMode(false);
+    }
+  });
+
+  it("in JSON mode the S3-fallback warning also avoids clack and stdout", async () => {
+    setJsonMode(true);
+    try {
+      const { ensureStateBucket } = await import("../shared/s3-state.js");
+      vi.mocked(ensureStateBucket).mockRejectedValueOnce(
+        new Error("no bucket")
+      );
+      vi.stubEnv("WRAPS_LOCAL_ONLY", "");
+      const stdout = vi.spyOn(process.stdout, "write");
+      const stderr = vi.spyOn(console, "error").mockImplementation(() => {});
+      await ensurePulumiWorkDir({
+        accountId: "123456789012",
+        region: "us-east-1",
+      });
+      expect(warn).not.toHaveBeenCalled();
+      expect(stdout).not.toHaveBeenCalled();
+      expect(String(stderr.mock.calls[0][0])).toContain(
+        "S3 state backend unavailable"
+      );
+    } finally {
+      setJsonMode(false);
+    }
   });
 });
