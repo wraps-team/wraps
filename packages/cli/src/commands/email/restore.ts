@@ -6,10 +6,7 @@ import type { EmailRestoreOptions } from "../../types/index.js";
 import { domainToConfigSetName } from "../../utils/email/config-set-slug.js";
 import { validateAWSCredentials } from "../../utils/shared/aws.js";
 import { errors, WrapsError } from "../../utils/shared/errors.js";
-import {
-  ensurePulumiWorkDir,
-  getPulumiWorkDir,
-} from "../../utils/shared/fs.js";
+import { getPulumiWorkDir } from "../../utils/shared/fs.js";
 import { isJsonMode, jsonSuccess } from "../../utils/shared/json-output.js";
 import {
   deleteConnectionMetadata,
@@ -24,30 +21,14 @@ import {
   previewWithResourceChanges,
 } from "../../utils/shared/pulumi.js";
 import { resolveRegionForCommand } from "../../utils/shared/region-resolver.js";
-import { getS3BackendUrl } from "../../utils/shared/s3-state.js";
+import { requireAccountStateBackend } from "../../utils/shared/state-backend.js";
 
-/**
- * Point Pulumi at the account's state backend, and refuse to continue on local
- * state. ensurePulumiWorkDir falls back to the local file backend when S3 is
- * unreachable; a migrated account still has a stale local stack, so destroying
- * from it would orphan resources created since. Fail closed instead.
- */
-async function ensureStateBackend(
-  accountId: string,
-  region: string
-): Promise<void> {
-  await ensurePulumiWorkDir({ accountId, region });
-  if (
-    process.env.WRAPS_LOCAL_ONLY !== "1" &&
-    process.env.PULUMI_BACKEND_URL !== getS3BackendUrl(accountId, region)
-  ) {
-    throw errors.stateBackendUnreachable(accountId, region);
-  }
-}
-
-function isStateBackendUnreachable(error: unknown): boolean {
+/** Errors that must reach the user with their own suggestion, not wrapped. */
+function isUnwrappedError(error: unknown): boolean {
   return (
-    error instanceof WrapsError && error.code === "STATE_BACKEND_UNREACHABLE"
+    error instanceof WrapsError &&
+    (error.code === "STATE_BACKEND_UNREACHABLE" ||
+      error.code === "STACK_PROJECT_CONFLICT")
   );
 }
 
@@ -167,7 +148,7 @@ export async function restore(options: EmailRestoreOptions): Promise<void> {
         const previewResult = await progress.execute(
           "Generating removal preview",
           async () => {
-            await ensureStateBackend(identity.accountId, region);
+            await requireAccountStateBackend(identity.accountId, region);
             const stack = await pulumi.automation.LocalWorkspace.selectStack(
               {
                 stackName: pulumiStackName,
@@ -213,7 +194,7 @@ export async function restore(options: EmailRestoreOptions): Promise<void> {
         });
         return;
       } catch (error) {
-        if (isStateBackendUnreachable(error)) {
+        if (isUnwrappedError(error)) {
           throw error; // keep its suggestion; don't wrap in "Preview failed"
         }
         trackError("PREVIEW_FAILED", "email:restore", { step: "preview" });
@@ -232,7 +213,7 @@ export async function restore(options: EmailRestoreOptions): Promise<void> {
           throw new Error("No Pulumi stack name found in metadata");
         }
 
-        await ensureStateBackend(identity.accountId, region);
+        await requireAccountStateBackend(identity.accountId, region);
 
         const stack = await pulumi.automation.LocalWorkspace.selectStack(
           {
@@ -258,7 +239,7 @@ export async function restore(options: EmailRestoreOptions): Promise<void> {
           metadata.services.email.pulumiStackName
         );
       } catch (error) {
-        if (isStateBackendUnreachable(error)) {
+        if (isUnwrappedError(error)) {
           throw error; // keep its suggestion; don't wrap
         }
         trackError("DESTROY_FAILED", "email:restore", { step: "destroy" });
