@@ -1423,10 +1423,21 @@ export const errors = {
   stateBackendListFailed: (details: {
     bucket: string;
     key?: string;
-    operation: "list" | "read" | "parse";
+    operation: "list" | "read" | "parse" | "unsupported";
     errorName: string;
     accessDenied: boolean;
+    /** "unsupported" only: the compression extension, e.g. ".zst". */
+    extension?: string;
   }) => {
+    if (details.operation === "unsupported") {
+      const ext = details.extension ?? "unknown";
+      return new WrapsError(
+        `Wraps can't read this stack file format (${ext}): ${details.key ?? details.bucket}. It couldn't check this machine's Pulumi project, and nothing was created. See ${PROJECT_DOCS_URL}.`,
+        "STATE_BACKEND_LIST_FAILED",
+        `This Wraps install can't decode ${ext} stack files. Use a newer Node (22.15 or later) if the format is .zst, or contact support (see the docs link).`,
+        PROJECT_DOCS_URL
+      );
+    }
     const what =
       details.operation === "list"
         ? `list the state bucket ${details.bucket}`
@@ -1443,7 +1454,7 @@ export const errors = {
       suggestion = `The AWS error was ${details.errorName}. Run the same command again.`;
     }
     return new WrapsError(
-      `Wraps couldn't ${what} to check this machine's Pulumi project. Nothing was created.`,
+      `Wraps couldn't ${what} (${details.errorName}) to check this machine's Pulumi project. Nothing was created. See ${PROJECT_DOCS_URL}.`,
       "STATE_BACKEND_LIST_FAILED",
       suggestion,
       PROJECT_DOCS_URL

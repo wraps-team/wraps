@@ -1,6 +1,6 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { gunzipSync } from "node:zlib";
+import * as zlib from "node:zlib";
 
 /**
  * Detection of the Pulumi project name an account's state lives under.
@@ -42,11 +42,13 @@ export type ProjectListing = {
 /** A list, read or parse failure while inspecting state. */
 export class ProjectListError extends Error {
   constructor(
-    public operation: "list" | "read" | "parse",
+    public operation: "list" | "read" | "parse" | "unsupported",
     public errorName: string,
     public accessDenied: boolean,
     /** The object key (S3) or path (local) that failed; absent for a list. */
-    public key?: string
+    public key?: string,
+    /** "unsupported" only: the compression extension Wraps can't decode, e.g. ".zst". */
+    public extension?: string
   ) {
     super(`${operation} ${key ?? "state"} failed: ${errorName}`);
     this.name = "ProjectListError";
@@ -59,7 +61,11 @@ function errorInfo(error: unknown): { name: string; accessDenied: boolean } {
     code?: string;
     $metadata?: { httpStatusCode?: number };
   };
-  const name = e?.name || e?.code || "UnknownError";
+  // Node fs and socket errors are named "Error"; their errno is in `code`.
+  const name =
+    (e?.name && e.name !== "Error" ? e.name : e?.code) ||
+    e?.name ||
+    "UnknownError";
   const accessDenied =
     name === "AccessDenied" ||
     name === "AccessDeniedException" ||
@@ -73,21 +79,51 @@ function isEnoent(error: unknown): boolean {
   return (error as { code?: string })?.code === "ENOENT";
 }
 
-/** `<stack>.json` or `<stack>.json.gz` -> stack; anything else (.bak, ...) -> undefined. */
-function stackNameOf(file: string): string | undefined {
-  if (file.endsWith(".json.gz")) {
-    return file.slice(0, -".json.gz".length) || undefined;
+const STACK_FILE = /^(.+)\.json((?:\.[A-Za-z0-9]+)?)$/;
+
+/**
+ * `<stack>.json` or `<stack>.json.<ext>` (Pulumi reads `.gz` and `.zst`).
+ * `.bak` forms and anything else are not stack files.
+ */
+function parseStackFile(
+  file: string
+): { stack: string; extension: string } | undefined {
+  if (file.endsWith(".bak")) {
+    return;
   }
-  if (file.endsWith(".json")) {
-    return file.slice(0, -".json".length) || undefined;
+  const m = STACK_FILE.exec(file);
+  return m ? { stack: m[1], extension: m[2] } : undefined;
+}
+
+type StackFile = { file: string; extension: string; modified: number };
+
+/** Newest copy wins (Pulumi keeps the most recently modified variant). */
+function newest(variants: StackFile[]): StackFile {
+  return [...variants].sort(
+    (a, b) => b.modified - a.modified || a.file.localeCompare(b.file)
+  )[0];
+}
+
+/** Decode a stack file's bytes, or null when this Node can't decode its extension. */
+function decode(bytes: Buffer, extension: string): Buffer | null {
+  if (extension === "") {
+    return bytes;
   }
-  return;
+  if (extension === ".gz") {
+    return zlib.gunzipSync(bytes);
+  }
+  const zstd = (zlib as { zstdDecompressSync?: (b: Buffer) => Buffer })
+    .zstdDecompressSync;
+  if (extension === ".zst" && typeof zstd === "function") {
+    return zstd(bytes);
+  }
+  return null;
 }
 
 type Source = {
   listDirs(): Promise<string[]>;
-  /** File names (not keys) in a project dir. */
-  listFiles(dir: string): Promise<string[]>;
+  /** File names (not keys) in a project dir, with their last-modified time (ms). */
+  listFiles(dir: string): Promise<Array<{ name: string; modified: number }>>;
   read(dir: string, file: string): Promise<Buffer>;
   keyOf(dir: string, file: string): string;
 };
@@ -125,7 +161,7 @@ async function s3Source(
     },
     async listFiles(dir) {
       const prefix = `${STACKS_PREFIX}${dir}/`;
-      const files: string[] = [];
+      const files: Array<{ name: string; modified: number }> = [];
       let token: string | undefined;
       do {
         const res = await client.send(
@@ -138,7 +174,10 @@ async function s3Source(
         );
         for (const o of res.Contents ?? []) {
           if (o.Key) {
-            files.push(o.Key.slice(prefix.length));
+            files.push({
+              name: o.Key.slice(prefix.length),
+              modified: o.LastModified ? new Date(o.LastModified).getTime() : 0,
+            });
           }
         }
         token = res.IsTruncated ? res.NextContinuationToken : undefined;
@@ -180,12 +219,18 @@ function localSource(
       }
     },
     async listFiles(dir) {
-      const files = await readdir(join(root, dir));
-      return filter
-        ? files.filter(
+      const names = await readdir(join(root, dir));
+      const wanted = filter
+        ? names.filter(
             (f) => f.includes(filter.accountId) && f.includes(filter.region)
           )
-        : files;
+        : names;
+      return Promise.all(
+        wanted.map(async (name) => ({
+          name,
+          modified: (await stat(join(root, dir, name))).mtimeMs,
+        }))
+      );
     },
     read: (dir, file) => readFile(join(root, dir, file)),
   };
@@ -261,25 +306,25 @@ export async function listWrapsProjects(
     throw new ProjectListError("list", info.name, info.accessDenied);
   }
 
-  const stackFiles = new Map<string, Map<string, string>>(); // dir -> stack -> file
+  const stackFiles = new Map<string, Map<string, StackFile[]>>(); // dir -> stack -> variants
   const listDir = async (dir: string) => {
-    let files: string[];
+    let files: Array<{ name: string; modified: number }>;
     try {
       files = await source.listFiles(dir);
     } catch (error) {
       const info = errorInfo(error);
       throw new ProjectListError("list", info.name, info.accessDenied);
     }
-    const stacks = new Map<string, string>();
-    for (const file of files) {
-      const stack = stackNameOf(file);
-      if (!stack) {
+    const stacks = new Map<string, StackFile[]>();
+    for (const { name, modified } of files) {
+      const parsed = parseStackFile(name);
+      if (!parsed) {
         continue;
       }
-      // Count a stack once if both forms exist; prefer the plain .json.
-      if (!stacks.has(stack) || file.endsWith(".json")) {
-        stacks.set(stack, file);
-      }
+      // One stack however many copies exist (.json, .json.gz, .json.zst).
+      const list = stacks.get(parsed.stack) ?? [];
+      list.push({ file: name, extension: parsed.extension, modified });
+      stacks.set(parsed.stack, list);
     }
     stackFiles.set(dir, stacks);
   };
@@ -306,9 +351,10 @@ export async function listWrapsProjects(
   const projects: Record<string, ProjectStacks> = {};
   for (const [dir, stacks] of stackFiles) {
     const entry: ProjectStacks = { nonEmpty: [], empty: [] };
-    for (const [stack, file] of [...stacks].sort(([a], [b]) =>
+    for (const [stack, variants] of [...stacks].sort(([a], [b]) =>
       a.localeCompare(b)
     )) {
+      const { file, extension } = newest(variants);
       const key = source.keyOf(dir, file);
       let bytes: Buffer;
       try {
@@ -319,9 +365,21 @@ export async function listWrapsProjects(
       }
       let nonEmpty: boolean;
       try {
-        const raw = file.endsWith(".gz") ? gunzipSync(bytes) : bytes;
+        const raw = decode(bytes, extension);
+        if (raw === null) {
+          throw new ProjectListError(
+            "unsupported",
+            "UnsupportedCompression",
+            false,
+            key,
+            extension
+          );
+        }
         nonEmpty = checkpointIsNonEmpty(JSON.parse(raw.toString("utf-8")));
       } catch (error) {
+        if (error instanceof ProjectListError) {
+          throw error;
+        }
         throw new ProjectListError(
           "parse",
           (error as Error)?.name ?? "ParseError",

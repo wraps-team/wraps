@@ -300,8 +300,12 @@ async function checkProject(
       throw error;
     }
     if (name !== undefined) {
+      const iam =
+        error.accessDenied && !local
+          ? ". Grant s3:ListBucket and s3:GetObject on wraps-state-* with no s3:prefix condition"
+          : "";
       await warnOnce(
-        `Couldn't check this machine's Pulumi project against ${location} (${error.errorName}${error.accessDenied ? ": AccessDenied, grant s3:ListBucket and s3:GetObject on wraps-state-* with no s3:prefix condition" : ""}${error.key ? `, at ${error.key}` : ""}). Continuing.`
+        `Couldn't check this machine's Pulumi project against ${location} (${error.errorName}${error.key ? `, at ${error.key}` : ""})${iam}. Continuing.`
       );
       return;
     }
@@ -314,6 +318,7 @@ async function checkProject(
       operation: error.operation,
       errorName: error.errorName,
       accessDenied: error.accessDenied,
+      extension: error.extension,
     });
   }
 

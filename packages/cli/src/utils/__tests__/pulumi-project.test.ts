@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { gzipSync } from "node:zlib";
+import { gzipSync, zstdCompressSync } from "node:zlib";
 import {
   GetObjectCommand,
   ListObjectsV2Command,
@@ -88,7 +88,10 @@ let listFailure: Error | undefined;
 const listCalls: Array<{ prefix: string; token?: string }> = [];
 const getCalls: string[] = [];
 
-function put(key: string, body: unknown) {
+const modifiedAt = new Map<string, number>();
+
+function put(key: string, body: unknown, modified = 0) {
+  modifiedAt.set(`${PREFIX}${key}`, modified);
   objects.set(
     `${PREFIX}${key}`,
     Buffer.isBuffer(body) ? body : Buffer.from(JSON.stringify(body))
@@ -135,7 +138,12 @@ function installFakeS3(pageSize = 2) {
     const page = items.slice(start, start + pageSize);
     const more = start + pageSize < items.length;
     return {
-      Contents: page.filter((i) => i.c).map((i) => ({ Key: i.c })),
+      Contents: page
+        .filter((i) => i.c)
+        .map((i) => ({
+          Key: i.c,
+          LastModified: new Date(modifiedAt.get(i.c as string) ?? 0),
+        })),
       CommonPrefixes: page.filter((i) => i.p).map((i) => ({ Prefix: i.p })),
       IsTruncated: more,
       NextContinuationToken: more ? String(start + pageSize) : undefined,
@@ -183,6 +191,15 @@ async function expectCode(code: string) {
   return error as import("../shared/errors.js").WrapsError;
 }
 
+async function withLink(link: () => Promise<void>) {
+  vi.doMock("node:fs/promises", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("node:fs/promises")>()),
+    link,
+  }));
+  vi.resetModules();
+  ({ ensurePulumiWorkDir } = await import("../shared/fs.js"));
+}
+
 beforeEach(async () => {
   vi.resetModules();
   ({ ensurePulumiWorkDir, getPulumiWorkDir } = await import("../shared/fs.js"));
@@ -196,6 +213,7 @@ beforeEach(async () => {
   vi.stubEnv("PULUMI_BACKEND_URL", "");
   s3.reset();
   objects = new Map();
+  modifiedAt.clear();
   getFailures = new Map();
   listFailure = undefined;
   listCalls.length = 0;
@@ -351,7 +369,10 @@ describe("project file present (S3)", () => {
     listFailure = awsError("AccessDenied", 403);
     await run();
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(String(warn.mock.calls[0][0])).toContain("AccessDenied");
+    const text = String(warn.mock.calls[0][0]);
+    expect(text).toContain("AccessDenied");
+    expect(text).toContain("s3:ListBucket");
+    expect(text).not.toContain("AccessDenied: AccessDenied");
   });
 
   it("names a network error in the warning, distinct from AccessDenied", async () => {
@@ -453,6 +474,71 @@ describe("no project file (S3)", () => {
     expect(error.suggestion).toContain("s3:GetObject");
   });
 
+  it("adopts the project of a stack that only has a valid .json.gz", async () => {
+    // Fails if gunzip is removed: the bytes are only valid once decompressed.
+    put(`wraps-sms/${STACK}.json.gz`, gzipSync(JSON.stringify(NON_EMPTY)));
+    await run();
+    expect(readYaml().name).toBe("wraps-sms");
+  });
+
+  it("adopts the project of a stack that only has a .json.zst", async () => {
+    put(
+      `wraps-sms/${STACK}.json.zst`,
+      zstdCompressSync(Buffer.from(JSON.stringify(NON_EMPTY)))
+    );
+    await run();
+    expect(readYaml().name).toBe("wraps-sms");
+  });
+
+  it("refuses with unsupported-compression wording when Node can't decode .zst, never adopting wraps-email", async () => {
+    put(`wraps-sms/${STACK}.json.zst`, Buffer.from("zst bytes"));
+    vi.doMock("node:zlib", async (importOriginal) => ({
+      ...(await importOriginal<typeof import("node:zlib")>()),
+      zstdDecompressSync: undefined,
+    }));
+    vi.resetModules();
+    ({ ensurePulumiWorkDir } = await import("../shared/fs.js"));
+    try {
+      const error = await expectCode("STATE_BACKEND_LIST_FAILED");
+      expect(error.message).toContain(".zst");
+      expect(error.message).toContain(`wraps-sms/${STACK}.json.zst`);
+      expect(error.suggestion).not.toContain("corrupt");
+      expect(error.suggestion).not.toContain("again");
+      expect(existsSync(yamlPath())).toBe(false);
+    } finally {
+      vi.doUnmock("node:zlib");
+    }
+  });
+
+  it("refuses an unknown compression extension the same way", async () => {
+    put(`wraps-sms/${STACK}.json.lz4`, Buffer.from("lz4 bytes"));
+    const error = await expectCode("STATE_BACKEND_LIST_FAILED");
+    expect(error.message).toContain(".lz4");
+    expect(existsSync(yamlPath())).toBe(false);
+  });
+
+  it("reads the newest copy: a newer non-empty .json.gz beats an older empty .json", async () => {
+    put(`wraps-sms/${STACK}.json`, EMPTY, 1000);
+    put(
+      `wraps-sms/${STACK}.json.gz`,
+      gzipSync(JSON.stringify(NON_EMPTY)),
+      2000
+    );
+    await run();
+    expect(readYaml().name).toBe("wraps-sms");
+  });
+
+  it("reads the newest copy: a newer empty .json beats an older non-empty .json.gz", async () => {
+    put(`wraps-sms/${STACK}.json`, EMPTY, 2000);
+    put(
+      `wraps-sms/${STACK}.json.gz`,
+      gzipSync(JSON.stringify(NON_EMPTY)),
+      1000
+    );
+    await run();
+    expect(readYaml().name).toBe("wraps-email");
+  });
+
   it("refuses with parse wording on a corrupt .gz", async () => {
     put("wraps-sms/b.json.gz", Buffer.from("not gzip"));
     const error = await expectCode("STATE_BACKEND_LIST_FAILED");
@@ -500,15 +586,6 @@ describe("no project file (S3)", () => {
     expect(callOrder.slice(1).every((c) => c === "list")).toBe(true);
     expect(readYaml().name).toBe("wraps-sms");
   });
-
-  async function withLink(link: () => Promise<void>) {
-    vi.doMock("node:fs/promises", async (importOriginal) => ({
-      ...(await importOriginal<typeof import("node:fs/promises")>()),
-      link,
-    }));
-    vi.resetModules();
-    ({ ensurePulumiWorkDir } = await import("../shared/fs.js"));
-  }
 
   it("on EEXIST re-checks against the other process's name", async () => {
     put(`wraps-email/${STACK}.json`, NON_EMPTY);
@@ -596,8 +673,35 @@ describe("local-only and fallback paths", () => {
   it("local path EEXIST re-checks against the other process's name", async () => {
     vi.stubEnv("WRAPS_LOCAL_ONLY", "1");
     await localStack("wraps-email", STACK, NON_EMPTY);
-    await writeProject("wraps-sms");
-    await expectCode("PULUMI_PROJECT_MISMATCH");
+    await withLink(async () => {
+      await writeProject("wraps-sms");
+      throw Object.assign(new Error("exists"), { code: "EEXIST" });
+    });
+    try {
+      const error = await expectCode("PULUMI_PROJECT_MISMATCH");
+      expect(error.message).toContain("local state in ~/.wraps/pulumi");
+      expect(readYaml().name).toBe("wraps-sms");
+    } finally {
+      vi.doUnmock("node:fs/promises");
+    }
+  });
+
+  it("warns without S3 advice on a local read error with a project file", async () => {
+    vi.stubEnv("WRAPS_LOCAL_ONLY", "1");
+    await writeProject("wraps-email");
+    const dir = join(
+      workDir,
+      ".pulumi",
+      "stacks",
+      "wraps-sms",
+      `${STACK}.json`
+    );
+    await mkdir(dir, { recursive: true });
+    await run();
+    expect(warn).toHaveBeenCalledTimes(1);
+    const text = String(warn.mock.calls[0][0]);
+    expect(text).toContain("EISDIR");
+    expect(text).not.toContain("s3:ListBucket");
   });
 
   it("does no detection, listing or creation on the S3-failure fallback", async () => {
