@@ -92,6 +92,7 @@
     "get-port": "^7.2.0",
     "http-terminator": "^3.2.0",
     "isomorphic-dompurify": "2.32.0",
+    "js-yaml": "^4.3.2",
     "mailparser": "3.9.15",
     "mri": "^1.2.0",
     "open": "^10.2.0",
@@ -103,6 +104,7 @@
   },
   "devDependencies": {
     "@types/express": "^4.17.23",
+    "@types/js-yaml": "^4.0.9",
     "@types/mailparser": "3.4.6",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
