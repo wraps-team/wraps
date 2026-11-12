@@ -766,6 +766,13 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
         solution: "Provide the flag named in the error message",
       },
       {
+        code: "STATE_BACKEND_UNREACHABLE",
+        message:
+          "Restore won't remove infrastructure using local state while the S3 state backend is unreachable",
+        solution:
+          "wraps email restore refuses to destroy from local state when it can't reach wraps-state-<account>-<region>, because a migrated account's local copy is stale. Fix S3 access to that bucket and rerun, or set WRAPS_LOCAL_ONLY=1 to use local state on purpose.",
+      },
+      {
         code: "JSON_REQUIRES_FORCE",
         message:
           "--force flag is required in JSON mode for destructive operations",
