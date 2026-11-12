@@ -305,6 +305,13 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
           "Local state is still intact. export WRAPS_LOCAL_ONLY=1 to skip migration",
       },
       {
+        code: "STATE_BACKEND_UNREACHABLE",
+        message:
+          "Restore won't use local state while the S3 state backend is unreachable",
+        solution:
+          "Fix S3 access to wraps-state-<account>-<region>. Local state is stale after migration; set WRAPS_LOCAL_ONLY=1 for that one run, only if state was never migrated",
+      },
+      {
         code: "SELFHOST_NO_LOG_GROUPS",
         message: "No self-hosted log groups found in <region>",
         solution: "Check wraps selfhost status, or target a different region",

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock all external dependencies
 vi.mock("@pulumi/pulumi", () => ({
@@ -20,13 +20,17 @@ vi.mock("../../utils/shared/fs.js");
 vi.mock("../../utils/shared/metadata.js");
 vi.mock("../../utils/shared/pulumi.js", () => ({
   ensurePulumiInstalled: vi.fn().mockResolvedValue(false),
+  previewWithResourceChanges: vi
+    .fn()
+    .mockResolvedValue({ changeSummary: {}, resourceChanges: [] }),
 }));
 
 import * as prompts from "@clack/prompts";
 import * as aws from "../../utils/shared/aws.js";
+// Import after mocks
+import { errors, WrapsError } from "../../utils/shared/errors.js";
 import * as fsUtils from "../../utils/shared/fs.js";
 import * as metadata from "../../utils/shared/metadata.js";
-// Import after mocks
 import { restore } from "../email/restore.js";
 
 describe("restore command", () => {
@@ -67,6 +71,19 @@ describe("restore command", () => {
 
     // Mock filesystem utilities
     vi.mocked(fsUtils.getPulumiWorkDir).mockReturnValue("/mock/.wraps/pulumi");
+    // Like the real function on the happy path: point Pulumi at the S3 backend.
+    vi.mocked(fsUtils.ensurePulumiWorkDir).mockImplementation(
+      async (options) => {
+        vi.stubEnv(
+          "PULUMI_BACKEND_URL",
+          `s3://wraps-state-${options?.accountId}-${options?.region}`
+        );
+      }
+    );
+    // Keep the tests independent of the developer's shell.
+    vi.stubEnv("WRAPS_LOCAL_ONLY", "");
+    vi.stubEnv("AWS_REGION", "");
+    vi.stubEnv("AWS_DEFAULT_REGION", "");
 
     // Mock metadata utilities with connection data
     vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue({
@@ -90,6 +107,10 @@ describe("restore command", () => {
       },
     } as any);
     vi.mocked(metadata.deleteConnectionMetadata).mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   // Helper function to setup Pulumi mocking
@@ -209,35 +230,206 @@ describe("restore command", () => {
     });
   });
 
-  describe("Pulumi.yaml repair ordering", () => {
-    it("repairs Pulumi.yaml main before selecting the stack when destroying", async () => {
-      await setupPulumiMock();
-      await restore({ force: true });
+  describe("State backend", () => {
+    const otherAccount = {
+      accountId: "210987654321",
+      userId: "AIDACKCEVSQ6C2EXAMPLE",
+      arn: "arn:aws:iam::210987654321:user/test",
+    };
 
+    async function selectMock() {
       const pulumi = await import("@pulumi/pulumi");
-      const repair = vi.mocked(fsUtils.repairPulumiProjectMain);
-      const select = vi.mocked(pulumi.automation.LocalWorkspace.selectStack);
-      expect(repair).toHaveBeenCalledTimes(1);
+      return vi.mocked(pulumi.automation.LocalWorkspace.selectStack);
+    }
+
+    function useLocalBackend() {
+      vi.mocked(fsUtils.ensurePulumiWorkDir).mockImplementation(async () => {
+        vi.stubEnv("PULUMI_BACKEND_URL", "file:///mock/.wraps/pulumi");
+      });
+    }
+
+    it("sets up the backend for the resolved account and region before selecting the stack when destroying", async () => {
+      await setupPulumiMock();
+      vi.mocked(aws.validateAWSCredentials).mockResolvedValue(otherAccount);
+      await restore({ force: true, region: "eu-west-1" });
+
+      const ensure = vi.mocked(fsUtils.ensurePulumiWorkDir);
+      const select = await selectMock();
+      expect(ensure).toHaveBeenCalledTimes(1);
+      expect(ensure).toHaveBeenCalledWith({
+        accountId: "210987654321",
+        region: "eu-west-1",
+      });
       expect(select).toHaveBeenCalledTimes(1);
-      expect(repair.mock.invocationCallOrder[0]).toBeLessThan(
+      expect(ensure.mock.invocationCallOrder[0]).toBeLessThan(
         select.mock.invocationCallOrder[0]
       );
     });
 
-    it("repairs Pulumi.yaml main before selecting the stack when previewing", async () => {
-      await setupPulumiMock(true); // select throws; ordering is all we assert
-      await expect(restore({ preview: true })).rejects.toThrow(
-        "Preview failed"
-      );
+    it("sets up the backend for the resolved account and region before selecting the stack when previewing", async () => {
+      await setupPulumiMock();
+      vi.mocked(aws.validateAWSCredentials).mockResolvedValue(otherAccount);
+      await restore({ force: true, preview: true, region: "eu-west-1" });
 
-      const pulumi = await import("@pulumi/pulumi");
-      const repair = vi.mocked(fsUtils.repairPulumiProjectMain);
-      const select = vi.mocked(pulumi.automation.LocalWorkspace.selectStack);
-      expect(repair).toHaveBeenCalledTimes(1);
+      const ensure = vi.mocked(fsUtils.ensurePulumiWorkDir);
+      const select = await selectMock();
+      expect(ensure).toHaveBeenCalledTimes(1);
+      expect(ensure).toHaveBeenCalledWith({
+        accountId: "210987654321",
+        region: "eu-west-1",
+      });
       expect(select).toHaveBeenCalledTimes(1);
-      expect(repair.mock.invocationCallOrder[0]).toBeLessThan(
+      expect(ensure.mock.invocationCallOrder[0]).toBeLessThan(
         select.mock.invocationCallOrder[0]
       );
+    });
+
+    it("asks for confirmation before touching the state backend", async () => {
+      await setupPulumiMock();
+      await restore({});
+
+      const select = await selectMock();
+      const confirmOrder = vi.mocked(prompts.confirm).mock
+        .invocationCallOrder[0];
+      const ensureOrder = vi.mocked(fsUtils.ensurePulumiWorkDir).mock
+        .invocationCallOrder[0];
+      expect(confirmOrder).toBeLessThan(ensureOrder);
+      expect(ensureOrder).toBeLessThan(select.mock.invocationCallOrder[0]);
+    });
+
+    it("removes nothing when backend setup fails while destroying", async () => {
+      const mockStack = await setupPulumiMock();
+      vi.mocked(fsUtils.ensurePulumiWorkDir).mockRejectedValue(
+        errors.ssoSessionExpired()
+      );
+
+      await expect(restore({ force: true })).rejects.toThrow(
+        "Failed to destroy Pulumi stack: AWS SSO session has expired"
+      );
+
+      expect(await selectMock()).not.toHaveBeenCalled();
+      expect(mockStack.destroy).not.toHaveBeenCalled();
+      expect(metadata.deleteConnectionMetadata).not.toHaveBeenCalled();
+    });
+
+    it("selects nothing when backend setup fails while previewing", async () => {
+      const mockStack = await setupPulumiMock();
+      vi.mocked(fsUtils.ensurePulumiWorkDir).mockRejectedValue(
+        errors.ssoSessionExpired()
+      );
+
+      await expect(restore({ preview: true })).rejects.toThrow(
+        "Preview failed: AWS SSO session has expired"
+      );
+
+      expect(await selectMock()).not.toHaveBeenCalled();
+      expect(mockStack.destroy).not.toHaveBeenCalled();
+      expect(metadata.deleteConnectionMetadata).not.toHaveBeenCalled();
+    });
+
+    it("fails closed when the S3 backend is unreachable while destroying", async () => {
+      const mockStack = await setupPulumiMock();
+      useLocalBackend();
+
+      vi.mocked(aws.validateAWSCredentials).mockResolvedValue(otherAccount);
+
+      const error = await restore({ force: true, region: "eu-west-1" }).catch(
+        (e) => e
+      );
+
+      expect(error).toBeInstanceOf(WrapsError);
+      expect(error.code).toBe("STATE_BACKEND_UNREACHABLE");
+      expect(error.suggestion).toContain("wraps-state-210987654321-eu-west-1");
+      expect(error.suggestion).toContain("WRAPS_LOCAL_ONLY=1");
+      expect(await selectMock()).not.toHaveBeenCalled();
+      expect(mockStack.destroy).not.toHaveBeenCalled();
+      expect(metadata.deleteConnectionMetadata).not.toHaveBeenCalled();
+    });
+
+    it("fails closed when the S3 backend is unreachable while previewing", async () => {
+      const mockStack = await setupPulumiMock();
+      useLocalBackend();
+
+      const error = await restore({ preview: true }).catch((e) => e);
+
+      expect(error).toBeInstanceOf(WrapsError);
+      expect(error.code).toBe("STATE_BACKEND_UNREACHABLE");
+      expect(await selectMock()).not.toHaveBeenCalled();
+      expect(mockStack.destroy).not.toHaveBeenCalled();
+      expect(metadata.deleteConnectionMetadata).not.toHaveBeenCalled();
+    });
+
+    it("fails closed when WRAPS_LOCAL_ONLY is set to anything but 1", async () => {
+      const mockStack = await setupPulumiMock();
+      useLocalBackend();
+      vi.stubEnv("WRAPS_LOCAL_ONLY", "true");
+
+      const error = await restore({ force: true }).catch((e) => e);
+
+      expect(error.code).toBe("STATE_BACKEND_UNREACHABLE");
+      expect(mockStack.destroy).not.toHaveBeenCalled();
+    });
+
+    it("fails closed when the backend is another account's bucket", async () => {
+      const mockStack = await setupPulumiMock();
+      vi.mocked(fsUtils.ensurePulumiWorkDir).mockImplementation(async () => {
+        vi.stubEnv(
+          "PULUMI_BACKEND_URL",
+          "s3://wraps-state-999999999999-us-east-1"
+        );
+      });
+
+      const error = await restore({ force: true }).catch((e) => e);
+
+      expect(error.code).toBe("STATE_BACKEND_UNREACHABLE");
+      expect(mockStack.destroy).not.toHaveBeenCalled();
+    });
+
+    it("uses local state when WRAPS_LOCAL_ONLY=1 while destroying", async () => {
+      const mockStack = await setupPulumiMock();
+      useLocalBackend();
+      vi.stubEnv("WRAPS_LOCAL_ONLY", "1");
+
+      await restore({ force: true });
+
+      expect(await selectMock()).toHaveBeenCalledTimes(1);
+      expect(mockStack.destroy).toHaveBeenCalled();
+      expect(metadata.deleteConnectionMetadata).toHaveBeenCalled();
+    });
+
+    it("uses local state when WRAPS_LOCAL_ONLY=1 while previewing", async () => {
+      await setupPulumiMock();
+      useLocalBackend();
+      vi.stubEnv("WRAPS_LOCAL_ONLY", "1");
+
+      await restore({ preview: true });
+
+      expect(await selectMock()).toHaveBeenCalledTimes(1);
+    });
+
+    it("never sets up the backend when the user cancels", async () => {
+      await setupPulumiMock();
+      vi.mocked(prompts.confirm).mockResolvedValue(false as never);
+
+      await expect(restore({})).rejects.toThrow();
+
+      expect(fsUtils.ensurePulumiWorkDir).not.toHaveBeenCalled();
+    });
+
+    it("never sets up the backend when metadata has no pulumiStackName", async () => {
+      await setupPulumiMock();
+      vi.mocked(metadata.loadConnectionMetadata).mockResolvedValue({
+        accountId: "123456789012",
+        region: "us-east-1",
+        provider: "vercel",
+        timestamp: new Date().toISOString(),
+        services: { email: { config: {} } },
+      } as any);
+
+      await restore({ force: true });
+      await restore({ force: true, preview: true });
+
+      expect(fsUtils.ensurePulumiWorkDir).not.toHaveBeenCalled();
     });
   });
 
