@@ -27,10 +27,10 @@ vi.mock("../../utils/shared/pulumi.js", () => ({
 
 import * as prompts from "@clack/prompts";
 import * as aws from "../../utils/shared/aws.js";
-import * as fsUtils from "../../utils/shared/fs.js";
-import * as metadata from "../../utils/shared/metadata.js";
 // Import after mocks
 import { WrapsError } from "../../utils/shared/errors.js";
+import * as fsUtils from "../../utils/shared/fs.js";
+import * as metadata from "../../utils/shared/metadata.js";
 import { restore } from "../email/restore.js";
 
 describe("restore command", () => {
