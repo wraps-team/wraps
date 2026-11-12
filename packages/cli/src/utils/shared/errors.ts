@@ -1359,7 +1359,7 @@ export const errors = {
 
   stateBackendUnreachable: (accountId: string, region: string) =>
     new WrapsError(
-      "Restore won't use local state while the S3 state backend is unreachable",
+      "Wraps won't remove infrastructure using local state while the S3 state backend is unreachable",
       "STATE_BACKEND_UNREACHABLE",
       `Fix access to the state bucket wraps-state-${accountId}-${region} (see the warning above for the S3 error), then run the same command again.\n\nIf this account's state has moved to S3, the local copy is stale: removing infrastructure from it can leave resources behind. Set the WRAPS_LOCAL_ONLY=1 environment variable only for an account that never used S3 state, then run the same command again.`,
       "https://wraps.dev/docs/guides/aws-setup/permissions"
