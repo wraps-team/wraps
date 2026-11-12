@@ -305,6 +305,13 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
           "Local state is still intact. export WRAPS_LOCAL_ONLY=1 to skip migration",
       },
       {
+        code: "STATE_BACKEND_UNREACHABLE",
+        message:
+          "Restore won't use local state while the S3 state backend is unreachable",
+        solution:
+          "Fix S3 access to wraps-state-<account>-<region>. Local state is stale after migration; export WRAPS_LOCAL_ONLY=1 only if state was never migrated",
+      },
+      {
         code: "SELFHOST_NO_LOG_GROUPS",
         message: "No self-hosted log groups found in <region>",
         solution: "Check wraps selfhost status, or target a different region",
@@ -764,13 +771,6 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
         code: "MISSING_REQUIRED_FLAG",
         message: "A required flag is missing in JSON mode",
         solution: "Provide the flag named in the error message",
-      },
-      {
-        code: "STATE_BACKEND_UNREACHABLE",
-        message:
-          "Restore won't remove infrastructure using local state while the S3 state backend is unreachable",
-        solution:
-          "wraps email restore refuses to destroy from local state when it can't reach wraps-state-<account>-<region>, because a migrated account's local copy is stale. Fix S3 access to that bucket and rerun, or set WRAPS_LOCAL_ONLY=1 to use local state on purpose.",
       },
       {
         code: "JSON_REQUIRES_FORCE",
