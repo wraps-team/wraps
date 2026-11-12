@@ -854,7 +854,7 @@ const PROJECT_SECTION_MD = `### Pulumi project mismatch or split
 - **Mismatch (fix this machine):** edit \`name\` in this machine's project file to the project the error names. If this machine also deploys an account whose stacks are under the old name, that account will then report a mismatch: contact support rather than switching back and forth.
 - **Split (fix the bucket):** don't deploy or destroy this account from any machine until it's resolved. Save a copy of the state: \`aws s3 cp s3://wraps-state-<account>-<region>/.pulumi/ ./wraps-state-backup/ --recursive\` (it holds encrypted secrets and resource details, so keep it private). Contact support with the error output. Wraps creates the bucket with versioning on, so nothing is lost by waiting. Never run \`pulumi destroy\`, \`pulumi stack rm\` or \`pulumi stack rename\` on these stacks without support.
 - **Local state:** if you already run Wraps with \`WRAPS_LOCAL_ONLY=1\`, the same advice applies to \`~/.wraps/pulumi/.pulumi/\`; back it up with \`cp -r\`.
-- **Couldn't list or read:** run the command again. For AccessDenied, grant \`s3:ListBucket\` and \`s3:GetObject\` on \`wraps-state-*\` with no \`s3:prefix\` condition.`;
+- **Couldn't list or read:** run the command again. A stack file ending in \`.zst\` that Wraps can't read needs Node 22.15 or later: upgrade Node, or contact support. For AccessDenied, grant \`s3:ListBucket\` and \`s3:GetObject\` on \`wraps-state-*\` with no \`s3:prefix\` condition.`;
 
 const CLI_ERRORS_MD = [
   ...CLI_ERROR_SECTIONS.map(sectionMd),
@@ -1167,7 +1167,10 @@ export default function PageContent() {
             </li>
             <li>
               <strong>Couldn&apos;t list or read:</strong> run the command
-              again. For AccessDenied, grant{" "}
+              again. A stack file ending in{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">.zst</code> that
+              Wraps can&apos;t read needs Node 22.15 or later: upgrade Node, or
+              contact support. For AccessDenied, grant{" "}
               <code className="rounded bg-muted px-1.5 py-0.5">
                 s3:ListBucket
               </code>{" "}
