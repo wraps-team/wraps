@@ -8,10 +8,7 @@ import {
   validateAWSCredentials,
 } from "../../utils/shared/aws.js";
 import { WrapsError } from "../../utils/shared/errors.js";
-import {
-  ensurePulumiWorkDir,
-  getPulumiWorkDir,
-} from "../../utils/shared/fs.js";
+import { getPulumiWorkDir } from "../../utils/shared/fs.js";
 import { isJsonMode, jsonSuccess } from "../../utils/shared/json-output.js";
 import {
   findConnectionsWithService,
@@ -28,6 +25,7 @@ import {
   previewWithResourceChanges,
   withLockRetry,
 } from "../../utils/shared/pulumi.js";
+import { requireAccountStateBackend } from "../../utils/shared/state-backend.js";
 
 /**
  * Storage destroy command options
@@ -172,12 +170,14 @@ export async function cdnDestroy(options: CdnDestroyOptions): Promise<void> {
   // 6. Preview or Destroy infrastructure using Pulumi
   if (options.preview) {
     // PREVIEW MODE - show what would be destroyed without actually destroying
+    // Outside the try below so STATE_BACKEND_UNREACHABLE reaches the user unwrapped.
+    await progress.execute("Checking state backend", () =>
+      requireAccountStateBackend(identity.accountId, region)
+    );
     try {
       const previewResult = await progress.execute(
         "Generating destruction preview",
         async () => {
-          await ensurePulumiWorkDir({ accountId: identity.accountId, region });
-
           // Use stored stack name from metadata, fallback to generated name
           const stackName =
             storedStackName || `wraps-cdn-${identity.accountId}-${region}`;
@@ -245,6 +245,13 @@ export async function cdnDestroy(options: CdnDestroyOptions): Promise<void> {
 
   // DESTROY MODE - actually remove infrastructure
 
+  // Fail closed before the first delete. Every prompt is behind us (the guard
+  // may create the state bucket), and the DNS records and every object in the
+  // CDN bucket go after this. Outside every try/catch below.
+  await progress.execute("Checking state backend", () =>
+    requireAccountStateBackend(identity.accountId, region)
+  );
+
   // 7. Clean up DNS records first
   if (shouldCleanDNS && hostedZone && customDomain) {
     try {
@@ -281,8 +288,6 @@ export async function cdnDestroy(options: CdnDestroyOptions): Promise<void> {
     await progress.execute(
       "Destroying CDN infrastructure (this may take 2-3 minutes)",
       async () => {
-        await ensurePulumiWorkDir({ accountId: identity.accountId, region });
-
         // Use stored stack name from metadata, fallback to generated name
         const stackName =
           storedStackName || `wraps-cdn-${identity.accountId}-${region}`;

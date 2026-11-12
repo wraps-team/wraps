@@ -13,10 +13,7 @@ import {
   validateAWSCredentials,
 } from "../../utils/shared/aws.js";
 import { errors, WrapsError } from "../../utils/shared/errors.js";
-import {
-  ensurePulumiWorkDir,
-  getPulumiWorkDir,
-} from "../../utils/shared/fs.js";
+import { getPulumiWorkDir } from "../../utils/shared/fs.js";
 import { isJsonMode, jsonSuccess } from "../../utils/shared/json-output.js";
 import {
   findConnectionsWithService,
@@ -32,6 +29,7 @@ import {
   ensurePulumiInstalled,
   previewWithResourceChanges,
 } from "../../utils/shared/pulumi.js";
+import { requireAccountStateBackend } from "../../utils/shared/state-backend.js";
 import {
   DEFAULT_PULUMI_TIMEOUT_MS,
   withTimeout,
@@ -146,12 +144,14 @@ export async function smsDestroy(options: SMSDestroyOptions): Promise<void> {
   // 5. Preview or Destroy infrastructure using Pulumi
   if (options.preview) {
     // PREVIEW MODE - show what would be destroyed without actually destroying
+    // Outside the try below so STATE_BACKEND_UNREACHABLE reaches the user unwrapped.
+    await progress.execute("Checking state backend", () =>
+      requireAccountStateBackend(identity.accountId, region)
+    );
     try {
       const previewResult = await progress.execute(
         "Generating destruction preview",
         async () => {
-          await ensurePulumiWorkDir({ accountId: identity.accountId, region });
-
           // Use stored stack name from metadata, fallback to generated name
           const stackName =
             storedStackName || `wraps-sms-${identity.accountId}-${region}`;
@@ -210,6 +210,14 @@ export async function smsDestroy(options: SMSDestroyOptions): Promise<void> {
 
   // DESTROY MODE - actually remove infrastructure
 
+  // Fail closed before the first delete. The only prompt is behind us (the
+  // guard may create the state bucket). Outside every try/catch below: the
+  // destroy catch marks the run partly failed and still deletes metadata,
+  // which must never happen on stale local state.
+  await progress.execute("Checking state backend", () =>
+    requireAccountStateBackend(identity.accountId, region)
+  );
+
   // 6. Clean up SDK-created resources (phone pool and event destination)
   await progress.execute("Cleaning up phone pool", async () => {
     await deleteSMSPhonePoolWithSDK(region);
@@ -232,8 +240,6 @@ export async function smsDestroy(options: SMSDestroyOptions): Promise<void> {
     await progress.execute(
       "Destroying SMS infrastructure (this may take 2-3 minutes)",
       async () => {
-        await ensurePulumiWorkDir({ accountId: identity.accountId, region });
-
         // Use stored stack name from metadata, fallback to generated name
         const stackName =
           storedStackName || `wraps-sms-${identity.accountId}-${region}`;
