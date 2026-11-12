@@ -8,6 +8,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllEnvs();
 });
+
 import { emailDestroy } from "../commands/email/destroy.js";
 import { init } from "../commands/email/init.js";
 

@@ -5,7 +5,7 @@ import { trackError, trackServiceRemoved } from "../../telemetry/events.js";
 import type { EmailRestoreOptions } from "../../types/index.js";
 import { domainToConfigSetName } from "../../utils/email/config-set-slug.js";
 import { validateAWSCredentials } from "../../utils/shared/aws.js";
-import { errors, WrapsError } from "../../utils/shared/errors.js";
+import { WrapsError } from "../../utils/shared/errors.js";
 import { getPulumiWorkDir } from "../../utils/shared/fs.js";
 import { isJsonMode, jsonSuccess } from "../../utils/shared/json-output.js";
 import {
