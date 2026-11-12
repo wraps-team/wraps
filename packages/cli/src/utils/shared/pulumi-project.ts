@@ -79,11 +79,12 @@ function isEnoent(error: unknown): boolean {
   return (error as { code?: string })?.code === "ENOENT";
 }
 
-const STACK_FILE = /^(.+)\.json((?:\.[A-Za-z0-9]+)?)$/;
+const STACK_FILE = /^(.+)\.json(\.gz|\.zst)?$/;
 
 /**
- * `<stack>.json` or `<stack>.json.<ext>` (Pulumi reads `.gz` and `.zst`).
- * `.bak` forms and anything else are not stack files.
+ * Exactly `<stack>.json`, `<stack>.json.gz` or `<stack>.json.zst`: the three
+ * candidates Pulumi considers. `.bak`, `.attrs` sidecars and anything else are
+ * invisible to Pulumi, so they are ignored here too.
  */
 function parseStackFile(
   file: string
@@ -92,15 +93,22 @@ function parseStackFile(
     return;
   }
   const m = STACK_FILE.exec(file);
-  return m ? { stack: m[1], extension: m[2] } : undefined;
+  return m ? { stack: m[1], extension: m[2] ?? "" } : undefined;
 }
 
 type StackFile = { file: string; extension: string; modified: number };
 
-/** Newest copy wins (Pulumi keeps the most recently modified variant). */
+const EXTENSION_RANK: Record<string, number> = { "": 0, ".gz": 1, ".zst": 2 };
+
+/**
+ * Newest copy wins (Pulumi keeps the most recently modified variant). On equal
+ * times Pulumi's later-listed candidate wins: .zst over .gz over .json.
+ */
 function newest(variants: StackFile[]): StackFile {
   return [...variants].sort(
-    (a, b) => b.modified - a.modified || a.file.localeCompare(b.file)
+    (a, b) =>
+      b.modified - a.modified ||
+      (EXTENSION_RANK[b.extension] ?? 0) - (EXTENSION_RANK[a.extension] ?? 0)
   )[0];
 }
 

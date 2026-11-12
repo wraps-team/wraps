@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gzipSync, zstdCompressSync } from "node:zlib";
@@ -510,12 +510,32 @@ describe("no project file (S3)", () => {
     }
   });
 
-  it("refuses an unknown compression extension the same way", async () => {
+  it("ignores .json.lz4 and .json.attrs files (Pulumi never reads them)", async () => {
     put(`wraps-sms/${STACK}.json.lz4`, Buffer.from("lz4 bytes"));
-    const error = await expectCode("STATE_BACKEND_LIST_FAILED");
-    expect(error.message).toContain(".lz4");
-    expect(existsSync(yamlPath())).toBe(false);
+    put(`wraps-sms/${STACK}.json.attrs`, Buffer.from("{}"));
+    await run();
+    expect(readYaml().name).toBe("wraps-email");
+    expect(getCalls).toEqual([]);
   });
+
+  it.skipIf(typeof zstdCompressSync !== "function")(
+    "on equal times the later variant wins, as in Pulumi: .zst over .gz over .json",
+    async () => {
+      const gz = (v: unknown) => gzipSync(JSON.stringify(v));
+      const zst = (v: unknown) =>
+        zstdCompressSync(Buffer.from(JSON.stringify(v)));
+      // .gz (non-empty) beats .json (empty)
+      put(`wraps-sms/${STACK}.json`, EMPTY, 5);
+      put(`wraps-sms/${STACK}.json.gz`, gz(NON_EMPTY), 5);
+      await run();
+      expect(readYaml().name).toBe("wraps-sms");
+      await rm(yamlPath());
+      // .zst (empty) beats .gz (non-empty)
+      put(`wraps-sms/${STACK}.json.zst`, zst(EMPTY), 5);
+      await run();
+      expect(readYaml().name).toBe("wraps-email");
+    }
+  );
 
   it("reads the newest copy: a newer non-empty .json.gz beats an older empty .json", async () => {
     put(`wraps-sms/${STACK}.json`, EMPTY, 1000);
@@ -661,6 +681,57 @@ describe("local-only and fallback paths", () => {
     await mkdir(dir, { recursive: true }); // reading a directory gives EISDIR
     await run();
     expect(existsSync(yamlPath())).toBe(false);
+  });
+
+  it("ignores a local .json.attrs sidecar written after the stack file", async () => {
+    vi.stubEnv("WRAPS_LOCAL_ONLY", "1");
+    await localStack("wraps-sms", STACK, NON_EMPTY);
+    const sidecar = join(
+      workDir,
+      ".pulumi",
+      "stacks",
+      "wraps-sms",
+      `${STACK}.json.attrs`
+    );
+    await writeFile(sidecar, "{}");
+    const later = new Date(Date.now() + 60_000);
+    await utimes(sidecar, later, later);
+    await run();
+    expect(readYaml().name).toBe("wraps-sms");
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("warns with no S3 advice on a mocked local EACCES", async () => {
+    vi.stubEnv("WRAPS_LOCAL_ONLY", "1");
+    await writeProject("wraps-email");
+    await localStack("wraps-sms", STACK, NON_EMPTY);
+    vi.doMock("node:fs/promises", async (importOriginal) => {
+      const real = await importOriginal<typeof import("node:fs/promises")>();
+      return {
+        ...real,
+        readFile: (path: string, ...rest: unknown[]) =>
+          String(path).includes("/.pulumi/stacks/")
+            ? Promise.reject(
+                Object.assign(new Error("denied"), { code: "EACCES" })
+              )
+            : (real.readFile as (...a: unknown[]) => Promise<unknown>)(
+                path,
+                ...rest
+              ),
+      };
+    });
+    vi.resetModules();
+    ({ ensurePulumiWorkDir } = await import("../shared/fs.js"));
+    try {
+      await run();
+      expect(warn).toHaveBeenCalledTimes(1);
+      const text = String(warn.mock.calls[0][0]);
+      expect(text).toContain("EACCES");
+      expect(text).not.toContain("s3:");
+      expect(text).not.toContain("wraps-state");
+    } finally {
+      vi.doUnmock("node:fs/promises");
+    }
   });
 
   it("does not warn when .pulumi/stacks is missing", async () => {
