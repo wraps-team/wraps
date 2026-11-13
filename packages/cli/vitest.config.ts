@@ -7,7 +7,14 @@ export default defineConfig({
     include: ["src/**/*.test.ts"],
     // Fails any test that opens a real socket. See the file for why this is a
     // runtime guard rather than a lint rule.
-    setupFiles: ["src/__tests__/setup/no-real-network.ts"],
+    setupFiles: [
+      "src/__tests__/setup/no-real-network.ts",
+      // Mocks os.homedir() so no test can touch the real ~/.wraps or ~/.pulumi.
+      "src/__tests__/setup/fake-home.ts",
+    ],
+    // CI sets CI and FORCE_COLOR, which turn picocolors on. NO_COLOR wins over
+    // both, so one local run covers CI mode.
+    env: { NO_COLOR: "1" },
     // Headroom for scheduler delay, not for slow tests: every test in this
     // package runs in single-digit milliseconds. Under `pnpm test` at the repo
     // root, apps/web and apps/api now run their files in parallel too, and the

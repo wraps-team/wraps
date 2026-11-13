@@ -160,6 +160,18 @@ The target follows `config.activeInstance` — a pointer set by `selfhost login`
 
 Deployment tests for all of this are `tests/deployment/selfhost-sst/` and `coexistence/` — see `tests/deployment/README.md`. They need real AWS and are kept out of CI.
 
+## Tests
+
+- Unit tests never see the real home directory (`src/__tests__/setup/fake-home.ts`
+  mocks `os.homedir()` to a per-worker temp dir and sets `PULUMI_HOME` inside it) and
+  fail on any real socket (`no-real-network.ts`). Never point a test at the real
+  `~/.wraps`; setting `HOME` inside a test has no effect on `os.homedir()` in vitest
+  worker threads. A test file that mocks `node:os` itself overrides the guard for that
+  file, so give it a temp dir.
+- Tests run with `NO_COLOR=1`, because CI sets `CI` and `FORCE_COLOR`, which turn
+  picocolors on. A test that passes locally but fails in CI on human output is seeing
+  colour codes. One local run covers both.
+
 ## Key Directories
 
 - `src/commands/` — Command implementations (by service)
