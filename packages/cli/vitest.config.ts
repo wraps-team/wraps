@@ -9,8 +9,9 @@ import { defineConfig } from "vitest/config";
 // node_modules code (conf, env-paths, Pulumi automation) and child processes,
 // which a vi.mock of node:os cannot reach. Under pool "threads" os.homedir()
 // ignores a HOME set in the worker, which is why the pool is "forks".
-// `??=` keeps the path stable if vitest evaluates this file twice.
-process.env.WRAPS_CLI_TEST_HOME ??= join(
+// All test files in a run share this one home, so a test that needs isolation (or
+// needs the dir empty) makes its own temp dir.
+process.env.WRAPS_CLI_TEST_HOME = join(
   tmpdir(),
   `wraps-cli-home-${process.pid}-${Math.random().toString(36).slice(2)}`
 );

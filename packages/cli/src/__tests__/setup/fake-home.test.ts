@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { TelemetryConfigManager } from "../../telemetry/config.js";
 import { getPulumiWorkDir, getWrapsDir } from "../../utils/shared/fs.js";
+import { isRemovableFakeHome } from "./fake-home-global.js";
 
 const fakeHome = process.env.WRAPS_CLI_TEST_HOME as string;
 
@@ -52,5 +53,21 @@ describe("fake home guard", () => {
       { env: process.env, encoding: "utf8" }
     );
     expect(out).toBe(fakeHome);
+  });
+});
+
+describe("fake home teardown guard", () => {
+  it("accepts only wraps-cli-home-* directly under tmp", () => {
+    expect(isRemovableFakeHome("/tmp/wraps-cli-home-1-a", "/tmp")).toBe(true);
+    expect(isRemovableFakeHome("/tmp/wraps-cli-home-1-a/", "/tmp/")).toBe(true);
+    expect(isRemovableFakeHome("/tmp/other", "/tmp")).toBe(false);
+    expect(isRemovableFakeHome("/tmp", "/tmp")).toBe(false);
+    expect(isRemovableFakeHome("/home/me", "/tmp")).toBe(false);
+    expect(isRemovableFakeHome("/tmp/x/wraps-cli-home-1-a", "/tmp")).toBe(
+      false
+    );
+    expect(isRemovableFakeHome("/tmp/../home/wraps-cli-home-1-a", "/tmp")).toBe(
+      false
+    );
   });
 });

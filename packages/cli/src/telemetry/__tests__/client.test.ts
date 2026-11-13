@@ -16,9 +16,13 @@ import { TelemetryClient } from "../client";
 
 // TelemetryClient builds its own TelemetryConfigManager with no cwd, which would
 // put the conf file under the home directory. Pin it to a temp dir instead.
-const confDir = vi.hoisted(
-  () => `${process.env.TMPDIR || "/tmp"}/wraps-telemetry-client-test`
-);
+// vi.hoisted runs before imports, so reach fs/os through getBuiltinModule.
+const confDir = vi.hoisted(() => {
+  const fs = process.getBuiltinModule("node:fs");
+  const os = process.getBuiltinModule("node:os");
+  const path = process.getBuiltinModule("node:path");
+  return fs.mkdtempSync(path.join(os.tmpdir(), "wraps-telemetry-client-"));
+});
 vi.mock("../config", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../config")>();
   return {
