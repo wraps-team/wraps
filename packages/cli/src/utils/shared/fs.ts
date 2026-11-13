@@ -1,16 +1,25 @@
 import { existsSync } from "node:fs";
 import {
+  link,
   mkdir,
   readdir,
   readFile,
   rename,
   rm,
+  unlink,
   writeFile,
 } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { CORE_SCHEMA, dump, load } from "js-yaml";
+import { errors } from "./errors.js";
 import { isJsonMode } from "./json-output.js";
+import {
+  DEFAULT_PROJECT_NAME,
+  decideProject,
+  listWrapsProjects,
+  ProjectListError,
+} from "./pulumi-project.js";
 
 /**
  * Get the Wraps configuration directory
@@ -155,6 +164,206 @@ export async function repairPulumiProjectMain(): Promise<void> {
   }
 }
 
+/** Default project name for a backend with no Wraps stacks. */
+export const PULUMI_PROJECT_NAME = DEFAULT_PROJECT_NAME;
+
+const PROJECT_FILE_NAMES = [
+  "Pulumi.yaml",
+  "Pulumi.yml",
+  "Pulumi.json",
+] as const;
+
+/**
+ * The project `name` from Pulumi.yaml, else Pulumi.yml, else Pulumi.json
+ * (Pulumi's lookup order). `undefined` when none exists; `"unreadable"` when
+ * one exists but can't be read or has no usable `name`.
+ */
+export async function readPulumiProjectName(): Promise<
+  string | undefined | "unreadable"
+> {
+  const pulumiDir = getPulumiWorkDir();
+  for (const file of PROJECT_FILE_NAMES) {
+    let text: string;
+    try {
+      text = await readFile(join(pulumiDir, file), "utf-8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        continue;
+      }
+      return "unreadable";
+    }
+    try {
+      const parsed = load(text, { schema: CORE_SCHEMA });
+      const name =
+        parsed && typeof parsed === "object" && !Array.isArray(parsed)
+          ? (parsed as Record<string, unknown>).name
+          : undefined;
+      return typeof name === "string" && name !== "" ? name : "unreadable";
+    } catch {
+      return "unreadable";
+    }
+  }
+  return;
+}
+
+/**
+ * Create Pulumi.yaml with `name`, only when none of the three project files
+ * exists. Returns "exists" when another process (or file) got there first, so
+ * the caller can check that file's name instead. Any other failure throws:
+ * Pulumi must never write the call-site name after a failed create.
+ */
+export async function createPulumiProjectFile(
+  name: string
+): Promise<"created" | "exists"> {
+  const pulumiDir = getPulumiWorkDir();
+  for (const file of PROJECT_FILE_NAMES) {
+    if (existsSync(join(pulumiDir, file))) {
+      return "exists";
+    }
+  }
+  const finalPath = join(pulumiDir, "Pulumi.yaml");
+  const tempFile = join(
+    pulumiDir,
+    `.Pulumi.yaml.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`
+  );
+  try {
+    await writeFile(
+      tempFile,
+      dump(
+        { name, runtime: "nodejs", main: pulumiDir },
+        { lineWidth: -1, schema: CORE_SCHEMA }
+      ),
+      "utf-8"
+    );
+    try {
+      await link(tempFile, finalPath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+        return "exists";
+      }
+      throw error;
+    }
+    return "created";
+  } finally {
+    await unlink(tempFile).catch(() => {});
+  }
+}
+
+type ProjectCheckBackend =
+  | { kind: "s3"; bucket: string; region: string }
+  | { kind: "local"; accountId: string; region: string };
+
+const warnedProjectCheck = new Set<string>();
+
+async function warnOnce(message: string): Promise<void> {
+  if (warnedProjectCheck.has(message)) {
+    return;
+  }
+  warnedProjectCheck.add(message);
+  await warnUser(message);
+}
+
+/**
+ * Compare this machine's Pulumi project with the account's state, adopt the
+ * account's name when the machine has no project file, and refuse when they
+ * disagree. Never renames a stack or rewrites an existing `name`.
+ */
+async function checkProject(
+  backend: ProjectCheckBackend,
+  retried = false
+): Promise<void> {
+  const pulumiDir = getPulumiWorkDir();
+  const name = await readPulumiProjectName();
+  if (name === "unreadable") {
+    return; // today's behaviour: let Pulumi report it
+  }
+  const local = backend.kind === "local";
+  const location = local
+    ? "local state in ~/.wraps/pulumi"
+    : `s3://${backend.bucket}/.pulumi/stacks/`;
+  const bucket = backend.kind === "s3" ? backend.bucket : "~/.wraps/pulumi";
+
+  let listing: Awaited<ReturnType<typeof listWrapsProjects>>;
+  try {
+    listing = await listWrapsProjects(
+      local
+        ? {
+            kind: "local",
+            dir: pulumiDir,
+            filter: { accountId: backend.accountId, region: backend.region },
+          }
+        : { kind: "s3", bucket: backend.bucket, region: backend.region },
+      { localName: name }
+    );
+  } catch (error) {
+    if (!(error instanceof ProjectListError)) {
+      throw error;
+    }
+    if (name !== undefined) {
+      const iam =
+        error.accessDenied && !local
+          ? ". Grant s3:ListBucket and s3:GetObject on wraps-state-* with no s3:prefix condition"
+          : "";
+      await warnOnce(
+        `Couldn't check this machine's Pulumi project against ${location} (${error.errorName}${error.key ? `, at ${error.key}` : ""})${iam}. Continuing.`
+      );
+      return;
+    }
+    if (local) {
+      return; // Pulumi creates the file from the call site, as today
+    }
+    throw errors.stateBackendListFailed({
+      bucket,
+      key: error.key,
+      operation: error.operation,
+      errorName: error.errorName,
+      accessDenied: error.accessDenied,
+      extension: error.extension,
+    });
+  }
+
+  const decision = decideProject(name, listing);
+  switch (decision.kind) {
+    case "conflict":
+      throw errors.stackProjectConflict({
+        location,
+        localName: name,
+        projects: decision.projects,
+        deployedTwice: decision.deployedTwice,
+        emptyDuplicates: decision.emptyDuplicates,
+      });
+    case "mismatch":
+      throw errors.pulumiProjectMismatch({
+        location,
+        localName: name as string,
+        accountProject: decision.accountProject,
+        emptyDuplicates: decision.emptyDuplicates,
+        projectFile:
+          (await existingProjectFile()) ?? join(pulumiDir, "Pulumi.yaml"),
+      });
+    case "adopt": {
+      const result = await createPulumiProjectFile(decision.name);
+      if (result === "exists" && !retried) {
+        // Another process created it first: check against its name.
+        await checkProject(backend, true);
+      }
+      return;
+    }
+    default:
+      return;
+  }
+}
+
+async function existingProjectFile(): Promise<string | undefined> {
+  for (const file of PROJECT_FILE_NAMES) {
+    const path = join(getPulumiWorkDir(), file);
+    if (existsSync(path)) {
+      return path;
+    }
+  }
+  return;
+}
+
 /**
  * Ensure the Pulumi workspace directory exists and configure backend.
  *
@@ -192,6 +401,7 @@ export async function ensurePulumiWorkDir(options?: {
     options?.region &&
     process.env.WRAPS_LOCAL_ONLY !== "1";
 
+  let stateBucket: string | undefined;
   if (useS3) {
     try {
       const {
@@ -230,7 +440,7 @@ export async function ensurePulumiWorkDir(options?: {
         options.accountId!,
         options.region!
       );
-      return;
+      stateBucket = bucketName;
     } catch (error) {
       // Graceful fallback to local
       await warnUser(
@@ -239,6 +449,31 @@ export async function ensurePulumiWorkDir(options?: {
     }
   }
 
+  // Outside the try above, so a project refusal can't fall through to the
+  // local fallback below. Runs after the migration, credentials and passphrase.
+  if (stateBucket !== undefined) {
+    await checkProject({
+      kind: "s3",
+      bucket: stateBucket,
+      region: options!.region!,
+    });
+    return;
+  }
+
   // Default: local backend
   process.env.PULUMI_BACKEND_URL = `file://${pulumiDir}`;
+
+  // Explicit local-only mode with an account: same rules over local state.
+  // The S3-failure fallback and calls with no account get no detection.
+  if (
+    process.env.WRAPS_LOCAL_ONLY === "1" &&
+    options?.accountId &&
+    options?.region
+  ) {
+    await checkProject({
+      kind: "local",
+      accountId: options.accountId,
+      region: options.region,
+    });
+  }
 }

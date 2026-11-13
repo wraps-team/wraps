@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -16,6 +16,7 @@ vi.mock("node:fs/promises", () => ({
   rename: vi.fn(),
   rm: vi.fn(),
   readdir: vi.fn(),
+  stat: vi.fn(),
 }));
 
 vi.mock("node:os", () => ({
@@ -34,6 +35,15 @@ vi.mock("../shared/s3-state.js", () => ({
   needsMigration: (...args: any[]) => mockNeedsMigration(...args),
   migrateLocalPulumiState: (...args: any[]) =>
     mockMigrateLocalPulumiState(...args),
+}));
+
+// The project check lists the (empty) state bucket after backend setup.
+vi.mock("@aws-sdk/client-s3", () => ({
+  S3Client: class {
+    send = vi.fn().mockResolvedValue({});
+  },
+  ListObjectsV2Command: class {},
+  GetObjectCommand: class {},
 }));
 
 // Mock @clack/prompts
@@ -280,6 +290,8 @@ describe("fs utilities", () => {
     });
 
     it("should stay local when WRAPS_LOCAL_ONLY=1 even with params", async () => {
+      // The local project check lists an empty stacks dir.
+      vi.mocked(readdir).mockResolvedValue([] as never);
       vi.mocked(existsSync).mockReturnValue(true);
       process.env.WRAPS_LOCAL_ONLY = "1";
 
@@ -340,6 +352,8 @@ describe("fs utilities", () => {
     });
 
     it("should pre-resolve credentials even with WRAPS_LOCAL_ONLY=1", async () => {
+      // The local project check lists an empty stacks dir.
+      vi.mocked(readdir).mockResolvedValue([] as never);
       // The pulumi-aws provider still needs to authenticate to AWS even when
       // state is local, so credential pre-resolution should happen regardless.
       vi.mocked(existsSync).mockReturnValue(true);

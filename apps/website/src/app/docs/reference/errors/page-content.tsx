@@ -312,6 +312,26 @@ const CLI_ERROR_SECTIONS: ErrorSection[] = [
           "Fix S3 access to wraps-state-<account>-<region>. Local state is stale after migration; set WRAPS_LOCAL_ONLY=1 for that one run, only if state was never migrated",
       },
       {
+        code: "PULUMI_PROJECT_MISMATCH",
+        message:
+          "This machine's Pulumi project (<name>) doesn't match this account's (<name>)",
+        solution:
+          "Edit name in this machine's Pulumi project file to the project the error names. See Pulumi project mismatch or split (#pulumi-project-mismatch-or-split)",
+      },
+      {
+        code: "STACK_PROJECT_CONFLICT",
+        message: "Wraps state for this account is split across Pulumi projects",
+        solution:
+          "Don't deploy or destroy this account; back up the state and contact support. See Pulumi project mismatch or split (#pulumi-project-mismatch-or-split)",
+      },
+      {
+        code: "STATE_BACKEND_LIST_FAILED",
+        message:
+          "Wraps couldn't list or read the state bucket to check this machine's Pulumi project",
+        solution:
+          "Run the same command again; for AccessDenied grant s3:ListBucket and s3:GetObject on wraps-state-*. See #pulumi-project-mismatch-or-split",
+      },
+      {
         code: "SELFHOST_NO_LOG_GROUPS",
         message: "No self-hosted log groups found in <region>",
         solution: "Check wraps selfhost status, or target a different region",
@@ -826,7 +846,20 @@ Most codes reach \`--json\` exactly as the tables below list them. Two families 
 
 Match on the documented code. Treat an unrecognised \`AWS_*\` or \`PULUMI_*\` code as the underlying tool's error, surfaced verbatim.`;
 
-const CLI_ERRORS_MD = CLI_ERROR_SECTIONS.map(sectionMd).join("\n\n");
+const PROJECT_SECTION_MD = `### Pulumi project mismatch or split
+
+\`PULUMI_PROJECT_MISMATCH\`, \`STACK_PROJECT_CONFLICT\` and \`STATE_BACKEND_LIST_FAILED\` change no state. Wraps stores each account's stacks in the state bucket under a Pulumi project name, and this machine keeps its own project name in \`~/.wraps/pulumi/Pulumi.yaml\` (or \`Pulumi.yml\` / \`Pulumi.json\`). The error means the two disagree, or Wraps couldn't check.
+
+- **See where stacks are:** \`aws s3 ls s3://wraps-state-<account>-<region>/.pulumi/stacks/ --recursive\`, with the same AWS profile and region Wraps uses.
+- **Mismatch (fix this machine):** edit \`name\` in this machine's project file to the project the error names. If this machine also deploys an account whose stacks are under the old name, that account will then report a mismatch: contact support rather than switching back and forth.
+- **Split (fix the bucket):** don't deploy or destroy this account from any machine until it's resolved. Save a copy of the state: \`aws s3 cp s3://wraps-state-<account>-<region>/.pulumi/ ./wraps-state-backup/ --recursive\` (it holds encrypted secrets and resource details, so keep it private). Contact support with the error output. Wraps creates the bucket with versioning on, so nothing is lost by waiting. Never run \`pulumi destroy\`, \`pulumi stack rm\` or \`pulumi stack rename\` on these stacks without support.
+- **Local state:** if you already run Wraps with \`WRAPS_LOCAL_ONLY=1\`, the same advice applies to \`~/.wraps/pulumi/.pulumi/\`; back it up with \`cp -r\`.
+- **Couldn't list or read:** run the command again. A stack file ending in \`.zst\` that Wraps can't read needs Node 22.15 or later: upgrade Node, or contact support. For AccessDenied, grant \`s3:ListBucket\` and \`s3:GetObject\` on \`wraps-state-*\` with no \`s3:prefix\` condition.`;
+
+const CLI_ERRORS_MD = [
+  ...CLI_ERROR_SECTIONS.map(sectionMd),
+  PROJECT_SECTION_MD,
+].join("\n\n");
 
 const EXIT_CODES_MD = `### Exit Codes
 
@@ -1056,6 +1089,105 @@ export default function PageContent() {
             </Card>
           </div>
         ))}
+
+        <div className="mb-8">
+          <h3
+            className="mb-3 font-medium text-lg"
+            id="pulumi-project-mismatch-or-split"
+          >
+            Pulumi project mismatch or split
+          </h3>
+          <p className="mb-3 text-muted-foreground">
+            These errors change no state. Wraps stores each account&apos;s
+            stacks in the state bucket under a Pulumi project name, and this
+            machine keeps its own project name in{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5">
+              ~/.wraps/pulumi/Pulumi.yaml
+            </code>{" "}
+            (or{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5">Pulumi.yml</code> /{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5">Pulumi.json</code>
+            ). The error means the two disagree, or Wraps couldn&apos;t check.
+          </p>
+          <ul className="mb-3 list-disc space-y-2 pl-6 text-muted-foreground">
+            <li>
+              <strong>See where stacks are:</strong>{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                aws s3 ls
+                s3://wraps-state-&lt;account&gt;-&lt;region&gt;/.pulumi/stacks/
+                --recursive
+              </code>{" "}
+              with the same AWS profile and region Wraps uses.
+            </li>
+            <li>
+              <strong>Mismatch (fix this machine):</strong> edit{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">name</code> in
+              this machine&apos;s project file to the project the error names.
+              If this machine also deploys an account whose stacks are under the
+              old name, that account will then report a mismatch: contact
+              support rather than switching back and forth.
+            </li>
+            <li>
+              <strong>Split (fix the bucket):</strong> don&apos;t deploy or
+              destroy this account from any machine until it&apos;s resolved.
+              Save a copy of the state:{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                aws s3 cp
+                s3://wraps-state-&lt;account&gt;-&lt;region&gt;/.pulumi/
+                ./wraps-state-backup/ --recursive
+              </code>{" "}
+              (it holds encrypted secrets and resource details, so keep it
+              private). Contact support with the error output. Wraps creates the
+              bucket with versioning on, so nothing is lost by waiting. Never
+              run{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                pulumi destroy
+              </code>
+              ,{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                pulumi stack rm
+              </code>{" "}
+              or{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                pulumi stack rename
+              </code>{" "}
+              on these stacks without support.
+            </li>
+            <li>
+              <strong>Local state:</strong> if you already run Wraps with{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                WRAPS_LOCAL_ONLY=1
+              </code>
+              , the same advice applies to{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                ~/.wraps/pulumi/.pulumi/
+              </code>
+              ; back it up with{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">cp -r</code>.
+            </li>
+            <li>
+              <strong>Couldn&apos;t list or read:</strong> run the command
+              again. A stack file ending in{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">.zst</code> that
+              Wraps can&apos;t read needs Node 22.15 or later: upgrade Node, or
+              contact support. For AccessDenied, grant{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                s3:ListBucket
+              </code>{" "}
+              and{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                s3:GetObject
+              </code>{" "}
+              on{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">
+                wraps-state-*
+              </code>{" "}
+              with no{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5">s3:prefix</code>{" "}
+              condition.
+            </li>
+          </ul>
+        </div>
       </section>
 
       {/* Exit Codes */}

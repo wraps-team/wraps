@@ -712,6 +712,27 @@ describe("email destroy command", () => {
       }
     });
 
+    it("STACK_PROJECT_CONFLICT from backend setup runs no receipt-rule, selectStack, SQS or metadata call", async () => {
+      const pulumi = await import("@pulumi/pulumi");
+      const stack = await setupPulumiMock();
+      const { errors } = await import("../../utils/shared/errors.js");
+      vi.mocked(fsUtils.ensurePulumiWorkDir).mockRejectedValue(
+        errors.stackProjectConflict({
+          location: "s3://bucket",
+          projects: { "wraps-email": ["a"], "wraps-sms": ["a"] },
+        })
+      );
+
+      const error = await emailDestroy({ force: true }).catch((e) => e);
+
+      expect(error).toBeInstanceOf(WrapsError);
+      expect(error.code).toBe("STACK_PROJECT_CONFLICT");
+      expectNothingDeleted(stack);
+      expect(
+        pulumi.automation.LocalWorkspace.selectStack
+      ).not.toHaveBeenCalled();
+    });
+
     it("WRAPS_LOCAL_ONLY=1 proceeds on file:// for preview and destroy", async () => {
       vi.stubEnv("WRAPS_LOCAL_ONLY", "1");
       const stack = await setupPulumiMock();

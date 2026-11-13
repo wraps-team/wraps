@@ -6,6 +6,9 @@ import { SES_RECEIVING_REGIONS } from "../../types/email.js";
 import { RULE_SET_NAME } from "../email/inbound-names.js";
 import { isJsonMode, jsonError } from "./json-output.js";
 
+const PROJECT_DOCS_URL =
+  "https://wraps.dev/docs/reference/errors#pulumi-project-mismatch-or-split";
+
 /**
  * Custom error class for Wraps CLI errors
  */
@@ -1364,6 +1367,99 @@ export const errors = {
       `Fix access to the state bucket wraps-state-${accountId}-${region} (see the warning above for the S3 error), then run the same command again.\n\nIf this account's state has moved to S3, the local copy is stale: removing infrastructure from it can leave resources behind. Set the WRAPS_LOCAL_ONLY=1 environment variable only for an account that never used S3 state, then run the same command again.`,
       "https://wraps.dev/docs/guides/aws-setup/permissions"
     ),
+
+  stackProjectConflict: (details: {
+    location: string;
+    /** The project file's `name`, or undefined when this machine has none yet. */
+    localName?: string;
+    /** Non-empty stacks per project, e.g. { "wraps-email": ["wraps-123-us-east-1"] }. */
+    projects: Record<string, string[]>;
+    /** Stack names that are non-empty under more than one project. */
+    deployedTwice?: string[];
+    /** Empty copies of a stack that is non-empty under another project: "project/stack". */
+    emptyDuplicates?: string[];
+  }) => {
+    const listed = Object.entries(details.projects)
+      .map(([project, stacks]) => `${project}: ${stacks.join(", ")}`)
+      .join("; ");
+    const notes: string[] = [];
+    if (details.deployedTwice?.length) {
+      notes.push(
+        `Deployed twice (non-empty under more than one project): ${details.deployedTwice.join(", ")}.`
+      );
+    }
+    if (details.emptyDuplicates?.length) {
+      notes.push(
+        `Empty duplicates (no resources): ${details.emptyDuplicates.join(", ")}.`
+      );
+    }
+    const who = details.localName
+      ? `This machine's Pulumi project is ${details.localName}.`
+      : "This machine has no Pulumi project yet.";
+    return new WrapsError(
+      `Wraps state for this account is split across Pulumi projects in ${details.location}: ${listed}. ${who}${notes.length ? ` ${notes.join(" ")}` : ""} See ${PROJECT_DOCS_URL}.`,
+      "STACK_PROJECT_CONFLICT",
+      "Don't deploy or destroy this account until it's resolved. Save a copy of the stacks and contact support (see the docs link). Never run `pulumi destroy`, `pulumi stack rm` or `pulumi stack rename` on these stacks without support.",
+      PROJECT_DOCS_URL
+    );
+  },
+
+  pulumiProjectMismatch: (details: {
+    location: string;
+    localName: string;
+    accountProject: string;
+    /** Empty copies of the account's stacks under the machine's project: "project/stack". */
+    emptyDuplicates?: string[];
+    /** Absolute path of the project file that holds `name`. */
+    projectFile: string;
+  }) =>
+    new WrapsError(
+      `This machine's Pulumi project (${details.localName}) doesn't match this account's (${details.accountProject}) in ${details.location}.${details.emptyDuplicates?.length ? ` Empty duplicates (no resources): ${details.emptyDuplicates.join(", ")}.` : ""} See ${PROJECT_DOCS_URL}.`,
+      "PULUMI_PROJECT_MISMATCH",
+      `If this machine deploys only accounts whose stacks are under ${details.accountProject}, set \`name: ${details.accountProject}\` in ${details.projectFile}. If it also deploys an account under ${details.localName}, that account would then mismatch: contact support (see the docs link) rather than switching back and forth.`,
+      PROJECT_DOCS_URL
+    ),
+
+  stateBackendListFailed: (details: {
+    bucket: string;
+    key?: string;
+    operation: "list" | "read" | "parse" | "unsupported";
+    errorName: string;
+    accessDenied: boolean;
+    /** "unsupported" only: the compression extension, e.g. ".zst". */
+    extension?: string;
+  }) => {
+    if (details.operation === "unsupported") {
+      const ext = details.extension ?? "unknown";
+      return new WrapsError(
+        `Wraps can't read this stack file format (${ext}): ${details.key ?? details.bucket}. It couldn't check this machine's Pulumi project, and nothing was created. See ${PROJECT_DOCS_URL}.`,
+        "STATE_BACKEND_LIST_FAILED",
+        `This Wraps install can't decode ${ext} stack files. Use a newer Node (22.15 or later) if the format is .zst, or contact support (see the docs link).`,
+        PROJECT_DOCS_URL
+      );
+    }
+    const what =
+      details.operation === "list"
+        ? `list the state bucket ${details.bucket}`
+        : `${details.operation} ${details.key ?? details.bucket}`;
+    let suggestion: string;
+    if (details.operation === "parse") {
+      suggestion =
+        "The stack file looks corrupt; contact support (see the docs link).";
+    } else if (details.accessDenied) {
+      const action =
+        details.operation === "list" ? "s3:ListBucket" : "s3:GetObject";
+      suggestion = `AccessDenied: grant ${action} on wraps-state-* with no s3:prefix condition, then run the same command again.`;
+    } else {
+      suggestion = `The AWS error was ${details.errorName}. Run the same command again.`;
+    }
+    return new WrapsError(
+      `Wraps couldn't ${what} (${details.errorName}) to check this machine's Pulumi project. Nothing was created. See ${PROJECT_DOCS_URL}.`,
+      "STATE_BACKEND_LIST_FAILED",
+      suggestion,
+      PROJECT_DOCS_URL
+    );
+  },
 
   stateMigrationFailed: () =>
     new WrapsError(

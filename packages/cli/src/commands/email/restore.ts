@@ -28,7 +28,9 @@ function isUnwrappedError(error: unknown): boolean {
   return (
     error instanceof WrapsError &&
     (error.code === "STATE_BACKEND_UNREACHABLE" ||
-      error.code === "STACK_PROJECT_CONFLICT")
+      error.code === "STACK_PROJECT_CONFLICT" ||
+      error.code === "PULUMI_PROJECT_MISMATCH" ||
+      error.code === "STATE_BACKEND_LIST_FAILED")
   );
 }
 
