@@ -35,7 +35,10 @@ vi.mock("os", async (importOriginal) => {
   return { ...actual, default: { ...actual, homedir }, homedir };
 });
 
-afterAll(async () => {
-  const { rmSync } = await import("node:fs");
-  rmSync(fakeHome, { recursive: true, force: true });
+afterAll(() => {
+  // getBuiltinModule bypasses vi.mock, so a test file that mocks node:fs
+  // without rmSync cannot break the cleanup.
+  process
+    .getBuiltinModule("node:fs")
+    .rmSync(fakeHome, { recursive: true, force: true });
 });
