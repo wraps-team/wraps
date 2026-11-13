@@ -2,8 +2,40 @@
  * Tests for telemetry client
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { rmSync } from "node:fs";
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { TelemetryClient } from "../client";
+
+// TelemetryClient builds its own TelemetryConfigManager with no cwd, which would
+// put the conf file under the home directory. Pin it to a temp dir instead.
+const confDir = vi.hoisted(
+  () => `${process.env.TMPDIR || "/tmp"}/wraps-telemetry-client-test`
+);
+vi.mock("../config", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../config")>();
+  return {
+    ...actual,
+    TelemetryConfigManager: class extends actual.TelemetryConfigManager {
+      constructor(
+        options?: ConstructorParameters<typeof actual.TelemetryConfigManager>[0]
+      ) {
+        super({ ...options, cwd: confDir });
+      }
+    },
+  };
+});
+
+afterAll(() => {
+  rmSync(confDir, { recursive: true, force: true });
+});
 
 describe("TelemetryClient", () => {
   let client: TelemetryClient;

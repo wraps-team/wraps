@@ -162,15 +162,20 @@ Deployment tests for all of this are `tests/deployment/selfhost-sst/` and `coexi
 
 ## Tests
 
-- Unit tests never see the real home directory (`src/__tests__/setup/fake-home.ts`
-  mocks `os.homedir()` to a per-worker temp dir and sets `PULUMI_HOME` inside it) and
-  fail on any real socket (`no-real-network.ts`). Never point a test at the real
-  `~/.wraps`; setting `HOME` inside a test has no effect on `os.homedir()` in vitest
-  worker threads. A test file that mocks `node:os` itself overrides the guard for that
-  file, so give it a temp dir.
-- Tests run with `NO_COLOR=1`, because CI sets `CI` and `FORCE_COLOR`, which turn
-  picocolors on. A test that passes locally but fails in CI on human output is seeing
-  colour codes. One local run covers both.
+- Unit tests never see the real home directory. `vitest.config.ts` runs them in forked
+  workers (`pool: "forks"`) whose `HOME`, `USERPROFILE`, `XDG_*` and `PULUMI_HOME` point
+  into one temp dir per vitest run, created and removed by
+  `src/__tests__/setup/fake-home-global.ts`. A fork's real `os.homedir()` follows
+  `HOME`, so `node_modules` code (conf, Pulumi automation) and child processes are
+  covered. `no-real-network.ts` fails any real socket. Never point a test at the real
+  `~/.wraps`. Under the old `threads` pool, setting `HOME` inside a test had no effect
+  on `os.homedir()`, so don't switch the pool back. A test file that mocks `node:os`
+  itself gets whatever path it returns, so give it a temp dir.
+- Tests run with `NO_COLOR=1`. `CI` alone turns picocolors on, and CI also sets
+  `FORCE_COLOR`; picocolors (and `@clack/prompts`, which uses it) honour `NO_COLOR` over
+  both, so a local run sees no colour codes. Node's own colour detection does not honour
+  it. `NO_COLOR` covers colour only: `CI` still changes `isInteractive()` and telemetry,
+  so run with `CI=true` when touching those.
 
 ## Key Directories
 
