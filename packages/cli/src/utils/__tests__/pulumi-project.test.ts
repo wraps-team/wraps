@@ -13,7 +13,8 @@ import { load } from "js-yaml";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Real file I/O against a temp HOME; S3 is an in-memory fake behind the SDK mock.
-// os.homedir() ignores process.env.HOME inside vitest worker threads, so mock it.
+// Each test gets its own temp home: the suite-wide fake home (vitest.config.ts) is
+// shared by every file, so this file mocks os.homedir() to stay isolated from it.
 let fakeHome = "";
 vi.mock("node:os", async (importOriginal) => ({
   ...(await importOriginal<typeof import("node:os")>()),
