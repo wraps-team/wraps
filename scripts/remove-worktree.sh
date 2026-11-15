@@ -10,9 +10,12 @@
 #   2. unlinks the shared-dir symlinks, and restores .claude from HEAD when it
 #      replaced a tracked directory;
 #   3. stops (exit 1, nothing removed) if the worktree is still dirty, or holds
-#      ignored files under the paths where uncommitted work lives (.claude,
-#      plans, ai-notes, notes, docs/superpowers, .gstack): `git worktree remove`
-#      does not count ignored files as dirty and would delete them;
+#      ignored files under the paths where uncommitted work lives: `git worktree
+#      remove` does not count ignored files as dirty and would delete them.
+#      Those paths are .claude, plans, ai-notes, .agents, .cursor, .wraps,
+#      .gstack and .mcp.json at ANY depth (the .gitignore patterns have no
+#      leading slash), plus notes, docs/superpowers and packages/video at the
+#      repo root;
 #   4. runs `git worktree remove` (never --force). That deletes the rest of the
 #      ignored files too (node_modules, .next, dist, .turbo, env files), which
 #      is fine: a worktree always has them and they are regenerated;
@@ -91,10 +94,12 @@ for d in "${SHARED_DIRS[@]}"; do
     git -C "$WORKTREE" checkout -- "$d"
     echo "Restored $d from HEAD"
     # Delete the restored copy only if it is still pristine (no ignored or
-    # modified files in it); otherwise move it aside so nothing is lost.
-    relink+=("if [ -z \"\$(git -C \"$WORKTREE\" status --porcelain --ignored -- $d)\" ]; then rm -r \"$WORKTREE/$d\"; else mv \"$WORKTREE/$d\" \"$WORKTREE/$d.restored.$stamp\"; fi && ln -s \"$MAIN_TREE/$d\" \"$WORKTREE/$d\"")
+    # modified files in it); otherwise move it aside so nothing is lost. Every
+    # printed line is safe to paste twice: it does nothing once the link exists,
+    # and `ln -sn` never descends into an existing link.
+    relink+=("[ -L \"$dst\" ] || { if [ -z \"\$(git -C \"$WORKTREE\" status --porcelain --ignored -- $d)\" ]; then rm -r \"$dst\"; else mv \"$dst\" \"$dst.restored.$stamp\"; fi && ln -sn \"$MAIN_TREE/$d\" \"$dst\"; }")
   else
-    relink+=("ln -s \"$MAIN_TREE/$d\" \"$WORKTREE/$d\"")
+    relink+=("[ -e \"$dst\" ] || [ -L \"$dst\" ] || ln -sn \"$MAIN_TREE/$d\" \"$dst\"")
   fi
 done
 
@@ -123,16 +128,30 @@ fi
 
 # `git worktree remove` ignores gitignored files and deletes them. Refuse when
 # any sit under the paths where uncommitted work lives; build output is fine.
+# -z: NUL-terminated, unquoted paths (the default output C-quotes names with
+# spaces or non-ASCII bytes, which no pattern below would match).
+# --ignored=matching: lists each ignored path by its own name. The default
+# collapses an untracked directory holding only ignored files into the
+# directory itself (`!! tools/`), hiding a nested `tools/plans/`.
 ignored=()
-while IFS= read -r line; do
-  [[ "$line" == "!! "* ]] || continue
-  entry="${line#!! }"
-  case "$entry" in
-    .claude|.claude/*|plans|plans/*|ai-notes|ai-notes/*|notes|notes/*|docs/superpowers|docs/superpowers/*|.gstack|.gstack/*)
+skip=0
+while IFS= read -r -d '' rec; do
+  if (( skip )); then skip=0; continue; fi
+  # A rename/copy record is followed by its source path as a second record.
+  case "${rec:0:2}" in R?|C?|?R|?C) skip=1 ;; esac
+  [[ "$rec" == "!! "* ]] || continue
+  entry="${rec#!! }"
+  # "/$entry" lets a pattern anchor at any depth with a leading */.
+  case "/$entry" in
+    */.claude|*/.claude/*|*/plans|*/plans/*|*/ai-notes|*/ai-notes/*|\
+    */.agents|*/.agents/*|*/.cursor|*/.cursor/*|*/.wraps|*/.wraps/*|\
+    */.gstack|*/.gstack/*|*/.mcp.json|\
+    /notes|/notes/*|/docs/superpowers|/docs/superpowers/*|\
+    /packages/video|/packages/video/*)
       [[ -L "$WORKTREE/${entry%/}" ]] || ignored+=("$entry")
       ;;
   esac
-done < <(git -C "$WORKTREE" status --porcelain --ignored)
+done < <(git -C "$WORKTREE" status --porcelain --ignored=matching -z)
 if (( ${#ignored[@]} )); then
   echo "Worktree holds ignored files that removal would delete; nothing was removed:" >&2
   printf '  %s\n' "${ignored[@]}" >&2

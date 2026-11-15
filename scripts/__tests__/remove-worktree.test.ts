@@ -72,6 +72,10 @@ function run(cwd: string, ...args: string[]) {
   return runScript(cwd, SCRIPT, args);
 }
 
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /** The relink commands the script printed: the indented lines after a blank line. */
 function relinkLines(out: string): string[] {
   return out
@@ -169,20 +173,44 @@ describe("remove-worktree.sh", () => {
     // is relinked, and status shows the usual dirty pair.
     const lines = relinkLines(r.out);
     expect(lines).toHaveLength(2);
+    const w = escapeRegExp(wt);
+    const m = escapeRegExp(main);
     expect(lines[0]).toMatch(
       new RegExp(
-        `^if \\[ -z "\\$\\(git -C "${wt}" status --porcelain --ignored -- \\.claude\\)" \\]; ` +
-          `then rm -r "${wt}/\\.claude"; else mv "${wt}/\\.claude" "${wt}/\\.claude\\.restored\\.\\d+"; fi ` +
-          `&& ln -s "${main}/\\.claude" "${wt}/\\.claude"$`
+        `^\\[ -L "${w}/\\.claude" \\] \\|\\| \\{ ` +
+          `if \\[ -z "\\$\\(git -C "${w}" status --porcelain --ignored -- \\.claude\\)" \\]; ` +
+          `then rm -r "${w}/\\.claude"; else mv "${w}/\\.claude" "${w}/\\.claude\\.restored\\.\\d+"; fi ` +
+          `&& ln -sn "${m}/\\.claude" "${w}/\\.claude"; \\}$`
       )
     );
-    expect(lines[1]).toBe(`ln -s "${main}/notes" "${wt}/notes"`);
+    expect(lines[1]).toBe(
+      `[ -e "${wt}/notes" ] || [ -L "${wt}/notes" ] || ln -sn "${main}/notes" "${wt}/notes"`
+    );
     for (const line of lines) {
       expect(spawnSync("bash", ["-c", line]).status).toBe(0);
     }
     expect(lstatSync(join(wt, ".claude")).isSymbolicLink()).toBe(true);
     expect(lstatSync(join(wt, "notes")).isSymbolicLink()).toBe(true);
     expect(git(wt, "status", "--porcelain")).toContain(" D .claude/x.md");
+  });
+
+  it("--restore-only relink lines are safe to paste twice", () => {
+    linkSharedDirs();
+    const lines = relinkLines(run(main, "--restore-only", wt).out);
+    for (const line of lines) {
+      expect(spawnSync("bash", ["-c", line]).status).toBe(0);
+    }
+    const afterFirst = git(wt, "status", "--porcelain");
+
+    for (const line of lines) {
+      expect(spawnSync("bash", ["-c", line]).status).toBe(0);
+    }
+
+    expect(lstatSync(join(wt, ".claude")).isSymbolicLink()).toBe(true);
+    expect(readdirSync(join(main, "notes"))).toEqual([]);
+    expect(readdirSync(join(main, ".claude"))).toEqual(["x.md"]);
+    expect(readdirSync(wt).filter((n) => n.includes(".restored."))).toEqual([]);
+    expect(git(wt, "status", "--porcelain")).toBe(afterFirst);
   });
 
   it("--restore-only relink moves .claude aside when it holds ignored work", () => {
@@ -257,7 +285,7 @@ describe("remove-worktree.sh", () => {
     expect(existsSync(join(wt, "plans", "draft.md"))).toBe(true);
     expect(existsSync(join(main, "reap-ran.txt"))).toBe(false);
     // The unlinked dirs come with a way back.
-    expect(r.err).toContain(`ln -s "${main}/notes" "${wt}/notes"`);
+    expect(r.err).toContain(`ln -sn "${main}/notes" "${wt}/notes"`);
   });
 
   it("refuses ignored files in a real .claude", () => {
@@ -269,6 +297,32 @@ describe("remove-worktree.sh", () => {
     expect(r.err).toContain(".claude/settings.local.json");
     expect(existsSync(join(wt, ".claude", "settings.local.json"))).toBe(true);
     expect(existsSync(join(main, "reap-ran.txt"))).toBe(false);
+  });
+
+  it.each([
+    ["a space", ".claude/my notes.md"],
+    ["non-ASCII characters", ".claude/caf\u00e9 \u65e5\u672c.md"],
+  ])("refuses an ignored file whose name has %s", (_label, rel) => {
+    writeFileSync(join(wt, rel), "unsaved\n");
+
+    const r = run(main, wt);
+
+    expect(r.code).toBe(1);
+    expect(r.err).toContain(rel);
+    expect(existsSync(join(wt, rel))).toBe(true);
+    expect(existsSync(wt)).toBe(true);
+    expect(existsSync(join(main, "reap-ran.txt"))).toBe(false);
+  });
+
+  it("refuses ignored work nested below the repo root", () => {
+    mkdirSync(join(wt, "packages", "app", "plans"), { recursive: true });
+    writeFileSync(join(wt, "packages", "app", "plans", "p.md"), "x\n");
+
+    const r = run(main, wt);
+
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("packages/app/plans/");
+    expect(existsSync(wt)).toBe(true);
   });
 
   it("removes a worktree whose only ignored files are build output", () => {
