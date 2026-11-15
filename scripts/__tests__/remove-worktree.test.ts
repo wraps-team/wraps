@@ -1,9 +1,11 @@
 import { spawnSync } from "node:child_process";
 import {
+  copyFileSync,
   existsSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -26,6 +28,10 @@ const SCRIPT = join(
 );
 
 const FAKE_REAP = `import { existsSync, writeFileSync } from "node:fs";
+if (process.env.REAP_FAIL) {
+  console.error("reap boom");
+  process.exit(1);
+}
 writeFileSync(
   "reap-ran.txt",
   existsSync(process.env.WORKTREE_UNDER_TEST) ? "worktree-still-there" : "worktree-gone"
@@ -48,13 +54,30 @@ function git(cwd: string, ...args: string[]): string {
   return r.stdout;
 }
 
-function run(cwd: string, ...args: string[]) {
-  const r = spawnSync("bash", [SCRIPT, ...args], {
+function runScript(
+  cwd: string,
+  script: string,
+  args: string[],
+  extraEnv: Record<string, string> = {}
+) {
+  const r = spawnSync("bash", [script, ...args], {
     cwd,
     encoding: "utf8",
-    env: { ...process.env, WORKTREE_UNDER_TEST: wt },
+    env: { ...process.env, WORKTREE_UNDER_TEST: wt, ...extraEnv },
   });
   return { code: r.status, out: r.stdout, err: r.stderr };
+}
+
+function run(cwd: string, ...args: string[]) {
+  return runScript(cwd, SCRIPT, args);
+}
+
+/** The relink commands the script printed: the indented lines after a blank line. */
+function relinkLines(out: string): string[] {
+  return out
+    .split("\n")
+    .filter((l) => l.startsWith("  "))
+    .map((l) => l.trim());
 }
 
 /** What setup-worktree.sh does: swap the tracked .claude for a symlink to the main tree's. */
@@ -80,7 +103,11 @@ beforeEach(() => {
     join(main, "scripts", "test-db", "reap-branches.mjs"),
     FAKE_REAP
   );
-  git(main, "add", ".claude", "scripts");
+  // Tracked copy of the script, so a worktree can run it by relative path.
+  copyFileSync(SCRIPT, join(main, "scripts", "remove-worktree.sh"));
+  // Same ignore rules as the real repo for the paths that matter here.
+  writeFileSync(join(main, ".gitignore"), "node_modules/\n.claude/\nplans/\n");
+  git(main, "add", "-f", ".claude", "scripts", ".gitignore");
   git(main, "commit", "-q", "-m", "init");
   git(main, "worktree", "add", "-q", "-b", "feature", wt);
 });
@@ -136,9 +163,45 @@ describe("remove-worktree.sh", () => {
     expect(existsSync(join(wt, ".claude", "x.md"))).toBe(true);
     expect(existsSync(join(wt, "notes"))).toBe(false);
     expect(git(wt, "status", "--porcelain")).toBe("");
-    expect(r.out).toContain(`ln -s "${main}/.claude" "${wt}/.claude"`);
-    expect(r.out).toContain(`ln -s "${main}/notes" "${wt}/notes"`);
     expect(existsSync(join(main, "reap-ran.txt"))).toBe(false);
+
+    // The printed lines are the real relink: .claude is a symlink again, notes
+    // is relinked, and status shows the usual dirty pair.
+    const lines = relinkLines(r.out);
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatch(
+      new RegExp(
+        `^if \\[ -z "\\$\\(git -C "${wt}" status --porcelain --ignored -- \\.claude\\)" \\]; ` +
+          `then rm -r "${wt}/\\.claude"; else mv "${wt}/\\.claude" "${wt}/\\.claude\\.restored\\.\\d+"; fi ` +
+          `&& ln -s "${main}/\\.claude" "${wt}/\\.claude"$`
+      )
+    );
+    expect(lines[1]).toBe(`ln -s "${main}/notes" "${wt}/notes"`);
+    for (const line of lines) {
+      expect(spawnSync("bash", ["-c", line]).status).toBe(0);
+    }
+    expect(lstatSync(join(wt, ".claude")).isSymbolicLink()).toBe(true);
+    expect(lstatSync(join(wt, "notes")).isSymbolicLink()).toBe(true);
+    expect(git(wt, "status", "--porcelain")).toContain(" D .claude/x.md");
+  });
+
+  it("--restore-only relink moves .claude aside when it holds ignored work", () => {
+    linkSharedDirs();
+    const r = run(main, "--restore-only", wt);
+    writeFileSync(join(wt, ".claude", "settings.local.json"), "{}\n");
+
+    for (const line of relinkLines(r.out)) {
+      expect(spawnSync("bash", ["-c", line]).status).toBe(0);
+    }
+
+    expect(lstatSync(join(wt, ".claude")).isSymbolicLink()).toBe(true);
+    const backup = readdirSync(wt).find((n) =>
+      n.startsWith(".claude.restored.")
+    );
+    expect(backup).toBeDefined();
+    expect(existsSync(join(wt, backup as string, "settings.local.json"))).toBe(
+      true
+    );
   });
 
   it("does not discard edits in a real (never symlinked) .claude", () => {
@@ -175,5 +238,79 @@ describe("remove-worktree.sh", () => {
     expect(run(main).code).toBe(2);
     expect(run(main, wt, wt).code).toBe(2);
     expect(run(main, "--bogus", wt).code).toBe(2);
+  });
+
+  it("refuses ignored work under plans/, keeps it, does not reap", () => {
+    linkSharedDirs();
+    mkdirSync(join(wt, "plans"));
+    writeFileSync(join(wt, "plans", "draft.md"), "unsaved plan\n");
+    // Build output is ignored too, and must not block removal on its own.
+    mkdirSync(join(wt, "node_modules"));
+    writeFileSync(join(wt, "node_modules", "dep.js"), "x\n");
+
+    const r = run(main, wt);
+
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("plans/");
+    expect(r.err).not.toContain("node_modules");
+    expect(r.err).toContain("nothing was removed");
+    expect(existsSync(join(wt, "plans", "draft.md"))).toBe(true);
+    expect(existsSync(join(main, "reap-ran.txt"))).toBe(false);
+    // The unlinked dirs come with a way back.
+    expect(r.err).toContain(`ln -s "${main}/notes" "${wt}/notes"`);
+  });
+
+  it("refuses ignored files in a real .claude", () => {
+    writeFileSync(join(wt, ".claude", "settings.local.json"), "{}\n");
+
+    const r = run(main, wt);
+
+    expect(r.code).toBe(1);
+    expect(r.err).toContain(".claude/settings.local.json");
+    expect(existsSync(join(wt, ".claude", "settings.local.json"))).toBe(true);
+    expect(existsSync(join(main, "reap-ran.txt"))).toBe(false);
+  });
+
+  it("removes a worktree whose only ignored files are build output", () => {
+    mkdirSync(join(wt, "node_modules"));
+    writeFileSync(join(wt, "node_modules", "dep.js"), "x\n");
+
+    const r = run(main, wt);
+
+    expect(r.code).toBe(0);
+    expect(existsSync(wt)).toBe(false);
+  });
+
+  it("removes the worktree when run from inside it by relative path", () => {
+    linkSharedDirs();
+
+    const r = runScript(wt, "scripts/remove-worktree.sh", ["."]);
+
+    expect(r.err).toBe("");
+    expect(r.code).toBe(0);
+    expect(existsSync(wt)).toBe(false);
+    expect(readFileSync(join(main, "reap-ran.txt"), "utf8")).toBe(
+      "worktree-gone"
+    );
+  });
+
+  it("reports a failing reap after the worktree is already gone", () => {
+    const r = runScript(main, SCRIPT, [wt], { REAP_FAIL: "1" });
+
+    expect(r.code).not.toBe(0);
+    expect(existsSync(wt)).toBe(false);
+    expect(r.err).toContain("reap boom");
+    expect(r.err).toContain("already gone");
+    expect(r.err).toContain("node scripts/test-db/reap-branches.mjs");
+  });
+
+  it("does not reap when git refuses to remove (locked worktree)", () => {
+    git(main, "worktree", "lock", wt);
+
+    const r = run(main, wt);
+
+    expect(r.code).not.toBe(0);
+    expect(existsSync(wt)).toBe(true);
+    expect(existsSync(join(main, "reap-ran.txt"))).toBe(false);
   });
 });

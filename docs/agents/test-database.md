@@ -24,7 +24,10 @@ running anything. An expired branch is simply re-cut from the parent on the next
 Deleting the worktree leaves its branch alive until it expires. `scripts/remove-worktree.sh
 <path>` does the whole teardown: it unlinks the shared dirs `setup-worktree.sh` linked in
 (which otherwise make `git worktree remove` refuse), restores `.claude`, removes the worktree
-without `--force`, and then reaps. To reclaim by hand instead:
+without `--force`, and then reaps. It refuses, and removes nothing, while the worktree has
+uncommitted changes or gitignored work under `.claude`, `plans`, `ai-notes`, `notes`,
+`docs/superpowers` or `.gstack` (plain `git worktree remove` would delete those silently).
+To reclaim by hand instead:
 
 ```bash
 node scripts/test-db/reap-branches.mjs        # delete wt-* branches whose worktree is gone

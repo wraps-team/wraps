@@ -111,7 +111,8 @@ disambiguation is which repo you are standing in, not the tag text.
 6. **Run the repo's checks** (see Pre-flight below). Never release past red on your own
    judgement. If the only failures are in packages the release doesn't ship, re-run the
    failing files alone, check main's CI for the same commit, show the user both, and
-   release only on their explicit yes. Record the red step in the release note.
+   release only on their explicit yes. Tell the user which step was red in the release
+   summary.
 7. **Bump the version**, commit as `chore(<pkg>): release v<new-version>`.
 8. **Push the commit**, then create and push the annotated tag:
    `git tag -a <pkg>-v<version> -m "<pkg>-v<version>" && git push origin <pkg>-v<version>`
