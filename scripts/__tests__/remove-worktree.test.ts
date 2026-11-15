@@ -325,6 +325,24 @@ describe("remove-worktree.sh", () => {
     expect(existsSync(wt)).toBe(true);
   });
 
+  it("does not treat generated wraps/.wraps output as work", () => {
+    writeFileSync(
+      join(main, ".gitignore"),
+      "node_modules/\n.claude/\nplans/\n.wraps/\n"
+    );
+    git(main, "add", ".gitignore");
+    git(main, "commit", "-q", "-m", "ignore .wraps");
+    git(wt, "merge", "-q", "main");
+    mkdirSync(join(wt, "wraps", ".wraps"), { recursive: true });
+    writeFileSync(join(wt, "wraps", ".wraps", "lockfile.json"), "{}\n");
+
+    const r = run(main, wt);
+
+    expect(r.err).toBe("");
+    expect(r.code).toBe(0);
+    expect(existsSync(wt)).toBe(false);
+  });
+
   it("removes a worktree whose only ignored files are build output", () => {
     mkdirSync(join(wt, "node_modules"));
     writeFileSync(join(wt, "node_modules", "dep.js"), "x\n");

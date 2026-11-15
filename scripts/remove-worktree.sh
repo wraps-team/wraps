@@ -12,8 +12,8 @@
 #   3. stops (exit 1, nothing removed) if the worktree is still dirty, or holds
 #      ignored files under the paths where uncommitted work lives: `git worktree
 #      remove` does not count ignored files as dirty and would delete them.
-#      Those paths are .claude, plans, ai-notes, .agents, .cursor, .wraps,
-#      .gstack and .mcp.json at ANY depth (the .gitignore patterns have no
+#      Those paths are .claude, plans, ai-notes, .agents, .cursor, .gstack
+#      and .mcp.json at ANY depth (the .gitignore patterns have no
 #      leading slash), plus notes, docs/superpowers and packages/video at the
 #      repo root;
 #   4. runs `git worktree remove` (never --force). That deletes the rest of the
@@ -144,7 +144,7 @@ while IFS= read -r -d '' rec; do
   # "/$entry" lets a pattern anchor at any depth with a leading */.
   case "/$entry" in
     */.claude|*/.claude/*|*/plans|*/plans/*|*/ai-notes|*/ai-notes/*|\
-    */.agents|*/.agents/*|*/.cursor|*/.cursor/*|*/.wraps|*/.wraps/*|\
+    */.agents|*/.agents/*|*/.cursor|*/.cursor/*|\
     */.gstack|*/.gstack/*|*/.mcp.json|\
     /notes|/notes/*|/docs/superpowers|/docs/superpowers/*|\
     /packages/video|/packages/video/*)

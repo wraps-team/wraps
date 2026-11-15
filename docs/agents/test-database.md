@@ -26,7 +26,7 @@ Deleting the worktree leaves its branch alive until it expires. `scripts/remove-
 (which otherwise make `git worktree remove` refuse), restores `.claude`, removes the worktree
 without `--force`, and then reaps. It refuses, and removes nothing, while the worktree has
 uncommitted changes or gitignored files under `.claude`, `plans`, `ai-notes`, `.agents`,
-`.cursor`, `.wraps`, `.gstack` or `.mcp.json` (at any depth), or `notes`, `docs/superpowers`
+`.cursor`, `.gstack` or `.mcp.json` (at any depth), or `notes`, `docs/superpowers`
 or `packages/video` (at the repo root). Plain `git worktree remove` would delete those
 silently. Other ignored files, such as `node_modules` and build output, are deleted.
 To reclaim by hand instead:
