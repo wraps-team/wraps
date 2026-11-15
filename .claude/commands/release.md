@@ -108,7 +108,10 @@ disambiguation is which repo you are standing in, not the tag text.
 4. **Review what is actually unreleased**:
    `git log <last-tag>..HEAD --oneline -- <package-dir>`
 5. **Sanity-check the bump against that log** (see Semver guard below).
-6. **Run the repo's checks** (see Pre-flight below). Never release past red.
+6. **Run the repo's checks** (see Pre-flight below). Never release past red on your own
+   judgement. If the only failures are in packages the release doesn't ship, re-run the
+   failing files alone, check main's CI for the same commit, show the user both, and
+   release only on their explicit yes. Record the red step in the release note.
 7. **Bump the version**, commit as `chore(<pkg>): release v<new-version>`.
 8. **Push the commit**, then create and push the annotated tag:
    `git tag -a <pkg>-v<version> -m "<pkg>-v<version>" && git push origin <pkg>-v<version>`
@@ -119,6 +122,8 @@ disambiguation is which repo you are standing in, not the tag text.
 10. **Watch it**: `gh run watch <run-id> --exit-status`.
 11. **Verify it actually landed** — do not trust a green workflow alone:
     - npm: `npm view <pkg> version dist-tags --json`
+      The registry often shows the old `latest` for 2-5 minutes after the publish job logs
+      `Published package`. Poll every 30 seconds for up to 10 minutes before calling it a failure.
     - PyPI: `uv pip index versions wraps-email` or check the project page
     - `mcp` only: the official MCP Registry, which `publish.yml` updates after npm.
       Check that `https://registry.modelcontextprotocol.io/v0/servers?search=dev.wraps/email`
@@ -139,6 +144,12 @@ running it elsewhere fails with a missing-script error.
 ```bash
 pnpm check:all          # lint, typecheck, baseline, build, test
 ```
+
+If `test` fails only on DB tests with `column ... does not exist` (42703) while main's CI
+is green, this checkout's Neon test branch predates a merged schema change. Run
+`node scripts/test-db/reap-branches.mjs --self` from this checkout and re-run
+`check:all`. It re-cuts the branch from the refreshed parent. If it is still red,
+follow step 6.
 
 **wraps-js** — no `check:all`; its CLAUDE.md defines the bar as:
 ```bash
