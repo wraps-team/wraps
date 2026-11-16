@@ -29,7 +29,7 @@ you are working in.
 - **Finding where something lives**, or the CLI's services → `docs/agents/repo-map.md`
 - **Checking work locally** (browser, CLI, `pnpm check:all` in a fresh worktree) →
   `docs/agents/local-dev.md`
-- **A Drizzle migration landed, or a worktree was removed** → `docs/agents/test-database.md`
+- **A Drizzle migration landed, a worktree was removed, or local tests fail `column ... does not exist`** → `docs/agents/test-database.md`
 - **Editing CI workflows, or a red `test-api`/`test-web`** → `docs/agents/ci-and-deploy.md`
 - **Writing or running dashboard e2e tests** (`apps/e2e`, TesterArmy's `e2e`) →
   `pnpm --filter @wraps/e2e exec e2e guide`. Run through `pnpm test:e2e [file]`, which
