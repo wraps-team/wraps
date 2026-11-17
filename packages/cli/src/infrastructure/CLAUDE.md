@@ -10,7 +10,7 @@ infrastructure/
 ├── sms-stack.ts        # SMS: AWS End User Messaging / Pinpoint SMS
 ├── cdn-stack.ts        # CDN: S3 + CloudFront + ACM certificates
 ├── vercel-oidc.ts      # Vercel OIDC provider setup
-└── resources/          # One file per AWS resource type
+└── resources/          # One file per concern
     ├── iam.ts          # IAM roles and policies
     ├── ses.ts          # SES configuration sets, identities
     ├── dynamodb.ts     # DynamoDB tables
@@ -39,7 +39,7 @@ Name every resource `wraps-{service}-{resource}` (invariant 2):
 - `wraps-cdn-bucket`, `wraps-cdn-distribution`
 
 ### Tagging
-Tag every AWS resource `ManagedBy: 'wraps-cli'`. Status checks and cleanup find Wraps-managed resources by this tag, and a stack adopts an existing resource only when it carries the tag (e.g. the phone-number lookup in `sms-stack.ts`).
+Tag every AWS resource `ManagedBy: 'wraps-cli'`. The tag marks a resource as Wraps-made where its name can't, as with SMS phone numbers (the phone-number lookup in `sms-stack.ts` checks it).
 
 ### Lambda Bundling
 Lambda functions are bundled at deploy time using esbuild. The `resources/lambda.ts` file:
@@ -60,7 +60,7 @@ Pulumi handles most ordering via output references, but explicit `dependsOn` is 
 
 ## Rules
 
-- Create new resources, and change an existing one only when it carries `ManagedBy: 'wraps-cli'`. Never modify an AWS resource Wraps didn't create (invariant 1).
+- Create new `wraps-{service}-` resources. Before importing an existing one into a stack, confirm Wraps created it: by its `wraps-` name, or by its `ManagedBy` tag where the name can't tell (the SMS phone-number lookup in `sms-stack.ts`). Never modify an AWS resource Wraps didn't create (invariant 1).
 - Keep each file in `resources/` to one concern (e.g. `sqs.ts`, `eventbridge-inbound.ts`, `iam-agent-user.ts`); orchestration stays in the stack files.
 - Return the created resources from each resource function so stacks can wire up dependencies.
 - Bundle Lambda functions with `@aws-sdk/*` as externals; the Lambda runtime provides them.

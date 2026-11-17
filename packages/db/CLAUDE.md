@@ -9,8 +9,9 @@ conventions; the rules below are the ones a schema file can't explain.
 ### 1. Org-Owned Tables Carry organizationId (cascade) and an Org Index
 
 Give every new org-owned table an `organizationId` FK to `organization.id` with
-`onDelete: "cascade"`, so its rows are deleted with their org, and an index on
-`organizationId` so org-scoped queries (invariant 4) stay cheap. Copy the column from
+`onDelete: "cascade"`, so its rows are deleted with their org, and an index led by
+`organizationId` (its own, the first column of a composite, or the primary key) so
+org-scoped queries (invariant 4) stay cheap. Copy the column from
 `contact` in `src/schema/contacts.ts`.
 
 Real exceptions today:
@@ -29,8 +30,7 @@ Real exceptions today:
 - **Nullable `organizationId` with `onDelete: "set null"`**: `aws_marketplace_subscription`,
   deliberately, because the row exists before the buyer has an org (comment at
   `src/schema/aws-marketplace.ts:44`).
-- **No separate org index**: `organization_extension` and `topic_settings`, whose
-  `organizationId` is the primary key; the better-auth `member`, `invitation` and
+- **No index led by `organizationId`**: the better-auth `member`, `invitation` and
   `statement` tables.
 
 ### 2. Unique Constraints Include organizationId

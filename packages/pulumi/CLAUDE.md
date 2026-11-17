@@ -2,19 +2,22 @@
 
 Pulumi component for deploying Wraps email infrastructure to AWS. Composition over presets — users enable only the features they need.
 
-## No In-Repo Deploy Path — CI Does Not Exercise This Against the CLI
+## Not Deployed in CI — Nothing Checks It Against the CLI
 
 Published as `@wraps.dev/pulumi` for customers who write their own Pulumi
-programs (documented at `/docs/pulumi-reference`). **No deploy path in this
-monorepo uses it**: its only in-repo dependent is `packages/cli`, as a
-devDependency for the parity test below. `packages/cli/src/infrastructure/` is a
+programs (documented at `/docs/pulumi-reference`). **No app or CI job deploys
+it.** In-repo it is used only by `packages/cli` (a devDependency, for the parity
+test below) and by the operator-run `tests/deployment/pulumi` scenario
+(`tests/deployment/pulumi/app/package.json` plus `tests/deployment/pulumi/run.sh`,
+which runs `pulumi up`), kept out of CI per `tests/deployment/README.md`.
+`packages/cli/src/infrastructure/` is a
 second, independent implementation of the same email stack — the one
 `email init` actually deploys — and the two are not the same code. They have
 already diverged silently once (the CLI hardcoded `matchingEventTypes` while
 this package honored a caller-supplied list) and before that, in the opposite
 direction, for Mail Manager archiving.
 
-Since no app or deploy path consumes this package, a change here that breaks the
+Since no app or CI job deploys this package, a change here that breaks the
 CLI's equivalent behavior (or vice versa) is caught by neither `pnpm build`
 nor any app's test suite — only by the guards in
 `packages/core/src/constants.ts` (shared resource-name and event-type
