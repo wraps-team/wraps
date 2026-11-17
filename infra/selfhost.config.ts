@@ -295,9 +295,10 @@ export default $config({
     }
 
     // Alarm: DLQ arrivals. This DLQ has a Lambda consumer that drains it in
-    // seconds, so the visible-count never reads >= 1. Every arrival is
-    // received by the consumer exactly once, so Sum(NumberOfMessagesReceived)
-    // counts them (NumberOfMessagesSent skips redrive-policy moves).
+    // seconds, so the visible-count rarely reads >= 1. Every arrival is
+    // received by the consumer at least once (more if it times out or
+    // crashes and the batch is redelivered), so Sum(NumberOfMessagesReceived)
+    // >= 1 catches them (NumberOfMessagesSent skips redrive-policy moves).
     new aws.cloudwatch.MetricAlarm("SelfhostBatchDlqAlarm", {
       name: $interpolate`wraps-selfhost-batch-dlq-${$app.stage}`,
       alarmDescription:
@@ -350,9 +351,10 @@ export default $config({
     });
 
     // Alarm: DLQ arrivals. This DLQ has a Lambda consumer that drains it in
-    // seconds, so the visible-count never reads >= 1. Every arrival is
-    // received by the consumer exactly once, so Sum(NumberOfMessagesReceived)
-    // counts them (NumberOfMessagesSent skips redrive-policy moves).
+    // seconds, so the visible-count rarely reads >= 1. Every arrival is
+    // received by the consumer at least once (more if it times out or
+    // crashes and the batch is redelivered), so Sum(NumberOfMessagesReceived)
+    // >= 1 catches them (NumberOfMessagesSent skips redrive-policy moves).
     new aws.cloudwatch.MetricAlarm("SelfhostWorkflowDlqAlarm", {
       name: $interpolate`wraps-selfhost-workflow-dlq-${$app.stage}`,
       alarmDescription:
