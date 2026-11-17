@@ -7,9 +7,20 @@
  * `auth.login` audit row, so the final delete always failed with a 23503.
  * The user was left with no sessions or login methods, and every retry
  * returned "Unauthorized" (2026-10-29, clubpicks).
+ *
+ * `reusable_block.created_by` and `ai_conversation.created_by` failed the same
+ * way with a 23502: they paired `onDelete: "set null"` with NOT NULL.
  */
 
-import { auditLog, awsAccount, db, organization, user } from "@wraps/db";
+import {
+  aiConversation,
+  auditLog,
+  awsAccount,
+  db,
+  organization,
+  reusableBlock,
+  user,
+} from "@wraps/db";
 import { eq, like } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -25,6 +36,8 @@ const email = `${PREFIX}-${stamp}@example.com`;
 const orgId = `${PREFIX}-org-${stamp}`;
 const auditId = `${PREFIX}-audit-${stamp}`;
 const awsId = `${PREFIX}-aws-${stamp}`;
+const blockId = `${PREFIX}-block-${stamp}`;
+const conversationId = `${PREFIX}-conversation-${stamp}`;
 const password = "a-long-unbreached-test-passphrase-7d1e";
 
 describe("deleteUser vs rows the user is attributed on", () => {
@@ -76,6 +89,18 @@ describe("deleteUser vs rows the user is attributed on", () => {
       externalId: `${PREFIX}-ext-${stamp}`,
       createdBy: userId,
     });
+    await db.insert(reusableBlock).values({
+      id: blockId,
+      organizationId: orgId,
+      name: "test block",
+      content: {},
+      createdBy: userId,
+    });
+    await db.insert(aiConversation).values({
+      id: conversationId,
+      organizationId: orgId,
+      createdBy: userId,
+    });
 
     const result = await auth.api.deleteUser({
       body: {},
@@ -99,5 +124,19 @@ describe("deleteUser vs rows the user is attributed on", () => {
       .from(awsAccount)
       .where(eq(awsAccount.id, awsId));
     expect(awsAccounts).toEqual([expect.objectContaining({ createdBy: null })]);
+
+    const blocks = await db
+      .select()
+      .from(reusableBlock)
+      .where(eq(reusableBlock.id, blockId));
+    expect(blocks).toEqual([expect.objectContaining({ createdBy: null })]);
+
+    const conversations = await db
+      .select()
+      .from(aiConversation)
+      .where(eq(aiConversation.id, conversationId));
+    expect(conversations).toEqual([
+      expect.objectContaining({ createdBy: null }),
+    ]);
   });
 });
