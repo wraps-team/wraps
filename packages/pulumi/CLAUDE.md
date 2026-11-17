@@ -2,7 +2,7 @@
 
 Pulumi component for deploying Wraps email infrastructure to AWS. Composition over presets — users enable only the features they need.
 
-## Not Deployed in CI — Nothing Checks It Against the CLI
+## Not Deployed in CI
 
 Published as `@wraps.dev/pulumi` for customers who write their own Pulumi
 programs (documented at `/docs/pulumi-reference`). **No app or CI job deploys

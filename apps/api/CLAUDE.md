@@ -54,9 +54,9 @@ const contact = await db.select().from(contact).where(
 Each work queue (`infra/queues.ts`, `infra/marketplace.ts`, `infra/selfhost.config.ts`) has a
 dead-letter queue, and a consumer drains each DLQ: `src/workers/batch-dlq-consumer.ts`,
 `src/workers/marketplace-dlq-consumer.ts`, `src/(ee)/workers/workflow-dlq-consumer.ts`. When
-you add a queue, add both. Nothing processes messages in an undrained DLQ (only its depth
-alarm in `infra/alarms.ts` fires): the batch consumer is what re-enqueues a broadcast's
-next chunk, so without it the broadcast stalls for good.
+you add a queue, add both. Nothing processes messages in an undrained DLQ: the batch
+consumer is what re-enqueues a broadcast's next chunk, so without it the broadcast stalls
+for good.
 
 ## Commands
 
