@@ -33,13 +33,13 @@ infrastructure/
 Each stack file (`email-stack.ts`, etc.) is a Pulumi inline program that composes resources from `resources/`. Stacks handle orchestration and dependency ordering; resource files handle the AWS API details.
 
 ### Resource Naming
-All resources MUST use the prefix `wraps-{service}-{resource}`:
+Name every resource `wraps-{service}-{resource}` (invariant 2):
 - `wraps-email-role`, `wraps-email-tracking`, `wraps-email-events`
 - `wraps-sms-role`, `wraps-sms-sending`
 - `wraps-cdn-bucket`, `wraps-cdn-distribution`
 
 ### Tagging
-Every AWS resource MUST include the tag `ManagedBy: 'wraps-cli'`. This is how we identify Wraps-managed resources for status checks and cleanup.
+Tag every AWS resource `ManagedBy: 'wraps-cli'`. Status checks and cleanup find Wraps-managed resources by this tag, and a stack adopts an existing resource only when it carries the tag (e.g. the phone-number lookup in `sms-stack.ts`).
 
 ### Lambda Bundling
 Lambda functions are bundled at deploy time using esbuild. The `resources/lambda.ts` file:
@@ -49,7 +49,7 @@ Lambda functions are bundled at deploy time using esbuild. The `resources/lambda
 4. Deploys as a Lambda function with the appropriate IAM role
 
 ### Resource Dependency Ordering
-Within stacks, resources must be created in dependency order:
+Within a stack, create resources in dependency order:
 1. IAM roles and policies (everything else depends on these)
 2. Storage (DynamoDB, S3)
 3. Messaging (SQS, EventBridge)
@@ -60,9 +60,7 @@ Pulumi handles most ordering via output references, but explicit `dependsOn` is 
 
 ## Rules
 
-- NEVER modify existing AWS resources that weren't created by Wraps. The `ManagedBy` tag check is critical.
-- ALWAYS use one resource per file in `resources/`. Don't combine unrelated resources.
-- ALWAYS return created resources from resource functions so stacks can wire up dependencies.
-- ALWAYS use the `wraps-{service}-` naming prefix.
-- ALWAYS tag with `ManagedBy: 'wraps-cli'`.
-- Lambda functions should use `@aws-sdk/*` as externals (provided by Lambda runtime).
+- Create new resources, and change an existing one only when it carries `ManagedBy: 'wraps-cli'`. Never modify an AWS resource Wraps didn't create (invariant 1).
+- Keep each file in `resources/` to one concern (e.g. `sqs.ts`, `eventbridge-inbound.ts`, `iam-agent-user.ts`); orchestration stays in the stack files.
+- Return the created resources from each resource function so stacks can wire up dependencies.
+- Bundle Lambda functions with `@aws-sdk/*` as externals; the Lambda runtime provides them.

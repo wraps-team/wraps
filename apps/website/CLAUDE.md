@@ -107,7 +107,7 @@ src/app/
 
 - **Root layout** (`app/layout.tsx`): Theme provider, analytics (Vercel + PostHog), fonts
 - **BaseLayout** (`components/layouts/base-layout.tsx`): Sidebar + header + footer (app pages)
-- **DocsLayout** (`components/layouts/docs-layout.tsx`): Docs sidebar nav + search (doc pages)
+- **DocsLayout** (`src/components/docs-layout.tsx`): Docs sidebar nav + search (doc pages)
 
 Docs pages use DocsLayout, NOT BaseLayout.
 
@@ -186,7 +186,7 @@ import { JsonLd } from "@/components/json-ld";
 
 ### Sitemap & Robots
 
-Generated at `app/sitemap.ts` and `app/robots.ts`.
+Generated at `src/app/sitemap.ts` and `src/app/robots.txt/route.ts`.
 
 ## Key Dependencies
 

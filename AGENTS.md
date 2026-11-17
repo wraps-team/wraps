@@ -4,8 +4,8 @@
 
 **Wraps** (CLI, dashboard, SDKs) deploys email, SMS, and CDN infrastructure into the
 **customer's own AWS account** with zero stored credentials: they own the resources and
-data and pay AWS directly. The `@wraps.dev/email` SDK lives in the separate `wraps-js`
-repo; `@wraps.dev/sms` lives here.
+data and pay AWS directly. The `@wraps.dev/email` and `@wraps.dev/sms` SDKs live in the
+separate `wraps-js` repo.
 
 Most workspaces under `apps/` and `packages/` carry their own CLAUDE.md; read the one
 you are working in.

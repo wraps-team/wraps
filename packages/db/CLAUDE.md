@@ -1,172 +1,66 @@
 # Wraps Database (packages/db)
 
-Drizzle ORM with Neon PostgreSQL (serverless). Multi-tenant — every table is scoped by `organizationId`.
+Drizzle ORM on Postgres (Neon). Multi-tenant: org-owned data is scoped by `organizationId`.
+Read `src/schema/*.ts` for column, ID, timestamp, enum, JSONB, index-naming and relation
+conventions; the rules below are the ones a schema file can't explain.
 
 ## Critical Rules
 
-### 1. Every Table MUST Have organizationId
+### 1. Org-Owned Tables Carry organizationId (cascade) and an Org Index
 
-```typescript
-organizationId: text("organization_id")
-  .references(() => organization.id, { onDelete: "cascade" })
-  .notNull(),
-```
+Give every new org-owned table an `organizationId` FK to `organization.id` with
+`onDelete: "cascade"`, so its rows are deleted with their org, and an index on
+`organizationId` so org-scoped queries (invariant 4) stay cheap. Copy the column from
+`contact` in `src/schema/contacts.ts`.
 
-- Always `onDelete: "cascade"` — data must not persist without its org
-- Always add an org index (see below)
+Real exceptions today:
 
-### 2. Every Table MUST Have an Organization Index
+- **No `organizationId` column**:
+  - the better-auth identity tables in `src/schema/auth.ts` (`user`, `session`, `account`,
+    `verification`, `passkey`, `two_factor`, `device_code`, `organization`; `subscription`
+    keys on `referenceId` instead) and the seven SCIM plugin tables in
+    `src/schema/scim-provider.ts:44` (the plugin owns their shape);
+  - the notification plugin tables `notification_delivery` and `inbox_presence`
+    (comment at `src/schema/auth.ts:224`);
+  - `waitlist` (pre-signup, no org yet);
+  - child tables that reach their org through a cascading parent FK:
+    `aws_account_permission` → `aws_account`, `contact_topic` → `contact`,
+    `template_version` → `template`, `workflow_step_execution` → `workflow_execution`.
+- **Nullable `organizationId` with `onDelete: "set null"`**: `aws_marketplace_subscription`,
+  deliberately, because the row exists before the buyer has an org (comment at
+  `src/schema/aws-marketplace.ts:44`).
+- **No separate org index**: `organization_extension` and `topic_settings`, whose
+  `organizationId` is the primary key; the better-auth `member`, `invitation` and
+  `statement` tables.
 
-```typescript
-export const myTable = pgTable("my_table", { ... }, (table) => [
-  index("my_table_org_idx").on(table.organizationId),
-]);
-```
+### 2. Unique Constraints Include organizationId
 
-### 3. Unique Constraints MUST Be Scoped to Organization
+On an org-owned table, make a unique index per org, e.g.
+`uniqueIndex("template_org_slug_idx").on(table.organizationId, table.slug)`, so one org's
+values never block another's. Real exceptions today:
 
-```typescript
-// BAD - globally unique
-uniqueIndex("slug_idx").on(table.slug)
+- globally unique tokens and external IDs: `api_key_key_hash_idx`, `template_room_id_idx`,
+  `message_send_message_id_idx`, `aws_account.external_id`, `sso_provider.provider_id`,
+  `aws_marketplace_subscription.license_arn`;
+- indexes keyed on a parent FK that is already org-scoped: `message_send_dedup_idx`,
+  `message_send_workflow_step_dedup_idx`, `workflow_execution_no_reentry_idx`, and the
+  `message_send_diagnostic` primary key (`messageSendId`, `eventType`);
+- tables with no `organizationId` (rule 1) key their unique indexes on their parent or
+  their own columns instead.
 
-// GOOD - unique per org
-uniqueIndex("my_table_unique_org_slug_idx").on(table.organizationId, table.slug)
-```
+### 3. User FKs: set null for Authorship, cascade for Identity
 
-## Schema Conventions
+Authorship and audit FKs (`createdBy`, `lastEditedBy`, `grantedBy`, `decidedBy`, and the
+`userId` on `audit_log`, `ai_usage_log`, `sso_provider`, `scim_provider`) use
+`onDelete: "set null"` and stay nullable, so content and history outlive the user who made
+them. Identity and membership rows cascade with their user: the better-auth tables in
+`src/schema/auth.ts`, the SCIM identity tables in `src/schema/scim-provider.ts`, and
+`aws_account_permission.userId`.
 
-### Column Naming
-- TypeScript: `camelCase` (e.g., `organizationId`, `createdAt`)
-- Database: `snake_case` (e.g., `organization_id`, `created_at`)
-
-```typescript
-organizationId: text("organization_id")  // camelCase field, snake_case DB column
-```
-
-### Table Naming
-- Database: `snake_case`, singular (e.g., `contact`, `template`, `workflow`)
-
-### ID Columns
-```typescript
-id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-```
-
-### Timestamps
-```typescript
-createdAt: timestamp("created_at").defaultNow().notNull(),
-updatedAt: timestamp("updated_at").defaultNow().notNull(),
-```
-
-### Audit Fields
-```typescript
-createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
-```
-Use `set null` for user FKs — don't delete content if the user is deleted.
-
-### Enums
-```typescript
-export const templateStatusEnum = pgEnum("template_status", ["DRAFT", "PUBLISHED", "ARCHIVED"]);
-```
-- Enum name: `snake_case` in DB
-- Values: `UPPERCASE`
-
-### JSONB Columns
-```typescript
-content: jsonb("content").$type<Record<string, unknown>>().notNull(),
-properties: json("properties").$type<Record<string, unknown>>().default({}).notNull(),
-```
-- Always provide `.$type<T>()` for TypeScript inference
-- Always provide `.default({})` for object types
-
-### Index Naming
-```
-{tableName}_{descriptor}_idx
-```
-Examples: `contact_org_idx`, `contact_unique_org_email_idx`, `workflow_org_status_idx`
-
-## Type Inference
-
-```typescript
-// Select type (reading)
-export type Template = typeof template.$inferSelect;
-
-// Insert type (writing)
-export type NewTemplate = typeof template.$inferInsert;
-```
-
-Always export at the end of the schema file, after relations.
-
-## Relations
-
-Define separately from the table:
-
-```typescript
-export const contactRelations = relations(contact, ({ one, many }) => ({
-  organization: one(organization, {
-    fields: [contact.organizationId],
-    references: [organization.id],
-  }),
-  events: many(event),
-}));
-```
-
-When the same table is referenced twice, use `relationName`:
-```typescript
-createdByUser: one(user, {
-  fields: [template.createdBy],
-  references: [user.id],
-  relationName: "templateCreatedBy",
-}),
-```
-
-## Schema Files
-
-| File | Tables |
-|------|--------|
-| `app.ts` | Organizations, memberships, AWS accounts |
-| `auth.ts` | Auth tables (managed by better-auth) |
-| `batch.ts` | Email batch tracking |
-| `contacts.ts` | Contact management (email + SMS channels in same table) |
-| `events.ts` | Email/SMS delivery events |
-| `segments.ts` | Audience segments |
-| `templates.ts` | Email and SMS templates |
-| `usage.ts` | Usage tracking |
-| `workflows.ts` | Workflow definitions and executions |
-| `waitlist.ts` | Waitlist entries |
-
-## Key Patterns
-
-### Partial Unique Indexes
-For deduplication on sparse data:
-```typescript
-uniqueIndex("contact_unique_org_email_idx")
-  .on(table.organizationId, table.emailHash)
-  .where(sql`email_hash IS NOT NULL`)
-```
-
-### Conditional Indexes
-For reentry prevention:
-```typescript
-uniqueIndex("workflow_execution_no_reentry_idx")
-  .on(table.workflowId, table.contactId)
-  .where(sql`${table.status} IN ('pending', 'active', 'paused', 'waiting') AND ${table.allowReentry} = false`)
-```
-
-### Channel Architecture
-Email and SMS are channels on the same `contact` table — not separate tables:
-- `email`, `emailHash`, `emailStatus`, `emailVerifiedAt`, `emailUnsubscribedAt`
-- `phoneNumber`, `phoneHash`, `smsStatus`, `smsOptedInAt`, `smsOptedOutAt`
-
-## DB Connection
-
-Exported from `src/index.ts`:
-```typescript
-import { db } from "@wraps/db";
-import { contact, template } from "@wraps/db/schema";
-import { eq, and, desc } from "@wraps/db";  // Re-exported drizzle operators
-```
-
-Connection uses `pg` (node-postgres) via `drizzle-orm/node-postgres`.
+Two FKs break this today and are an open decision, not a pattern to copy:
+`reusable_block.createdBy` (`src/schema/templates.ts:190`) and `ai_conversation.createdBy`
+(`src/schema/templates.ts:314`) pair `set null` with `.notNull()`, so deleting a user who authored one
+of those rows fails with a not-null violation.
 
 ## ⚠️ Production vs Dev Database
 
@@ -191,12 +85,8 @@ psql "$DATABASE_URL"
 
 ## Migration Workflow
 
-```bash
-pnpm --filter @wraps/db db:generate   # Generate migration from schema changes
-pnpm --filter @wraps/db db:push       # Push schema directly (dev)
-pnpm --filter @wraps/db db:migrate    # Run migrations (production)
-pnpm --filter @wraps/db db:studio     # Open Drizzle Studio GUI
-```
+Generate migrations with `pnpm --filter @wraps/db db:generate`; the rules for the
+generated files are in `src/migrations/CLAUDE.md`.
 
 ### CONCURRENT Indexes (out-of-band)
 

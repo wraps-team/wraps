@@ -2,19 +2,19 @@
 
 Pulumi component for deploying Wraps email infrastructure to AWS. Composition over presets — users enable only the features they need.
 
-## No Monorepo Consumer — CI Does Not Exercise This Against the CLI
+## No In-Repo Deploy Path — CI Does Not Exercise This Against the CLI
 
 Published as `@wraps.dev/pulumi` for customers who write their own Pulumi
-programs (documented at `/docs/pulumi-reference`). **No package or app in
-this monorepo depends on it.** `packages/cli/src/infrastructure/` is a
+programs (documented at `/docs/pulumi-reference`). **No deploy path in this
+monorepo uses it**: its only in-repo dependent is `packages/cli`, as a
+devDependency for the parity test below. `packages/cli/src/infrastructure/` is a
 second, independent implementation of the same email stack — the one
 `email init` actually deploys — and the two are not the same code. They have
-already diverged silently once (plan 182: the CLI hardcoded
-`matchingEventTypes` while this package honored a caller-supplied list) and
-before that, in the opposite direction, for Mail Manager archiving (plan
-014, `plans/014-pulumi-mail-manager-parity.md`).
+already diverged silently once (the CLI hardcoded `matchingEventTypes` while
+this package honored a caller-supplied list) and before that, in the opposite
+direction, for Mail Manager archiving.
 
-Since this package has no in-repo consumer, a change here that breaks the
+Since no app or deploy path consumes this package, a change here that breaks the
 CLI's equivalent behavior (or vice versa) is caught by neither `pnpm build`
 nor any app's test suite — only by the guards in
 `packages/core/src/constants.ts` (shared resource-name and event-type
@@ -22,10 +22,10 @@ literals both packages import) and
 `packages/cli/src/infrastructure/resources/__tests__/cli-pulumi-parity.test.ts`
 (the one behavior comparison that can't be expressed as a shared constant:
 the default-event-type-set derivation). Those guards only cover what they
-were written to cover — see plan 183's report for the other divergences
-found and not fixed (IAM policy statement shape between the two
-`wraps-email-role` policies; the CLI's 30-day EventBridge replay archive and
-delivery-failure alarm have no equivalent here). Before changing resource
+were written to cover. Known divergences they don't catch: the IAM policy
+statement shape differs between the two `wraps-email-role` policies, and the
+CLI's 30-day EventBridge replay archive and delivery-failure alarm have no
+equivalent here. Before changing resource
 names, defaults, or the IAM policy shape in this package, check whether
 `packages/cli/src/infrastructure/resources/` needs the same change, and vice
 versa — nothing else will tell you.
