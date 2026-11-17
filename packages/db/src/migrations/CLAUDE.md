@@ -7,8 +7,7 @@ editing anything here.
 
 1. **Never hand-edit or hand-create files under `meta/`** (`*_snapshot.json`,
    `_journal.json`). They are machine-generated. Hand-edited snapshots broke
-   `db:generate` repo-wide for migrations 0055–0059 (see
-   `plans/018-repair-drizzle-snapshot-chain.md`): index `columns` were
+   `db:generate` repo-wide for migrations 0055–0059: index `columns` were
    encoded as strings where drizzle's v7 schema requires objects, and every
    later migration had to be hand-written as a workaround.
 2. **Never hand-write migration SQL plus journal entries to bypass a broken
@@ -32,8 +31,6 @@ editing anything here.
    objects.
 3. Repair the encoding in the named files — change nothing else (not `id`,
    not `prevId`) — and re-run the probe.
-   `plans/018-repair-drizzle-snapshot-chain.md` is the worked example of a
-   full repair, including how to regenerate a tip snapshot safely.
 
 ## Manual SQL (e.g. CREATE INDEX CONCURRENTLY)
 

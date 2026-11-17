@@ -118,7 +118,7 @@ types by default, and none of them are filtered out before reaching Wraps.
 
 Customers can run the control plane in their own AWS account. There is exactly one way to deploy it: `pnpm selfhost:deploy` from a fork, driven by `infra/selfhost.config.ts` + `scripts/selfhost/*` (SST). It deploys the full platform — API Lambda, dashboard on CloudFront, DynamoDB rate limit, SQS batch/workflow queues + DLQ consumers, scheduler group, alarms.
 
-A second, Pulumi-based API-only variant (`wraps selfhost deploy`, `infrastructure/selfhost-stack.ts`) shipped alongside it and was **deleted 2026-07-31** — no customer ever deployed it, and it had diverged: its Lambda multiplexer crashed on every SQS batch invocation and its batch DLQ had no consumer, so broadcasts stalled permanently. Do not reintroduce a second deploy path. `wraps selfhost` keeps only the commands that operate on an existing deployment: `login`, `logout`, `status`, `logs`, `env`, `connect`, `update-role`.
+Keep it the only deploy path: an earlier second one, Pulumi-based, drifted from the SST stack until broadcasts stalled. `wraps selfhost` holds only the commands that operate on an existing deployment: `login`, `logout`, `status`, `logs`, `env`, `connect`, `update-role`.
 
 Deploying over an existing deployment fails partway with `EntityAlreadyExists`, because the stack creates the account-global `wraps-selfhost-scheduler-role` and `wraps-selfhost-schedulers` group. `deploy`/`upgrade` fail fast on that with `hasExistingSelfhostResources(region)` (`utils/selfhost/existing-deployment.ts`) before writing `.env.selfhost` — whose existence would otherwise lock the customer out of the deploy path forever.
 

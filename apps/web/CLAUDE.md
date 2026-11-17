@@ -4,24 +4,11 @@ Next.js 16 App Router dashboard with React 19, TanStack Form, React Email templa
 
 ## Critical Rules
 
-### 1. Always Scope Queries by organizationId
+### 1. Scope Every Query by organizationId
 
-Every database query MUST filter by `organizationId`. Omitting this is a cross-org data leak.
-
-```typescript
-// BAD - security hole
-const contacts = await db.query.contact.findMany({
-  where: eq(contact.name, "John"),
-});
-
-// GOOD - scoped
-const contacts = await db.query.contact.findMany({
-  where: and(
-    eq(contact.organizationId, organizationId),
-    eq(contact.name, "John"),
-  ),
-});
-```
+Every database query filters by `organizationId`, lookups by ID included:
+`and(eq(contact.id, id), eq(contact.organizationId, organizationId))`. A query without it
+reads or writes another org's rows (invariant 4).
 
 ### 2. Wrap Every Org-Scoped Server Action in `orgAction`
 
@@ -57,36 +44,30 @@ export const createContact = orgAction(
 ```
 
 `ctx.audited(fn, fields)` runs `fn(tx)` and writes the audit-log row in the
-same transaction — see the `audit-coverage` skill. The wrapper returns
+same transaction. The wrapper returns
 `TResult | { success: false; error: string }`; the exact string returned for
 an unauthorized org is exported as `UNAUTHORIZED` from `org-action.ts` — compare
 against it instead of duplicating the literal.
 
-Use raw `verifyOrgAccess` (`src/actions/shared/verify-org-access.ts`, checks
-session + org membership, returns `null` if unauthorized) ONLY for reads
-inside a `page.tsx` server component, not for mutations.
+Call raw `verifyOrgAccess` (`src/actions/shared/verify-org-access.ts`: checks
+session + org membership, returns `null` if unauthorized) only for reads inside
+a `page.tsx` server component. Mutations go through `orgAction`, because raw
+`verifyOrgAccess` runs neither the permission check nor the audit write.
 
-### 3. Revalidate with orgSlug, Not organizationId
+### 3. Revalidate by orgSlug
 
-```typescript
-// BAD - orgSlug is a slug like "my-company", not a UUID
-revalidatePath(`/${organizationId}/contacts`, "page");
-
-// GOOD
-revalidatePath(`/${access.orgSlug}/contacts`, "page");
-```
-
-### 4. Await All Async Operations
-
-Server actions run in Node.js serverless contexts. Fire-and-forget promises may not complete.
+Dashboard pages live under `src/app/(dashboard)/[orgSlug]/`, so build revalidation
+paths from the slug (`ctx.access.orgSlug`, e.g. `my-company`). A path built from
+`organizationId` matches no page and revalidates nothing.
 
 ```typescript
-// BAD
-trackEvent(data); // no await = may not execute
-
-// GOOD
-await trackEvent(data);
+revalidatePath(`/${ctx.access.orgSlug}/contacts`, "page");
 ```
+
+### 4. Await Every Async Call
+
+Server actions run on serverless, which may drop a promise nobody awaited, so await every
+async call.
 
 ### 5. Log with Context Using Pino
 
@@ -96,67 +77,13 @@ errors itself — manual try/catch + `createActionLogger`/`serializeError` is
 only needed for code that runs outside the wrapper (e.g. route handlers,
 `page.tsx` server components).
 
-## Server Action Pattern
+## Forms
 
-The full pattern for form submissions:
-
-**1. Schema** (`lib/forms/contact.ts`):
-```typescript
-import { z } from "zod";
-import { formOptions } from "@tanstack/react-form";
-
-export const createContactSchema = z.object({
-  email: z.string().email().optional(),
-  firstName: z.string().optional(),
-});
-
-export const createContactFormOpts = formOptions({
-  defaultValues: { email: "", firstName: "" },
-});
-```
-
-**2. Server action** (`actions/contacts.ts`):
-```typescript
-"use server";
-import { orgAction } from "@/actions/shared/org-action";
-
-export const createContact = orgAction(
-  {
-    name: "createContact",
-    resource: "contacts",
-    permission: ["write"],
-    orgId: (organizationId: string) => organizationId,
-    onError: "Failed to create contact",
-  },
-  async (ctx, organizationId: string, data: Input) => {
-    // validate → check limits → insert (ctx.audited for the write) → revalidate → return
-  }
-);
-```
-
-**3. Client form** — uses `useActionState` + `useForm` from TanStack Form + `mergeForm`/`useTransform` for server state sync.
-
-## Route Groups
-
-| Group | Purpose | Providers |
-|-------|---------|-----------|
-| `(auth)` | Sign in, sign up, password reset | None (centered card layout) |
-| `(dashboard)` | Main app — templates, contacts, workflows, settings | `OrganizationProvider`, `SidebarProvider`, `QueryProvider` |
-| `(onboarding)` | Step-by-step setup wizard | None (header + footer) |
-| `(public)` | Unsubscribe, preference centers (from email links) | None, `robots: "noindex"` |
-| `(subscription)` | Upgrade, billing | Org membership check only |
-
-## Key Directories
-
-| Path | Purpose |
-|------|---------|
-| `src/actions/` | Server actions (contacts, templates, workflows, orgs, etc.) |
-| `src/app/(dashboard)/[orgSlug]/` | Dashboard pages |
-| `src/components/(ee)/workflow-builder/` | Workflow builder (React Flow + Zustand) |
-| `src/components/template-editor/` | Email template editor (React Email TSX + AI chat) |
-| `src/hooks/` | Custom hooks (template queries, org context, etc.) |
-| `src/lib/` | Utilities (auth, logger, contacts, validation, serializers) |
-| `src/lib/forms/` | Zod schemas + TanStack Form options |
+Each form's Zod schema and TanStack `formOptions` live in `src/lib/forms/`: for example
+`src/lib/forms/contact-form.ts`, which
+`src/app/(dashboard)/[orgSlug]/contacts/components/contact-form-dialog.tsx` passes to
+`useForm`. An `orgAction`-wrapped server action (rule 2) saves the data, e.g.
+`createContact` in `src/actions/contacts.ts`.
 
 ## Template Editor
 
@@ -186,15 +113,6 @@ Never stores customer AWS credentials. Instead:
 2. Backend calls STS `AssumeRole` with external ID
 3. Gets 1-hour temporary credentials, cached for 50 minutes
 
-## Commands
-
-```bash
-pnpm --filter @wraps/web dev         # Dev server on :3000
-pnpm --filter @wraps/web test        # Run tests
-pnpm --filter @wraps/web test:ee     # Enterprise tests only
-pnpm --filter @wraps/web typecheck   # Type check
-```
-
 ## Testing
 
 `pnpm --filter @wraps/web test` runs against a **real Postgres (Neon) database**,
@@ -208,9 +126,10 @@ opaque connection/query errors, not a helpful message.
   `src/app/api/__tests__/setup.ts`, by any path, must be listed, because that
   file's `afterAll` deletes the shared fixture rows; the other listed files are
   there for historical reasons. Isolation everywhere else
-  comes from per-file fixture prefixes (`setupPermissionFixtures`,
-  `__tests__/fixtures/real-db.ts`) — **any new DB-touching test must namespace
-  its fixtures the same way**, or it will collide under parallelism.
+  comes from per-file fixture prefixes: `setupPermissionFixtures(filePrefix)`
+  (`src/lib/permissions/__tests__/setup.ts`) builds every fixture ID from the
+  file's prefix plus a per-run random suffix — **any new DB-touching test must
+  namespace its fixtures the same way**, or it will collide under parallelism.
 - Never run two vitest processes against the same database — check
   `ps aux | grep vitest` before blaming a flake.
 - In a **linked git worktree**, `scripts/test-db/resolve-branch.mjs` gives the

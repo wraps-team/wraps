@@ -2,10 +2,6 @@
 
 Elysia.js API running on AWS Lambda.
 
-## Required Reading
-
-**Before writing any API code, read:** `/.claude/skills/wraps-api-developer/SKILL.md`
-
 ## Critical Rules
 
 ### 1. ALWAYS Await Async Operations
@@ -52,6 +48,15 @@ const contact = await db.select().from(contact).where(
 | Topic subscribed | `emitTopicSubscribed` |
 | Topic unsubscribed | `emitTopicUnsubscribed` |
 | Topics replaced (PUT) | `emitTopicSubscribed` (new), `emitTopicUnsubscribed` (removed), segment checks |
+
+### 5. Pair Every SQS Queue with a DLQ and a DLQ Consumer
+
+Each work queue (`infra/queues.ts`, `infra/marketplace.ts`, `infra/selfhost.config.ts`) has a
+dead-letter queue, and a consumer drains each DLQ: `src/workers/batch-dlq-consumer.ts`,
+`src/workers/marketplace-dlq-consumer.ts`, `src/(ee)/workers/workflow-dlq-consumer.ts`. When
+you add a queue, add both. Nothing processes messages in an undrained DLQ: the batch
+consumer is what re-enqueues a broadcast's next chunk, so without it the broadcast stalls
+for good.
 
 ## Commands
 
