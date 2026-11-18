@@ -57,11 +57,6 @@ them. Identity and membership rows cascade with their user: the better-auth tabl
 `src/schema/auth.ts`, the SCIM identity tables in `src/schema/scim-provider.ts`, and
 `aws_account_permission.userId`.
 
-Two FKs break this today and are an open decision, not a pattern to copy:
-`reusable_block.createdBy` (`src/schema/templates.ts:190`) and `ai_conversation.createdBy`
-(`src/schema/templates.ts:314`) pair `set null` with `.notNull()`, so deleting a user who authored one
-of those rows fails with a not-null violation.
-
 ## ⚠️ Production vs Dev Database
 
 Two separate Neon databases exist:

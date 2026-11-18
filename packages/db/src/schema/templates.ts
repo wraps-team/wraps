@@ -187,9 +187,9 @@ export const reusableBlock = pgTable(
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
-    createdBy: text("created_by")
-      .references(() => user.id, { onDelete: "set null" })
-      .notNull(),
+    createdBy: text("created_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
   },
   (table) => [
     index("reusable_block_org_idx").on(table.organizationId),
@@ -311,9 +311,9 @@ export const aiConversation = pgTable(
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
-    createdBy: text("created_by")
-      .references(() => user.id, { onDelete: "set null" })
-      .notNull(),
+    createdBy: text("created_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
   },
   (table) => [
     index("ai_conversation_org_idx").on(table.organizationId),
