@@ -57,26 +57,25 @@ them. Identity and membership rows cascade with their user: the better-auth tabl
 `src/schema/auth.ts`, the SCIM identity tables in `src/schema/scim-provider.ts`, and
 `aws_account_permission.userId`.
 
-## ⚠️ Production vs Dev Database
+## Production vs Dev Database
 
 Two separate Neon databases exist:
-- **`apps/web/.env.local`** → DEV (`ep-autumn-block-*`) — test data only
-- **`apps/web/.env.production.local`** → PRODUCTION (`ep-damp-heart-*`) — real customer data
+- **Dev** (`ep-autumn-block-*`): `apps/web/.env.local`, test data only.
+- **Production** (`ep-damp-heart-*`): real customer data. No file on disk holds its URL; it
+  lives in 1Password at `op://Wraps/web-production/DATABASE_URL`. The Wraps vault is not
+  granted to the agents' service account, so reading it uses Jarod's desktop `op` session
+  and needs his yes in that session.
 
-To connect to **production**:
+Query production read-only, with a timeout, without printing the URL:
 
 ```bash
-# Export the production DATABASE_URL
-eval "$(scripts/db-prod-url.sh)"
-
-# Confirm you're on prod (endpoint should contain ep-damp-heart)
-echo $DATABASE_URL | grep -o 'ep-[^-]*-[^.]*'
-
-# Then query with psql
-psql "$DATABASE_URL"
+scripts/db-prod-query.sh "select id, slug from organization where slug = 'example'"
 ```
 
-**When asked to analyze data or run queries, always use the production database unless explicitly told to use dev.**
+The pooled endpoint rejects startup options (`PGOPTIONS`, `?options=`), so the script sets
+`transaction read only` and `statement_timeout` inside the transaction instead.
+
+When asked to analyze data or run queries, use production unless told to use dev.
 
 ## Migration Workflow
 
