@@ -4,12 +4,11 @@ import { describe, expect, it } from "vitest";
 // A DLQ alarm on ApproximateNumberOfMessagesVisible only works for a DLQ
 // nobody drains. The batch and workflow DLQs each have a Lambda consumer that
 // moves a message in-flight within seconds and deletes it, so the visible
-// count almost never reads >= 1 at the 1-minute sample and the alarm stays
-// silent while jobs are dying. Those four alarms (managed + self-host) count
+// count rarely reads >= 1 at the 1-minute sample and the alarm stays
+// silent while jobs are dying. Those five alarms (managed + self-host) count
 // arrivals instead: every message landing in a consumed DLQ is received by its
-// consumer exactly once, so Sum(NumberOfMessagesReceived) >= 1 is the signal.
+// consumer at least once, so Sum(NumberOfMessagesReceived) >= 1 is the signal.
 // (NumberOfMessagesSent is not usable: redrive-policy moves are not counted.)
-// The marketplace DLQ has no consumer, so visible-count is correct there.
 const infra = (name: string) =>
   readFileSync(new URL(`../infra/${name}`, import.meta.url), "utf-8");
 
@@ -29,6 +28,7 @@ describe("consumed DLQ alarms count arrivals", () => {
   const cases: [string, string][] = [
     ["WorkflowDlqAlarm", alarms],
     ["BatchDlqAlarm", alarms],
+    ["MarketplaceDlqAlarm", alarms],
     ["SelfhostWorkflowDlqAlarm", selfhost],
     ["SelfhostBatchDlqAlarm", selfhost],
   ];
@@ -40,10 +40,4 @@ describe("consumed DLQ alarms count arrivals", () => {
       expect(block).toContain('statistic: "Sum"');
     });
   }
-
-  it("MarketplaceDlqAlarm (no consumer) keeps the visible-count metric", () => {
-    expect(alarmBlock(alarms, "MarketplaceDlqAlarm")).toContain(
-      "ApproximateNumberOfMessagesVisible"
-    );
-  });
 });

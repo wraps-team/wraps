@@ -34,9 +34,10 @@ if (process.env.ALERT_EMAIL) {
 }
 
 // Alarm: DLQ arrivals. This DLQ has a Lambda consumer that drains it in
-// seconds, so the visible-count never reads >= 1. Every arrival is
-// received by the consumer exactly once, so Sum(NumberOfMessagesReceived)
-// counts them (NumberOfMessagesSent skips redrive-policy moves).
+// seconds, so the visible-count rarely reads >= 1. Every arrival is
+// received by the consumer at least once (more if it times out or
+// crashes and the batch is redelivered), so Sum(NumberOfMessagesReceived)
+// >= 1 catches them (NumberOfMessagesSent skips redrive-policy moves).
 new aws.cloudwatch.MetricAlarm("WorkflowDlqAlarm", {
   name: $interpolate`wraps-workflow-dlq-${$app.stage}`,
   alarmDescription: "One or more workflow jobs landed in the dead-letter queue",
@@ -60,9 +61,10 @@ new aws.cloudwatch.MetricAlarm("WorkflowDlqAlarm", {
 });
 
 // Alarm: DLQ arrivals. This DLQ has a Lambda consumer that drains it in
-// seconds, so the visible-count never reads >= 1. Every arrival is
-// received by the consumer exactly once, so Sum(NumberOfMessagesReceived)
-// counts them (NumberOfMessagesSent skips redrive-policy moves).
+// seconds, so the visible-count rarely reads >= 1. Every arrival is
+// received by the consumer at least once (more if it times out or
+// crashes and the batch is redelivered), so Sum(NumberOfMessagesReceived)
+// >= 1 catches them (NumberOfMessagesSent skips redrive-policy moves).
 new aws.cloudwatch.MetricAlarm("BatchDlqAlarm", {
   name: $interpolate`wraps-batch-dlq-${$app.stage}`,
   alarmDescription: "One or more batch jobs landed in the dead-letter queue",
@@ -85,19 +87,22 @@ new aws.cloudwatch.MetricAlarm("BatchDlqAlarm", {
   },
 });
 
-// Alarm: messages visible in the Marketplace DLQ. Its DLQ has no consumer, which
-// is why it keeps the visible-count metric.
+// Alarm: DLQ arrivals. This DLQ has a Lambda consumer that drains it in
+// seconds, so the visible-count rarely reads >= 1. Every arrival is
+// received by the consumer at least once (more if it times out or
+// crashes and the batch is redelivered), so Sum(NumberOfMessagesReceived)
+// >= 1 catches them (NumberOfMessagesSent skips redrive-policy moves).
 new aws.cloudwatch.MetricAlarm("MarketplaceDlqAlarm", {
   name: $interpolate`wraps-marketplace-dlq-${$app.stage}`,
   alarmDescription:
     "One or more marketplace events landed in the dead-letter queue",
   namespace: "AWS/SQS",
-  metricName: "ApproximateNumberOfMessagesVisible",
+  metricName: "NumberOfMessagesReceived",
   dimensions: {
     QueueName: marketplaceDlq.nodes.queue.name,
   },
-  statistic: "Maximum",
-  period: 60,
+  statistic: "Sum",
+  period: 300,
   evaluationPeriods: 1,
   threshold: 1,
   comparisonOperator: "GreaterThanOrEqualToThreshold",
