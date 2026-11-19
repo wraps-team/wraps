@@ -43,4 +43,7 @@ migration SQL, and create the index via a script under
 ## Normal workflow
 
 Edit `packages/db/src/schema/*.ts` → `pnpm --filter @wraps/db db:generate`
-→ review the generated SQL → commit schema + SQL + meta together.
+→ review the generated SQL → `node scripts/test-db/ci-branch.mjs push-worktree` so this
+worktree's `wt-*` test branch has the new schema (stop if it prompts; never `db:push` or
+`db:migrate`, which reach other databases) → run the tests → commit schema + SQL + meta
+together. Details: `docs/agents/test-database.md`, "Testing a PR's schema change".
