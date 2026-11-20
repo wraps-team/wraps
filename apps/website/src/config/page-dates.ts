@@ -6,7 +6,7 @@
 // <lastmod>, which cannot be derived at build time: see the script header.
 
 export const PAGE_DATES: Record<string, string> = {
-  "/": "2026-11-20T12:31:43-07:00",
+  "/": "2026-11-20T13:10:44-07:00",
   "/about": "2026-11-20T12:17:50-07:00",
   "/agents": "2026-11-20T12:17:50-07:00",
   "/alternatives": "2026-11-20T12:17:50-07:00",
@@ -50,7 +50,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/blog/yc-w26-email-security-audit": "2026-11-20T12:17:50-07:00",
   "/blog/your-dmarc-policy-is-useless": "2026-11-20T12:17:50-07:00",
   "/byoc": "2026-11-20T12:17:50-07:00",
-  "/changelog": "2026-11-20T12:31:43-07:00",
+  "/changelog": "2026-11-20T12:31:57-07:00",
   "/cli": "2026-11-20T12:17:50-07:00",
   "/compare": "2026-11-20T12:17:50-07:00",
   "/compare/amazon-ses-vs-wraps": "2026-11-20T12:17:50-07:00",
