@@ -449,8 +449,8 @@ exclude_glob = [
 ]
 message = "Remove console.log before deploying — use a proper logger or remove debug output"
 
-# Override preset: OG/Twitter image routes render through ImageResponse
-# (satori), where next/image does not work; docs pages hold <img> in code samples
+# Override preset: OG/Twitter image routes (and the /og card route) render through
+# ImageResponse (satori), where next/image does not work; docs pages hold <img> in code samples
 [[rule]]
 id = "use-next-image"
 type = "banned-pattern"
@@ -461,6 +461,7 @@ glob = "**/*.{tsx,jsx}"
 exclude_glob = [
   "**/opengraph-image.tsx",
   "**/twitter-image.tsx",
+  "apps/website/src/app/og/**",
   "apps/website/src/app/docs/**",
 ]
 message = "Use next/image instead of <img> for automatic optimization"

@@ -13,6 +13,7 @@
     "**/__tests__/**",
     "**/opengraph-image.tsx",
     "**/twitter-image.tsx",
+    "apps/website/src/app/og/**",
     "apps/web/src/app/global-error.tsx"
   ],
   "settings": {
