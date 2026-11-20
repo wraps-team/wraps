@@ -181,6 +181,13 @@ Pass a bare `title` (the helper throws on a trailing "| Wraps"). `image` default
 share copy genuinely differs from the page title or description. Generated versus, glossary and SES
 pages go through their `*Metadata()` builders, which call the helper.
 
+- `image: null`: for a route with its own `opengraph-image.tsx` file. On Next 16.4.3 an explicit
+  `images` array overrides that file, so the route keeps its card only by emitting none.
+- `social.titleSuffix` (a string, or `null` for none) and `social.twitterCopy`: only to preserve share
+  copy a page already had (an editorial og title without "| Wraps", a shorter X description). Don't
+  reach for them on new pages.
+- `absoluteTitle`: the homepage only, whose `<title>` is the root's `title.default`.
+
 After a build, `pnpm --filter wraps-website metadata:audit` checks the rendered HTML of every page.
 
 ### JSON-LD Schema

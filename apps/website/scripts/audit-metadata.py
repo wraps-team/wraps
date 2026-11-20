@@ -11,11 +11,13 @@ description lengths are warnings only.
 
 --compare diffs the dump of this build against an earlier dump and lists every
 page whose title, description, canonical, og:title, og:description, twitter:title,
-twitter:description, og:type (when it had one) or bespoke (non-default) og:image
-or twitter:image changed, plus pages added or removed. It is informational
+twitter:description, robots, keywords, article:* tags, JSON-LD (types and a digest
+of the content), og:type (when it had one) or bespoke (non-default) og:image or
+twitter:image changed, plus pages added or removed. It is informational
 and does not change the exit code.
 """
 import collections
+import hashlib
 import html
 import json
 import os
@@ -52,6 +54,9 @@ def parse_page(root, dirpath, filename):
             ld_types += [str(i.get("@type")) for i in items if isinstance(i, dict)]
         except Exception:
             ld_types.append("PARSE_ERR")
+    article = {}
+    for found in re.finditer(r'<meta property="(article:[^"]*)" content="([^"]*)"', head):
+        article.setdefault(found.group(1), []).append(html.unescape(found.group(2)))
     return dict(
         route=route,
         title=html.unescape(title.group(1)) if title else None,
@@ -71,7 +76,10 @@ def parse_page(root, dirpath, filename):
         twd=meta("name", "twitter:description"),
         twsite=meta("name", "twitter:site"),
         robots=meta("name", "robots"),
+        keywords=meta("name", "keywords"),
+        article=article,
         ld=ld_types,
+        ld_digest=hashlib.sha256("".join(ld_blocks).encode("utf-8")).hexdigest()[:16],
     )
 
 
@@ -181,13 +189,18 @@ def compare(rows, before_path):
         ("ogd", "og:description"),
         ("twt", "twitter:title"),
         ("twd", "twitter:description"),
+        ("robots", "robots"),
+        ("keywords", "keywords"),
+        ("article", "article:* (published, modified, author)"),
+        ("ld", "JSON-LD types"),
+        ("ld_digest", "JSON-LD content"),
     )
     changed = collections.defaultdict(list)
     for route in sorted(before.keys() & after.keys()):
         b, a = before[route], after[route]
         for key, label in fields:
-            if b[key] != a[key]:
-                changed[label].append((route, b[key], a[key]))
+            if b.get(key) != a.get(key):
+                changed[label].append((route, b.get(key), a.get(key)))
         if b["ogtype"] and b["ogtype"] != a["ogtype"]:
             changed["og:type"].append((route, b["ogtype"], a["ogtype"]))
         if bespoke_images(b) != bespoke_images(a):

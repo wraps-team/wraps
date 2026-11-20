@@ -33,7 +33,12 @@ export async function generateMetadata({
     type: "article",
     publishedTime: `${release.date}T00:00:00Z`,
     image: release.media
-      ? { url: release.media.src, alt: release.media.alt }
+      ? {
+          url: release.media.src,
+          alt: release.media.alt,
+          width: release.media.width,
+          height: release.media.height,
+        }
       : undefined,
     social: { title: release.title, titleSuffix: "Wraps Changelog" },
   });

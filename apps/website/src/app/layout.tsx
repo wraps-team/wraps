@@ -15,8 +15,10 @@ import { FONT_PRELOADS } from "@/lib/font-subset.generated";
 import {
   DEFAULT_OG_IMAGE,
   SITE_DESCRIPTION,
+  SITE_NAME,
   SITE_TITLE,
   SITE_URL,
+  TWITTER_SITE,
 } from "@/lib/page-metadata";
 import "./font-subset.generated.css";
 import "./globals.css";
@@ -30,7 +32,8 @@ export const metadata: Metadata = {
   description: SITE_DESCRIPTION,
   openGraph: {
     type: "website",
-    siteName: "Wraps",
+    siteName: SITE_NAME,
+    locale: "en_US",
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
     url: `${SITE_URL}/`,
@@ -38,7 +41,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    site: "@useWraps",
+    site: TWITTER_SITE,
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
     images: [DEFAULT_OG_IMAGE.url],

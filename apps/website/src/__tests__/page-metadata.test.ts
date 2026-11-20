@@ -249,31 +249,93 @@ describe("metadata stays behind pageMetadata()", () => {
     "src/app/layout.tsx",
     "src/lib/page-metadata.ts",
   ]);
+  // The only key a page may add after `...pageMetadata(...)`. Anything else can
+  // override what the helper just wrote (a `title` with the suffix, a different
+  // `alternates.canonical`).
+  const KEYS_ALLOWED_AFTER_SPREAD = new Set(["keywords"]);
 
   const sourceFiles = [
     ...globSync("src/app/**/*.{ts,tsx}", { cwd: webRoot }),
     ...globSync("src/components/**/*.{ts,tsx}", { cwd: webRoot }),
   ].filter((file) => !ALLOWED_TO_WRITE_SOCIAL_KEYS.has(file));
 
-  it("no file under src/app or src/components writes an openGraph: or twitter: key", () => {
-    // `twitter: "https://..."` in sample data is not a metadata key, so only an
-    // object literal after the key counts.
-    const offenders = sourceFiles.filter((file) =>
-      /^\s*(openGraph|twitter)\s*:\s*\{/m.test(read(file))
+  /** Source with comments blanked, so a mention in a comment is not a call or a key. */
+  const code = (file: string) =>
+    read(file)
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
+
+  it("scans the source tree (a broken glob must not pass silently)", () => {
+    expect(sourceFiles.length).toBeGreaterThan(200);
+  });
+
+  it("no file under src/app or src/components writes an openGraph, twitter or alternates key", () => {
+    // Optional quotes, and any value that is not a string literal: a spread, an
+    // identifier or an object all count. `twitter: "https://..."` in sample data
+    // is a string, so it is not a metadata key.
+    const keyPattern =
+      /^\s*["']?(openGraph|twitter|alternates)["']?\s*:[ \t]*(?![ \t"'`])/m;
+    const assignPattern = /\.(openGraph|twitter|alternates)\s*=[^=]/;
+    const offenders = sourceFiles.filter((file) => {
+      const source = code(file);
+      return keyPattern.test(source) || assignPattern.test(source);
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  it("keys after a ...pageMetadata() spread are limited to keywords", () => {
+    const spreaders = sourceFiles.filter((file) =>
+      /\.\.\.pageMetadata\(/.test(code(file))
     );
+    expect(spreaders.length).toBeGreaterThan(0);
+    const offenders: string[] = [];
+    for (const file of spreaders) {
+      const source = code(file);
+      const start = source.indexOf("...pageMetadata(");
+      // Walk to the paren that closes the call, then read the keys that follow
+      // it at the top level of the enclosing object.
+      let depth = 0;
+      let end = -1;
+      for (let i = source.indexOf("(", start); i < source.length; i++) {
+        if (source[i] === "(") {
+          depth++;
+        } else if (source[i] === ")" && --depth === 0) {
+          end = i;
+          break;
+        }
+      }
+      let braces = 0;
+      for (const match of source
+        .slice(end + 1)
+        .matchAll(/[{}[\]]|^\s*["']?([A-Za-z]\w*)["']?\s*:/gm)) {
+        const token = match[0].trim();
+        if (token === "{" || token === "[") {
+          braces++;
+        } else if (token === "}" || token === "]") {
+          if (--braces < 0) {
+            break; // left the enclosing object
+          }
+        } else if (
+          braces === 0 &&
+          !KEYS_ALLOWED_AFTER_SPREAD.has(match[1] ?? "")
+        ) {
+          offenders.push(`${file}: ${match[1]}`);
+        }
+      }
+    }
     expect(offenders).toEqual([]);
   });
 
   it("every page.tsx that exports metadata or generateMetadata goes through pageMetadata or a builder", () => {
     const pages = globSync("src/app/**/page.tsx", { cwd: webRoot });
     const exporters = pages.filter((file) =>
-      /export\s+(const\s+metadata\b|(async\s+)?function\s+generateMetadata\b)/.test(
-        read(file)
+      /export\s+(const\s+(metadata|generateMetadata)\b|(async\s+)?function\s+generateMetadata\b)/.test(
+        code(file)
       )
     );
     expect(exporters.length).toBeGreaterThan(0);
     const offenders = exporters.filter((file) => {
-      const source = read(file);
+      const source = code(file);
       return !["pageMetadata", ...BUILDERS].some((name) =>
         new RegExp(`\\b${name}\\(`).test(source)
       );
@@ -288,7 +350,7 @@ describe("metadata stays behind pageMetadata()", () => {
       "src/components/ses-topic-article.tsx",
       "src/components/ses-error-article.tsx",
     ]) {
-      expect(read(file), file).toMatch(/\bpageMetadata\(/);
+      expect(code(file), file).toMatch(/\bpageMetadata\(/);
     }
   });
 
