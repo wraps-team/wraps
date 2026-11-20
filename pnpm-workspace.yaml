@@ -46,7 +46,7 @@ overrides:
   hono: ^4.11.7
   '@modelcontextprotocol/sdk': ^1.26.0
   nodemailer: ^10.0.6
-  next: 16.4.3
+  next: 16.4.5
   'path-to-regexp@6': ^6.3.0
   tar: ^7.5.11
   '@smithy/types': ^4.12.0
