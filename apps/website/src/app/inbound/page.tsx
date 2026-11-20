@@ -17,6 +17,7 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import { AnatomyInteractive } from "./components/anatomy-interactive";
 import { AnimatedInbox } from "./components/animated-inbox";
 import { PipelineInteractive } from "./components/pipeline-interactive";
@@ -96,33 +97,23 @@ const softwareSchema = {
   programmingLanguage: "TypeScript",
 };
 
-export const metadata: Metadata = {
-  title: "Inbound Email for Amazon SES - Receive Emails in Your AWS | Wraps",
+export const metadata: Metadata = pageMetadata({
+  title: "Inbound Email for Amazon SES - Receive Emails in Your AWS",
   description:
     "Receive and process emails in your AWS account. Parse headers, extract attachments, detect spam, and trigger webhooks with EventBridge.",
-  openGraph: {
-    title: "Inbound Email | Wraps",
+  path: "/inbound",
+  image: {
+    url: "/blog/wraps-inbound-og.webp",
+    width: 1200,
+    height: 630,
+    alt: "Wraps Inbound Email - Receive and process emails in your AWS",
+  },
+  social: {
+    title: "Inbound Email",
     description:
       "Receive emails in your AWS with EventBridge webhooks. Full parsing, attachments, and threading support.",
-    images: [
-      {
-        url: "/blog/wraps-inbound-og.webp",
-        width: 1200,
-        height: 630,
-        alt: "Wraps Inbound Email - Receive and process emails in your AWS",
-      },
-    ],
   },
-  twitter: {
-    title: "Inbound Email | Wraps",
-    description:
-      "Receive emails in your AWS with EventBridge webhooks. Full parsing, attachments, and threading support.",
-    images: ["/blog/wraps-inbound-og.webp"],
-  },
-  alternates: {
-    canonical: "https://wraps.dev/inbound",
-  },
-};
+});
 
 export default function InboundPage() {
   return (

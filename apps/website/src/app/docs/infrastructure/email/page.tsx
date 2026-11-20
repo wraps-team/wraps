@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import PageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,16 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "What Gets Deployed: Email",
   description:
     "Every AWS resource Wraps creates when you run wraps email init, organized by configuration preset. Includes IAM roles, SES, DynamoDB, Lambda, EventBridge, and SQS.",
-  openGraph: {
-    title: "What Gets Deployed: Email | Wraps",
-    description:
-      "Every AWS resource Wraps creates when you run wraps email init, organized by configuration preset.",
-    type: "website",
-    url: "https://wraps.dev/docs/infrastructure/email",
-  },
-  twitter: {
-    title: "What Gets Deployed: Email | Wraps",
+  path: "/docs/infrastructure/email",
+  social: {
     description:
       "Every AWS resource Wraps creates when you run wraps email init, organized by configuration preset.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/docs/infrastructure/email",
-  },
-};
+});
 
 export default function InfrastructureEmailPage() {
   return (

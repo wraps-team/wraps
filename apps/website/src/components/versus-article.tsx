@@ -13,6 +13,7 @@ import {
   type Vendor,
 } from "@/config/alternatives";
 import { type VersusPage, versusPath } from "@/config/versus";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const SITE = "https://wraps.dev";
 
@@ -21,23 +22,12 @@ export function versusUrl(page: VersusPage): string {
 }
 
 export function versusMetadata(page: VersusPage): Metadata {
-  const url = versusUrl(page);
-  return {
+  return pageMetadata({
     title: page.title,
     description: page.description,
-    openGraph: {
-      title: `${page.title} | Wraps`,
-      description: page.description,
-      type: "article",
-      url,
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: `${page.title} | Wraps`,
-      description: page.description,
-    },
-    alternates: { canonical: url },
-  };
+    path: versusPath(page),
+    type: "article",
+  });
 }
 
 function breadcrumbSchema(page: VersusPage): Record<string, unknown> {

@@ -18,6 +18,7 @@ import { LandingNavbar } from "@/app/landing/components/navbar";
 import { InfoCard } from "@/components/blog/info-card";
 import { CodeBlock, Collapsible } from "@/components/blog/interactive";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const articleSchema = {
   "@context": "https://schema.org",
@@ -145,26 +146,23 @@ const faqSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "How to Send Email from Your Replit App",
   description:
     "Your Replit app emits events. Wraps sends the emails. Set up automated email in 10 minutes — no email logic in your code, no Lambda deploy.",
-  openGraph: {
-    title: "How to Send Email from Your Replit App | Wraps",
+  path: "/blog/replit-send-email",
+  type: "article",
+  publishedTime: "2026-05-06T00:00:00.000Z",
+  authors: ["Wraps Team"],
+  social: {
     description:
       "Emit a behavioral event from Replit. Wraps sends the email. No email logic in your app.",
-    type: "article",
-    url: "https://wraps.dev/blog/replit-send-email",
-    publishedTime: "2026-05-06T00:00:00.000Z",
-    authors: ["Wraps Team"],
+    twitterCopy: {
+      description:
+        "Emit a behavioral event from Replit. Wraps sends the email.",
+    },
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "How to Send Email from Your Replit App | Wraps",
-    description: "Emit a behavioral event from Replit. Wraps sends the email.",
-  },
-  alternates: { canonical: "https://wraps.dev/blog/replit-send-email" },
-};
+});
 
 export default function Page() {
   return (

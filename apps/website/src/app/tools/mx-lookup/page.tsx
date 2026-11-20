@@ -5,26 +5,17 @@ import { Suspense } from "react";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import ToolsPageContent from "../page-content";
 
 const description =
   "Look up a domain's MX records: mail server hostnames, priorities, whether each host resolves, and warnings for IP-address or localhost targets.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "MX Record Lookup",
   description,
-  openGraph: {
-    title: "MX Record Lookup | Wraps",
-    description,
-  },
-  twitter: {
-    title: "MX Record Lookup | Wraps",
-    description,
-  },
-  alternates: {
-    canonical: "https://wraps.dev/tools/mx-lookup",
-  },
-};
+  path: "/tools/mx-lookup",
+});
 
 const sections = [
   {

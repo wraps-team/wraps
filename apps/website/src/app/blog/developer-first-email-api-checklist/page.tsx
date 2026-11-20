@@ -6,6 +6,7 @@ import Link from "next/link";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const TITLE = "What to Look For in a Developer-First Transactional Email API";
 const DESCRIPTION =
@@ -37,30 +38,20 @@ const articleSchema = {
   mainEntityOfPage: { "@type": "WebPage", "@id": URL },
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: TITLE,
   description: DESCRIPTION,
-  openGraph: {
-    title: "Developer-First Email API Checklist | Wraps",
-    description: DESCRIPTION,
-    type: "article",
-    url: URL,
-    images: [
-      {
-        url: "https://wraps.dev/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "Developer-first email API checklist",
-      },
-    ],
-    publishedTime: PUBLISHED,
+  path: "/blog/developer-first-email-api-checklist",
+  type: "article",
+  image: {
+    url: "https://wraps.dev/og-image.png",
+    width: 1200,
+    height: 630,
+    alt: "Developer-first email API checklist",
   },
-  twitter: {
-    title: "Developer-First Email API Checklist | Wraps",
-    description: DESCRIPTION,
-  },
-  alternates: { canonical: URL },
-};
+  publishedTime: PUBLISHED,
+  social: { title: "Developer-First Email API Checklist" },
+});
 
 type Item = {
   n: string;

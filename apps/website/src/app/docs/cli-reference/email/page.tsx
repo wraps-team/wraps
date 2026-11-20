@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import CLIReferenceEmailPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,23 +28,11 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Email CLI Commands",
   description: "CLI commands for managing email infrastructure.",
-  openGraph: {
-    title: "Email CLI Commands | Wraps",
-    description: "CLI commands for managing email infrastructure.",
-    type: "website",
-    url: "https://wraps.dev/docs/cli-reference/email",
-  },
-  twitter: {
-    title: "Email CLI Commands | Wraps",
-    description: "CLI commands for managing email infrastructure.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/cli-reference/email",
-  },
-};
+  path: "/docs/cli-reference/email",
+});
 
 export default function CLIReferenceEmailPage() {
   return (

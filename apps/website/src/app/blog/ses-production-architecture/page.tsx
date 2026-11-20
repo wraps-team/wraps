@@ -13,6 +13,7 @@ import Link from "next/link";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import { CodeBlock, SectionNav } from "./page-content";
 
 const FlowDiagram = dynamic(() =>
@@ -50,38 +51,29 @@ const articleSchema = {
   },
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "AWS SES Production Architecture Guide",
   description:
     "Everything you need to deploy SES at scale: dedicated IPs, bounce handling, rate limiting, configuration sets, and the patterns that protect your sender reputation.",
-  openGraph: {
-    title: "AWS SES Production Architecture Guide | Wraps",
+  path: "/blog/ses-production-architecture",
+  type: "article",
+  image: {
+    url: "https://wraps.dev/og-image.png",
+    width: 1200,
+    height: 630,
+    alt: "AWS SES Production Architecture Guide",
+  },
+  publishedTime: "2026-01-21T00:00:00.000Z",
+  authors: ["Wraps Team"],
+  social: {
     description:
       "Everything you need to deploy SES at scale: dedicated IPs, bounce handling, rate limiting, and the patterns that protect your sender reputation.",
-    type: "article",
-    url: "https://wraps.dev/blog/ses-production-architecture",
-    images: [
-      {
-        url: "https://wraps.dev/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "AWS SES Production Architecture Guide",
-      },
-    ],
-    publishedTime: "2026-01-21T00:00:00.000Z",
-    authors: ["Wraps Team"],
+    twitterCopy: {
+      description:
+        "Everything you need to deploy SES at scale: dedicated IPs, bounce handling, rate limiting, and monitoring.",
+    },
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "AWS SES Production Architecture Guide | Wraps",
-    description:
-      "Everything you need to deploy SES at scale: dedicated IPs, bounce handling, rate limiting, and monitoring.",
-    images: ["https://wraps.dev/og-image.png"],
-  },
-  alternates: {
-    canonical: "https://wraps.dev/blog/ses-production-architecture",
-  },
-};
+});
 
 // ============================================================================
 // STATIC COMPONENTS (server-compatible)

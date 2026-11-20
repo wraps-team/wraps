@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import AccountHealthPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -30,23 +31,12 @@ const breadcrumbSchema = {
 const DESCRIPTION =
   "GET /v1/account/health: query the SES health verdict Wraps already computes every hour, so an agent or CI job can ask 'am I safe to send right now?' before it sends. Zero AWS calls, bounded by the last hourly sweep.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Account Health API",
   description: DESCRIPTION,
-  openGraph: {
-    title: "Account Health API | Wraps",
-    description: DESCRIPTION,
-    type: "article",
-    url: "https://wraps.dev/docs/guides/account-health",
-  },
-  twitter: {
-    title: "Account Health API | Wraps",
-    description: DESCRIPTION,
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides/account-health",
-  },
-};
+  path: "/docs/guides/account-health",
+  type: "article",
+});
 
 export default function Page() {
   return (

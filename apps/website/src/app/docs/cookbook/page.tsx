@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import CookbookPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -21,26 +22,16 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Cookbook",
   description:
     "Copy-pasteable code recipes for common email and SMS patterns using the Wraps TypeScript SDKs. Send emails, handle bounces, manage suppression lists, automate workflows, and more.",
-  openGraph: {
-    title: "Cookbook | Wraps",
-    description:
-      "Copy-pasteable code recipes for common email and SMS patterns using the Wraps TypeScript SDKs.",
-    type: "website",
-    url: "https://wraps.dev/docs/cookbook",
-  },
-  twitter: {
-    title: "Cookbook | Wraps",
+  path: "/docs/cookbook",
+  social: {
     description:
       "Copy-pasteable code recipes for common email and SMS patterns using the Wraps TypeScript SDKs.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/docs/cookbook",
-  },
-};
+});
 
 export default function CookbookPage() {
   return (

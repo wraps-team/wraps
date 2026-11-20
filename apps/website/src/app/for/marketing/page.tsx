@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import { MarketingAudienceSection } from "./components/audience-section";
 import { MarketingCampaignsSection } from "./components/campaigns-section";
 import { MarketingCtaSection } from "./components/cta-section";
@@ -33,23 +34,15 @@ const softwareSchema = {
   license: "https://opensource.org/licenses/AGPL-3.0",
 };
 
-export const metadata: Metadata = {
-  // The root layout applies a "%s | Wraps" template — do not repeat the suffix.
+export const metadata: Metadata = pageMetadata({
   title: "Email marketing with unlimited contacts on every plan",
   description,
-  openGraph: {
+  path: "/for/marketing",
+  social: {
     title: "Grow the list. Watch the bill stay put.",
-    description,
-    url: "https://wraps.dev/for/marketing",
+    titleSuffix: null,
   },
-  twitter: {
-    title: "Grow the list. Watch the bill stay put.",
-    description,
-  },
-  alternates: {
-    canonical: "https://wraps.dev/for/marketing",
-  },
-};
+});
 
 export default function ForMarketingPage() {
   return (

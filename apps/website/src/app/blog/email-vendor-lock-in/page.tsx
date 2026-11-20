@@ -6,6 +6,7 @@ import Link from "next/link";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const TITLE = "Email Vendor Lock-In: The Five Things That Actually Trap You";
 const DESCRIPTION =
@@ -37,30 +38,20 @@ const articleSchema = {
   mainEntityOfPage: { "@type": "WebPage", "@id": URL },
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: TITLE,
   description: DESCRIPTION,
-  openGraph: {
-    title: "Email Vendor Lock-In | Wraps",
-    description: DESCRIPTION,
-    type: "article",
-    url: URL,
-    images: [
-      {
-        url: "https://wraps.dev/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "Email vendor lock-in",
-      },
-    ],
-    publishedTime: PUBLISHED,
+  path: "/blog/email-vendor-lock-in",
+  type: "article",
+  image: {
+    url: "https://wraps.dev/og-image.png",
+    width: 1200,
+    height: 630,
+    alt: "Email vendor lock-in",
   },
-  twitter: {
-    title: "Email Vendor Lock-In | Wraps",
-    description: DESCRIPTION,
-  },
-  alternates: { canonical: URL },
-};
+  publishedTime: PUBLISHED,
+  social: { title: "Email Vendor Lock-In" },
+});
 
 type Trap = {
   n: string;

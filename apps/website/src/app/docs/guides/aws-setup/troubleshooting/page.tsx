@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import TroubleshootingPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -33,23 +34,11 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "AWS Troubleshooting",
   description: "Troubleshoot common AWS setup issues.",
-  openGraph: {
-    title: "AWS Troubleshooting | Wraps",
-    description: "Troubleshoot common AWS setup issues.",
-    type: "website",
-    url: "https://wraps.dev/docs/guides/aws-setup/troubleshooting",
-  },
-  twitter: {
-    title: "AWS Troubleshooting | Wraps",
-    description: "Troubleshoot common AWS setup issues.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides/aws-setup/troubleshooting",
-  },
-};
+  path: "/docs/guides/aws-setup/troubleshooting",
+});
 
 export default function TroubleshootingPage() {
   return (

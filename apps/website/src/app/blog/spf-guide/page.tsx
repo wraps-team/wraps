@@ -17,6 +17,7 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { CodeBlock, Collapsible } from "@/components/blog/interactive";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const articleSchema = {
   "@context": "https://schema.org",
@@ -49,38 +50,28 @@ const articleSchema = {
   },
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "The SPF 10-Lookup Limit: Why Your Email Might Be Failing",
   description:
     "SPF looks simple until you hit the 10-lookup limit. Learn how lookups are counted, which providers cost the most, and how to stay under the limit.",
-  openGraph: {
-    title: "The SPF 10-Lookup Limit | Wraps",
-    description:
-      "SPF looks simple until you hit the 10-lookup limit. Learn how lookups are counted, which providers cost the most, and how to stay under the limit.",
-    type: "article",
-    url: "https://wraps.dev/blog/spf-guide",
-    images: [
-      {
-        url: "https://wraps.dev/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "SPF 10-Lookup Limit Guide",
-      },
-    ],
-    publishedTime: "2026-01-12T00:00:00.000Z",
-    authors: ["Wraps Team"],
+  path: "/blog/spf-guide",
+  type: "article",
+  image: {
+    url: "https://wraps.dev/og-image.png",
+    width: 1200,
+    height: 630,
+    alt: "SPF 10-Lookup Limit Guide",
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "The SPF 10-Lookup Limit | Wraps",
-    description:
-      "SPF looks simple until you hit the 10-lookup limit. Learn how lookups are counted and how to stay under.",
-    images: ["https://wraps.dev/og-image.png"],
+  publishedTime: "2026-01-12T00:00:00.000Z",
+  authors: ["Wraps Team"],
+  social: {
+    title: "The SPF 10-Lookup Limit",
+    twitterCopy: {
+      description:
+        "SPF looks simple until you hit the 10-lookup limit. Learn how lookups are counted and how to stay under.",
+    },
   },
-  alternates: {
-    canonical: "https://wraps.dev/blog/spf-guide",
-  },
-};
+});
 
 const InfoCard = ({
   type = "tip",

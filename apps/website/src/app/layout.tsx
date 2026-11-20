@@ -12,40 +12,36 @@ import { WebMCP } from "@/components/webmcp";
 import { SidebarConfigProvider } from "@/contexts/sidebar-context";
 import { InViewProvider } from "@/hooks/use-shared-in-view";
 import { FONT_PRELOADS } from "@/lib/font-subset.generated";
+import {
+  DEFAULT_OG_IMAGE,
+  SITE_DESCRIPTION,
+  SITE_TITLE,
+  SITE_URL,
+} from "@/lib/page-metadata";
 import "./font-subset.generated.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://wraps.dev"),
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: "Wraps - The Email Platform for Amazon SES",
+    default: SITE_TITLE,
     template: "%s | Wraps",
   },
-  description:
-    "Deploy everything Amazon SES needs into your own AWS account with one command: event tracking, bounce handling, templates, workflows, and a dashboard. You pay AWS directly.",
+  description: SITE_DESCRIPTION,
   openGraph: {
     type: "website",
     siteName: "Wraps",
-    title: "Wraps - The Email Platform for Amazon SES",
-    description:
-      "Deploy everything Amazon SES needs into your own AWS account with one command: event tracking, bounce handling, templates, workflows, and a dashboard. You pay AWS directly.",
-    url: "https://wraps.dev/",
-    images: [
-      {
-        url: "/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "Wraps — Email infrastructure, deployed to your own AWS.",
-      },
-    ],
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    url: `${SITE_URL}/`,
+    images: [DEFAULT_OG_IMAGE],
   },
   twitter: {
     card: "summary_large_image",
     site: "@useWraps",
-    title: "Wraps - The Email Platform for Amazon SES",
-    description:
-      "Deploy everything Amazon SES needs into your own AWS account with one command: event tracking, bounce handling, templates, workflows, and a dashboard. You pay AWS directly.",
-    images: ["/og-image.png"],
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: [DEFAULT_OG_IMAGE.url],
   },
   icons: {
     // One SVG that switches color itself: Chrome ignores `media` on

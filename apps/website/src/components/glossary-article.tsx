@@ -10,6 +10,7 @@ import {
   type GlossaryTerm,
   glossaryTermBySlug,
 } from "@/lib/glossary";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const SITE = "https://wraps.dev";
 
@@ -23,24 +24,13 @@ function looksLikeCommand(value: string): boolean {
 }
 
 export function glossaryMetadata(term: GlossaryTerm): Metadata {
-  const url = glossaryUrl(term);
   const title = `${term.term}: Definition and How It Works`;
-  return {
+  return pageMetadata({
     title,
     description: term.shortDefinition,
-    openGraph: {
-      title: `${title} | Wraps`,
-      description: term.shortDefinition,
-      type: "article",
-      url,
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: `${title} | Wraps`,
-      description: term.shortDefinition,
-    },
-    alternates: { canonical: url },
-  };
+    path: `/glossary/${term.slug}`,
+    type: "article",
+  });
 }
 
 function breadcrumbSchema(term: GlossaryTerm): Record<string, unknown> {

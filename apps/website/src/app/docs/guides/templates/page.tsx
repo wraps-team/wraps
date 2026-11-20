@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import PageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,12 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Templates as Code",
   description:
     "Write email templates as React components, preview them locally, and push to SES and the Wraps dashboard.",
-  openGraph: {
-    title: "Templates as Code | Wraps",
-    description:
-      "Write email templates as React components, preview them locally, and push to SES and the Wraps dashboard.",
-    type: "website",
-    url: "https://wraps.dev/docs/guides/templates",
-  },
-  twitter: {
-    title: "Templates as Code | Wraps",
-    description:
-      "Write email templates as React components, preview them locally, and push to SES and the Wraps dashboard.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides/templates",
-  },
-};
+  path: "/docs/guides/templates",
+});
 
 export default function TemplatesPage() {
   return (

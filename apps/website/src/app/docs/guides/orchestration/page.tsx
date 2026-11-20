@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import PageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,12 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Cross-Channel Orchestration",
   description:
     "Build cascading notification flows that try email first and fall back to SMS using the cascade() helper.",
-  openGraph: {
-    title: "Cross-Channel Orchestration | Wraps",
-    description:
-      "Build cascading notification flows that try email first and fall back to SMS using the cascade() helper.",
-    type: "website",
-    url: "https://wraps.dev/docs/guides/orchestration",
-  },
-  twitter: {
-    title: "Cross-Channel Orchestration | Wraps",
-    description:
-      "Build cascading notification flows that try email first and fall back to SMS using the cascade() helper.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides/orchestration",
-  },
-};
+  path: "/docs/guides/orchestration",
+});
 
 export default function OrchestrationPage() {
   return (

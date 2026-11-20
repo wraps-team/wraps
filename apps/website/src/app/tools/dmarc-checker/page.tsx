@@ -5,26 +5,17 @@ import { Suspense } from "react";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import ToolsPageContent from "../page-content";
 
 const description =
   "Look up a domain's DMARC record and read it: policy, subdomain policy, alignment modes, reporting addresses, and what each warning means.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "DMARC Record Checker",
   description,
-  openGraph: {
-    title: "DMARC Record Checker | Wraps",
-    description,
-  },
-  twitter: {
-    title: "DMARC Record Checker | Wraps",
-    description,
-  },
-  alternates: {
-    canonical: "https://wraps.dev/tools/dmarc-checker",
-  },
-};
+  path: "/tools/dmarc-checker",
+});
 
 const sections = [
   {

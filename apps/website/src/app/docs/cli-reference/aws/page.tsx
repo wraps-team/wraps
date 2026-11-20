@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import CLIReferenceAWSPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,12 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "AWS CLI Commands",
   description:
     "Set up and diagnose your AWS credentials and permissions for Wraps.",
-  openGraph: {
-    title: "AWS CLI Commands | Wraps",
-    description:
-      "Set up and diagnose your AWS credentials and permissions for Wraps.",
-    type: "website",
-    url: "https://wraps.dev/docs/cli-reference/aws",
-  },
-  twitter: {
-    title: "AWS CLI Commands | Wraps",
-    description:
-      "Set up and diagnose your AWS credentials and permissions for Wraps.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/cli-reference/aws",
-  },
-};
+  path: "/docs/cli-reference/aws",
+});
 
 export default function CLIReferenceAWSPage() {
   return (

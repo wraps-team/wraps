@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import InboundEmailQuickstartPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -33,26 +34,18 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Inbound Email Quickstart",
   description:
     "Set up inbound email receiving with AWS SES in under 5 minutes. Parse incoming emails, extract attachments, and build automated workflows.",
-  openGraph: {
-    title: "Inbound Email Quickstart | Wraps",
-    description:
-      "Set up inbound email receiving with AWS SES in under 5 minutes. Parse incoming emails, extract attachments, and build automated workflows.",
-    type: "website",
-    url: "https://wraps.dev/docs/quickstart/email/inbound",
+  path: "/docs/quickstart/email/inbound",
+  social: {
+    twitterCopy: {
+      description:
+        "Set up inbound email receiving with AWS SES in under 5 minutes.",
+    },
   },
-  twitter: {
-    title: "Inbound Email Quickstart | Wraps",
-    description:
-      "Set up inbound email receiving with AWS SES in under 5 minutes.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/quickstart/email/inbound",
-  },
-};
+});
 
 export default function InboundEmailQuickstartPage() {
   return (

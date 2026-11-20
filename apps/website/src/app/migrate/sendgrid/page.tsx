@@ -8,14 +8,19 @@ import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
 import { VENDORS } from "@/config/alternatives";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const TITLE = "Migrate from SendGrid to Amazon SES";
 const DESCRIPTION =
   "A SendGrid-to-SES migration in the order it has to happen: subusers onto SES tenants, Inbound Parse, dynamic templates, the unsubscribe groups SES has no slot for, and the production-access request that decides your timeline.";
 
 export const metadata: Metadata = {
-  title: TITLE,
-  description: DESCRIPTION,
+  ...pageMetadata({
+    title: TITLE,
+    description: DESCRIPTION,
+    path: "/migrate/sendgrid",
+    type: "article",
+  }),
   keywords: [
     "migrate from sendgrid to ses",
     "sendgrid to amazon ses",
@@ -24,20 +29,6 @@ export const metadata: Metadata = {
     "sendgrid inbound parse ses",
     "leave sendgrid",
   ],
-  openGraph: {
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-    url: "https://wraps.dev/migrate/sendgrid",
-    type: "article",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-  },
-  alternates: {
-    canonical: "https://wraps.dev/migrate/sendgrid",
-  },
 };
 
 const breadcrumbSchema = {

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import SmsQuickstartPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,23 +28,11 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "SMS Quickstart",
   description: "Send SMS messages through AWS with the Wraps SMS SDK.",
-  openGraph: {
-    title: "SMS Quickstart | Wraps",
-    description: "Send SMS messages through AWS with the Wraps SMS SDK.",
-    type: "website",
-    url: "https://wraps.dev/docs/quickstart/sms",
-  },
-  twitter: {
-    title: "SMS Quickstart | Wraps",
-    description: "Send SMS messages through AWS with the Wraps SMS SDK.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/quickstart/sms",
-  },
-};
+  path: "/docs/quickstart/sms",
+});
 
 export default function SmsQuickstartPage() {
   return (

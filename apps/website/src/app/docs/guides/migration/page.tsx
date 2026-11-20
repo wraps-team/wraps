@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import MigrationGuidePageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,25 +28,17 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Migration Guide",
   description:
     "Switch from SendGrid, Postmark, or Resend to Wraps. Side-by-side code comparisons, cost analysis, and step-by-step migration instructions.",
-  openGraph: {
-    title: "Migration Guide | Wraps",
-    description:
-      "Switch from SendGrid, Postmark, or Resend to Wraps. Side-by-side code comparisons, cost analysis, and step-by-step migration instructions.",
-    type: "website",
-    url: "https://wraps.dev/docs/guides/migration",
+  path: "/docs/guides/migration",
+  social: {
+    twitterCopy: {
+      description: "Switch from SendGrid, Postmark, or Resend to Wraps.",
+    },
   },
-  twitter: {
-    title: "Migration Guide | Wraps",
-    description: "Switch from SendGrid, Postmark, or Resend to Wraps.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides/migration",
-  },
-};
+});
 
 export default function MigrationGuidePage() {
   return (

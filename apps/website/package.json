@@ -11,6 +11,7 @@
     "test": "vitest run",
     "pricing:md": "tsx scripts/generate-pricing-md.ts",
     "mcp:server-json": "tsx scripts/generate-server-json.ts",
+    "metadata:audit": "python3 scripts/audit-metadata.py .next/server/app",
     "sitemap:dates": "tsx scripts/generate-page-dates.ts",
     "versus:generate": "tsx scripts/generate-versus-pages.ts",
     "glossary:generate": "tsx scripts/generate-glossary-pages.ts",

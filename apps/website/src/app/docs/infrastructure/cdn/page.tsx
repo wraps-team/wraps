@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import PageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,16 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "What Gets Deployed: CDN",
   description:
     "Every AWS resource Wraps creates when you run wraps cdn init. Includes S3, CloudFront, ACM certificates, and IAM roles for hosting email assets and images.",
-  openGraph: {
-    title: "What Gets Deployed: CDN | Wraps",
-    description:
-      "Every AWS resource Wraps creates when you run wraps cdn init.",
-    type: "website",
-    url: "https://wraps.dev/docs/infrastructure/cdn",
-  },
-  twitter: {
-    title: "What Gets Deployed: CDN | Wraps",
+  path: "/docs/infrastructure/cdn",
+  social: {
     description:
       "Every AWS resource Wraps creates when you run wraps cdn init.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/docs/infrastructure/cdn",
-  },
-};
+});
 
 export default function InfrastructureCdnPage() {
   return (

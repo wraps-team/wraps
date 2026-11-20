@@ -26,27 +26,20 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title:
     "SendGrid vs Wraps - Everything Amazon SES Needs, Including Operations",
   description:
     "Compare SendGrid and Wraps side by side. SendGrid rents you a sending API. Wraps sets up the whole Amazon SES surface in your own AWS account in one command, then runs it day to day. Pricing, features, and migration path.",
-  openGraph: {
-    title: "SendGrid vs Wraps | Wraps",
-    description:
-      "SendGrid rents you a sending API. Wraps sets up Amazon SES in your own AWS account in one command, then runs it day to day.",
-    url: "https://wraps.dev/compare/sendgrid-vs-wraps",
-  },
-  twitter: {
-    title: "SendGrid vs Wraps | Wraps",
+  path: "/compare/sendgrid-vs-wraps",
+  social: {
+    title: "SendGrid vs Wraps",
     description:
       "SendGrid rents you a sending API. Wraps sets up Amazon SES in your own AWS account in one command, then runs it day to day.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/compare/sendgrid-vs-wraps",
-  },
-};
+});
 
 const breadcrumbJsonLd = {
   "@context": "https://schema.org",

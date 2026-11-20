@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import { OperatorsConsentSection } from "./components/consent-section";
 import { OperatorsCtaSection } from "./components/cta-section";
 import { OperatorsExclusionSection } from "./components/exclusion-section";
@@ -34,23 +35,15 @@ const softwareSchema = {
   license: "https://opensource.org/licenses/AGPL-3.0",
 };
 
-export const metadata: Metadata = {
-  // The root layout applies a "%s | Wraps" template — do not repeat the suffix.
+export const metadata: Metadata = pageMetadata({
   title: "Email operations: consent, deliverability, and a paper trail",
   description,
-  openGraph: {
+  path: "/for/operators",
+  social: {
     title: "Your name is on the send. So is the paper trail.",
-    description,
-    url: "https://wraps.dev/for/operators",
+    titleSuffix: null,
   },
-  twitter: {
-    title: "Your name is on the send. So is the paper trail.",
-    description,
-  },
-  alternates: {
-    canonical: "https://wraps.dev/for/operators",
-  },
-};
+});
 
 export default function ForOperatorsPage() {
   return (

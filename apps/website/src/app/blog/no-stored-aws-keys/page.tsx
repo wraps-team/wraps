@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import { CodeBlock } from "./page-content";
 
 const articleSchema = {
@@ -36,29 +37,19 @@ const articleSchema = {
   },
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "We Don't Hold Your AWS Keys",
   description:
     "How Wraps reaches your SES through OIDC and one-hour role sessions, the trust policy you can copy, and the places a static key still exists.",
-  openGraph: {
-    title: "We Don't Hold Your AWS Keys | Wraps",
-    description:
-      "OIDC and one-hour role sessions instead of stored AWS access keys, and a trust policy you can copy today.",
-    type: "article",
-    url: "https://wraps.dev/blog/no-stored-aws-keys",
-    publishedTime: "2026-10-23T00:00:00.000Z",
-    authors: ["Wraps Team"],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "We Don't Hold Your AWS Keys | Wraps",
+  path: "/blog/no-stored-aws-keys",
+  type: "article",
+  publishedTime: "2026-10-23T00:00:00.000Z",
+  authors: ["Wraps Team"],
+  social: {
     description:
       "OIDC and one-hour role sessions instead of stored AWS access keys, and a trust policy you can copy today.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/blog/no-stored-aws-keys",
-  },
-};
+});
 
 export default function Page() {
   return (

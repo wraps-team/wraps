@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import PageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,12 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Environment Variables",
   description:
     "All environment variables used by the Wraps CLI and SDKs, including AWS credentials, DNS automation, and CI/CD configuration.",
-  openGraph: {
-    title: "Environment Variables | Wraps",
-    description:
-      "All environment variables used by the Wraps CLI and SDKs, including AWS credentials, DNS automation, and CI/CD configuration.",
-    type: "website",
-    url: "https://wraps.dev/docs/reference/environment-variables",
-  },
-  twitter: {
-    title: "Environment Variables | Wraps",
-    description:
-      "All environment variables used by the Wraps CLI and SDKs, including AWS credentials, DNS automation, and CI/CD configuration.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/reference/environment-variables",
-  },
-};
+  path: "/docs/reference/environment-variables",
+});
 
 export default function EnvironmentVariablesPage() {
   return (

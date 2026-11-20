@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import GuidesPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -21,26 +22,18 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Guides",
   description:
     "In-depth guides for production access, domain verification, AWS setup, templates, workflows, and configuration presets.",
-  openGraph: {
-    title: "Guides | Wraps",
-    description:
-      "In-depth guides for production access, domain verification, AWS setup, templates, workflows, and configuration presets.",
-    type: "website",
-    url: "https://wraps.dev/docs/guides",
+  path: "/docs/guides",
+  social: {
+    twitterCopy: {
+      description:
+        "In-depth guides for production access, domain verification, and AWS setup.",
+    },
   },
-  twitter: {
-    title: "Guides | Wraps",
-    description:
-      "In-depth guides for production access, domain verification, and AWS setup.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides",
-  },
-};
+});
 
 export default function GuidesPage() {
   return (

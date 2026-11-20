@@ -25,26 +25,19 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Postmark vs Wraps - Comparison for Transactional Email",
   description:
     "Detailed comparison of Postmark and Wraps for transactional and application email. Pricing at real volumes, feature differences, architecture tradeoffs, and migration guide.",
-  openGraph: {
-    title: "Postmark vs Wraps | Wraps",
-    description:
-      "Detailed comparison of Postmark and Wraps for transactional and application email. Pricing, features, architecture, and migration.",
-    url: "https://wraps.dev/compare/postmark-vs-wraps",
-  },
-  twitter: {
-    title: "Postmark vs Wraps | Wraps",
+  path: "/compare/postmark-vs-wraps",
+  social: {
+    title: "Postmark vs Wraps",
     description:
       "Detailed comparison of Postmark and Wraps for transactional and application email. Pricing, features, architecture, and migration.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/compare/postmark-vs-wraps",
-  },
-};
+});
 
 const breadcrumbSchema = {
   "@context": "https://schema.org",

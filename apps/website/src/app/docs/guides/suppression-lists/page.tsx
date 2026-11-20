@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import SuppressionListsPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,17 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Suppression Lists",
   description:
     "Manage the AWS SES account-level suppression list with the Wraps SDK: check, add, remove, and list suppressed addresses, filter campaigns before sending, and know when removing an address is safe.",
-  openGraph: {
-    title: "Suppression Lists | Wraps",
-    description:
-      "The SES account-level suppression list and your application's own list are two independent things. Here is how to keep them in sync.",
-    type: "article",
-    url: "https://wraps.dev/docs/guides/suppression-lists",
-  },
-  twitter: {
-    title: "Suppression Lists | Wraps",
+  path: "/docs/guides/suppression-lists",
+  type: "article",
+  social: {
     description:
       "The SES account-level suppression list and your application's own list are two independent things. Here is how to keep them in sync.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides/suppression-lists",
-  },
-};
+});
 
 export default function SuppressionListsPage() {
   return (

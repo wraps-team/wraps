@@ -8,34 +8,24 @@ import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
 import { ResendForgeNotice } from "@/components/resend-forge-notice";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const TITLE = "Migrate to Amazon SES";
 const DESCRIPTION =
   "Provider-by-provider guides for moving email onto Amazon SES in your own AWS account: SendGrid, Mailgun, Postmark, Resend, and the Amazon Pinpoint shutdown. Each one says who should stay put.";
 
 export const metadata: Metadata = {
-  title: TITLE,
-  description: DESCRIPTION,
+  ...pageMetadata({
+    title: TITLE,
+    description: DESCRIPTION,
+    path: "/migrate",
+  }),
   keywords: [
     "migrate to amazon ses",
     "move email to aws ses",
     "ses migration guide",
     "switch email provider to ses",
   ],
-  openGraph: {
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-    url: "https://wraps.dev/migrate",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-  },
-  alternates: {
-    canonical: "https://wraps.dev/migrate",
-  },
 };
 
 const guides: {

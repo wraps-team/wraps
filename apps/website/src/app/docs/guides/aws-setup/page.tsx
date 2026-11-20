@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import AWSSetupPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,23 +28,11 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "AWS Setup Guide",
   description: "Configure your AWS account for Wraps.",
-  openGraph: {
-    title: "AWS Setup Guide | Wraps",
-    description: "Configure your AWS account for Wraps.",
-    type: "website",
-    url: "https://wraps.dev/docs/guides/aws-setup",
-  },
-  twitter: {
-    title: "AWS Setup Guide | Wraps",
-    description: "Configure your AWS account for Wraps.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides/aws-setup",
-  },
-};
+  path: "/docs/guides/aws-setup",
+});
 
 export default function AWSSetupPage() {
   return (

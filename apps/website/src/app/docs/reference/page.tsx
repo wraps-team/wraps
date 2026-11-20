@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import ReferencePageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -21,26 +22,18 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Reference",
   description:
     "Technical reference for the Wraps API, error codes, rate limits, JSON output format, and environment variables.",
-  openGraph: {
-    title: "Reference | Wraps",
-    description:
-      "Technical reference for the Wraps API, error codes, rate limits, JSON output format, and environment variables.",
-    type: "website",
-    url: "https://wraps.dev/docs/reference",
+  path: "/docs/reference",
+  social: {
+    twitterCopy: {
+      description:
+        "Technical reference for the Wraps API, error codes, rate limits, and environment variables.",
+    },
   },
-  twitter: {
-    title: "Reference | Wraps",
-    description:
-      "Technical reference for the Wraps API, error codes, rate limits, and environment variables.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/reference",
-  },
-};
+});
 
 export default function ReferencePage() {
   return (

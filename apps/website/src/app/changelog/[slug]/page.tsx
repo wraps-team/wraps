@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
+import { pageMetadata } from "@/lib/page-metadata";
 import { EntryCard } from "../components/entry-card";
 import { releases } from "../releases";
 
@@ -25,24 +26,17 @@ export async function generateMetadata({
   }
   const description =
     release.summary ?? `What changed in Wraps: ${release.title}.`;
-  return {
+  return pageMetadata({
     title: `${release.title} | Changelog`,
     description,
-    openGraph: {
-      title: `${release.title} | Wraps Changelog`,
-      description,
-      type: "article",
-      publishedTime: `${release.date}T00:00:00Z`,
-      images: release.media ? [release.media.src] : undefined,
-    },
-    twitter: {
-      title: `${release.title} | Wraps Changelog`,
-      description,
-    },
-    alternates: {
-      canonical: `https://wraps.dev/changelog/${release.slug}`,
-    },
-  };
+    path: `/changelog/${release.slug}`,
+    type: "article",
+    publishedTime: `${release.date}T00:00:00Z`,
+    image: release.media
+      ? { url: release.media.src, alt: release.media.alt }
+      : undefined,
+    social: { title: release.title, titleSuffix: "Wraps Changelog" },
+  });
 }
 
 export default async function ChangelogEntryPage({

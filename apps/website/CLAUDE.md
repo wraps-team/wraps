@@ -161,15 +161,27 @@ type NavItem = {
 
 ### Page Metadata
 
-Every page exports a `metadata` object:
+Every page builds its `metadata` with `pageMetadata()` (`src/lib/page-metadata.ts`). Never write
+`openGraph` or `twitter` by hand: Next.js merges metadata shallowly, so a page-level `openGraph`
+replaces the root's whole object and drops the image, site, locale and card type.
+`src/__tests__/page-metadata.test.ts` fails when a file other than the helper and the root layout
+writes either key.
 
 ```typescript
-export const metadata: Metadata = {
-  title: "Email Infrastructure",  // Becomes "Email Infrastructure | Wraps"
+export const metadata: Metadata = pageMetadata({
+  title: "Email Infrastructure", // bare: <title>, og:title and twitter:title all become "Email Infrastructure | Wraps"
   description: "Deploy production-ready email...",
-  openGraph: { ... },
-};
+  path: "/email", // canonical and og:url
+  // image, type: "article", publishedTime, authors, social: { title, description } are optional
+});
 ```
+
+Pass a bare `title` (the helper throws on a trailing "| Wraps"). `image` defaults to the shared
+`/og-image.png` card; pass `{ url, width, height, alt }` for a bespoke one. Use `social` only when the
+share copy genuinely differs from the page title or description. Generated versus, glossary and SES
+pages go through their `*Metadata()` builders, which call the helper.
+
+After a build, `pnpm --filter wraps-website metadata:audit` checks the rendered HTML of every page.
 
 ### JSON-LD Schema
 

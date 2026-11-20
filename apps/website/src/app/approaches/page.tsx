@@ -9,25 +9,19 @@ import {
   WRAPPER_CRITERIA,
   WRAPS_LIMITS,
 } from "@/config/approaches";
+import { pageMetadata } from "@/lib/page-metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "The four ways to send application email — a rubric",
   description:
     "Run SES yourself, rent a sending API, rent a marketing platform, or put an open-source wrapper over your own SES. What each is good at, who it is for, and how to choose between the wrappers once you are there.",
-  openGraph: {
-    title: "The four ways to send application email | Wraps",
+  path: "/approaches",
+  social: {
+    title: "The four ways to send application email",
     description:
       "Run SES yourself, rent a sending API, rent a marketing platform, or put an open-source wrapper over your own SES. What each is good at, and who it is for.",
   },
-  twitter: {
-    title: "The four ways to send application email | Wraps",
-    description:
-      "Run SES yourself, rent a sending API, rent a marketing platform, or put an open-source wrapper over your own SES. What each is good at, and who it is for.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/approaches",
-  },
-};
+});
 
 export default function ApproachesPage() {
   return (

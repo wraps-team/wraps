@@ -24,26 +24,19 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Customer.io vs Wraps - Contact-Based Pricing vs Unlimited Contacts",
   description:
     "Compare Customer.io and Wraps. Customer.io charges per contact and hosts everything. Wraps sets up the whole SES surface in your AWS account in one command, then runs it day to day from one control plane, with unlimited contacts on every tier.",
-  openGraph: {
-    title: "Customer.io vs Wraps | Wraps",
-    description:
-      "Contact-based pricing vs unlimited contacts. Rented infrastructure vs SES in your own AWS account, set up in one command and operated from one control plane.",
-    url: "https://wraps.dev/compare/customer-io-vs-wraps",
-  },
-  twitter: {
-    title: "Customer.io vs Wraps | Wraps",
+  path: "/compare/customer-io-vs-wraps",
+  social: {
+    title: "Customer.io vs Wraps",
     description:
       "Contact-based pricing vs unlimited contacts. Rented infrastructure vs SES in your own AWS account, set up in one command and operated from one control plane.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/compare/customer-io-vs-wraps",
-  },
-};
+});
 
 const breadcrumbJsonLd = {
   "@context": "https://schema.org",

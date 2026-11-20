@@ -9,14 +9,19 @@ import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
 import { ResendForgeNotice } from "@/components/resend-forge-notice";
 import { VENDORS } from "@/config/alternatives";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const TITLE = "Migrate from Resend to Amazon SES";
 const DESCRIPTION =
   "Resend has historically run on SES, so this is the shortest migration of the four: for domains not on its new Forge MTA the SPF include is often already right, and React Email templates move unchanged. Under about 100K a month, Resend is usually the cheaper answer — here is where that stops being true.";
 
 export const metadata: Metadata = {
-  title: TITLE,
-  description: DESCRIPTION,
+  ...pageMetadata({
+    title: TITLE,
+    description: DESCRIPTION,
+    path: "/migrate/resend",
+    type: "article",
+  }),
   keywords: [
     "migrate from resend to ses",
     "resend to amazon ses",
@@ -25,20 +30,6 @@ export const metadata: Metadata = {
     "resend rate limit",
     "leave resend",
   ],
-  openGraph: {
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-    url: "https://wraps.dev/migrate/resend",
-    type: "article",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-  },
-  alternates: {
-    canonical: "https://wraps.dev/migrate/resend",
-  },
 };
 
 const breadcrumbSchema = {

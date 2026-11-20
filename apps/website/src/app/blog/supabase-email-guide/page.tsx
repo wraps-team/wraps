@@ -21,6 +21,7 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { CodeBlock, Collapsible } from "@/components/blog/interactive";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const articleSchema = {
   "@context": "https://schema.org",
@@ -143,29 +144,27 @@ const COST_COMPARISON = [
   },
 ];
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "4 Email Flows Your Supabase App Needs Before Going Live",
   description:
     "Supabase handles auth and database. Email beyond magic links? That's on you. The 4 email flows every production Supabase app needs and how to set each one up.",
-  openGraph: {
-    title: "4 Email Flows Your Supabase App Needs | Wraps",
+  path: "/blog/supabase-email-guide",
+  // opengraph-image.tsx in this folder supplies the card; an explicit image
+  // here would override it.
+  image: null,
+  type: "article",
+  publishedTime: "2026-03-13T00:00:00.000Z",
+  authors: ["Wraps Team"],
+  social: {
+    title: "4 Email Flows Your Supabase App Needs",
     description:
       "Supabase handles auth and database. Email beyond magic links? That's on you. The 4 flows every production app needs.",
-    type: "article",
-    url: "https://wraps.dev/blog/supabase-email-guide",
-    publishedTime: "2026-03-13T00:00:00.000Z",
-    authors: ["Wraps Team"],
+    twitterCopy: {
+      description:
+        "Supabase handles auth and database. Email beyond magic links? That's on you.",
+    },
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "4 Email Flows Your Supabase App Needs | Wraps",
-    description:
-      "Supabase handles auth and database. Email beyond magic links? That's on you.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/blog/supabase-email-guide",
-  },
-};
+});
 
 const InfoCard = ({
   type = "tip",

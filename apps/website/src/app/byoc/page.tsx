@@ -1,33 +1,20 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/page-metadata";
 import ByocPageContent from "./page-content";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "BYOC Email Infrastructure - Amazon SES in Your Own Cloud",
   description:
     "Bring your own cloud email sending. Wraps deploys SES, EventBridge, and DynamoDB into your AWS with one CLI command. Self-serve. No Kubernetes.",
-  openGraph: {
-    title: "BYOC Email Infrastructure | Wraps",
-    description:
-      "Bring your own cloud email sending. Wraps deploys SES, EventBridge, and DynamoDB into your AWS with one CLI command. Self-serve. No Kubernetes.",
-    images: [
-      {
-        url: "/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "BYOC Email Infrastructure - Wraps",
-      },
-    ],
+  path: "/byoc",
+  image: {
+    url: "/og-image.png",
+    width: 1200,
+    height: 630,
+    alt: "BYOC Email Infrastructure - Wraps",
   },
-  twitter: {
-    title: "BYOC Email Infrastructure | Wraps",
-    description:
-      "Bring your own cloud email sending. Wraps deploys SES, EventBridge, and DynamoDB into your AWS with one CLI command. Self-serve. No Kubernetes.",
-    images: ["/og-image.png"],
-  },
-  alternates: {
-    canonical: "https://wraps.dev/byoc",
-  },
-};
+  social: { title: "BYOC Email Infrastructure" },
+});
 
 export default function ByocPage() {
   return <ByocPageContent />;

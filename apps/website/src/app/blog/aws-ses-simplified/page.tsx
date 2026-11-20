@@ -13,6 +13,7 @@ import type { Metadata } from "next";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import {
   AnimatedCounter,
   ArchitectureDiagram,
@@ -93,38 +94,21 @@ const faqSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "AWS SES Setup Simplified: From Hours to Minutes",
   description:
     "What should be a simple 'send email from my app' turns into a multi-day odyssey. See how one command deploys production-ready SES infrastructure.",
-  openGraph: {
-    title: "AWS SES Setup Simplified: From Hours to Minutes | Wraps",
-    description:
-      "What should be a simple 'send email from my app' turns into a multi-day odyssey. See how one command deploys production-ready SES infrastructure.",
-    type: "article",
-    url: "https://wraps.dev/blog/aws-ses-simplified",
-    images: [
-      {
-        url: "https://wraps.dev/blog/aws-ses-simplified.webp",
-        width: 800,
-        height: 421,
-        alt: "AWS SES Setup Simplified",
-      },
-    ],
-    publishedTime: "2026-01-29T00:00:00.000Z",
-    authors: ["Wraps Team"],
+  path: "/blog/aws-ses-simplified",
+  type: "article",
+  image: {
+    url: "https://wraps.dev/blog/aws-ses-simplified.webp",
+    width: 800,
+    height: 421,
+    alt: "AWS SES Setup Simplified",
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "AWS SES Setup Simplified: From Hours to Minutes | Wraps",
-    description:
-      "What should be a simple 'send email from my app' turns into a multi-day odyssey. See how one command deploys production-ready SES infrastructure.",
-    images: ["https://wraps.dev/blog/aws-ses-simplified.webp"],
-  },
-  alternates: {
-    canonical: "https://wraps.dev/blog/aws-ses-simplified",
-  },
-};
+  publishedTime: "2026-01-29T00:00:00.000Z",
+  authors: ["Wraps Team"],
+});
 
 // Quote card component - purely presentational, no hooks
 function QuoteCard({

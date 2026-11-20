@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import DomainVerificationPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,23 +28,11 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Domain Verification Guide",
   description: "Set up DKIM, SPF, and DMARC for your domain.",
-  openGraph: {
-    title: "Domain Verification Guide | Wraps",
-    description: "Set up DKIM, SPF, and DMARC for your domain.",
-    type: "website",
-    url: "https://wraps.dev/docs/guides/domain-verification",
-  },
-  twitter: {
-    title: "Domain Verification Guide | Wraps",
-    description: "Set up DKIM, SPF, and DMARC for your domain.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides/domain-verification",
-  },
-};
+  path: "/docs/guides/domain-verification",
+});
 
 export default function DomainVerificationPage() {
   return (

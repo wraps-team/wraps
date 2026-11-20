@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import EmailQuickstartPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,18 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Email Quickstart",
   description:
     "Deploy AWS SES email infrastructure and send your first email in under 2 minutes. Step-by-step guide with CLI commands and TypeScript SDK examples.",
-  openGraph: {
-    title: "Email Quickstart | Wraps",
-    description:
-      "Deploy AWS SES email infrastructure and send your first email in under 2 minutes. Step-by-step guide with CLI commands and TypeScript SDK examples.",
-    type: "website",
-    url: "https://wraps.dev/docs/quickstart/email",
+  path: "/docs/quickstart/email",
+  social: {
+    twitterCopy: {
+      description:
+        "Deploy AWS SES email infrastructure and send your first email in under 2 minutes. Step-by-step guide.",
+    },
   },
-  twitter: {
-    title: "Email Quickstart | Wraps",
-    description:
-      "Deploy AWS SES email infrastructure and send your first email in under 2 minutes. Step-by-step guide.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/quickstart/email",
-  },
-};
+});
 
 export default function EmailQuickstartPage() {
   return (

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import TelemetryPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -21,23 +22,11 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Telemetry",
   description: "Learn about Wraps CLI telemetry and how to opt out.",
-  openGraph: {
-    title: "Telemetry | Wraps",
-    description: "Learn about Wraps CLI telemetry and how to opt out.",
-    type: "website",
-    url: "https://wraps.dev/docs/telemetry",
-  },
-  twitter: {
-    title: "Telemetry | Wraps",
-    description: "Learn about Wraps CLI telemetry and how to opt out.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/telemetry",
-  },
-};
+  path: "/docs/telemetry",
+});
 
 export default function TelemetryPage() {
   return (

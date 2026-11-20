@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import PageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,16 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "EventBridge Events",
   description:
     "Every email event flows through your AWS account's EventBridge bus. Learn what events are available, their payloads, and how to create custom rules for alerts, analytics, and workflows.",
-  openGraph: {
-    title: "EventBridge Events | Wraps",
-    description:
-      "Every email event flows through your AWS account's EventBridge bus. Create custom rules for alerts, analytics, and workflows.",
-    type: "website",
-    url: "https://wraps.dev/docs/infrastructure/events",
-  },
-  twitter: {
-    title: "EventBridge Events | Wraps",
+  path: "/docs/infrastructure/events",
+  social: {
     description:
       "Every email event flows through your AWS account's EventBridge bus. Create custom rules for alerts, analytics, and workflows.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/docs/infrastructure/events",
-  },
-};
+});
 
 export default function InfrastructureEventsPage() {
   return (

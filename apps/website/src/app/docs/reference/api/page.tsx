@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import PageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,12 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "API Reference",
   description:
     "OpenAPI reference for the Wraps Platform API. Endpoints for contacts, batch sending, workflows, events, and webhooks.",
-  openGraph: {
-    title: "API Reference | Wraps",
-    description:
-      "OpenAPI reference for the Wraps Platform API. Endpoints for contacts, batch sending, workflows, events, and webhooks.",
-    type: "website",
-    url: "https://wraps.dev/docs/reference/api",
-  },
-  twitter: {
-    title: "API Reference | Wraps",
-    description:
-      "OpenAPI reference for the Wraps Platform API. Endpoints for contacts, batch sending, workflows, events, and webhooks.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/reference/api",
-  },
-};
+  path: "/docs/reference/api",
+});
 
 export default function ApiReferencePage() {
   return (

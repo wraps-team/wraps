@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import InfrastructurePageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -21,26 +22,18 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Infrastructure",
   description:
     "What gets deployed to your AWS account for each Wraps service. Detailed resource breakdowns for Email, SMS, CDN, and EventBridge events.",
-  openGraph: {
-    title: "Infrastructure | Wraps",
-    description:
-      "What gets deployed to your AWS account for each Wraps service. Detailed resource breakdowns for Email, SMS, CDN, and EventBridge events.",
-    type: "website",
-    url: "https://wraps.dev/docs/infrastructure",
+  path: "/docs/infrastructure",
+  social: {
+    twitterCopy: {
+      description:
+        "What gets deployed to your AWS account for each Wraps service.",
+    },
   },
-  twitter: {
-    title: "Infrastructure | Wraps",
-    description:
-      "What gets deployed to your AWS account for each Wraps service.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/infrastructure",
-  },
-};
+});
 
 export default function InfrastructurePage() {
   return (

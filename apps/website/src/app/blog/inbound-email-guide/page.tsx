@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import {
   CLIDemo,
   CodeBlock,
@@ -83,38 +84,26 @@ const faqSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Receive Emails in Your AWS Account with Wraps",
   description:
     "Build support inboxes, automate order processing, and create email-to-ticket workflows. All in your AWS account with EventBridge webhooks.",
-  openGraph: {
-    title: "Receive Emails in Your AWS Account | Wraps",
+  path: "/blog/inbound-email-guide",
+  type: "article",
+  image: {
+    url: "https://wraps.dev/blog/wraps-inbound-og.webp",
+    width: 1200,
+    height: 630,
+    alt: "Wraps Inbound Email Guide",
+  },
+  publishedTime: "2026-02-03T00:00:00.000Z",
+  authors: ["Wraps Team"],
+  social: {
+    title: "Receive Emails in Your AWS Account",
     description:
       "Build support inboxes, automate order processing, and create email-to-ticket workflows with Wraps inbound email.",
-    type: "article",
-    url: "https://wraps.dev/blog/inbound-email-guide",
-    images: [
-      {
-        url: "https://wraps.dev/blog/wraps-inbound-og.webp",
-        width: 1200,
-        height: 630,
-        alt: "Wraps Inbound Email Guide",
-      },
-    ],
-    publishedTime: "2026-02-03T00:00:00.000Z",
-    authors: ["Wraps Team"],
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "Receive Emails in Your AWS Account | Wraps",
-    description:
-      "Build support inboxes, automate order processing, and create email-to-ticket workflows with Wraps inbound email.",
-    images: ["https://wraps.dev/blog/wraps-inbound-og.webp"],
-  },
-  alternates: {
-    canonical: "https://wraps.dev/blog/inbound-email-guide",
-  },
-};
+});
 
 export default function Page() {
   return (

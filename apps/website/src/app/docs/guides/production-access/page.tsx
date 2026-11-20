@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import ProductionAccessPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,20 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Production Access Guide",
   description:
     "Step-by-step guide to getting AWS SES production access approval. Includes request templates, common rejection reasons, and best practices for approval.",
-  openGraph: {
-    title: "Production Access Guide | Wraps",
+  path: "/docs/guides/production-access",
+  social: {
     description:
       "Step-by-step guide to getting AWS SES production access approval. Includes request templates and best practices.",
-    type: "website",
-    url: "https://wraps.dev/docs/guides/production-access",
+    twitterCopy: {
+      description:
+        "Step-by-step guide to getting AWS SES production access approval. Includes templates and best practices.",
+    },
   },
-  twitter: {
-    title: "Production Access Guide | Wraps",
-    description:
-      "Step-by-step guide to getting AWS SES production access approval. Includes templates and best practices.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides/production-access",
-  },
-};
+});
 
 export default function ProductionAccessPage() {
   return (

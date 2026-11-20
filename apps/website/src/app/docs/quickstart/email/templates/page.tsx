@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import TemplatesQuickstartPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -33,26 +34,18 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Templates Quickstart",
   description:
     "Build email templates as React components, preview with hot-reload, and push to AWS SES in minutes. Step-by-step quickstart guide.",
-  openGraph: {
-    title: "Templates Quickstart | Wraps",
-    description:
-      "Build email templates as React components, preview with hot-reload, and push to AWS SES in minutes. Step-by-step quickstart guide.",
-    type: "website",
-    url: "https://wraps.dev/docs/quickstart/email/templates",
+  path: "/docs/quickstart/email/templates",
+  social: {
+    twitterCopy: {
+      description:
+        "Build email templates as React components, preview with hot-reload, and push to AWS SES in minutes.",
+    },
   },
-  twitter: {
-    title: "Templates Quickstart | Wraps",
-    description:
-      "Build email templates as React components, preview with hot-reload, and push to AWS SES in minutes.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/quickstart/email/templates",
-  },
-};
+});
 
 export default function TemplatesQuickstartPage() {
   return (

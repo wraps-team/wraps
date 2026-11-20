@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import CustomEventsPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,18 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Custom Events",
   description:
     "Emit custom events from your application to trigger workflows, track user behavior, and resume waiting automation steps using the @wraps.dev/client SDK.",
-  openGraph: {
-    title: "Custom Events | Wraps",
-    description:
-      "Emit custom events from your application to trigger workflows, track user behavior, and resume waiting automation steps using the @wraps.dev/client SDK.",
-    type: "website",
-    url: "https://wraps.dev/docs/guides/custom-events",
+  path: "/docs/guides/custom-events",
+  social: {
+    twitterCopy: {
+      description:
+        "Emit custom events from your application to trigger workflows and track user behavior using the @wraps.dev/client SDK.",
+    },
   },
-  twitter: {
-    title: "Custom Events | Wraps",
-    description:
-      "Emit custom events from your application to trigger workflows and track user behavior using the @wraps.dev/client SDK.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides/custom-events",
-  },
-};
+});
 
 export default function CustomEventsPage() {
   return (

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
+import { pageMetadata } from "@/lib/page-metadata";
 import { CopyLinkButton } from "./components/copy-link-button";
 import { FaqSection } from "./components/faq-section";
 
@@ -16,24 +17,17 @@ import { FaqSection } from "./components/faq-section";
  * /approaches carries the market rubric; neither belongs here again.
  */
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Why Wraps — the evaluation guide you can forward",
   description:
     "What Wraps reduces, what it costs all in, what happens to your infrastructure if we disappear, and the questions a security review will ask — including the ones we fail.",
-  openGraph: {
-    title: "Why Wraps | Wraps",
+  path: "/why-wraps",
+  social: {
+    title: "Why Wraps",
     description:
       "What Wraps reduces, what it costs all in, what happens if we disappear, and the questions a security review will ask — including the ones we fail.",
   },
-  twitter: {
-    title: "Why Wraps | Wraps",
-    description:
-      "What Wraps reduces, what it costs all in, what happens if we disappear, and the questions a security review will ask — including the ones we fail.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/why-wraps",
-  },
-};
+});
 
 /*
  * The risk register. Every row names AWS's own enforcement number, what Wraps

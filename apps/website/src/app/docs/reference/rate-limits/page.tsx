@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import PageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,12 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "API Rate Limits",
   description:
     "Rate limits for the Wraps Platform API by plan. Includes per-minute and daily limits, response headers, and handling 429 errors.",
-  openGraph: {
-    title: "API Rate Limits | Wraps",
-    description:
-      "Rate limits for the Wraps Platform API by plan. Includes per-minute and daily limits, response headers, and handling 429 errors.",
-    type: "website",
-    url: "https://wraps.dev/docs/reference/rate-limits",
-  },
-  twitter: {
-    title: "API Rate Limits | Wraps",
-    description:
-      "Rate limits for the Wraps Platform API by plan. Includes per-minute and daily limits, response headers, and handling 429 errors.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/reference/rate-limits",
-  },
-};
+  path: "/docs/reference/rate-limits",
+});
 
 export default function RateLimitsReferencePage() {
   return (

@@ -12,6 +12,7 @@ import { Suspense } from "react";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import { SES_DENIAL_GAPS } from "@/lib/ses-production-access";
 import SESProductionAccessPageContent from "./page-content";
 
@@ -20,22 +21,11 @@ const DESCRIPTION =
   "Write the AWS SES production access request that answers the four questions the form never asks — or paste a denial and find out which one you missed. Runs entirely in your browser: no account, no upload, no AI.";
 const URL = "https://wraps.dev/tools/ses-production-access";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: TITLE,
   description: DESCRIPTION,
-  openGraph: {
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-    type: "website",
-    url: URL,
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-  },
-  alternates: { canonical: URL },
-};
+  path: "/tools/ses-production-access",
+});
 
 const breadcrumbSchema = {
   "@context": "https://schema.org",

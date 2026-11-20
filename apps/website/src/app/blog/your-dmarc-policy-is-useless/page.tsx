@@ -4,6 +4,7 @@ import type * as React from "react";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import {
   AuthExplainer,
   BreachTimeline,
@@ -91,38 +92,27 @@ const articleSchema = {
   },
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Your DMARC Policy is Useless",
   description:
     "82% of domains have no DMARC. Of those that do, most set p=none\u2014which tells receivers not to enforce. An interactive deep-dive into email authentication.",
-  openGraph: {
-    title: "Your DMARC Policy is Useless | Wraps",
-    description:
-      "82% of domains have no DMARC. Of those that do, most set p=none\u2014which tells receivers not to enforce. An interactive deep-dive into email authentication.",
-    type: "article",
-    url: "https://wraps.dev/blog/your-dmarc-policy-is-useless",
-    images: [
-      {
-        url: "https://wraps.dev/blog/dmarc-policy-is-useless.webp",
-        width: 800,
-        height: 421,
-        alt: "Your DMARC policy is useless",
-      },
-    ],
-    publishedTime: "2025-01-15T00:00:00.000Z",
-    authors: ["Wraps Team"],
+  path: "/blog/your-dmarc-policy-is-useless",
+  type: "article",
+  image: {
+    url: "https://wraps.dev/blog/dmarc-policy-is-useless.webp",
+    width: 800,
+    height: 421,
+    alt: "Your DMARC policy is useless",
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "Your DMARC Policy is Useless | Wraps",
-    description:
-      "82% of domains have no DMARC. Of those that do, most set p=none. An interactive deep-dive into email authentication.",
-    images: ["https://wraps.dev/blog/dmarc-policy-is-useless.webp"],
+  publishedTime: "2025-01-15T00:00:00.000Z",
+  authors: ["Wraps Team"],
+  social: {
+    twitterCopy: {
+      description:
+        "82% of domains have no DMARC. Of those that do, most set p=none. An interactive deep-dive into email authentication.",
+    },
   },
-  alternates: {
-    canonical: "https://wraps.dev/blog/your-dmarc-policy-is-useless",
-  },
-};
+});
 
 // Static "The Fix" section - no hooks, pure presentational
 const THE_FIX_STEPS = [

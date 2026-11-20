@@ -1,28 +1,20 @@
 import type { Metadata } from "next";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
+import { pageMetadata } from "@/lib/page-metadata";
 import { ContactPageContent } from "./page-content";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Contact Us - Book a Call with Wraps",
   description:
     "Schedule a call with the Wraps team to discuss your email infrastructure needs. Or reach out via Discord or GitHub.",
-  openGraph: {
-    title: "Contact Us | Wraps",
-    description:
-      "Schedule a call with the Wraps team to discuss your email infrastructure needs.",
-    type: "website",
-    url: "https://wraps.dev/contact",
-  },
-  twitter: {
-    title: "Contact Us | Wraps",
+  path: "/contact",
+  social: {
+    title: "Contact Us",
     description:
       "Schedule a call with the Wraps team to discuss your email infrastructure needs.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/contact",
-  },
-};
+});
 
 export default function ContactPage() {
   return (

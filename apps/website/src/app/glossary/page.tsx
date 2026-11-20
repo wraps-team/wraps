@@ -10,28 +10,19 @@ import {
   GLOSSARY_CATEGORY_META,
   glossaryTermsInCategory,
 } from "@/lib/glossary";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const TITLE = "Email Terminology Glossary";
 const DESCRIPTION =
   "SPF, DKIM, DMARC, bounces, suppression lists, and every other term that comes up running Amazon SES in production — defined from the code that actually checks each one.";
 const URL = "https://wraps.dev/glossary";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: TITLE,
   description: DESCRIPTION,
-  openGraph: {
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-    type: "article",
-    url: URL,
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-  },
-  alternates: { canonical: URL },
-};
+  path: "/glossary",
+  type: "article",
+});
 
 const listSchema = {
   "@context": "https://schema.org",

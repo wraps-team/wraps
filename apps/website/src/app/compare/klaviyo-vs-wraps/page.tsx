@@ -29,27 +29,20 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title:
     "Klaviyo vs Wraps - E-commerce Marketing Platform vs SES You Own and Operate",
   description:
     "Compare Klaviyo and Wraps: a profile-based marketing platform you rent against Amazon SES set up and operated in your own AWS account. Pricing at real volumes, what each one is built for, and who should pick which.",
-  openGraph: {
-    title: "Klaviyo vs Wraps | Wraps",
-    description:
-      "Klaviyo is an e-commerce marketing platform. Wraps is everything Amazon SES needs, including operations, in your own AWS account.",
-    url: "https://wraps.dev/compare/klaviyo-vs-wraps",
-  },
-  twitter: {
-    title: "Klaviyo vs Wraps | Wraps",
+  path: "/compare/klaviyo-vs-wraps",
+  social: {
+    title: "Klaviyo vs Wraps",
     description:
       "Klaviyo is an e-commerce marketing platform. Wraps is everything Amazon SES needs, including operations, in your own AWS account.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/compare/klaviyo-vs-wraps",
-  },
-};
+});
 
 const breadcrumbJsonLd = {
   "@context": "https://schema.org",

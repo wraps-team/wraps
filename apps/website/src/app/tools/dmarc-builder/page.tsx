@@ -4,26 +4,17 @@ import Link from "next/link";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import DmarcBuilderPageContent from "./page-content";
 
 const description =
   "Build a DMARC record from a few answers and get the _dmarc TXT value, with warnings for the combinations that break mail. Runs in your browser: no account, no upload.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "DMARC Record Generator",
   description,
-  openGraph: {
-    title: "DMARC Record Generator | Wraps",
-    description,
-  },
-  twitter: {
-    title: "DMARC Record Generator | Wraps",
-    description,
-  },
-  alternates: {
-    canonical: "https://wraps.dev/tools/dmarc-builder",
-  },
-};
+  path: "/tools/dmarc-builder",
+});
 
 const sections = [
   {

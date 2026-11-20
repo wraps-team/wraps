@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import NextjsQuickstartPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -33,26 +34,18 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Next.js Email Quickstart",
   description:
     "Deploy email infrastructure and send your first email from a Next.js application in under 5 minutes. Server Actions, API Routes, and Vercel OIDC.",
-  openGraph: {
-    title: "Next.js Email Quickstart | Wraps",
-    description:
-      "Deploy email infrastructure and send your first email from a Next.js application in under 5 minutes. Server Actions, API Routes, and Vercel OIDC.",
-    type: "website",
-    url: "https://wraps.dev/docs/quickstart/email/nextjs",
+  path: "/docs/quickstart/email/nextjs",
+  social: {
+    twitterCopy: {
+      description:
+        "Deploy email infrastructure and send your first email from a Next.js application in under 5 minutes.",
+    },
   },
-  twitter: {
-    title: "Next.js Email Quickstart | Wraps",
-    description:
-      "Deploy email infrastructure and send your first email from a Next.js application in under 5 minutes.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/quickstart/email/nextjs",
-  },
-};
+});
 
 export default function NextjsQuickstartPage() {
   return (

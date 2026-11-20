@@ -3,26 +3,20 @@ import Link from "next/link";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { LegalArticle } from "@/components/legal-article";
+import { pageMetadata } from "@/lib/page-metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Terms of Service",
   description:
     "Terms and conditions for using Wraps CLI, SDK, and Platform. Covers acceptable use, AWS account requirements, and open source licensing.",
-  openGraph: {
-    title: "Terms of Service | Wraps",
-    description:
-      "Terms and conditions for using Wraps CLI, SDK, and Platform. Covers acceptable use, AWS account requirements, and open source licensing.",
-    type: "website",
-    url: "https://wraps.dev/terms",
+  path: "/terms",
+  social: {
+    twitterCopy: {
+      description:
+        "Terms and conditions for using Wraps CLI, SDK, and Platform.",
+    },
   },
-  twitter: {
-    title: "Terms of Service | Wraps",
-    description: "Terms and conditions for using Wraps CLI, SDK, and Platform.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/terms",
-  },
-};
+});
 
 export default function TermsOfService() {
   return (

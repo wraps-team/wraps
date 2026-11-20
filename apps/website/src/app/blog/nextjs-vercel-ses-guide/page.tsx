@@ -5,6 +5,7 @@ import Link from "next/link";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import { CodeBlock, OIDCDiagram, TerminalDemo } from "./page-content";
 
 const articleSchema = {
@@ -77,38 +78,21 @@ const faqSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Next.js + Vercel + AWS SES: The Complete Email Guide",
   description:
     "Deploy production-ready email infrastructure to your AWS account in minutes. No stored credentials, zero access keys.",
-  openGraph: {
-    title: "Next.js + Vercel + AWS SES: The Complete Email Guide | Wraps",
-    description:
-      "Deploy production-ready email infrastructure to your AWS account in minutes. No stored credentials, zero access keys.",
-    type: "article",
-    url: "https://wraps.dev/blog/nextjs-vercel-ses-guide",
-    images: [
-      {
-        url: "https://wraps.dev/blog/nextjs-vercel-ses-guide.webp",
-        width: 800,
-        height: 421,
-        alt: "Next.js + Vercel + AWS SES Guide",
-      },
-    ],
-    publishedTime: "2026-01-29T00:00:00.000Z",
-    authors: ["Wraps Team"],
+  path: "/blog/nextjs-vercel-ses-guide",
+  type: "article",
+  image: {
+    url: "https://wraps.dev/blog/nextjs-vercel-ses-guide.webp",
+    width: 800,
+    height: 421,
+    alt: "Next.js + Vercel + AWS SES Guide",
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "Next.js + Vercel + AWS SES: The Complete Email Guide | Wraps",
-    description:
-      "Deploy production-ready email infrastructure to your AWS account in minutes. No stored credentials, zero access keys.",
-    images: ["https://wraps.dev/blog/nextjs-vercel-ses-guide.webp"],
-  },
-  alternates: {
-    canonical: "https://wraps.dev/blog/nextjs-vercel-ses-guide",
-  },
-};
+  publishedTime: "2026-01-29T00:00:00.000Z",
+  authors: ["Wraps Team"],
+});
 
 // Static helper components (no hooks, server-compatible)
 

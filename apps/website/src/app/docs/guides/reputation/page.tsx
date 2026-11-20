@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import ReputationPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -30,25 +31,16 @@ const breadcrumbSchema = {
 const DESCRIPTION =
   "Keeping domain reputation high and complaint rates low on Amazon SES: what actually moves the number, how to watch it per configuration set, and the runbook for the day a rate starts climbing.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Domain Reputation on SES",
   description: DESCRIPTION,
-  openGraph: {
-    title: "Domain Reputation on SES | Wraps",
-    description:
-      "Complaint rate is a recipient-quality problem before it is a technical one. What moves it, how to watch it, and what to do when it climbs.",
-    type: "article",
-    url: "https://wraps.dev/docs/guides/reputation",
-  },
-  twitter: {
-    title: "Domain Reputation on SES | Wraps",
+  path: "/docs/guides/reputation",
+  type: "article",
+  social: {
     description:
       "Complaint rate is a recipient-quality problem before it is a technical one. What moves it, how to watch it, and what to do when it climbs.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides/reputation",
-  },
-};
+});
 
 export default function Page() {
   return (

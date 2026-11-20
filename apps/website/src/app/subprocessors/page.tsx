@@ -5,27 +5,17 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const TITLE = "Subprocessors";
 const DESCRIPTION =
   "The complete list of third parties that process data on behalf of Wraps: what each one receives, why, and where it is located. Updated whenever the list changes.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: TITLE,
   description: DESCRIPTION,
-  openGraph: {
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-    url: "https://wraps.dev/subprocessors",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-  },
-  alternates: { canonical: "https://wraps.dev/subprocessors" },
-};
+  path: "/subprocessors",
+});
 
 const LAST_UPDATED = "August 28, 2026";
 

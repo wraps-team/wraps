@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import CLIReferencePlatformPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,12 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Platform CLI Commands",
   description:
     "Connect your AWS infrastructure to the Wraps Platform for dashboards, templates, and workflows.",
-  openGraph: {
-    title: "Platform CLI Commands | Wraps",
-    description:
-      "Connect your AWS infrastructure to the Wraps Platform for dashboards, templates, and workflows.",
-    type: "website",
-    url: "https://wraps.dev/docs/cli-reference/platform",
-  },
-  twitter: {
-    title: "Platform CLI Commands | Wraps",
-    description:
-      "Connect your AWS infrastructure to the Wraps Platform for dashboards, templates, and workflows.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/cli-reference/platform",
-  },
-};
+  path: "/docs/cli-reference/platform",
+});
 
 export default function CLIReferencePlatformPage() {
   return (

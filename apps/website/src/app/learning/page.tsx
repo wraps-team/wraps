@@ -11,28 +11,18 @@ import {
   type GlossaryCategory,
   glossaryTermsInCategory,
 } from "@/lib/glossary";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const TITLE = "Learning Center";
 const DESCRIPTION =
   "Everything Wraps has on email authentication, deliverability, and infrastructure — glossary terms, deep guides, and the tools that check each one, organized by topic.";
 const URL = "https://wraps.dev/learning";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: TITLE,
   description: DESCRIPTION,
-  openGraph: {
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-    type: "website",
-    url: URL,
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-  },
-  alternates: { canonical: URL },
-};
+  path: "/learning",
+});
 
 const collectionSchema = {
   "@context": "https://schema.org",

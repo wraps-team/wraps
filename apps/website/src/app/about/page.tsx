@@ -6,27 +6,21 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { Github } from "@/components/ui/svgs/brand-icons";
+import { pageMetadata } from "@/lib/page-metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "About Wraps - Our Mission and Values",
   description:
     "Wraps brings SaaS-quality developer experience to AWS infrastructure. Deploy to your own account, pay AWS directly, and keep full control.",
-  openGraph: {
-    title: "About Wraps | Wraps",
-    description:
-      "Wraps brings SaaS-quality developer experience to AWS infrastructure. Deploy to your own account, pay AWS directly, and keep full control.",
-    type: "website",
-    url: "https://wraps.dev/about",
+  path: "/about",
+  social: {
+    title: "About Wraps",
+    twitterCopy: {
+      description:
+        "Wraps brings SaaS-quality developer experience to AWS infrastructure.",
+    },
   },
-  twitter: {
-    title: "About Wraps | Wraps",
-    description:
-      "Wraps brings SaaS-quality developer experience to AWS infrastructure.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/about",
-  },
-};
+});
 
 const values = [
   {

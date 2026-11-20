@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import SandboxGuideContent from "./page-content";
 
 const faqSchema = {
@@ -83,38 +84,27 @@ const articleSchema = {
   },
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "How to Get Out of AWS SES Sandbox",
   description:
     "The complete guide to SES production access approval. Interactive checklists, request templates, and everything you need to escape the sandbox on your first try.",
-  openGraph: {
-    title: "How to Get Out of AWS SES Sandbox | Wraps",
-    description:
-      "The complete guide to SES production access approval. Interactive checklists, request templates, and everything you need to escape the sandbox on your first try.",
-    type: "article",
-    url: "https://wraps.dev/blog/ses-sandbox-guide",
-    images: [
-      {
-        url: "https://wraps.dev/blog/get-out-of-sandbox.webp",
-        width: 800,
-        height: 421,
-        alt: "How to Get Out of AWS SES Sandbox",
-      },
-    ],
-    publishedTime: "2026-01-10T00:00:00.000Z",
-    authors: ["Wraps Team"],
+  path: "/blog/ses-sandbox-guide",
+  type: "article",
+  image: {
+    url: "https://wraps.dev/blog/get-out-of-sandbox.webp",
+    width: 800,
+    height: 421,
+    alt: "How to Get Out of AWS SES Sandbox",
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "How to Get Out of AWS SES Sandbox | Wraps",
-    description:
-      "The complete guide to SES production access approval. Checklists, templates, and everything you need.",
-    images: ["https://wraps.dev/blog/get-out-of-sandbox.webp"],
+  publishedTime: "2026-01-10T00:00:00.000Z",
+  authors: ["Wraps Team"],
+  social: {
+    twitterCopy: {
+      description:
+        "The complete guide to SES production access approval. Checklists, templates, and everything you need.",
+    },
   },
-  alternates: {
-    canonical: "https://wraps.dev/blog/ses-sandbox-guide",
-  },
-};
+});
 
 export default function Page() {
   return (

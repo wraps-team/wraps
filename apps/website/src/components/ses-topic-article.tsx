@@ -5,6 +5,7 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
 import { SesCodeSnippet } from "@/components/ses-code-snippet";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const SITE = "https://wraps.dev";
 
@@ -70,23 +71,12 @@ export function sesTopicUrl(topic: SesTopic): string {
 }
 
 export function sesTopicMetadata(topic: SesTopic): Metadata {
-  const url = sesTopicUrl(topic);
-  return {
+  return pageMetadata({
     title: topic.title,
     description: topic.description,
-    openGraph: {
-      title: `${topic.title} | Wraps`,
-      description: topic.description,
-      type: "article",
-      url,
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: `${topic.title} | Wraps`,
-      description: topic.description,
-    },
-    alternates: { canonical: url },
-  };
+    path: `/ses/${topic.slug}`,
+    type: "article",
+  });
 }
 
 function faqSchema(topic: SesTopic): Record<string, unknown> {

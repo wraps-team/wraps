@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import CLIReferenceSMSPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,23 +28,11 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "SMS CLI Commands",
   description: "CLI commands for managing SMS infrastructure.",
-  openGraph: {
-    title: "SMS CLI Commands | Wraps",
-    description: "CLI commands for managing SMS infrastructure.",
-    type: "website",
-    url: "https://wraps.dev/docs/cli-reference/sms",
-  },
-  twitter: {
-    title: "SMS CLI Commands | Wraps",
-    description: "CLI commands for managing SMS infrastructure.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/cli-reference/sms",
-  },
-};
+  path: "/docs/cli-reference/sms",
+});
 
 export default function CLIReferenceSMSPage() {
   return (

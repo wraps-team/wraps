@@ -8,14 +8,19 @@ import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
 import { VENDORS } from "@/config/alternatives";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const TITLE = "Migrate from Postmark to Amazon SES";
 const DESCRIPTION =
   "Most people leave Postmark over unit price, not over anything Postmark did badly. Here is the volume where that argument starts to hold, what Message Streams and inbound parsing cost you to give up, and the migration order.";
 
 export const metadata: Metadata = {
-  title: TITLE,
-  description: DESCRIPTION,
+  ...pageMetadata({
+    title: TITLE,
+    description: DESCRIPTION,
+    path: "/migrate/postmark",
+    type: "article",
+  }),
   keywords: [
     "migrate from postmark to ses",
     "postmark to amazon ses",
@@ -24,20 +29,6 @@ export const metadata: Metadata = {
     "postmark suppression export",
     "leave postmark",
   ],
-  openGraph: {
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-    url: "https://wraps.dev/migrate/postmark",
-    type: "article",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-  },
-  alternates: {
-    canonical: "https://wraps.dev/migrate/postmark",
-  },
 };
 
 const breadcrumbSchema = {

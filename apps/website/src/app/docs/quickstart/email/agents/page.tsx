@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import AgentEmailQuickstartPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -33,26 +34,18 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Agent Email Quickstart",
   description:
     "Wire Wraps into your agent's tool calls. Deploy AWS SES, install the SDK, and let your agent send transactional email from your AWS account.",
-  openGraph: {
-    title: "Agent Email Quickstart | Wraps",
-    description:
-      "Wire Wraps into your agent's tool calls. Deploy AWS SES, install the SDK, and let your agent send transactional email from your AWS account.",
-    type: "website",
-    url: "https://wraps.dev/docs/quickstart/email/agents",
+  path: "/docs/quickstart/email/agents",
+  social: {
+    twitterCopy: {
+      description:
+        "Wire Wraps into your agent's tool calls. Deploy AWS SES, install the SDK, and let your agent send email from your AWS account.",
+    },
   },
-  twitter: {
-    title: "Agent Email Quickstart | Wraps",
-    description:
-      "Wire Wraps into your agent's tool calls. Deploy AWS SES, install the SDK, and let your agent send email from your AWS account.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/quickstart/email/agents",
-  },
-};
+});
 
 export default function AgentEmailQuickstartPage() {
   return (

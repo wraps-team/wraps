@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import { DomainChecker, GradeDistribution, StatCard } from "./page-content";
 
 const articleSchema = {
@@ -69,38 +70,29 @@ const faqSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "We Graded 200 YC W26 Companies on Email Security",
   description:
     "We scanned every YC W26 company for SPF, DKIM, and DMARC. Only 23% got an A. 70% don't enforce DMARC. Full data and methodology.",
-  openGraph: {
-    title: "We Graded 200 YC W26 Companies on Email Security | Wraps",
+  path: "/blog/yc-w26-email-security-audit",
+  type: "article",
+  image: {
+    url: "https://wraps.dev/blog/yc-w26-email-security-audit.webp",
+    width: 1200,
+    height: 630,
+    alt: "YC W26 Email Security Audit — Only 23% got an A",
+  },
+  publishedTime: "2026-03-30T00:00:00.000Z",
+  authors: ["Wraps Team"],
+  social: {
     description:
       "Only 23% of YC W26 companies got an A on email security. 70% don't enforce DMARC. Full audit results with data.",
-    type: "article",
-    url: "https://wraps.dev/blog/yc-w26-email-security-audit",
-    images: [
-      {
-        url: "https://wraps.dev/blog/yc-w26-email-security-audit.webp",
-        width: 1200,
-        height: 630,
-        alt: "YC W26 Email Security Audit — Only 23% got an A",
-      },
-    ],
-    publishedTime: "2026-03-30T00:00:00.000Z",
-    authors: ["Wraps Team"],
+    twitterCopy: {
+      description:
+        "Only 23% got an A. 70% don't enforce DMARC. We scanned every YC W26 company's SPF, DKIM, and DMARC.",
+    },
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "We Graded 200 YC W26 Companies on Email Security | Wraps",
-    description:
-      "Only 23% got an A. 70% don't enforce DMARC. We scanned every YC W26 company's SPF, DKIM, and DMARC.",
-    images: ["https://wraps.dev/blog/yc-w26-email-security-audit.webp"],
-  },
-  alternates: {
-    canonical: "https://wraps.dev/blog/yc-w26-email-security-audit",
-  },
-};
+});
 
 export default function Page() {
   return (

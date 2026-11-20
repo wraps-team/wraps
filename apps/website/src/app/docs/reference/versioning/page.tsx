@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import PageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -30,23 +31,15 @@ const breadcrumbSchema = {
 const description =
   "How the Wraps Platform API is versioned, what counts as a breaking change, and how deprecations are signaled — Deprecation and Sunset response headers plus a 12-month notice period.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "API Versioning and Deprecation Policy",
   description,
-  openGraph: {
+  path: "/docs/reference/versioning",
+  social: {
     title: "Wraps API Versioning and Deprecation Policy",
-    description,
-    type: "website",
-    url: "https://wraps.dev/docs/reference/versioning",
+    titleSuffix: null,
   },
-  twitter: {
-    title: "Wraps API Versioning and Deprecation Policy",
-    description,
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/reference/versioning",
-  },
-};
+});
 
 export default function VersioningReferencePage() {
   return (

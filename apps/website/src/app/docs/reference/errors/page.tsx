@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import PageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,12 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Error Codes & Troubleshooting",
   description:
     "Complete reference for all Wraps CLI error codes and SDK error classes, with solutions for each.",
-  openGraph: {
-    title: "Error Codes & Troubleshooting | Wraps",
-    description:
-      "Complete reference for all Wraps CLI error codes and SDK error classes, with solutions for each.",
-    type: "website",
-    url: "https://wraps.dev/docs/reference/errors",
-  },
-  twitter: {
-    title: "Error Codes & Troubleshooting | Wraps",
-    description:
-      "Complete reference for all Wraps CLI error codes and SDK error classes, with solutions for each.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/reference/errors",
-  },
-};
+  path: "/docs/reference/errors",
+});
 
 export default function ErrorsReferencePage() {
   return (
