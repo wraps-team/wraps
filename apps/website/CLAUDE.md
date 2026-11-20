@@ -205,18 +205,26 @@ import { JsonLd } from "@/components/json-ld";
 
 ### Share cards (`/og`)
 
-A page that passes no `image` to `pageMetadata` gets a card drawn by `src/app/og/route.tsx` with
-its own title and section (the homepage keeps `/og-image.png`). The URL is signed by
-`ogCardPath` (`src/lib/og-card.ts`) with `OG_IMAGE_SECRET`; the route draws only the exact canonical query `?d=<payload>&sig=<hmac>` and serves the
-generic `/og-image.png` for anything else (bad or missing `sig`, extra or reordered params).
-Bump `OG_CARD_VERSION` in `og-card.ts` when the card design changes: it is in the signed payload,
-so every card URL changes and the year-long CDN cache is bypassed. A title with a glyph the
-bundled fonts lack gets `/og-image.png` instead of a card. With the secret unset, `pageMetadata` falls back to
-`/og-image.png` too, so a missing env var never breaks images. `next/og` reads ttf, not woff2:
-the card's fonts are static ttf in `src/app/og/fonts/`, rebuilt from `public/fonts/subset` by
-`build-fonts.py` in that folder. `/og` is excluded from the middleware matcher (an immutable
-image must not get the attribution cookie or a markdown rewrite). To preview a card, run
-`OG_IMAGE_SECRET=<anything> pnpm dev` and open a page's `og:image` URL.
+A page that passes no `image` to `pageMetadata` gets a card drawn by `src/app/og/route.tsx` (the
+homepage keeps `/og-image.png`). The card shows a dot grid, the section label, the title and a
+terminal-style panel with the page's route (`$ wraps.dev/docs/guides/dkim`), with an orange glow
+and a top bar. The URL is minted by `ogCardPath` (`src/lib/og-card.ts`) as
+`/og?d=<base64url {v, t: title, s: section, r: route}>&sig=<hmac>`, signed with `OG_IMAGE_SECRET`.
+The route draws only that exact query string and serves the generic `/og-image.png` for anything
+else (bad or missing `sig`, extra or reordered params, a payload over the caps).
+
+- `OG_CARD_VERSION` (in `og-card.ts`) is in the signed payload. Bump it with any visual change to
+  `card.tsx`, the fonts or the logo: every card URL changes and the year-long cache is bypassed.
+- A page keeps `/og-image.png`, with no card, when its title has a glyph the title font lacks, its
+  path is not a plain route (letters, digits, `.`, `_`, `-`, `/`, up to 120 characters) or
+  `OG_IMAGE_SECRET` is unset at build. A missing env var never breaks images.
+- Titles of up to 100 characters are balanced (`textWrap: "balance"`); longer ones are not.
+- `next/og` reads ttf, not woff2: the card's fonts are static ttf in `src/app/og/fonts/`, rebuilt
+  from `public/fonts/subset` by `build-fonts.py` in that folder. Satori ignores repeating gradient
+  backgrounds, so the dot grid is an SVG image under the card.
+- `/og` is excluded from the middleware matcher (an immutable image must not get the attribution
+  cookie or a markdown rewrite). Preview a card with `OG_IMAGE_SECRET=<anything> pnpm dev` and
+  open a page's `og:image` URL.
 
 ### Sitemap & Robots
 

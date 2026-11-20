@@ -86,7 +86,12 @@ export async function GET(request: Request): Promise<Response> {
     // Drawing is lazy: read the PNG here so a failure lands in the catch below
     // rather than as a broken stream after the headers are sent.
     const png = await new ImageResponse(
-      <OgCard logoSrc={logoSrc} section={card.section} title={card.title} />,
+      <OgCard
+        logoSrc={logoSrc}
+        route={card.route}
+        section={card.section}
+        title={card.title}
+      />,
       { ...OG_SIZE, fonts: [...fonts] }
     ).arrayBuffer();
     return new Response(png, {

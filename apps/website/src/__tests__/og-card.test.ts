@@ -10,12 +10,16 @@ vi.mock("node:crypto", async (importOriginal) => {
 
 import { createHmac } from "node:crypto";
 import {
+  cardRoute,
   clampOgTitle,
   encodeOgCard,
   hasCardGlyphs,
+  hasMonoGlyphs,
   OG_CARD_VERSION,
   OG_GLYPH_RANGES,
+  OG_MONO_GLYPH_RANGES,
   OG_PAYLOAD_MAX,
+  OG_ROUTE_MAX,
   OG_SECTION_MAX,
   OG_SIG_LENGTH,
   OG_TITLE_MAX,
@@ -31,8 +35,12 @@ const SECRET = "test-secret-not-for-production-0123456789";
 const webRoot = resolve(__dirname, "..", "..");
 
 /** `?d=…&sig=…` for a card, signed with SECRET. */
-function signedSearch(title: string, section = ""): string {
-  const d = encodeOgCard({ title, section });
+function signedSearch(
+  title: string,
+  section = "",
+  route = "/docs/guides/dkim"
+): string {
+  const d = encodeOgCard({ title, section, route });
   return `?${ogCardQuery(d, signOgPayload(d, SECRET))}`;
 }
 
@@ -90,7 +98,11 @@ describe("clampOgTitle", () => {
 });
 
 describe("signOgPayload / verifyOgPayload", () => {
-  const d = encodeOgCard({ title: "Configure DKIM", section: "Docs" });
+  const d = encodeOgCard({
+    title: "Configure DKIM",
+    section: "Docs",
+    route: "/docs/x",
+  });
 
   it("signs to 16 lowercase hex characters, deterministically", () => {
     const sig = signOgPayload(d, SECRET);
@@ -105,7 +117,11 @@ describe("signOgPayload / verifyOgPayload", () => {
 
   it("rejects a tampered payload and a signature from another secret", () => {
     const sig = signOgPayload(d, SECRET);
-    const other = encodeOgCard({ title: "Configure DKIM!", section: "Docs" });
+    const other = encodeOgCard({
+      title: "Configure DKIM!",
+      section: "Docs",
+      route: "/docs/x",
+    });
     expect(verifyOgPayload(other, sig, SECRET)).toBe(false);
     expect(verifyOgPayload(d, signOgPayload(d, "another-secret"), SECRET)).toBe(
       false
@@ -136,18 +152,23 @@ describe("signOgPayload / verifyOgPayload", () => {
 
 describe("encodeOgCard", () => {
   it("carries the version, title and section as base64url JSON", () => {
-    const d = encodeOgCard({ title: "A & B = C", section: "Docs" });
+    const d = encodeOgCard({
+      title: "A & B = C",
+      section: "Docs",
+      route: "/docs/guides/dkim",
+    });
     expect(d).toMatch(/^[A-Za-z0-9_-]+$/);
     expect(JSON.parse(Buffer.from(d, "base64url").toString())).toEqual({
       v: OG_CARD_VERSION,
       t: "A & B = C",
       s: "Docs",
+      r: "/docs/guides/dkim",
     });
   });
 
   it("treats a missing section and an empty one the same", () => {
-    expect(encodeOgCard({ title: "T" })).toBe(
-      encodeOgCard({ title: "T", section: "" })
+    expect(encodeOgCard({ title: "T", route: "/x" })).toBe(
+      encodeOgCard({ title: "T", section: "", route: "/x" })
     );
   });
 });
@@ -176,7 +197,32 @@ describe("ogCardPath", () => {
     expect(parseOgCardRequest(path.slice("/og".length), SECRET)).toEqual({
       title: "SES bounce rate & you",
       section: "Docs",
+      route: "/docs/guides/bounces",
     });
+  });
+
+  it("carries the page path as the route, trimming a trailing slash", () => {
+    const path = ogCardPath(
+      { title: "T", path: "/docs/guides/dkim/" },
+      SECRET
+    ) as string;
+    expect(parseOgCardRequest(path.slice("/og".length), SECRET)?.route).toBe(
+      "/docs/guides/dkim"
+    );
+  });
+
+  it("returns null for a path the card can't draw, so the page keeps the shared card", () => {
+    for (const path of [
+      "docs/x",
+      "/has space",
+      "/ü",
+      "/a?b=c",
+      `/${"a".repeat(OG_ROUTE_MAX)}`,
+    ]) {
+      expect(ogCardPath({ title: "T", path }, SECRET), path).toBeNull();
+    }
+    expect(cardRoute("/docs/x/")).toBe("/docs/x");
+    expect(cardRoute("/")).toBe("/");
   });
 
   it("gives a page without a section an empty label", () => {
@@ -187,6 +233,7 @@ describe("ogCardPath", () => {
     expect(parseOgCardRequest(path.slice("/og".length), SECRET)).toEqual({
       title: "About",
       section: "",
+      route: "/about",
     });
   });
 
@@ -219,10 +266,11 @@ describe("ogCardPath", () => {
 });
 
 describe("parseOgCardRequest", () => {
-  it("accepts the canonical query", () => {
+  it("accepts the canonical query and returns the route", () => {
     expect(parseOgCardRequest(signedSearch("Hello", "Docs"), SECRET)).toEqual({
       title: "Hello",
       section: "Docs",
+      route: "/docs/guides/dkim",
     });
   });
 
@@ -247,12 +295,16 @@ describe("parseOgCardRequest", () => {
   });
 
   it("rejects a bad, missing, empty or tampered signature", () => {
-    const d = encodeOgCard({ title: "Hello", section: "Docs" });
+    const d = encodeOgCard({
+      title: "Hello",
+      section: "Docs",
+      route: "/docs/x",
+    });
     for (const search of [
       `?d=${d}&sig=${"0".repeat(16)}`,
       `?d=${d}`,
       `?d=${d}&sig=`,
-      `?${ogCardQuery(encodeOgCard({ title: "Buy crypto", section: "Docs" }), signOgPayload(d, SECRET))}`,
+      `?${ogCardQuery(encodeOgCard({ title: "Buy crypto", section: "Docs", route: "/docs/x" }), signOgPayload(d, SECRET))}`,
     ]) {
       expect(parseOgCardRequest(search, SECRET)).toBeNull();
     }
@@ -263,10 +315,11 @@ describe("parseOgCardRequest", () => {
       const d = Buffer.from(JSON.stringify(value)).toString("base64url");
       return `?${ogCardQuery(d, signOgPayload(d, SECRET))}`;
     };
-    const ok = { v: OG_CARD_VERSION, t: "T", s: "" };
+    const ok = { v: OG_CARD_VERSION, t: "T", s: "", r: "/docs/x" };
     expect(parseOgCardRequest(sign(ok), SECRET)).toEqual({
       title: "T",
       section: "",
+      route: "/docs/x",
     });
     for (const bad of [
       { ...ok, v: OG_CARD_VERSION + 1 },
@@ -274,6 +327,14 @@ describe("parseOgCardRequest", () => {
       { ...ok, t: "" },
       { ...ok, t: 5 },
       { ...ok, s: null },
+      { ...ok, r: undefined },
+      { ...ok, r: 5 },
+      { ...ok, r: "docs/x" },
+      { ...ok, r: "/docs/a b" },
+      { ...ok, r: "/docs/x?y=1" },
+      { ...ok, r: "/docs/%2e%2e" },
+      { ...ok, r: "/docs/ü" },
+      { ...ok, r: `/${"a".repeat(OG_ROUTE_MAX)}` },
       "just a string",
       null,
       [],
@@ -326,6 +387,60 @@ describe("parseOgCardRequest", () => {
     // Control: the canonical request does reach the HMAC.
     expect(parseOgCardRequest(search, SECRET)).not.toBeNull();
     expect(createHmac).toHaveBeenCalled();
+  });
+
+  it("round-trips the route, and rejects a tampered one with the old signature", () => {
+    const d = encodeOgCard({
+      title: "Hello",
+      section: "Docs",
+      route: "/docs/a",
+    });
+    const sig = signOgPayload(d, SECRET);
+    expect(parseOgCardRequest(`?${ogCardQuery(d, sig)}`, SECRET)?.route).toBe(
+      "/docs/a"
+    );
+    const forged = encodeOgCard({
+      title: "Hello",
+      section: "Docs",
+      route: "/docs/b",
+    });
+    expect(
+      parseOgCardRequest(`?${ogCardQuery(forged, sig)}`, SECRET)
+    ).toBeNull();
+  });
+
+  it("rejects an invalid or oversized route before computing any HMAC", () => {
+    const routes = [
+      "docs/no-leading-slash",
+      "/has space",
+      "/query?x=1",
+      "/encoded/%2e%2e",
+      "/unicode/ü",
+      "/",
+      `/${"a".repeat(OG_ROUTE_MAX)}`,
+    ];
+    for (const route of routes.filter((r) => r !== "/")) {
+      const d = encodeOgCard({ title: "T", section: "", route });
+      // Valid signature, so only the route can reject it.
+      const sig = signOgPayload(d, SECRET);
+      vi.mocked(createHmac).mockClear();
+      expect(
+        parseOgCardRequest(`?${ogCardQuery(d, sig)}`, SECRET),
+        route
+      ).toBeNull();
+      expect(createHmac, route).not.toHaveBeenCalled();
+    }
+    // The bare root path is a valid route (the panel then shows just wraps.dev).
+    expect(parseOgCardRequest(signedSearch("T", "", "/"), SECRET)?.route).toBe(
+      "/"
+    );
+    // At the cap it is fine.
+    expect(
+      parseOgCardRequest(
+        signedSearch("T", "", `/${"a".repeat(OG_ROUTE_MAX - 1)}`),
+        SECRET
+      )
+    ).not.toBeNull();
   });
 
   it("rejects everything when the secret is unset", () => {
@@ -415,6 +530,26 @@ describe("card font coverage", () => {
     }
     expect(hasCardGlyphs("→")).toBe(false);
     expect(hasCardGlyphs("≠")).toBe(false);
+  });
+
+  it("OG_MONO_GLYPH_RANGES is exactly the printable code points in jetbrains-mono-500.ttf", () => {
+    const mono = cmapCodePoints("src/app/og/fonts/jetbrains-mono-500.ttf");
+    const listed = new Set<number>();
+    for (const [low, high] of OG_MONO_GLYPH_RANGES) {
+      for (let code = low; code <= high; code++) {
+        listed.add(code);
+      }
+    }
+    expect([...listed].sort((a, b) => a - b)).toEqual(
+      [...mono].filter((code) => code >= 0x20).sort((a, b) => a - b)
+    );
+  });
+
+  it("the mono font covers every character a route may contain", () => {
+    expect(hasMonoGlyphs("/abcdefghijklmnopqrstuvwxyz0123456789-._ABC")).toBe(
+      true
+    );
+    expect(hasMonoGlyphs("→")).toBe(false);
   });
 
   it("the mono font has every character of the section labels and the domain", () => {

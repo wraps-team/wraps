@@ -70,9 +70,17 @@ describe("GET /og", () => {
   });
 
   it("serves the generic card, not the text, for a bad or tampered sig", async () => {
-    const d = encodeOgCard({ title: "Real", section: "Docs" });
+    const d = encodeOgCard({
+      title: "Real",
+      section: "Docs",
+      route: "/docs/x",
+    });
     const sig = signOgPayload(d, SECRET);
-    const other = encodeOgCard({ title: "Buy crypto now", section: "Docs" });
+    const other = encodeOgCard({
+      title: "Buy crypto now",
+      section: "Docs",
+      route: "/docs/x",
+    });
     for (const query of [
       `d=${d}&sig=0000000000000000`,
       `d=${other}&sig=${sig}`,
@@ -90,7 +98,11 @@ describe("GET /og", () => {
   });
 
   it("draws only the canonical URL: a replayed signature under any variant gets the generic card", async () => {
-    const d = encodeOgCard({ title: "Real card", section: "Docs" });
+    const d = encodeOgCard({
+      title: "Real card",
+      section: "Docs",
+      route: "/docs/x",
+    });
     const sig = signOgPayload(d, SECRET);
     const canonical = `/og?${ogCardQuery(d, sig)}`;
 
@@ -131,7 +143,11 @@ describe("GET /og", () => {
   });
 
   it("serves the generic card for a title over the cap, even when signed", async () => {
-    const d = encodeOgCard({ title: "t".repeat(201), section: "" });
+    const d = encodeOgCard({
+      title: "t".repeat(201),
+      section: "",
+      route: "/docs/x",
+    });
     const response = await GET(
       request(`/og?${ogCardQuery(d, signOgPayload(d, SECRET))}`)
     );

@@ -8,7 +8,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  * image that carries its logo. The URL carries one base64url payload and the
  * signature over it:
  *
- *   /og?d=<base64url(JSON {v, t: title, s: section})>&sig=<16 hex>
+ *   /og?d=<base64url(JSON {v, t: title, s: section, r: route})>&sig=<16 hex>
  *
  * A signature is public (it sits in the page HTML), so the route draws only
  * for exactly that query string. An extra parameter, a different order or a
@@ -29,12 +29,17 @@ export const OG_TITLE_MAX = 200;
 export const OG_SECTION_MAX = 24;
 /** Hex characters kept from the HMAC-SHA256 digest. */
 export const OG_SIG_LENGTH = 16;
+/** Longest route (page path) the route will draw in the card's panel. */
+export const OG_ROUTE_MAX = 120;
 /**
- * Longest `d` the route will decode. 200 four-byte characters plus a 24
- * character section is about 1,000 bytes of JSON, so 1,400 base64url characters
- * leaves room; anything longer cannot be a card we signed.
+ * Longest `d` the route will decode. 200 four-byte characters, a 24 character
+ * section and a 120 character route are about 1,100 bytes of JSON, so 1,600
+ * base64url characters leaves room; anything longer cannot be a card we signed.
  */
-export const OG_PAYLOAD_MAX = 1400;
+export const OG_PAYLOAD_MAX = 1600;
+/** A page path: a leading slash, then only what our routes use. */
+const ROUTE_PATTERN = /^\/[A-Za-z0-9._/-]*$/;
+const TRAILING_SLASHES = /\/+$/;
 
 /**
  * Code point ranges the bundled `inter-600.ttf` has glyphs for (its cmap, from
@@ -74,12 +79,73 @@ export const OG_GLYPH_RANGES: ReadonlyArray<readonly [number, number]> = [
   [0xfe_ff, 0xfe_ff],
 ];
 
-/** Whether every character of `text` has a glyph in the card's title font. */
-export function hasCardGlyphs(text: string): boolean {
+/**
+ * The same for `jetbrains-mono-500.ttf`, the font of the section label and of
+ * the route in the bottom panel (also compared with the real cmap in a test).
+ */
+export const OG_MONO_GLYPH_RANGES: ReadonlyArray<readonly [number, number]> = [
+  [0x20, 0x7e],
+  [0xa0, 0xff],
+  [0x1_31, 0x1_31],
+  [0x1_52, 0x1_53],
+  [0x2_bc, 0x2_bc],
+  [0x2_c6, 0x2_c6],
+  [0x2_da, 0x2_da],
+  [0x2_dc, 0x2_dc],
+  [0x3_04, 0x3_04],
+  [0x3_08, 0x3_08],
+  [0x20_13, 0x20_14],
+  [0x20_18, 0x20_1a],
+  [0x20_1c, 0x20_1e],
+  [0x20_22, 0x20_22],
+  [0x20_26, 0x20_26],
+  [0x20_32, 0x20_33],
+  [0x20_39, 0x20_3a],
+  [0x20_44, 0x20_44],
+  [0x20_ac, 0x20_ac],
+  [0x21_22, 0x21_22],
+  [0x21_91, 0x21_91],
+  [0x21_93, 0x21_93],
+  [0x22_12, 0x22_12],
+  [0x22_15, 0x22_15],
+  [0xfe_ff, 0xfe_ff],
+];
+
+function covers(
+  ranges: ReadonlyArray<readonly [number, number]>,
+  text: string
+): boolean {
   return Array.from(text).every((char) => {
     const code = char.codePointAt(0) ?? 0;
-    return OG_GLYPH_RANGES.some(([low, high]) => code >= low && code <= high);
+    return ranges.some(([low, high]) => code >= low && code <= high);
   });
+}
+
+/** Whether every character of `text` has a glyph in the card's title font. */
+export function hasCardGlyphs(text: string): boolean {
+  return covers(OG_GLYPH_RANGES, text);
+}
+
+/** Whether every character of `text` has a glyph in the card's mono font. */
+export function hasMonoGlyphs(text: string): boolean {
+  return covers(OG_MONO_GLYPH_RANGES, text);
+}
+
+/**
+ * A page path as the card shows it: leading slash, no trailing slash, only the
+ * characters our routes use, within the cap and the mono font's glyphs.
+ * `null` when it can't be drawn.
+ */
+export function cardRoute(path: string): string | null {
+  const route = path.length > 1 ? path.replace(TRAILING_SLASHES, "") : path;
+  if (
+    route.length > OG_ROUTE_MAX ||
+    !ROUTE_PATTERN.test(route) ||
+    !hasMonoGlyphs(route)
+  ) {
+    return null;
+  }
+  return route;
 }
 
 /** First path segment to card label. Anything else gets no label. */
@@ -118,21 +184,30 @@ export function clampOgTitle(title: string): string {
 }
 
 type OgCard = {
+  /** The page path, e.g. `/docs/guides/dkim`. */
+  route: string;
   section?: string | null;
   title: string;
 };
 
-/** The payload `d`: the version, title and section as base64url JSON. */
-export function encodeOgCard({ title, section }: OgCard): string {
+/** The payload `d`: the version, title, section and route as base64url JSON. */
+export function encodeOgCard({ title, section, route }: OgCard): string {
   return Buffer.from(
-    JSON.stringify({ v: OG_CARD_VERSION, t: title, s: section ?? "" })
+    JSON.stringify({
+      v: OG_CARD_VERSION,
+      t: title,
+      s: section ?? "",
+      r: route,
+    })
   ).toString("base64url");
 }
 
 const PAYLOAD_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 /** The card behind `d`, or `null` when it is malformed, a stale version or over the caps. */
-function decodeOgCard(d: string): { title: string; section: string } | null {
+function decodeOgCard(
+  d: string
+): { title: string; section: string; route: string } | null {
   if (d.length > OG_PAYLOAD_MAX || !PAYLOAD_PATTERN.test(d)) {
     return null;
   }
@@ -145,18 +220,21 @@ function decodeOgCard(d: string): { title: string; section: string } | null {
   if (typeof data !== "object" || data === null) {
     return null;
   }
-  const { v, t, s } = data as Record<string, unknown>;
+  const { v, t, s, r } = data as Record<string, unknown>;
   if (
     v !== OG_CARD_VERSION ||
     typeof t !== "string" ||
     typeof s !== "string" ||
+    typeof r !== "string" ||
     t === "" ||
     Array.from(t).length > OG_TITLE_MAX ||
-    Array.from(s).length > OG_SECTION_MAX
+    Array.from(s).length > OG_SECTION_MAX ||
+    r.length > OG_ROUTE_MAX ||
+    !ROUTE_PATTERN.test(r)
   ) {
     return null;
   }
-  return { title: t, section: s };
+  return { title: t, section: s, route: r };
 }
 
 /** HMAC-SHA256 over the payload string `d`, kept to `OG_SIG_LENGTH` hex characters. */
@@ -191,7 +269,8 @@ export function ogCardQuery(d: string, sig: string): string {
 
 /**
  * The `/og?…` path for a page, or `null` when `OG_IMAGE_SECRET` is unset, the
- * title is empty, or it has a character the card font lacks. The caller keeps
+ * title is empty, it has a character the card font lacks, or the path can't be
+ * drawn as a route (`cardRoute`). The caller keeps
  * its default image on `null`, so a missing env var degrades to the shared card
  * instead of breaking images.
  */
@@ -200,10 +279,11 @@ export function ogCardPath(
   secret: string | undefined = process.env.OG_IMAGE_SECRET
 ): string | null {
   const clean = clampOgTitle(title);
-  if (!(secret && clean && hasCardGlyphs(clean))) {
+  const route = cardRoute(path);
+  if (!(secret && clean && route && hasCardGlyphs(clean))) {
     return null;
   }
-  const d = encodeOgCard({ title: clean, section: ogSection(path) });
+  const d = encodeOgCard({ title: clean, section: ogSection(path), route });
   return `/og?${ogCardQuery(d, signOgPayload(d, secret))}`;
 }
 
@@ -217,7 +297,7 @@ export function ogCardPath(
 export function parseOgCardRequest(
   search: string,
   secret: string | undefined
-): { title: string; section: string } | null {
+): { title: string; section: string; route: string } | null {
   const params = new URLSearchParams(search);
   const d = params.get("d");
   const sig = params.get("sig");

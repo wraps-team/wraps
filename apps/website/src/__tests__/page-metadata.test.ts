@@ -136,6 +136,7 @@ describe("pageMetadata", () => {
       expect(parseOgCardRequest(url.search, SECRET)).toEqual({
         title: "AWS Setup Guide",
         section: "Docs",
+        route: "/docs/guides/aws-setup",
       });
       // X gets the same card, with the same alt.
       const [tw] = images(meta.twitter?.images);
@@ -161,6 +162,11 @@ describe("pageMetadata", () => {
       const og = cardOf(pageMetadata({ ...BASE, path: "/about" }));
       const url = new URL(og.url, SITE_URL);
       expect(parseOgCardRequest(url.search, SECRET)?.section).toBe("");
+    });
+
+    it("keeps the shared card for a path the card can't draw", () => {
+      const og = cardOf(pageMetadata({ ...BASE, path: "/docs/has space" }));
+      expect(og.url).toBe(DEFAULT_OG_IMAGE.url);
     });
 
     it("keeps the shared card on the homepage", () => {
