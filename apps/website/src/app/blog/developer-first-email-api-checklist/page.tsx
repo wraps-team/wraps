@@ -43,12 +43,6 @@ export const metadata: Metadata = pageMetadata({
   description: DESCRIPTION,
   path: "/blog/developer-first-email-api-checklist",
   type: "article",
-  image: {
-    url: "https://wraps.dev/og-image.png",
-    width: 1200,
-    height: 630,
-    alt: "Developer-first email API checklist",
-  },
   publishedTime: PUBLISHED,
   social: { title: "Developer-First Email API Checklist" },
 });

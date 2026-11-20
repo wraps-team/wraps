@@ -372,6 +372,36 @@ describe("metadata stays behind pageMetadata()", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("no page but the homepage passes the shared /og-image.png to pageMetadata()", () => {
+    // A page with no image of its own gets a signed /og card with its title.
+    // Passing the shared image by hand opts out of that and shows the generic
+    // card. Pages with a real image pass its URL; the homepage leaves `image`
+    // out and keeps the shared one by default.
+    const calls = (file: string) => {
+      const source = code(file);
+      const found: string[] = [];
+      for (const match of source.matchAll(/\bpageMetadata\(/g)) {
+        let depth = 1;
+        let end = (match.index ?? 0) + match[0].length;
+        while (end < source.length && depth > 0) {
+          const char = source[end];
+          depth += char === "(" ? 1 : char === ")" ? -1 : 0;
+          end += 1;
+        }
+        found.push(source.slice(match.index, end));
+      }
+      return found;
+    };
+    const withCalls = sourceFiles.filter(
+      (file) => file !== "src/app/page.tsx" && calls(file).length > 0
+    );
+    expect(withCalls.length).toBeGreaterThan(100);
+    const offenders = withCalls.filter((file) =>
+      calls(file).some((call) => /og-image\.png/.test(call))
+    );
+    expect(offenders).toEqual([]);
+  });
+
   it("keys after a ...pageMetadata() spread are limited to keywords", () => {
     const spreaders = sourceFiles.filter((file) =>
       /\.\.\.pageMetadata\(/.test(code(file))

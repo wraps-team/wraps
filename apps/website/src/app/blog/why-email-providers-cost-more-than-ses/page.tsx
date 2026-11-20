@@ -44,12 +44,6 @@ export const metadata: Metadata = pageMetadata({
   description: DESCRIPTION,
   path: "/blog/why-email-providers-cost-more-than-ses",
   type: "article",
-  image: {
-    url: "https://wraps.dev/og-image.png",
-    width: 1200,
-    height: 630,
-    alt: "Email provider pricing versus Amazon SES",
-  },
   publishedTime: PUBLISHED,
   social: { title: "Why Email Providers Cost More Than SES" },
 });

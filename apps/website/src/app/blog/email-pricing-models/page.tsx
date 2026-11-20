@@ -43,12 +43,6 @@ export const metadata: Metadata = pageMetadata({
   description: DESCRIPTION,
   path: "/blog/email-pricing-models",
   type: "article",
-  image: {
-    url: "https://wraps.dev/og-image.png",
-    width: 1200,
-    height: 630,
-    alt: "Email pricing models",
-  },
   publishedTime: PUBLISHED,
 });
 

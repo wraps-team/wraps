@@ -57,12 +57,6 @@ export const metadata: Metadata = pageMetadata({
     "Everything you need to deploy SES at scale: dedicated IPs, bounce handling, rate limiting, configuration sets, and the patterns that protect your sender reputation.",
   path: "/blog/ses-production-architecture",
   type: "article",
-  image: {
-    url: "https://wraps.dev/og-image.png",
-    width: 1200,
-    height: 630,
-    alt: "AWS SES Production Architecture Guide",
-  },
   publishedTime: "2026-01-21T00:00:00.000Z",
   authors: ["Wraps Team"],
   social: {

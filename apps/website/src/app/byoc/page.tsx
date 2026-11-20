@@ -7,12 +7,6 @@ export const metadata: Metadata = pageMetadata({
   description:
     "Bring your own cloud email sending. Wraps deploys SES, EventBridge, and DynamoDB into your AWS with one CLI command. Self-serve. No Kubernetes.",
   path: "/byoc",
-  image: {
-    url: "/og-image.png",
-    width: 1200,
-    height: 630,
-    alt: "BYOC Email Infrastructure - Wraps",
-  },
   social: { title: "BYOC Email Infrastructure" },
 });
 

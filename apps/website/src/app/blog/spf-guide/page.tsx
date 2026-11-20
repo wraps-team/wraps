@@ -56,12 +56,6 @@ export const metadata: Metadata = pageMetadata({
     "SPF looks simple until you hit the 10-lookup limit. Learn how lookups are counted, which providers cost the most, and how to stay under the limit.",
   path: "/blog/spf-guide",
   type: "article",
-  image: {
-    url: "https://wraps.dev/og-image.png",
-    width: 1200,
-    height: 630,
-    alt: "SPF 10-Lookup Limit Guide",
-  },
   publishedTime: "2026-01-12T00:00:00.000Z",
   authors: ["Wraps Team"],
   social: {
