@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ogCardPath } from "@/lib/og-card";
 
 /**
  * The one place that writes `openGraph` and `twitter` metadata.
@@ -20,7 +21,10 @@ export const SITE_TITLE = "Wraps - The Email Platform for Amazon SES";
 export const SITE_DESCRIPTION =
   "Deploy everything Amazon SES needs into your own AWS account with one command: event tracking, bounce handling, templates, workflows, and a dashboard. You pay AWS directly.";
 
-/** The shared 1200x630 card every page falls back to. */
+/**
+ * The shared 1200x630 card: the homepage's image, and what every other page
+ * falls back to when `OG_IMAGE_SECRET` is unset (see `defaultImageFor`).
+ */
 export const DEFAULT_OG_IMAGE = {
   url: "/og-image.png",
   width: 1200,
@@ -55,7 +59,8 @@ export type PageMetadataInput = {
    */
   absoluteTitle?: boolean;
   /**
-   * Defaults to DEFAULT_OG_IMAGE. A bare URL string gets the title as alt.
+   * Defaults to a signed `/og` card with the page's title, or DEFAULT_OG_IMAGE
+   * on the homepage and when `OG_IMAGE_SECRET` is unset. A bare URL string gets the title as alt.
    * `null` emits no `images` at all, for a route with its own file-based
    * `opengraph-image`: an explicit `images` array in the metadata object wins
    * over that file, so the route can only keep its card by leaving it out.
@@ -91,12 +96,31 @@ function assertBareTitle(label: string, value: string): void {
   }
 }
 
+/**
+ * The image for a page that passes none: a signed `/og` card showing its own
+ * title and section (`app/og/route.tsx`), so a docs page, a glossary term and
+ * a comparison no longer share one generic card. The homepage keeps
+ * DEFAULT_OG_IMAGE, and so does every page when `OG_IMAGE_SECRET` is unset, so
+ * a missing env var degrades to the shared card instead of breaking images.
+ */
+function defaultImageFor(
+  { title, path, social }: PageMetadataInput,
+  alt: string
+): PageImage {
+  const card =
+    path === "/" ? null : ogCardPath({ title: social?.title ?? title, path });
+  return card
+    ? { url: card, width: 1200, height: 630, alt }
+    : { ...DEFAULT_OG_IMAGE, alt };
+}
+
 function toImages(
   input: PageMetadataInput["image"],
+  defaultImage: PageImage,
   fallbackAlt: string
 ): PageImage[] {
   if (input === undefined) {
-    return [{ ...DEFAULT_OG_IMAGE, alt: fallbackAlt }];
+    return [defaultImage];
   }
   if (input === null) {
     return [];
@@ -139,7 +163,11 @@ export function pageMetadata(input: PageMetadataInput): Metadata {
   const url = path === "/" ? SITE_URL : `${SITE_URL}${path}`;
   const socialTitle = socialTitleFor(input);
   const socialDescription = social?.description ?? description;
-  const images = toImages(input.image, socialTitle);
+  const images = toImages(
+    input.image,
+    defaultImageFor(input, socialTitle),
+    socialTitle
+  );
   const imageFields = images.length > 0 ? { images } : {};
 
   const openGraphBase = {

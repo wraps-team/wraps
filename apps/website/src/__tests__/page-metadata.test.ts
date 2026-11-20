@@ -1,7 +1,8 @@
 import { globSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Metadata } from "next";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { parseOgCardRequest } from "@/lib/og-card";
 import {
   DEFAULT_OG_IMAGE,
   type PageMetadataInput,
@@ -29,6 +30,16 @@ function images(value: unknown): Array<{ url: string; alt?: string }> {
     alt?: string;
   }>;
 }
+
+// Unset (empty counts as unset) unless a test sets it: the default-image
+// tests below describe what ships when OG_IMAGE_SECRET is missing.
+beforeEach(() => {
+  vi.stubEnv("OG_IMAGE_SECRET", "");
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("pageMetadata", () => {
   it("builds canonical and og:url from SITE_URL + path for a nested route", () => {
@@ -79,7 +90,7 @@ describe("pageMetadata", () => {
     );
   });
 
-  it("defaults to the shared card with an alt that is the og title", () => {
+  it("without OG_IMAGE_SECRET, defaults to the shared card with an alt that is the og title", () => {
     const meta = pageMetadata(BASE);
     const [og] = images(meta.openGraph?.images);
     expect(og).toMatchObject({
@@ -92,6 +103,84 @@ describe("pageMetadata", () => {
     expect(tw).toMatchObject({
       url: DEFAULT_OG_IMAGE.url,
       alt: "AWS Setup Guide | Wraps",
+    });
+  });
+
+  describe("with OG_IMAGE_SECRET set", () => {
+    const SECRET = "test-secret-not-for-production-0123456789";
+
+    beforeEach(() => {
+      vi.stubEnv("OG_IMAGE_SECRET", SECRET);
+    });
+
+    function cardOf(meta: Metadata) {
+      const [og] = images(meta.openGraph?.images) as Array<{
+        url: string;
+        alt?: string;
+        width?: number;
+        height?: number;
+      }>;
+      return og;
+    }
+
+    it("defaults to a signed /og card with the page title and section", () => {
+      const meta = pageMetadata(BASE);
+      const og = cardOf(meta);
+      expect(og).toMatchObject({
+        width: 1200,
+        height: 630,
+        alt: "AWS Setup Guide | Wraps",
+      });
+      expect(og.url.startsWith("/og?")).toBe(true);
+      const url = new URL(og.url, SITE_URL);
+      expect(parseOgCardRequest(url.searchParams, SECRET)).toEqual({
+        title: "AWS Setup Guide",
+        section: "Docs",
+      });
+      // X gets the same card, with the same alt.
+      const [tw] = images(meta.twitter?.images);
+      expect(tw).toMatchObject({
+        url: og.url,
+        alt: "AWS Setup Guide | Wraps",
+        width: 1200,
+        height: 630,
+      });
+    });
+
+    it("shows the social title when the page has one, never the | Wraps suffix", () => {
+      const og = cardOf(
+        pageMetadata({ ...BASE, social: { title: "Set up AWS for Wraps" } })
+      );
+      const url = new URL(og.url, SITE_URL);
+      expect(parseOgCardRequest(url.searchParams, SECRET)?.title).toBe(
+        "Set up AWS for Wraps"
+      );
+    });
+
+    it("gives a page outside the section map a card with no label", () => {
+      const og = cardOf(pageMetadata({ ...BASE, path: "/about" }));
+      const url = new URL(og.url, SITE_URL);
+      expect(url.searchParams.has("section")).toBe(false);
+    });
+
+    it("keeps the shared card on the homepage", () => {
+      const og = cardOf(
+        pageMetadata({
+          title: "Wraps - The Email Platform for Amazon SES",
+          description: "d",
+          path: "/",
+          absoluteTitle: true,
+        })
+      );
+      expect(og.url).toBe(DEFAULT_OG_IMAGE.url);
+    });
+
+    it("keeps an explicit image, and emits none for image: null", () => {
+      const explicit = pageMetadata({ ...BASE, image: "/media/release.png" });
+      expect(cardOf(explicit).url).toBe("/media/release.png");
+      expect(
+        pageMetadata({ ...BASE, image: null }).openGraph
+      ).not.toHaveProperty("images");
     });
   });
 

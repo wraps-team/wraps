@@ -203,6 +203,18 @@ import { JsonLd } from "@/components/json-ld";
 <JsonLd data={schema} />
 ```
 
+### Share cards (`/og`)
+
+A page that passes no `image` to `pageMetadata` gets a card drawn by `src/app/og/route.tsx` with
+its own title and section (the homepage keeps `/og-image.png`). The URL is signed by
+`ogCardPath` (`src/lib/og-card.ts`) with `OG_IMAGE_SECRET`; the route serves the generic
+`/og-image.png` for a missing or bad `sig`. With the secret unset, `pageMetadata` falls back to
+`/og-image.png` too, so a missing env var never breaks images. `next/og` reads ttf, not woff2:
+the card's fonts are static ttf in `src/app/og/fonts/`, rebuilt from `public/fonts/subset` by
+`build-fonts.py` in that folder. `/og` is excluded from the middleware matcher (an immutable
+image must not get the attribution cookie or a markdown rewrite). To preview a card, run
+`OG_IMAGE_SECRET=<anything> pnpm dev` and open a page's `og:image` URL.
+
 ### Sitemap & Robots
 
 Generated at `src/app/sitemap.ts` and `src/app/robots.txt/route.ts`.

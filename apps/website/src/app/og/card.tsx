@@ -1,3 +1,4 @@
+/* oxlint-disable shadcn/no-inline-styles -- next/og (satori) renders inline styles only; .oxlintrc.json ignores opengraph-image.tsx for the same reason */
 import type { CSSProperties } from "react";
 
 /**

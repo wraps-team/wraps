@@ -12,7 +12,7 @@ description lengths are warnings only.
 --compare diffs the dump of this build against an earlier dump and lists every
 page whose title, description, canonical, og:title, og:description, twitter:title,
 twitter:description, robots, keywords, article:* tags, JSON-LD (types and a digest
-of the content), og:type (when it had one) or bespoke (non-default) og:image or
+of the content), og:type (when it had one) or bespoke (neither the default nor a /og card) og:image or
 twitter:image changed, plus pages added or removed. It is informational
 and does not change the exit code.
 """
@@ -26,6 +26,9 @@ import sys
 
 SITE = "https://wraps.dev"
 DEFAULT_OG_IMAGE = SITE + "/og-image.png"
+# Signed per-page cards drawn by src/app/og/route.tsx (plan 067). They stand in
+# for the default image, so they are not "bespoke" in the sense below.
+CARD_PREFIX = SITE + "/og?"
 
 
 def parse_page(root, dirpath, filename):
@@ -105,8 +108,22 @@ def same_url(a, b):
     return a.rstrip("/") == b.rstrip("/")
 
 
+def is_shared_image(url):
+    return url == DEFAULT_OG_IMAGE or url.startswith(CARD_PREFIX)
+
+
 def bespoke_images(row):
-    return [i for i in row["ogi"] if i != DEFAULT_OG_IMAGE]
+    return [i for i in row["ogi"] if not is_shared_image(i)]
+
+
+def image_kind(row):
+    if not row["ogi"]:
+        return "none"
+    if all(i == DEFAULT_OG_IMAGE for i in row["ogi"]):
+        return "default"
+    if all(i.startswith(CARD_PREFIX) for i in row["ogi"]):
+        return "card"
+    return "bespoke"
 
 
 def audit(rows):
@@ -207,10 +224,29 @@ def compare(rows, before_path):
             changed["bespoke og:image"].append(
                 (route, bespoke_images(b), bespoke_images(a))
             )
-        if [i for i in b["twi"] if i != DEFAULT_OG_IMAGE] != [
-            i for i in a["twi"] if i != DEFAULT_OG_IMAGE
+        if [i for i in b["twi"] if not is_shared_image(i)] != [
+            i for i in a["twi"] if not is_shared_image(i)
         ]:
             changed["bespoke twitter:image"].append((route, b["twi"], a["twi"]))
+    # What happened to the shared default image (plan 067): which pages moved to
+    # a card, and which kept the default. The homepage keeps it by design.
+    moves = collections.Counter()
+    kept_default = []
+    mismatched = []
+    for route in sorted(before.keys() & after.keys()):
+        b_kind, a_kind = image_kind(before[route]), image_kind(after[route])
+        moves[(b_kind, a_kind)] += 1
+        if b_kind == "default" and a_kind == "default":
+            kept_default.append(route)
+        if a_kind == "card" and after[route]["ogi"] != after[route]["twi"]:
+            mismatched.append(route)
+    print("\nog:image kind, before -> after (pages in both builds)")
+    for (b_kind, a_kind), count in sorted(moves.items()):
+        print("  %4d  %s -> %s" % (count, b_kind, a_kind))
+    shown = kept_default if len(kept_default) <= 20 else kept_default[:5] + ["..."]
+    print("  kept the default image (%d): %s" % (len(kept_default), shown))
+    if mismatched:
+        print("  og:image != twitter:image on cards: %s" % mismatched)
     print("\ncompare against %s" % before_path)
     print("  pages only in before: %s" % sorted(before.keys() - after.keys()))
     print("  pages only in after:  %s" % sorted(after.keys() - before.keys()))
@@ -237,6 +273,7 @@ def main(argv):
         with open(args[1], "w", encoding="utf-8") as fh:
             json.dump(rows, fh, indent=1)
     print("pages: %d" % len(rows))
+    print("og:image kinds: %s" % dict(collections.Counter(image_kind(r) for r in rows)))
     if not rows:
         print("no prerendered pages under %s: run the build first" % root)
         return 1
