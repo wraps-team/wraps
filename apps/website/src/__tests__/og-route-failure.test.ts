@@ -8,7 +8,7 @@ vi.mock("node:fs/promises", async (importOriginal) => {
     readFile: vi.fn((path: string, ...rest: unknown[]) =>
       String(path).endsWith(".ttf")
         ? Promise.reject(
-            Object.assign(new Error("tracing dropped it"), { name: "ENOENT" })
+            Object.assign(new Error("tracing dropped it"), { code: "ENOENT" })
           )
         : (actual.readFile as (...args: unknown[]) => Promise<Buffer>)(
             path,
