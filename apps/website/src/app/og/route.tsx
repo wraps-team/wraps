@@ -97,7 +97,11 @@ export async function GET(request: Request): Promise<Response> {
     // in the logs, or a broken font deploy would turn every card generic quietly.
     console.error(
       "og: card failed to draw, serving the generic card:",
-      error instanceof Error ? error.name : "unknown error"
+      error instanceof Error
+        ? [error.name, (error as NodeJS.ErrnoException).code]
+            .filter(Boolean)
+            .join(" ")
+        : "unknown error"
     );
     return genericCard(generic, FAILURE_CACHE);
   }

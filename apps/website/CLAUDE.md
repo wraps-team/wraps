@@ -176,8 +176,8 @@ export const metadata: Metadata = pageMetadata({
 });
 ```
 
-Pass a bare `title` (the helper throws on a trailing "| Wraps"). `image` defaults to the shared
-`/og-image.png` card; pass `{ url, width, height, alt }` for a bespoke one. Use `social` only when the
+Pass a bare `title` (the helper throws on a trailing "| Wraps"). With no `image`, the page gets
+its own signed `/og` title card (see "Share cards" below); pass `{ url, width, height, alt }` for a bespoke one. Use `social` only when the
 share copy genuinely differs from the page title or description. Generated versus, glossary and SES
 pages go through their `*Metadata()` builders, which call the helper.
 
@@ -207,8 +207,11 @@ import { JsonLd } from "@/components/json-ld";
 
 A page that passes no `image` to `pageMetadata` gets a card drawn by `src/app/og/route.tsx` with
 its own title and section (the homepage keeps `/og-image.png`). The URL is signed by
-`ogCardPath` (`src/lib/og-card.ts`) with `OG_IMAGE_SECRET`; the route serves the generic
-`/og-image.png` for a missing or bad `sig`. With the secret unset, `pageMetadata` falls back to
+`ogCardPath` (`src/lib/og-card.ts`) with `OG_IMAGE_SECRET`; the route draws only the exact canonical query `?d=<payload>&sig=<hmac>` and serves the
+generic `/og-image.png` for anything else (bad or missing `sig`, extra or reordered params).
+Bump `OG_CARD_VERSION` in `og-card.ts` when the card design changes: it is in the signed payload,
+so every card URL changes and the year-long CDN cache is bypassed. A title with a glyph the
+bundled fonts lack gets `/og-image.png` instead of a card. With the secret unset, `pageMetadata` falls back to
 `/og-image.png` too, so a missing env var never breaks images. `next/og` reads ttf, not woff2:
 the card's fonts are static ttf in `src/app/og/fonts/`, rebuilt from `public/fonts/subset` by
 `build-fonts.py` in that folder. `/og` is excluded from the middleware matcher (an immutable
