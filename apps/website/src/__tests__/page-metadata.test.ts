@@ -133,7 +133,7 @@ describe("pageMetadata", () => {
       });
       expect(og.url.startsWith("/og?")).toBe(true);
       const url = new URL(og.url, SITE_URL);
-      expect(parseOgCardRequest(url.searchParams, SECRET)).toEqual({
+      expect(parseOgCardRequest(url.search, SECRET)).toEqual({
         title: "AWS Setup Guide",
         section: "Docs",
       });
@@ -152,7 +152,7 @@ describe("pageMetadata", () => {
         pageMetadata({ ...BASE, social: { title: "Set up AWS for Wraps" } })
       );
       const url = new URL(og.url, SITE_URL);
-      expect(parseOgCardRequest(url.searchParams, SECRET)?.title).toBe(
+      expect(parseOgCardRequest(url.search, SECRET)?.title).toBe(
         "Set up AWS for Wraps"
       );
     });
@@ -160,7 +160,7 @@ describe("pageMetadata", () => {
     it("gives a page outside the section map a card with no label", () => {
       const og = cardOf(pageMetadata({ ...BASE, path: "/about" }));
       const url = new URL(og.url, SITE_URL);
-      expect(url.searchParams.has("section")).toBe(false);
+      expect(parseOgCardRequest(url.search, SECRET)?.section).toBe("");
     });
 
     it("keeps the shared card on the homepage", () => {
@@ -372,7 +372,7 @@ describe("metadata stays behind pageMetadata()", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("no page but the homepage passes the shared /og-image.png to pageMetadata()", () => {
+  it("no page but the homepage passes the shared image (/og-image.png or DEFAULT_OG_IMAGE) to pageMetadata()", () => {
     // A page with no image of its own gets a signed /og card with its title.
     // Passing the shared image by hand opts out of that and shows the generic
     // card. Pages with a real image pass its URL; the homepage leaves `image`
@@ -397,7 +397,7 @@ describe("metadata stays behind pageMetadata()", () => {
     );
     expect(withCalls.length).toBeGreaterThan(100);
     const offenders = withCalls.filter((file) =>
-      calls(file).some((call) => /og-image\.png/.test(call))
+      calls(file).some((call) => /og-image\.png|DEFAULT_OG_IMAGE/.test(call))
     );
     expect(offenders).toEqual([]);
   });

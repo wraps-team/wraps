@@ -1,4 +1,3 @@
-/* oxlint-disable shadcn/no-inline-styles -- next/og (satori) renders inline styles only; .oxlintrc.json ignores opengraph-image.tsx for the same reason */
 import type { CSSProperties } from "react";
 
 /**
@@ -9,6 +8,9 @@ import type { CSSProperties } from "react";
  * Layout and type follow `public/og-image.png`: dark ink background, white
  * Wraps wordmark top left, white title in Inter, orange used once (the section
  * label), `wraps.dev` in mono bottom right.
+ *
+ * Bump `OG_CARD_VERSION` in `src/lib/og-card.ts` with any visual change here, in
+ * the fonts or in the logo: card URLs are cached as immutable for a year.
  */
 
 export const OG_SIZE = { width: 1200, height: 630 } as const;

@@ -2,7 +2,12 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET } from "@/app/og/route";
-import { ogCardPath, signOgCard } from "@/lib/og-card";
+import {
+  encodeOgCard,
+  ogCardPath,
+  ogCardQuery,
+  signOgPayload,
+} from "@/lib/og-card";
 
 const SECRET = "test-secret-not-for-production-0123456789";
 const GENERIC = readFileSync(join(process.cwd(), "public/og-image.png"));
@@ -45,8 +50,9 @@ describe("GET /og", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("image/png");
+    // s-maxage is what makes Vercel's CDN cache a function response.
     expect(response.headers.get("cache-control")).toBe(
-      "public, max-age=31536000, immutable"
+      "public, max-age=31536000, s-maxage=31536000, immutable"
     );
     const png = await body(response);
     expect(pngSize(png)).toEqual({ width: 1200, height: 630 });
@@ -64,18 +70,48 @@ describe("GET /og", () => {
   });
 
   it("serves the generic card, not the text, for a bad or tampered sig", async () => {
-    const sig = signOgCard({ title: "Real", section: "Docs" }, SECRET);
+    const d = encodeOgCard({ title: "Real", section: "Docs" });
+    const sig = signOgPayload(d, SECRET);
+    const other = encodeOgCard({ title: "Buy crypto now", section: "Docs" });
     for (const query of [
-      "title=Real&section=Docs&sig=0000000000000000",
-      `title=Buy+crypto&section=Docs&sig=${sig}`,
-      "title=Real&section=Docs",
-      "title=Real&section=Docs&sig=",
+      `d=${d}&sig=0000000000000000`,
+      `d=${other}&sig=${sig}`,
+      `d=${d}`,
+      `d=${d}&sig=`,
     ]) {
       const response = await GET(request(`/og?${query}`));
       expect(response.status).toBe(200);
       expect(response.headers.get("content-type")).toBe("image/png");
-      expect(response.headers.get("cache-control")).not.toContain("immutable");
+      expect(response.headers.get("cache-control")).toBe(
+        "public, max-age=3600, s-maxage=3600"
+      );
       expect((await body(response)).equals(GENERIC)).toBe(true);
+    }
+  });
+
+  it("draws only the canonical URL: a replayed signature under any variant gets the generic card", async () => {
+    const d = encodeOgCard({ title: "Real card", section: "Docs" });
+    const sig = signOgPayload(d, SECRET);
+    const canonical = `/og?${ogCardQuery(d, sig)}`;
+
+    const drawn = await GET(request(canonical));
+    expect(drawn.status).toBe(200);
+    expect((await body(drawn)).equals(GENERIC)).toBe(false);
+
+    const escapedFirst = `%${d.charCodeAt(0).toString(16)}${d.slice(1)}`;
+    for (const variant of [
+      `${canonical}&x=1`,
+      `${canonical}&x=2`,
+      `/og?sig=${sig}&d=${d}`,
+      `/og?d=${escapedFirst}&sig=${sig}`,
+      `/og?d=${d}&sig=${sig}&d=${d}`,
+    ]) {
+      const response = await GET(request(variant));
+      expect(response.status, variant).toBe(200);
+      expect(response.headers.get("cache-control")).toBe(
+        "public, max-age=3600, s-maxage=3600"
+      );
+      expect((await body(response)).equals(GENERIC), variant).toBe(true);
     }
   });
 
@@ -95,9 +131,10 @@ describe("GET /og", () => {
   });
 
   it("serves the generic card for a title over the cap, even when signed", async () => {
-    const title = "t".repeat(201);
-    const sig = signOgCard({ title, section: "" }, SECRET);
-    const response = await GET(request(`/og?title=${title}&sig=${sig}`));
+    const d = encodeOgCard({ title: "t".repeat(201), section: "" });
+    const response = await GET(
+      request(`/og?${ogCardQuery(d, signOgPayload(d, SECRET))}`)
+    );
     expect((await body(response)).equals(GENERIC)).toBe(true);
   });
 });
