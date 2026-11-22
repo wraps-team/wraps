@@ -370,6 +370,7 @@ describe("Email detail page — timeline states", () => {
 
     await renderDetailPage();
 
+    expect(screen.getByText(/^send$/i)).toBeInTheDocument();
     expect(screen.queryByText("No events recorded")).toBeNull();
     expect(screen.queryByText("Event timeline unavailable")).toBeNull();
   });
