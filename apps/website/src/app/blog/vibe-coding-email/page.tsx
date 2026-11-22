@@ -14,6 +14,7 @@ import { LandingNavbar } from "@/app/landing/components/navbar";
 import { InfoCard } from "@/components/blog/info-card";
 import { CodeBlock, Collapsible } from "@/components/blog/interactive";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const articleSchema = {
   "@context": "https://schema.org",
@@ -90,29 +91,24 @@ const faqSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Sending Email from AI-Built Apps (Lovable, Bolt, Base44, Replit)",
   description:
     "Your AI-built app emits events. Wraps sends the emails. Connect any vibe-coded app to automated email workflows in 10 minutes — no email logic in your code.",
-  openGraph: {
-    title: "Sending Email from AI-Built Apps | Wraps",
+  path: "/blog/vibe-coding-email",
+  type: "article",
+  publishedTime: "2026-05-06T00:00:00.000Z",
+  authors: ["Wraps Team"],
+  social: {
+    title: "Sending Email from AI-Built Apps",
     description:
       "Emit behavioral events from your AI-built app. Wraps workflows send the emails. Works with Lovable, Bolt, Base44, and Replit.",
-    type: "article",
-    url: "https://wraps.dev/blog/vibe-coding-email",
-    publishedTime: "2026-05-06T00:00:00.000Z",
-    authors: ["Wraps Team"],
+    twitterCopy: {
+      description:
+        "Emit behavioral events from your AI-built app. Wraps workflows send the emails.",
+    },
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "Sending Email from AI-Built Apps | Wraps",
-    description:
-      "Emit behavioral events from your AI-built app. Wraps workflows send the emails.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/blog/vibe-coding-email",
-  },
-};
+});
 
 export default function Page() {
   return (

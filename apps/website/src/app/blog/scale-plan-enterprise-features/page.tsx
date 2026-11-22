@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import { ScalePlanContent } from "./page-content";
 
 const articleSchema = {
@@ -33,30 +34,21 @@ const articleSchema = {
   },
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title:
     "SSO, Behavioral Segments, and What's Next: Inside the Wraps Scale Plan",
   description:
     "Every Scale-exclusive feature explained — SSO + SCIM, behavioral segments, unlimited AWS accounts, 1-year history — plus a look at the audit trail and custom retention coming next.",
-  openGraph: {
-    title: "Inside the Wraps Scale Plan | Wraps",
-    description:
-      "SSO, behavioral segments, unlimited AWS accounts, 1-year event history — plus audit trail and custom retention on the roadmap.",
-    type: "article",
-    url: "https://wraps.dev/blog/scale-plan-enterprise-features",
-    publishedTime: "2026-05-06T00:00:00.000Z",
-    authors: ["Wraps Team"],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Inside the Wraps Scale Plan | Wraps",
+  path: "/blog/scale-plan-enterprise-features",
+  type: "article",
+  publishedTime: "2026-05-06T00:00:00.000Z",
+  authors: ["Wraps Team"],
+  social: {
+    title: "Inside the Wraps Scale Plan",
     description:
       "SSO, behavioral segments, unlimited AWS accounts, 1-year event history — plus audit trail and custom retention on the roadmap.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/blog/scale-plan-enterprise-features",
-  },
-};
+});
 
 export default function Page() {
   return (

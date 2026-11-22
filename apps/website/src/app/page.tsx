@@ -1,5 +1,11 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import {
+  DEFAULT_OG_IMAGE,
+  pageMetadata,
+  SITE_DESCRIPTION,
+  SITE_TITLE,
+} from "@/lib/page-metadata";
 import { CTASection } from "./landing/components/cta-section";
 import { FaqSection } from "./landing/components/faq-section";
 import { LandingFooter } from "./landing/components/footer";
@@ -8,11 +14,13 @@ import { LandingNavbar } from "./landing/components/navbar";
 import { PricingSection } from "./landing/components/pricing-section";
 import { WhatItDoesSection } from "./landing/components/what-it-does-section";
 
-export const metadata: Metadata = {
-  alternates: {
-    canonical: "https://wraps.dev",
-  },
-};
+export const metadata: Metadata = pageMetadata({
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  absoluteTitle: true,
+  image: DEFAULT_OG_IMAGE,
+  path: "/",
+});
 
 // What an agent needs to answer "can I start with this on my own, today?" —
 // a free tier, a real package it can install, and no sales call in the path.

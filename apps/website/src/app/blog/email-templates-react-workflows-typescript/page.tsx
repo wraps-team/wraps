@@ -13,6 +13,7 @@ import type { Metadata } from "next";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import {
   CLIDemo,
   CodeBlock,
@@ -93,41 +94,25 @@ const faqSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Email Templates as React, Workflows as TypeScript",
   description:
     "Write email templates as React components and automation workflows as TypeScript. Version-controlled, type-safe, code-reviewable email infrastructure.",
-  openGraph: {
-    title: "Email Templates as React, Workflows as TypeScript | Wraps",
+  path: "/blog/email-templates-react-workflows-typescript",
+  type: "article",
+  image: {
+    url: "https://wraps.dev/blog/wraps-templates-and-workflows-as-code.webp",
+    width: 1200,
+    height: 630,
+    alt: "Email Templates as React, Workflows as TypeScript",
+  },
+  publishedTime: "2026-02-18T00:00:00.000Z",
+  authors: ["Wraps Team"],
+  social: {
     description:
       "Write email templates as React components and automation workflows as TypeScript with Wraps.",
-    type: "article",
-    url: "https://wraps.dev/blog/email-templates-react-workflows-typescript",
-    images: [
-      {
-        url: "https://wraps.dev/blog/wraps-templates-and-workflows-as-code.webp",
-        width: 1200,
-        height: 630,
-        alt: "Email Templates as React, Workflows as TypeScript",
-      },
-    ],
-    publishedTime: "2026-02-18T00:00:00.000Z",
-    authors: ["Wraps Team"],
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "Email Templates as React, Workflows as TypeScript | Wraps",
-    description:
-      "Write email templates as React components and automation workflows as TypeScript with Wraps.",
-    images: [
-      "https://wraps.dev/blog/wraps-templates-and-workflows-as-code.webp",
-    ],
-  },
-  alternates: {
-    canonical:
-      "https://wraps.dev/blog/email-templates-react-workflows-typescript",
-  },
-};
+});
 
 export default function Page() {
   return (

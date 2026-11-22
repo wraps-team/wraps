@@ -17,29 +17,23 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "SES Bounce Handling: Hand-Rolled vs Wraps",
   description:
     "An honest comparison. Hand-rolling SNS signature verification for SES bounce handling takes 85 lines, and a competent developer — or a coding agent — writes them correctly. Here is that exact code, and here is what it still does not cover.",
-  openGraph: {
-    title: "SES Bounce Handling: Hand-Rolled vs Wraps | Wraps",
+  path: "/compare/ses-bounce-handling-hand-rolled-vs-wraps",
+  type: "article",
+  social: {
     description:
       "85 lines of SNS signature verification, written correctly. We show the code. The argument for Wraps is not that your code will be wrong — it's what the code doesn't cover.",
-    url: "https://wraps.dev/compare/ses-bounce-handling-hand-rolled-vs-wraps",
-    type: "article",
+    twitterCopy: {
+      description:
+        "85 lines of SNS signature verification, written correctly. We show the code. The argument for Wraps is what the code doesn't cover.",
+    },
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "SES Bounce Handling: Hand-Rolled vs Wraps | Wraps",
-    description:
-      "85 lines of SNS signature verification, written correctly. We show the code. The argument for Wraps is what the code doesn't cover.",
-  },
-  alternates: {
-    canonical:
-      "https://wraps.dev/compare/ses-bounce-handling-hand-rolled-vs-wraps",
-  },
-};
+});
 
 const breadcrumbJsonLd = {
   "@context": "https://schema.org",

@@ -3,26 +3,19 @@ import Link from "next/link";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { LegalArticle } from "@/components/legal-article";
+import { pageMetadata } from "@/lib/page-metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Privacy Policy",
   description:
     "Learn how Wraps collects, uses, and protects your data, including CLI telemetry, dashboard analytics, recipient engagement data from open and click events, and the contact and campaign data we process to run platform features.",
-  openGraph: {
-    title: "Privacy Policy | Wraps",
-    description:
-      "Learn how Wraps collects, uses, and protects your data, including CLI telemetry, dashboard analytics, recipient engagement data from open and click events, and the contact and campaign data we process to run platform features.",
-    type: "website",
-    url: "https://wraps.dev/privacy",
+  path: "/privacy",
+  social: {
+    twitterCopy: {
+      description: "Learn how Wraps collects, uses, and protects your data.",
+    },
   },
-  twitter: {
-    title: "Privacy Policy | Wraps",
-    description: "Learn how Wraps collects, uses, and protects your data.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/privacy",
-  },
-};
+});
 
 export default function PrivacyPolicy() {
   return (

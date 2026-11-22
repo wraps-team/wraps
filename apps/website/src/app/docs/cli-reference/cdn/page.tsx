@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import CLIReferenceCdnPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,23 +28,11 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "CDN CLI Commands",
   description: "CLI commands for managing CDN infrastructure.",
-  openGraph: {
-    title: "CDN CLI Commands | Wraps",
-    description: "CLI commands for managing CDN infrastructure.",
-    type: "website",
-    url: "https://wraps.dev/docs/cli-reference/cdn",
-  },
-  twitter: {
-    title: "CDN CLI Commands | Wraps",
-    description: "CLI commands for managing CDN infrastructure.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/cli-reference/cdn",
-  },
-};
+  path: "/docs/cli-reference/cdn",
+});
 
 export default function CLIReferenceCdnPage() {
   return (

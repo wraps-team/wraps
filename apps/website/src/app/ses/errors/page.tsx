@@ -4,6 +4,7 @@ import Link from "next/link";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import {
   SES_ERROR_CATEGORIES,
   SES_ERRORS,
@@ -13,24 +14,13 @@ import {
 const TITLE = "Amazon SES Error Codes: Every Exception and Its Fix";
 const DESCRIPTION =
   "Every Amazon SES exception the Wraps CLI knows how to explain, grouped by what actually went wrong: verification, throughput, account state, credentials.";
-const URL = "https://wraps.dev/ses/errors";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: TITLE,
   description: DESCRIPTION,
-  openGraph: {
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-    type: "article",
-    url: URL,
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-  },
-  alternates: { canonical: URL },
-};
+  path: "/ses/errors",
+  type: "article",
+});
 
 const listSchema = {
   "@context": "https://schema.org",

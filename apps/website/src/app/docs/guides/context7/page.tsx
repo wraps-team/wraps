@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import Context7PageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,16 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "AI-Assisted Development with Context7",
   description:
     "Give your AI coding assistant up-to-date Wraps documentation. Set up Context7 in Cursor, Claude Code, Windsurf, or any MCP-compatible editor to get accurate code suggestions for Wraps CLI, email SDK, and SMS SDK.",
-  openGraph: {
-    title: "AI-Assisted Development with Context7 | Wraps",
-    description:
-      "Give your AI coding assistant up-to-date Wraps documentation. Set up Context7 to get accurate code suggestions for Wraps.",
-    type: "website",
-    url: "https://wraps.dev/docs/guides/context7",
-  },
-  twitter: {
-    title: "AI-Assisted Development with Context7 | Wraps",
+  path: "/docs/guides/context7",
+  social: {
     description:
       "Give your AI coding assistant up-to-date Wraps documentation. Set up Context7 to get accurate code suggestions for Wraps.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides/context7",
-  },
-};
+});
 
 export default function Context7Page() {
   return (

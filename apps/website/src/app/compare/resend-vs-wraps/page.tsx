@@ -18,26 +18,19 @@ import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
 import { ResendForgeNotice } from "@/components/resend-forge-notice";
+import { pageMetadata } from "@/lib/page-metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Resend vs Wraps - Compare Email Infrastructure Approaches",
   description:
     "Resend runs the sending infrastructure for you: Amazon SES historically, its own Forge MTA since October 2026. Wraps sets SES up in your own AWS account and runs it day to day. Compare setup, operations, pricing, data retention, and infrastructure ownership side by side.",
-  openGraph: {
-    title: "Resend vs Wraps | Wraps",
-    description:
-      "Resend runs the sending infrastructure for you: Amazon SES historically, its own Forge MTA since October 2026. Wraps sets SES up in your own AWS account. Compare setup, operations, pricing, data retention, and ownership.",
-    url: "https://wraps.dev/compare/resend-vs-wraps",
-  },
-  twitter: {
-    title: "Resend vs Wraps | Wraps",
+  path: "/compare/resend-vs-wraps",
+  social: {
+    title: "Resend vs Wraps",
     description:
       "Resend runs the sending infrastructure for you: Amazon SES historically, its own Forge MTA since October 2026. Wraps sets SES up in your own AWS account. Compare setup, operations, pricing, data retention, and ownership.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/compare/resend-vs-wraps",
-  },
-};
+});
 
 const breadcrumbJsonLd = {
   "@context": "https://schema.org",

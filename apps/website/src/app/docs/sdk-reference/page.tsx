@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import SDKReferencePageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -21,26 +22,16 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Email SDK Reference",
   description:
     "Complete API reference for @wraps.dev/email TypeScript SDK. Send emails, use templates, track delivery events, manage suppression lists, and integrate with AWS SES.",
-  openGraph: {
-    title: "Email SDK Reference | Wraps",
-    description:
-      "Complete API reference for @wraps.dev/email TypeScript SDK. Send emails, use templates, and integrate with AWS SES.",
-    type: "website",
-    url: "https://wraps.dev/docs/sdk-reference",
-  },
-  twitter: {
-    title: "Email SDK Reference | Wraps",
+  path: "/docs/sdk-reference",
+  social: {
     description:
       "Complete API reference for @wraps.dev/email TypeScript SDK. Send emails, use templates, and integrate with AWS SES.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/docs/sdk-reference",
-  },
-};
+});
 
 export default function SDKReferencePage() {
   return (

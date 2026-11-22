@@ -161,15 +161,34 @@ type NavItem = {
 
 ### Page Metadata
 
-Every page exports a `metadata` object:
+Every page builds its `metadata` with `pageMetadata()` (`src/lib/page-metadata.ts`). Never write
+`openGraph` or `twitter` by hand: Next.js merges metadata shallowly, so a page-level `openGraph`
+replaces the root's whole object and drops the image, site, locale and card type.
+`src/__tests__/page-metadata.test.ts` fails when a file other than the helper and the root layout
+writes either key.
 
 ```typescript
-export const metadata: Metadata = {
-  title: "Email Infrastructure",  // Becomes "Email Infrastructure | Wraps"
+export const metadata: Metadata = pageMetadata({
+  title: "Email Infrastructure", // bare: <title>, og:title and twitter:title all become "Email Infrastructure | Wraps"
   description: "Deploy production-ready email...",
-  openGraph: { ... },
-};
+  path: "/email", // canonical and og:url
+  // image, type: "article", publishedTime, authors, social: { title, description } are optional
+});
 ```
+
+Pass a bare `title` (the helper throws on a trailing "| Wraps"). With no `image`, the page gets
+its own signed `/og` title card (see "Share cards" below); pass `{ url, width, height, alt }` for a bespoke one. Use `social` only when the
+share copy genuinely differs from the page title or description. Generated versus, glossary and SES
+pages go through their `*Metadata()` builders, which call the helper.
+
+- `image: null`: for a route with its own `opengraph-image.tsx` file. On Next 16.4.3 an explicit
+  `images` array overrides that file, so the route keeps its card only by emitting none.
+- `social.titleSuffix` (a string, or `null` for none) and `social.twitterCopy`: only to preserve share
+  copy a page already had (an editorial og title without "| Wraps", a shorter X description). Don't
+  reach for them on new pages.
+- `absoluteTitle`: the homepage only, whose `<title>` is the root's `title.default`.
+
+After a build, `pnpm --filter wraps-website metadata:audit` checks the rendered HTML of every page.
 
 ### JSON-LD Schema
 
@@ -183,6 +202,29 @@ import { JsonLd } from "@/components/json-ld";
 
 <JsonLd data={schema} />
 ```
+
+### Share cards (`/og`)
+
+A page that passes no `image` to `pageMetadata` gets a card drawn by `src/app/og/route.tsx` (the
+homepage keeps `/og-image.png`). The card shows a dot grid, the section label, the title and a
+terminal-style panel with the page's route (`$ wraps.dev/docs/guides/dkim`), with an orange glow
+and a top bar. The URL is minted by `ogCardPath` (`src/lib/og-card.ts`) as
+`/og?d=<base64url {v, t: title, s: section, r: route}>&sig=<hmac>`, signed with `OG_IMAGE_SECRET`.
+The route draws only that exact query string and serves the generic `/og-image.png` for anything
+else (bad or missing `sig`, extra or reordered params, a payload over the caps).
+
+- `OG_CARD_VERSION` (in `og-card.ts`) is in the signed payload. Bump it with any visual change to
+  `card.tsx`, the fonts or the logo: every card URL changes and the year-long cache is bypassed.
+- A page keeps `/og-image.png`, with no card, when its title has a glyph the title font lacks, its
+  path is not a plain route (letters, digits, `.`, `_`, `-`, `/`, up to 120 characters) or
+  `OG_IMAGE_SECRET` is unset at build. A missing env var never breaks images.
+- Titles of up to 100 characters are balanced (`textWrap: "balance"`); longer ones are not.
+- `next/og` reads ttf, not woff2: the card's fonts are static ttf in `src/app/og/fonts/`, rebuilt
+  from `public/fonts/subset` by `build-fonts.py` in that folder. Satori ignores repeating gradient
+  backgrounds, so the dot grid is an SVG image under the card.
+- `/og` is excluded from the middleware matcher (an immutable image must not get the attribution
+  cookie or a markdown rewrite). Preview a card with `OG_IMAGE_SECRET=<anything> pnpm dev` and
+  open a page's `og:image` URL.
 
 ### Sitemap & Robots
 

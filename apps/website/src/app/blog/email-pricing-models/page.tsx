@@ -6,6 +6,7 @@ import Link from "next/link";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const TITLE = "The Five Pricing Models for High-Volume Email";
 const DESCRIPTION =
@@ -37,30 +38,13 @@ const articleSchema = {
   mainEntityOfPage: { "@type": "WebPage", "@id": URL },
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: TITLE,
   description: DESCRIPTION,
-  openGraph: {
-    title: "The Five Pricing Models for High-Volume Email | Wraps",
-    description: DESCRIPTION,
-    type: "article",
-    url: URL,
-    images: [
-      {
-        url: "https://wraps.dev/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "Email pricing models",
-      },
-    ],
-    publishedTime: PUBLISHED,
-  },
-  twitter: {
-    title: "The Five Pricing Models for High-Volume Email | Wraps",
-    description: DESCRIPTION,
-  },
-  alternates: { canonical: URL },
-};
+  path: "/blog/email-pricing-models",
+  type: "article",
+  publishedTime: PUBLISHED,
+});
 
 type Model = {
   n: string;

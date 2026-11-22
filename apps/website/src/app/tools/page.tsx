@@ -12,26 +12,16 @@ import { Suspense } from "react";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import ToolsPageContent from "./page-content";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Free Email Tools - SPF, DMARC, and Amazon SES Checks",
   description:
     "Free tools to check your email deliverability setup. DMARC analyzer, SPF validator, and more.",
-  openGraph: {
-    title: "Email Tools | Wraps",
-    description:
-      "Free tools to check your email deliverability setup. DMARC analyzer, SPF validator, and more.",
-  },
-  twitter: {
-    title: "Email Tools | Wraps",
-    description:
-      "Free tools to check your email deliverability setup. DMARC analyzer, SPF validator, and more.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/tools",
-  },
-};
+  path: "/tools",
+  social: { title: "Email Tools" },
+});
 
 const webAppSchema = {
   "@context": "https://schema.org",

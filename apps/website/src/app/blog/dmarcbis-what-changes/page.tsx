@@ -10,6 +10,7 @@ import type { Metadata } from "next";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import { CodeBlock } from "./page-content";
 
 const articleSchema = {
@@ -42,29 +43,20 @@ const articleSchema = {
   },
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "DMARC Is Finally an Actual Standard: What RFC 9989 Changes",
   description:
     "RFC 9989 made DMARC Standards Track in May 2026, obsoleting RFC 7489 and RFC 9091. The Public Suffix List is replaced by a DNS tree walk, pct= is removed, np= and t= are in.",
-  openGraph: {
-    title: "DMARC Is Finally an Actual Standard | Wraps",
-    description:
-      "Every tag RFC 9989 changed: the tree walk, the removal of pct=, np=, t=, psd=, and a p= that is now only RECOMMENDED.",
-    type: "article",
-    url: "https://wraps.dev/blog/dmarcbis-what-changes",
-    publishedTime: "2026-07-09T00:00:00.000Z",
-    authors: ["Wraps Team"],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "DMARC Is Finally an Actual Standard | Wraps",
+  path: "/blog/dmarcbis-what-changes",
+  type: "article",
+  publishedTime: "2026-07-09T00:00:00.000Z",
+  authors: ["Wraps Team"],
+  social: {
+    title: "DMARC Is Finally an Actual Standard",
     description:
       "Every tag RFC 9989 changed: the tree walk, the removal of pct=, np=, t=, psd=, and a p= that is now only RECOMMENDED.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/blog/dmarcbis-what-changes",
-  },
-};
+});
 
 const tagRegistry = [
   {

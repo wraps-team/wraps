@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import SelfHostedPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,25 +28,18 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Self-Hosted Deployment Guide",
   description:
     "Deploy the full Wraps control plane to your own AWS account. API, dashboard, database, and email infrastructure — everything in your infrastructure.",
-  openGraph: {
-    title: "Self-Hosted Deployment Guide | Wraps",
-    description:
-      "Deploy the full Wraps control plane to your own AWS account. API, dashboard, database, and email infrastructure — everything in your infrastructure.",
-    type: "website",
-    url: "https://wraps.dev/docs/guides/self-hosted",
+  path: "/docs/guides/self-hosted",
+  social: {
+    twitterCopy: {
+      description:
+        "Deploy the full Wraps control plane to your own AWS account.",
+    },
   },
-  twitter: {
-    title: "Self-Hosted Deployment Guide | Wraps",
-    description: "Deploy the full Wraps control plane to your own AWS account.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides/self-hosted",
-  },
-};
+});
 
 export default function SelfHostedPage() {
   return (

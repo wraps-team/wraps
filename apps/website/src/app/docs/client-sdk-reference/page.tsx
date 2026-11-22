@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import ClientSDKReferencePageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -21,23 +22,11 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Platform SDK Reference",
   description: "Complete reference for @wraps.dev/client Platform API SDK.",
-  openGraph: {
-    title: "Platform SDK Reference | Wraps",
-    description: "Complete reference for @wraps.dev/client Platform API SDK.",
-    type: "website",
-    url: "https://wraps.dev/docs/client-sdk-reference",
-  },
-  twitter: {
-    title: "Platform SDK Reference | Wraps",
-    description: "Complete reference for @wraps.dev/client Platform API SDK.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/client-sdk-reference",
-  },
-};
+  path: "/docs/client-sdk-reference",
+});
 
 export default function ClientSDKReferencePage() {
   return (

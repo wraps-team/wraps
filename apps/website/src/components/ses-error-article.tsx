@@ -5,6 +5,7 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
 import { SesCodeSnippet } from "@/components/ses-code-snippet";
+import { pageMetadata } from "@/lib/page-metadata";
 import { SES_ERROR_CATEGORIES, type SesError } from "@/lib/ses-errors";
 
 const SITE = "https://wraps.dev";
@@ -21,23 +22,12 @@ function categoryLabel(error: SesError): string {
 }
 
 export function sesErrorMetadata(error: SesError): Metadata {
-  const url = sesErrorUrl(error);
-  return {
+  return pageMetadata({
     title: error.title,
     description: error.description,
-    openGraph: {
-      title: `${error.title} | Wraps`,
-      description: error.description,
-      type: "article",
-      url,
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: `${error.title} | Wraps`,
-      description: error.description,
-    },
-    alternates: { canonical: url },
-  };
+    path: `/ses/errors/${error.slug}`,
+    type: "article",
+  });
 }
 
 function faqSchema(error: SesError): Record<string, unknown> {

@@ -21,6 +21,7 @@ import { Suspense } from "react";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import type { SesPlanId } from "@/lib/ses-cost";
 import {
   AWS_INFRA_PRICING,
@@ -44,21 +45,11 @@ const SNIPPET_TITLE =
 const SNIPPET_DESCRIPTION =
   "SES à la carte is $0.10 per 1,000 emails; since July 2026 new accounts start on Essentials at $0.16. All 4 plans, free tier, switch-back steps, calculator.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: SNIPPET_TITLE,
   description: SNIPPET_DESCRIPTION,
-  openGraph: {
-    title: `${SNIPPET_TITLE} | Wraps`,
-    description: SNIPPET_DESCRIPTION,
-  },
-  twitter: {
-    title: `${SNIPPET_TITLE} | Wraps`,
-    description: SNIPPET_DESCRIPTION,
-  },
-  alternates: {
-    canonical: "https://wraps.dev/tools/ses-calculator",
-  },
-};
+  path: "/tools/ses-calculator",
+});
 
 /** À la carte line items beyond sending, from the AWS SES pricing page. */
 const OTHER_CHARGES = [

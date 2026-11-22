@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import PageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,12 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Building Workflows",
   description:
     "Create automated email and SMS sequences using the Wraps workflow DSL.",
-  openGraph: {
-    title: "Building Workflows | Wraps",
-    description:
-      "Create automated email and SMS sequences using the Wraps workflow DSL.",
-    type: "website",
-    url: "https://wraps.dev/docs/guides/workflows",
-  },
-  twitter: {
-    title: "Building Workflows | Wraps",
-    description:
-      "Create automated email and SMS sequences using the Wraps workflow DSL.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides/workflows",
-  },
-};
+  path: "/docs/guides/workflows",
+});
 
 export default function WorkflowsPage() {
   return (

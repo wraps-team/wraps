@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import PageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,12 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Configuration Presets",
   description:
     "Understanding Wraps email configuration presets — features, costs, and how to choose the right one.",
-  openGraph: {
-    title: "Configuration Presets | Wraps",
-    description:
-      "Understanding Wraps email configuration presets — features, costs, and how to choose the right one.",
-    type: "website",
-    url: "https://wraps.dev/docs/guides/configuration-presets",
-  },
-  twitter: {
-    title: "Configuration Presets | Wraps",
-    description:
-      "Understanding Wraps email configuration presets — features, costs, and how to choose the right one.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides/configuration-presets",
-  },
-};
+  path: "/docs/guides/configuration-presets",
+});
 
 export default function ConfigurationPresetsPage() {
   return (

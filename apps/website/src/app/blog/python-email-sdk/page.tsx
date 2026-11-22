@@ -11,6 +11,7 @@ import type { Metadata } from "next";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import { CodeBlock } from "./page-content";
 
 const articleSchema = {
@@ -43,29 +44,19 @@ const articleSchema = {
   },
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "A Python Email SDK for Your Own SES",
   description:
     "wraps-email 0.1.0 is on PyPI. It signs SigV4 straight against SES in your AWS account — no Wraps API key, no Wraps server in the request path.",
-  openGraph: {
-    title: "A Python Email SDK for Your Own SES | Wraps",
-    description:
-      "wraps-email 0.1.0: send, batch, attachments, SES templates, and suppression from Python, signed directly against your own SES.",
-    type: "article",
-    url: "https://wraps.dev/blog/python-email-sdk",
-    publishedTime: "2026-07-15T00:00:00.000Z",
-    authors: ["Wraps Team"],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "A Python Email SDK for Your Own SES | Wraps",
+  path: "/blog/python-email-sdk",
+  type: "article",
+  publishedTime: "2026-07-15T00:00:00.000Z",
+  authors: ["Wraps Team"],
+  social: {
     description:
       "wraps-email 0.1.0: send, batch, attachments, SES templates, and suppression from Python, signed directly against your own SES.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/blog/python-email-sdk",
-  },
-};
+});
 
 export default function Page() {
   return (

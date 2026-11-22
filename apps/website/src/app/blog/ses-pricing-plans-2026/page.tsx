@@ -13,6 +13,7 @@ import Link from "next/link";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import { CodeBlock } from "./page-content";
 
 const DESCRIPTION =
@@ -86,26 +87,14 @@ const faqSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "AWS SES Pricing Plans: What Actually Changed",
   description: DESCRIPTION,
-  openGraph: {
-    title: "AWS SES Pricing Plans: What Actually Changed | Wraps",
-    description: DESCRIPTION,
-    type: "article",
-    url: "https://wraps.dev/blog/ses-pricing-plans-2026",
-    publishedTime: "2026-07-21T00:00:00.000Z",
-    authors: ["Wraps Team"],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "AWS SES Pricing Plans: What Actually Changed | Wraps",
-    description: DESCRIPTION,
-  },
-  alternates: {
-    canonical: "https://wraps.dev/blog/ses-pricing-plans-2026",
-  },
-};
+  path: "/blog/ses-pricing-plans-2026",
+  type: "article",
+  publishedTime: "2026-07-21T00:00:00.000Z",
+  authors: ["Wraps Team"],
+});
 
 const PLAN_ROWS = [
   {

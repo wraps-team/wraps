@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import ReplyThreadingPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,20 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Reply Threading Guide",
   description:
     "Thread inbound replies to the original conversation using HMAC-signed reply-to addresses. Verified conversationId, per-domain secrets, and auto-reply detection on email.received events.",
-  openGraph: {
-    title: "Reply Threading Guide | Wraps",
+  path: "/docs/guides/reply-threading",
+  social: {
     description:
       "HMAC-signed reply-to addresses give you a verified conversationId on inbound replies. Per-domain secrets in your AWS account; Wraps never sees them.",
-    type: "website",
-    url: "https://wraps.dev/docs/guides/reply-threading",
+    twitterCopy: {
+      description:
+        "HMAC-signed reply-to addresses for verified conversation threading on inbound email events.",
+    },
   },
-  twitter: {
-    title: "Reply Threading Guide | Wraps",
-    description:
-      "HMAC-signed reply-to addresses for verified conversation threading on inbound email events.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides/reply-threading",
-  },
-};
+});
 
 export default function ReplyThreadingPage() {
   return (

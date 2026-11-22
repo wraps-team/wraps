@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import BetterAuthPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,20 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Better Auth",
   description:
     "One plugin block sends every Better Auth auth email through SES in your own AWS account: verification, password reset, magic link, OTP, and organization invites. No Wraps account needed.",
-  openGraph: {
-    title: "Better Auth | Wraps",
+  path: "/docs/guides/better-auth",
+  social: {
     description:
       "One plugin block sends every Better Auth auth email through SES in your own AWS account, with @wraps.dev/better-auth.",
-    type: "website",
-    url: "https://wraps.dev/docs/guides/better-auth",
+    twitterCopy: {
+      description:
+        "Send Better Auth verification, password reset, magic link, and OTP emails through SES in your own AWS account.",
+    },
   },
-  twitter: {
-    title: "Better Auth | Wraps",
-    description:
-      "Send Better Auth verification, password reset, magic link, and OTP emails through SES in your own AWS account.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides/better-auth",
-  },
-};
+});
 
 export default function BetterAuthPage() {
   return (

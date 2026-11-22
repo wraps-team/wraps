@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import CLIReferencePageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -21,23 +22,11 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "CLI Reference",
   description: "Complete reference for all Wraps CLI commands.",
-  openGraph: {
-    title: "CLI Reference | Wraps",
-    description: "Complete reference for all Wraps CLI commands.",
-    type: "website",
-    url: "https://wraps.dev/docs/cli-reference",
-  },
-  twitter: {
-    title: "CLI Reference | Wraps",
-    description: "Complete reference for all Wraps CLI commands.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/cli-reference",
-  },
-};
+  path: "/docs/cli-reference",
+});
 
 export default function CLIReferencePage() {
   return (

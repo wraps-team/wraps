@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import { McpCtaSection } from "./components/cta-section";
 import { McpGuardrailsSection } from "./components/guardrails-section";
 import { McpHeroSection } from "./components/hero-section";
@@ -31,26 +32,20 @@ const softwareSchema = {
   programmingLanguage: "TypeScript",
 };
 
-export const metadata: Metadata = {
-  title: "MCP server for Amazon SES email | Wraps",
+export const metadata: Metadata = pageMetadata({
+  title: "MCP server for Amazon SES email",
   description:
     "Give your AI agent read access to your email infrastructure — send history, delivery events, domain status, suppressions — and guarded sending. npx -y @wraps.dev/mcp.",
-  openGraph: {
-    title: "MCP server for Amazon SES email | Wraps",
+  path: "/mcp",
+  social: {
     description:
       "Give your AI agent read access to your email infrastructure — send history, delivery events, domain status, suppressions — and guarded sending. Runs locally against your AWS account.",
-    type: "website",
-    url: "https://wraps.dev/mcp",
+    twitterCopy: {
+      description:
+        "Six MCP tools over the AWS SES stack in your account — seven in enforced mode. Read by default, sending behind explicit guardrails.",
+    },
   },
-  twitter: {
-    title: "MCP server for Amazon SES email | Wraps",
-    description:
-      "Six MCP tools over the AWS SES stack in your account — seven in enforced mode. Read by default, sending behind explicit guardrails.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/mcp",
-  },
-};
+});
 
 export default function McpPage() {
   return (

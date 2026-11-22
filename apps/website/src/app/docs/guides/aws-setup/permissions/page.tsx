@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import PermissionsPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -33,26 +34,12 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "IAM Permissions",
   description:
     "Required AWS IAM permissions for deploying Wraps infrastructure.",
-  openGraph: {
-    title: "IAM Permissions | Wraps",
-    description:
-      "Required AWS IAM permissions for deploying Wraps infrastructure.",
-    type: "website",
-    url: "https://wraps.dev/docs/guides/aws-setup/permissions",
-  },
-  twitter: {
-    title: "IAM Permissions | Wraps",
-    description:
-      "Required AWS IAM permissions for deploying Wraps infrastructure.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides/aws-setup/permissions",
-  },
-};
+  path: "/docs/guides/aws-setup/permissions",
+});
 
 export default function PermissionsPage() {
   return (

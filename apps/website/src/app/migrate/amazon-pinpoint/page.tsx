@@ -7,6 +7,7 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const TITLE =
   "Migrate from Amazon Pinpoint to Amazon SES before October 30, 2026";
@@ -14,8 +15,12 @@ const DESCRIPTION =
   "AWS ends support for Amazon Pinpoint on October 30, 2026. Email workloads move to Amazon SES. Here is what breaks, what AWS recommends, what it leaves out, and how to land segments, campaigns, journeys, and analytics in your own AWS account.";
 
 export const metadata: Metadata = {
-  title: TITLE,
-  description: DESCRIPTION,
+  ...pageMetadata({
+    title: TITLE,
+    description: DESCRIPTION,
+    path: "/migrate/amazon-pinpoint",
+    type: "article",
+  }),
   keywords: [
     "amazon pinpoint end of support",
     "pinpoint migration",
@@ -24,20 +29,6 @@ export const metadata: Metadata = {
     "pinpoint shutdown 2026",
     "migrate pinpoint email",
   ],
-  openGraph: {
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-    url: "https://wraps.dev/migrate/amazon-pinpoint",
-    type: "article",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-  },
-  alternates: {
-    canonical: "https://wraps.dev/migrate/amazon-pinpoint",
-  },
 };
 
 const END_OF_SUPPORT = "October 30, 2026";

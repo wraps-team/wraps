@@ -13,6 +13,7 @@ import type { Metadata } from "next";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import { CodeBlock } from "./page-content";
 
 const DESCRIPTION =
@@ -210,8 +211,19 @@ const DELETION_VALUE = [
 ];
 
 export const metadata: Metadata = {
-  title: "How to Reduce Transactional Email Costs Above 100K a Month",
-  description: DESCRIPTION,
+  ...pageMetadata({
+    title: "How to Reduce Transactional Email Costs Above 100K a Month",
+    description: DESCRIPTION,
+    path: "/blog/reduce-transactional-email-costs",
+    type: "article",
+    publishedTime: "2026-08-21T00:00:00.000Z",
+    social: {
+      titleSuffix: null,
+      twitterCopy: {
+        title: "Reducing Transactional Email Costs Above 100K a Month | Wraps",
+      },
+    },
+  }),
   keywords: [
     "reduce transactional email costs",
     "transactional email pricing 100k",
@@ -219,21 +231,6 @@ export const metadata: Metadata = {
     "AWS SES cost 100000 emails",
     "SES vs SendGrid vs Postmark pricing",
   ],
-  openGraph: {
-    title: "How to Reduce Transactional Email Costs Above 100K a Month",
-    description: DESCRIPTION,
-    type: "article",
-    url: "https://wraps.dev/blog/reduce-transactional-email-costs",
-    publishedTime: "2026-08-21T00:00:00.000Z",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Reducing Transactional Email Costs Above 100K a Month | Wraps",
-    description: DESCRIPTION,
-  },
-  alternates: {
-    canonical: "https://wraps.dev/blog/reduce-transactional-email-costs",
-  },
 };
 
 export default function Page() {

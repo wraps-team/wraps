@@ -5,26 +5,17 @@ import { Suspense } from "react";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import ToolsPageContent from "../page-content";
 
 const description =
   "Check a domain's DKIM records. Tests 25 common selectors, or enter your own, and reports key type, key size, and testing or revoked flags.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "DKIM Record Checker",
   description,
-  openGraph: {
-    title: "DKIM Record Checker | Wraps",
-    description,
-  },
-  twitter: {
-    title: "DKIM Record Checker | Wraps",
-    description,
-  },
-  alternates: {
-    canonical: "https://wraps.dev/tools/dkim-checker",
-  },
-};
+  path: "/tools/dkim-checker",
+});
 
 const sections = [
   {

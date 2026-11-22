@@ -4,6 +4,7 @@ import Link from "next/link";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import { SES_ERRORS } from "@/lib/ses-errors";
 
 const TITLE = "Running Amazon SES in Production";
@@ -11,22 +12,11 @@ const DESCRIPTION =
   "A working reference for operating Amazon SES: the exceptions it throws, what each one means, and the operational limits AWS enforces on every account.";
 const URL = "https://wraps.dev/ses";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: TITLE,
   description: DESCRIPTION,
-  openGraph: {
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-    type: "website",
-    url: URL,
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-  },
-  alternates: { canonical: URL },
-};
+  path: "/ses",
+});
 
 const collectionSchema = {
   "@context": "https://schema.org",

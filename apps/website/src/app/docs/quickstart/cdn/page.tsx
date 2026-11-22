@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import CdnQuickstartPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,23 +28,11 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "CDN Quickstart",
   description: "Deploy a CDN for your email assets with Wraps.",
-  openGraph: {
-    title: "CDN Quickstart | Wraps",
-    description: "Deploy a CDN for your email assets with Wraps.",
-    type: "website",
-    url: "https://wraps.dev/docs/quickstart/cdn",
-  },
-  twitter: {
-    title: "CDN Quickstart | Wraps",
-    description: "Deploy a CDN for your email assets with Wraps.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/quickstart/cdn",
-  },
-};
+  path: "/docs/quickstart/cdn",
+});
 
 export default function CdnQuickstartPage() {
   return (

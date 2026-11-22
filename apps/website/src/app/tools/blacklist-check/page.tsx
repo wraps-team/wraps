@@ -5,26 +5,17 @@ import { Suspense } from "react";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import ToolsPageContent from "../page-content";
 
 const description =
   "Check whether a domain or its mail servers appear on 10 widely used DNS blocklists, including Spamhaus, Barracuda and SpamCop, and see what a listing means.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Domain Blacklist Check",
   description,
-  openGraph: {
-    title: "Domain Blacklist Check | Wraps",
-    description,
-  },
-  twitter: {
-    title: "Domain Blacklist Check | Wraps",
-    description,
-  },
-  alternates: {
-    canonical: "https://wraps.dev/tools/blacklist-check",
-  },
-};
+  path: "/tools/blacklist-check",
+});
 
 const sections = [
   {

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import WorkflowsQuickstartPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -33,26 +34,18 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Workflows Quickstart",
   description:
     "Define automated email sequences as code and deploy them in minutes. Initialize, validate, and push workflows using the Wraps CLI.",
-  openGraph: {
-    title: "Workflows Quickstart | Wraps",
-    description:
-      "Define automated email sequences as code and deploy them in minutes. Initialize, validate, and push workflows using the Wraps CLI.",
-    type: "website",
-    url: "https://wraps.dev/docs/quickstart/email/workflows",
+  path: "/docs/quickstart/email/workflows",
+  social: {
+    twitterCopy: {
+      description:
+        "Define automated email sequences as code and deploy them in minutes.",
+    },
   },
-  twitter: {
-    title: "Workflows Quickstart | Wraps",
-    description:
-      "Define automated email sequences as code and deploy them in minutes.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/quickstart/email/workflows",
-  },
-};
+});
 
 export default function WorkflowsQuickstartPage() {
   return (

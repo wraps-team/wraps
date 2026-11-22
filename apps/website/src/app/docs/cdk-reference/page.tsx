@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import CDKReferencePageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -21,23 +22,11 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "CDK Construct Reference",
   description: "Deploy Wraps infrastructure with AWS CDK.",
-  openGraph: {
-    title: "CDK Construct Reference | Wraps",
-    description: "Deploy Wraps infrastructure with AWS CDK.",
-    type: "website",
-    url: "https://wraps.dev/docs/cdk-reference",
-  },
-  twitter: {
-    title: "CDK Construct Reference | Wraps",
-    description: "Deploy Wraps infrastructure with AWS CDK.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/cdk-reference",
-  },
-};
+  path: "/docs/cdk-reference",
+});
 
 export default function CDKReferencePage() {
   return (

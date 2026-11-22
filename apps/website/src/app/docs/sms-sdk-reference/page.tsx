@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import SMSSDKReferencePageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -21,23 +22,11 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "SMS SDK Reference",
   description: "Complete reference for @wraps.dev/sms TypeScript SDK.",
-  openGraph: {
-    title: "SMS SDK Reference | Wraps",
-    description: "Complete reference for @wraps.dev/sms TypeScript SDK.",
-    type: "website",
-    url: "https://wraps.dev/docs/sms-sdk-reference",
-  },
-  twitter: {
-    title: "SMS SDK Reference | Wraps",
-    description: "Complete reference for @wraps.dev/sms TypeScript SDK.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/sms-sdk-reference",
-  },
-};
+  path: "/docs/sms-sdk-reference",
+});
 
 export default function SMSSDKReferencePage() {
   return (

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import CloudflareQuickstartPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -33,26 +34,18 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Cloudflare Workers Email Quickstart",
   description:
     "Send email from a Cloudflare Worker with Wraps. Enable nodejs_compat, store AWS credentials as Wrangler secrets, and send your first email from the edge.",
-  openGraph: {
-    title: "Cloudflare Workers Email Quickstart | Wraps",
-    description:
-      "Send email from a Cloudflare Worker with Wraps. Enable nodejs_compat, store AWS credentials as Wrangler secrets, and send your first email from the edge.",
-    type: "website",
-    url: "https://wraps.dev/docs/quickstart/email/cloudflare",
+  path: "/docs/quickstart/email/cloudflare",
+  social: {
+    twitterCopy: {
+      description:
+        "Send email from a Cloudflare Worker with Wraps using nodejs_compat and Wrangler secrets.",
+    },
   },
-  twitter: {
-    title: "Cloudflare Workers Email Quickstart | Wraps",
-    description:
-      "Send email from a Cloudflare Worker with Wraps using nodejs_compat and Wrangler secrets.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/quickstart/email/cloudflare",
-  },
-};
+});
 
 export default function CloudflareQuickstartPage() {
   return (

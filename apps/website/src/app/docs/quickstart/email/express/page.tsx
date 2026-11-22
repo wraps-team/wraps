@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import ExpressQuickstartPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -33,26 +34,18 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Express Email Quickstart",
   description:
     "Deploy email infrastructure and send your first email from an Express application. Singleton pattern, error handling middleware, and production best practices.",
-  openGraph: {
-    title: "Express Email Quickstart | Wraps",
-    description:
-      "Deploy email infrastructure and send your first email from an Express application. Singleton pattern, error handling middleware, and production best practices.",
-    type: "website",
-    url: "https://wraps.dev/docs/quickstart/email/express",
+  path: "/docs/quickstart/email/express",
+  social: {
+    twitterCopy: {
+      description:
+        "Deploy email infrastructure and send your first email from an Express application.",
+    },
   },
-  twitter: {
-    title: "Express Email Quickstart | Wraps",
-    description:
-      "Deploy email infrastructure and send your first email from an Express application.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/quickstart/email/express",
-  },
-};
+});
 
 export default function ExpressQuickstartPage() {
   return (

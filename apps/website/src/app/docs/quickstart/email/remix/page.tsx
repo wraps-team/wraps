@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import RemixQuickstartPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -33,26 +34,18 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Remix Email Quickstart",
   description:
     "Deploy email infrastructure and send your first email from a Remix application. Remix actions, form handling, and deployment configuration.",
-  openGraph: {
-    title: "Remix Email Quickstart | Wraps",
-    description:
-      "Deploy email infrastructure and send your first email from a Remix application. Remix actions, form handling, and deployment configuration.",
-    type: "website",
-    url: "https://wraps.dev/docs/quickstart/email/remix",
+  path: "/docs/quickstart/email/remix",
+  social: {
+    twitterCopy: {
+      description:
+        "Deploy email infrastructure and send your first email from a Remix application.",
+    },
   },
-  twitter: {
-    title: "Remix Email Quickstart | Wraps",
-    description:
-      "Deploy email infrastructure and send your first email from a Remix application.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/quickstart/email/remix",
-  },
-};
+});
 
 export default function RemixQuickstartPage() {
   return (

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import PageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,16 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "What Gets Deployed: SMS",
   description:
     "Every AWS resource Wraps creates when you run wraps sms init. Includes IAM roles, phone numbers, opt-out management, and delivery tracking.",
-  openGraph: {
-    title: "What Gets Deployed: SMS | Wraps",
-    description:
-      "Every AWS resource Wraps creates when you run wraps sms init.",
-    type: "website",
-    url: "https://wraps.dev/docs/infrastructure/sms",
-  },
-  twitter: {
-    title: "What Gets Deployed: SMS | Wraps",
+  path: "/docs/infrastructure/sms",
+  social: {
     description:
       "Every AWS resource Wraps creates when you run wraps sms init.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/docs/infrastructure/sms",
-  },
-};
+});
 
 export default function InfrastructureSmsPage() {
   return (

@@ -3,27 +3,17 @@ import Link from "next/link";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { LegalArticle } from "@/components/legal-article";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const TITLE = "Data Processing Agreement";
 const DESCRIPTION =
   "The Wraps Data Processing Agreement: roles, scope of processing, subprocessors, security measures, international transfers, breach notification, and deletion. Published in full, not gated behind a sales call.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: TITLE,
   description: DESCRIPTION,
-  openGraph: {
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-    url: "https://wraps.dev/dpa",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-  },
-  alternates: { canonical: "https://wraps.dev/dpa" },
-};
+  path: "/dpa",
+});
 
 const LAST_UPDATED = "August 28, 2026";
 

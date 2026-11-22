@@ -11,6 +11,7 @@ import type { Metadata } from "next";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import { CodeBlock } from "./page-content";
 
 const articleSchema = {
@@ -43,29 +44,19 @@ const articleSchema = {
   },
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Making Our Docs Agent-Readable",
   description:
     "Per-page markdown over content negotiation, well-known discovery documents, an in-browser tool surface, and AI crawl signals. What we shipped, what it does not do, and which of it is actually a standard.",
-  openGraph: {
-    title: "Making Our Docs Agent-Readable | Wraps",
-    description:
-      "Ask wraps.dev for text/markdown and you get the page, not the HTML. Here is how it works and what it does not do.",
-    type: "article",
-    url: "https://wraps.dev/blog/agent-readable-docs",
-    publishedTime: "2026-05-21T00:00:00.000Z",
-    authors: ["Wraps Team"],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Making Our Docs Agent-Readable | Wraps",
+  path: "/blog/agent-readable-docs",
+  type: "article",
+  publishedTime: "2026-05-21T00:00:00.000Z",
+  authors: ["Wraps Team"],
+  social: {
     description:
       "Ask wraps.dev for text/markdown and you get the page, not the HTML. Here is how it works and what it does not do.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/blog/agent-readable-docs",
-  },
-};
+});
 
 export default function Page() {
   return (

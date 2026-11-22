@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import McpReferencePageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -21,26 +22,20 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "MCP Server Reference",
   description:
     "Connect @wraps.dev/mcp to Claude Code, Claude Desktop, or Cursor. Tools, configuration, write-mode guardrails, and enforced mode for the Wraps email MCP server.",
-  openGraph: {
-    title: "MCP Server Reference | Wraps",
+  path: "/docs/mcp-reference",
+  social: {
     description:
       "Connect @wraps.dev/mcp to Claude Code, Claude Desktop, or Cursor. Tools, configuration, write-mode guardrails, and enforced mode.",
-    type: "website",
-    url: "https://wraps.dev/docs/mcp-reference",
+    twitterCopy: {
+      description:
+        "Tools, configuration, and guardrails for the Wraps email MCP server.",
+    },
   },
-  twitter: {
-    title: "MCP Server Reference | Wraps",
-    description:
-      "Tools, configuration, and guardrails for the Wraps email MCP server.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/mcp-reference",
-  },
-};
+});
 
 export default function McpReferencePage() {
   return (

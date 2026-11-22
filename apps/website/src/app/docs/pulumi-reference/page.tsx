@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import PulumiReferencePageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -21,23 +22,11 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Pulumi Component Reference",
   description: "Deploy Wraps infrastructure with Pulumi.",
-  openGraph: {
-    title: "Pulumi Component Reference | Wraps",
-    description: "Deploy Wraps infrastructure with Pulumi.",
-    type: "website",
-    url: "https://wraps.dev/docs/pulumi-reference",
-  },
-  twitter: {
-    title: "Pulumi Component Reference | Wraps",
-    description: "Deploy Wraps infrastructure with Pulumi.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/pulumi-reference",
-  },
-};
+  path: "/docs/pulumi-reference",
+});
 
 export default function PulumiReferencePage() {
   return (

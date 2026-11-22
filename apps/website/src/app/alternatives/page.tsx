@@ -7,25 +7,18 @@ import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
 import { ALTERNATIVES_PAGES, PRICES_VERIFIED } from "@/config/alternatives";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const url = "https://wraps.dev/alternatives";
 const description =
   "Ranked, honestly-written lists of the real alternatives to Resend, SendGrid, Postmark, Mailgun, and Customer.io. Published prices, a catch on every option, and the incumbent kept on the list.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Amazon SES and Email Platform Alternatives, Ranked",
   description,
-  openGraph: {
-    title: "Email Platform Alternatives, Ranked | Wraps",
-    description,
-    url,
-  },
-  twitter: {
-    title: "Email Platform Alternatives, Ranked | Wraps",
-    description,
-  },
-  alternates: { canonical: url },
-};
+  path: "/alternatives",
+  social: { title: "Email Platform Alternatives, Ranked" },
+});
 
 const breadcrumbJsonLd = {
   "@context": "https://schema.org",

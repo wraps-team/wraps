@@ -4,26 +4,17 @@ import Link from "next/link";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import EmailHeaderAnalyzerPageContent from "./page-content";
 
 const description =
   "Paste raw email headers and read the Received chain, SPF, DKIM and DMARC results, and Return-Path alignment. Parsed in your browser: nothing is uploaded or stored.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Email Header Analyzer",
   description,
-  openGraph: {
-    title: "Email Header Analyzer | Wraps",
-    description,
-  },
-  twitter: {
-    title: "Email Header Analyzer | Wraps",
-    description,
-  },
-  alternates: {
-    canonical: "https://wraps.dev/tools/email-header-analyzer",
-  },
-};
+  path: "/tools/email-header-analyzer",
+});
 
 const sections = [
   {

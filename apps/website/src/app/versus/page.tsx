@@ -8,25 +8,17 @@ import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
 import { PRICES_VERIFIED, VENDORS } from "@/config/alternatives";
 import { VERSUS_PAGES, versusPath } from "@/config/versus";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const url = "https://wraps.dev/versus";
 const description =
   "Head-to-head comparisons between other email vendors, written by someone who is not one of them. Published prices, the real tension in each pair, and who each one is actually for.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Email Vendor Comparisons, Head to Head",
   description,
-  openGraph: {
-    title: "Email Vendor Comparisons, Head to Head | Wraps",
-    description,
-    url,
-  },
-  twitter: {
-    title: "Email Vendor Comparisons, Head to Head | Wraps",
-    description,
-  },
-  alternates: { canonical: url },
-};
+  path: "/versus",
+});
 
 const breadcrumbJsonLd = {
   "@context": "https://schema.org",

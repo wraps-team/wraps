@@ -13,26 +13,21 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { ResendForgeNotice } from "@/components/resend-forge-notice";
+import { pageMetadata } from "@/lib/page-metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Compare Wraps to Email Platforms — Resend, SendGrid, SES & More",
   description:
     "See how Wraps compares to Resend, SendGrid, Amazon SES, Postmark, Customer.io, and Klaviyo. Real pricing, real features, honest tradeoffs.",
-  openGraph: {
-    title: "Compare Wraps to Email Platforms | Wraps",
-    description:
-      "See how Wraps compares to Resend, SendGrid, Amazon SES, Postmark, Customer.io, and Klaviyo. Real pricing, real features, honest tradeoffs.",
-    url: "https://wraps.dev/compare",
+  path: "/compare",
+  social: {
+    title: "Compare Wraps to Email Platforms",
+    twitterCopy: {
+      description:
+        "See how Wraps compares to Resend, SendGrid, Amazon SES, Postmark, Customer.io, and Klaviyo.",
+    },
   },
-  twitter: {
-    title: "Compare Wraps to Email Platforms | Wraps",
-    description:
-      "See how Wraps compares to Resend, SendGrid, Amazon SES, Postmark, Customer.io, and Klaviyo.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/compare",
-  },
-};
+});
 
 const breadcrumbJsonLd = {
   "@context": "https://schema.org",

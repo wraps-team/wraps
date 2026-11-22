@@ -5,26 +5,17 @@ import { Suspense } from "react";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import BounceRateCalculatorPageContent from "./page-content";
 
 const description =
   "Enter your sends, hard bounces and complaints and see where you sit against the Amazon SES review and pause thresholds, plus how many more events you can take. Runs in your browser.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "SES Bounce Rate Calculator",
   description,
-  openGraph: {
-    title: "SES Bounce Rate Calculator | Wraps",
-    description,
-  },
-  twitter: {
-    title: "SES Bounce Rate Calculator | Wraps",
-    description,
-  },
-  alternates: {
-    canonical: "https://wraps.dev/tools/bounce-rate-calculator",
-  },
-};
+  path: "/tools/bounce-rate-calculator",
+});
 
 const sections = [
   {

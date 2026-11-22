@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import PythonSDKReferencePageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -21,26 +22,20 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Python Email SDK Reference",
   description:
     "Complete API reference for the wraps-email Python SDK. Send emails, attachments, SES-stored templates, batch sends, and suppression management via AWS SES — your AWS account, no vendor lock-in.",
-  openGraph: {
-    title: "Python Email SDK Reference | Wraps",
+  path: "/docs/python-sdk-reference",
+  social: {
     description:
       "Send email via AWS SES from Python with wraps-email. Attachments, templates, batch sends, and suppression — typed and lightweight.",
-    type: "website",
-    url: "https://wraps.dev/docs/python-sdk-reference",
+    twitterCopy: {
+      description:
+        "Send email via AWS SES from Python with wraps-email. Attachments, templates, batch sends, and suppression.",
+    },
   },
-  twitter: {
-    title: "Python Email SDK Reference | Wraps",
-    description:
-      "Send email via AWS SES from Python with wraps-email. Attachments, templates, batch sends, and suppression.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/python-sdk-reference",
-  },
-};
+});
 
 export default function PythonSDKReferencePage() {
   return (

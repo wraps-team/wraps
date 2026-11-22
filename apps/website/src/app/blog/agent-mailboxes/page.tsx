@@ -11,6 +11,7 @@ import type { Metadata } from "next";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import { CodeBlock } from "./page-content";
 
 const articleSchema = {
@@ -43,29 +44,19 @@ const articleSchema = {
   },
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Agent Mailboxes: A Leash the Agent Can't Reach",
   description:
     "An email identity for an AI agent, constrained by a Lambda in your own AWS account. Kill switch, sender pin, allowlist, and caps decided where the agent's credential can't reach them.",
-  openGraph: {
-    title: "Agent Mailboxes: A Leash the Agent Can't Reach | Wraps",
-    description:
-      "Agent identity from the Lambda alias qualifier, an IAM policy with one statement, and an approval queue. Enforced in your AWS account.",
-    type: "article",
-    url: "https://wraps.dev/blog/agent-mailboxes",
-    publishedTime: "2026-07-10T00:00:00.000Z",
-    authors: ["Wraps Team"],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Agent Mailboxes: A Leash the Agent Can't Reach | Wraps",
+  path: "/blog/agent-mailboxes",
+  type: "article",
+  publishedTime: "2026-07-10T00:00:00.000Z",
+  authors: ["Wraps Team"],
+  social: {
     description:
       "Agent identity from the Lambda alias qualifier, an IAM policy with one statement, and an approval queue. Enforced in your AWS account.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/blog/agent-mailboxes",
-  },
-};
+});
 
 function ChainStep({
   children,

@@ -16,28 +16,17 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const PAGE_DESCRIPTION =
   "Wraps runs on your own Amazon SES, not instead of it. Same AWS account, same pricing, same sending reputation. One command sets the whole surface up, and the control plane runs it day to day.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Amazon SES vs Wraps - Everything SES Needs, Including Operations",
   description: PAGE_DESCRIPTION,
-  openGraph: {
-    title: "Amazon SES vs Wraps | Wraps",
-    description: PAGE_DESCRIPTION,
-    url: "https://wraps.dev/compare/amazon-ses-vs-wraps",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Amazon SES vs Wraps | Wraps",
-    description: PAGE_DESCRIPTION,
-  },
-  alternates: {
-    canonical: "https://wraps.dev/compare/amazon-ses-vs-wraps",
-  },
-};
+  path: "/compare/amazon-ses-vs-wraps",
+  social: { title: "Amazon SES vs Wraps" },
+});
 
 const breadcrumbJsonLd = {
   "@context": "https://schema.org",

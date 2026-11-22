@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import CLIReferenceAuthPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,12 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Auth CLI Commands",
   description:
     "Authenticate with the Wraps Platform for dashboard access, templates, and workflows.",
-  openGraph: {
-    title: "Auth CLI Commands | Wraps",
-    description:
-      "Authenticate with the Wraps Platform for dashboard access, templates, and workflows.",
-    type: "website",
-    url: "https://wraps.dev/docs/cli-reference/auth",
-  },
-  twitter: {
-    title: "Auth CLI Commands | Wraps",
-    description:
-      "Authenticate with the Wraps Platform for dashboard access, templates, and workflows.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/cli-reference/auth",
-  },
-};
+  path: "/docs/cli-reference/auth",
+});
 
 export default function CLIReferenceAuthPage() {
   return (

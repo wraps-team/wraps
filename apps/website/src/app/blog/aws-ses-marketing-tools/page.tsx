@@ -6,6 +6,7 @@ import Link from "next/link";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const TITLE = "Tools That Run Marketing Campaigns On Your Own AWS SES";
 const DESCRIPTION =
@@ -37,30 +38,14 @@ const articleSchema = {
   mainEntityOfPage: { "@type": "WebPage", "@id": URL },
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: TITLE,
   description: DESCRIPTION,
-  openGraph: {
-    title: "Marketing Tools On Your Own AWS SES | Wraps",
-    description: DESCRIPTION,
-    type: "article",
-    url: URL,
-    images: [
-      {
-        url: "https://wraps.dev/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "Marketing campaign tools built on AWS SES",
-      },
-    ],
-    publishedTime: PUBLISHED,
-  },
-  twitter: {
-    title: "Marketing Tools On Your Own AWS SES | Wraps",
-    description: DESCRIPTION,
-  },
-  alternates: { canonical: URL },
-};
+  path: "/blog/aws-ses-marketing-tools",
+  type: "article",
+  publishedTime: PUBLISHED,
+  social: { title: "Marketing Tools On Your Own AWS SES" },
+});
 
 type Tool = {
   name: string;

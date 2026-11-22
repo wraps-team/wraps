@@ -8,14 +8,19 @@ import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
 import { VENDORS } from "@/config/alternatives";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const TITLE = "Migrate from Mailgun to Amazon SES";
 const DESCRIPTION =
   "Three Mailgun habits break on SES: Routes, the EU endpoint, and per-domain reputation. Here is what replaces each one, how the three suppression lists collapse into one, and the order that keeps mail flowing.";
 
 export const metadata: Metadata = {
-  title: TITLE,
-  description: DESCRIPTION,
+  ...pageMetadata({
+    title: TITLE,
+    description: DESCRIPTION,
+    path: "/migrate/mailgun",
+    type: "article",
+  }),
   keywords: [
     "migrate from mailgun to ses",
     "mailgun to amazon ses",
@@ -24,20 +29,6 @@ export const metadata: Metadata = {
     "mailgun suppression export",
     "leave mailgun",
   ],
-  openGraph: {
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-    url: "https://wraps.dev/migrate/mailgun",
-    type: "article",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-  },
-  alternates: {
-    canonical: "https://wraps.dev/migrate/mailgun",
-  },
 };
 
 const breadcrumbSchema = {

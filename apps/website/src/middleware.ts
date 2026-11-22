@@ -137,7 +137,11 @@ export const config = {
   // likely to send `Accept: text/markdown` — are exactly who reads the
   // discovery documents served there, and rewriting those to markdown returned
   // llms.txt instead of the OAuth metadata, api-catalog, or robots.txt.
+  // `og` is the signed share-card image route (src/app/og/route.tsx). It is an
+  // immutable, cacheable PNG: the attribution Set-Cookie, the markdown Link
+  // header and a markdown rewrite for AI-bot user agents all break it. Written
+  // `og(?:/|$)` so a page such as `/og-something` still runs through here.
   matcher: [
-    "/((?!_next|api|ingest|\\.well-known|.*\\.(?:txt|js|css|png|jpg|jpeg|gif|webp|avif|svg|ico|woff|woff2|ttf|mp4|pdf|zip)).*)",
+    "/((?!_next|api|og(?:/|$)|ingest|\\.well-known|.*\\.(?:txt|js|css|png|jpg|jpeg|gif|webp|avif|svg|ico|woff|woff2|ttf|mp4|pdf|zip)).*)",
   ],
 };

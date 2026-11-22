@@ -16,26 +16,19 @@ import { FeatureCell } from "@/app/compare/components/feature-cell";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
+import { pageMetadata } from "@/lib/page-metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Mailgun vs Wraps - Compare Email Infrastructure Approaches",
   description:
     "Mailgun sends from their servers. Wraps sets up Amazon SES in your AWS account and runs it day to day. Compare setup, operations, pricing, and developer experience side by side.",
-  openGraph: {
-    title: "Mailgun vs Wraps | Wraps",
-    description:
-      "Mailgun sends from their servers. Wraps sets up Amazon SES in your AWS account and runs it day to day. Compare setup, operations, pricing, and developer experience.",
-    url: "https://wraps.dev/compare/mailgun-vs-wraps",
-  },
-  twitter: {
-    title: "Mailgun vs Wraps | Wraps",
+  path: "/compare/mailgun-vs-wraps",
+  social: {
+    title: "Mailgun vs Wraps",
     description:
       "Mailgun sends from their servers. Wraps sets up Amazon SES in your AWS account and runs it day to day. Compare setup, operations, pricing, and developer experience.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/compare/mailgun-vs-wraps",
-  },
-};
+});
 
 const breadcrumbJsonLd = {
   "@context": "https://schema.org",

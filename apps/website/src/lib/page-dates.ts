@@ -18,6 +18,7 @@ const NOT_PAGE_CONTENT = [
   ".well-known/",
   "robots.txt/",
   "mcp/server-card/",
+  "og/",
   "sitemap.ts",
 ];
 

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import PageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,12 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "JSON Output Reference",
   description:
     "Complete reference for Wraps CLI --json flag. Machine-readable output schemas for every command.",
-  openGraph: {
-    title: "JSON Output Reference | Wraps",
-    description:
-      "Complete reference for Wraps CLI --json flag. Machine-readable output schemas for every command.",
-    type: "website",
-    url: "https://wraps.dev/docs/reference/json-output",
-  },
-  twitter: {
-    title: "JSON Output Reference | Wraps",
-    description:
-      "Complete reference for Wraps CLI --json flag. Machine-readable output schemas for every command.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/reference/json-output",
-  },
-};
+  path: "/docs/reference/json-output",
+});
 
 export default function JSONOutputReferencePage() {
   return (

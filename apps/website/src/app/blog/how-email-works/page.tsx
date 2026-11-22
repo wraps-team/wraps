@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import {
   AuthVisualizer,
   ChapterNav,
@@ -129,38 +130,30 @@ const faqSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "How Email Actually Works: An Interactive Deep-Dive",
   description:
     "You click Send. What happens in the next 3 seconds? An interactive journey through SMTP handshakes, DNS lookups, relay hops, and authentication.",
-  openGraph: {
-    title: "How Email Actually Works | Wraps",
+  path: "/blog/how-email-works",
+  type: "article",
+  image: {
+    url: "https://wraps.dev/blog/how-email-works.webp",
+    width: 1200,
+    height: 630,
+    alt: "How Email Actually Works — interactive deep-dive",
+  },
+  publishedTime: "2026-03-06T00:00:00.000Z",
+  authors: ["Wraps Team"],
+  social: {
+    title: "How Email Actually Works",
     description:
       "You click Send. What happens in the next 3 seconds? An interactive journey through SMTP, DNS, and email authentication.",
-    type: "article",
-    url: "https://wraps.dev/blog/how-email-works",
-    images: [
-      {
-        url: "https://wraps.dev/blog/how-email-works.webp",
-        width: 1200,
-        height: 630,
-        alt: "How Email Actually Works — interactive deep-dive",
-      },
-    ],
-    publishedTime: "2026-03-06T00:00:00.000Z",
-    authors: ["Wraps Team"],
+    twitterCopy: {
+      description:
+        "An interactive journey through SMTP handshakes, DNS lookups, relay hops, and authentication.",
+    },
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "How Email Actually Works | Wraps",
-    description:
-      "An interactive journey through SMTP handshakes, DNS lookups, relay hops, and authentication.",
-    images: ["https://wraps.dev/blog/how-email-works.webp"],
-  },
-  alternates: {
-    canonical: "https://wraps.dev/blog/how-email-works",
-  },
-};
+});
 
 export default function Page() {
   return (

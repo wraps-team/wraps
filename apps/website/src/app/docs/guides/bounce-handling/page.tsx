@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import BounceHandlingPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,17 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Bounce & Complaint Handling",
   description:
     "Handle AWS SES bounces and complaints correctly: what bounceType and bounceSubType mean, why transient bounces should not suppress, the AWS rate thresholds that pause sending, and how to test with the SES mailbox simulator.",
-  openGraph: {
-    title: "Bounce & Complaint Handling | Wraps",
-    description:
-      "What SES bounce and complaint events mean, what to do with each one, and how to test bounce handling before it matters.",
-    type: "article",
-    url: "https://wraps.dev/docs/guides/bounce-handling",
-  },
-  twitter: {
-    title: "Bounce & Complaint Handling | Wraps",
+  path: "/docs/guides/bounce-handling",
+  type: "article",
+  social: {
     description:
       "What SES bounce and complaint events mean, what to do with each one, and how to test bounce handling before it matters.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides/bounce-handling",
-  },
-};
+});
 
 export default function BounceHandlingPage() {
   return (

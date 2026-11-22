@@ -13,26 +13,15 @@ import { Suspense } from "react";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import SPFBuilderWidget from "./page-content";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "SPF Record Builder",
   description:
     "Build and validate your SPF record. Avoid the 10-lookup limit with our interactive tool.",
-  openGraph: {
-    title: "SPF Record Builder | Wraps",
-    description:
-      "Build and validate your SPF record. Avoid the 10-lookup limit with our interactive tool.",
-  },
-  twitter: {
-    title: "SPF Record Builder | Wraps",
-    description:
-      "Build and validate your SPF record. Avoid the 10-lookup limit with our interactive tool.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/tools/spf-builder",
-  },
-};
+  path: "/tools/spf-builder",
+});
 
 const webAppSchema = {
   "@context": "https://schema.org",

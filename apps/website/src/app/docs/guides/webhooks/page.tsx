@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import WebhooksPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,16 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Webhooks Guide",
   description:
     "Receive real-time SES email events at your HTTPS endpoint. Set up webhook delivery, authenticate requests, and handle events in your application.",
-  openGraph: {
-    title: "Webhooks Guide | Wraps",
-    description:
-      "Receive real-time SES email events at your HTTPS endpoint. Set up webhook delivery, authenticate requests, and handle events.",
-    type: "website",
-    url: "https://wraps.dev/docs/guides/webhooks",
-  },
-  twitter: {
-    title: "Webhooks Guide | Wraps",
+  path: "/docs/guides/webhooks",
+  social: {
     description:
       "Receive real-time SES email events at your HTTPS endpoint. Set up webhook delivery, authenticate requests, and handle events.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides/webhooks",
-  },
-};
+});
 
 export default function WebhooksPage() {
   return (

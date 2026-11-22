@@ -6,27 +6,17 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 
 const TITLE = "Security at Wraps — the trust boundary, in detail";
 const DESCRIPTION =
   "How Wraps accesses your AWS account: a cross-account IAM role with an external ID, short-lived STS credentials, no stored AWS keys, resources namespaced wraps-*. What we store, what stays in your account, and what certifications we do and do not have.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: TITLE,
   description: DESCRIPTION,
-  openGraph: {
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-    url: "https://wraps.dev/security",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: `${TITLE} | Wraps`,
-    description: DESCRIPTION,
-  },
-  alternates: { canonical: "https://wraps.dev/security" },
-};
+  path: "/security",
+});
 
 const LAST_UPDATED = "August 28, 2026";
 

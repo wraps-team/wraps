@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import VercelSetupPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,25 +28,17 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Vercel Setup Guide",
   description:
     "Deploy email infrastructure with Vercel OIDC federation. Zero stored credentials, automatic rotation, and seamless Vercel integration.",
-  openGraph: {
-    title: "Vercel Setup Guide | Wraps",
-    description:
-      "Deploy email infrastructure with Vercel OIDC federation. Zero stored credentials, automatic rotation, and seamless Vercel integration.",
-    type: "website",
-    url: "https://wraps.dev/docs/guides/vercel-setup",
+  path: "/docs/guides/vercel-setup",
+  social: {
+    twitterCopy: {
+      description: "Deploy email infrastructure with Vercel OIDC federation.",
+    },
   },
-  twitter: {
-    title: "Vercel Setup Guide | Wraps",
-    description: "Deploy email infrastructure with Vercel OIDC federation.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides/vercel-setup",
-  },
-};
+});
 
 export default function VercelSetupPage() {
   return (

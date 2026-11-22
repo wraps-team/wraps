@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import QuickStartPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -33,23 +34,11 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Quick AWS Setup",
   description: "Fast track AWS setup for Wraps.",
-  openGraph: {
-    title: "Quick AWS Setup | Wraps",
-    description: "Fast track AWS setup for Wraps.",
-    type: "website",
-    url: "https://wraps.dev/docs/guides/aws-setup/quick",
-  },
-  twitter: {
-    title: "Quick AWS Setup | Wraps",
-    description: "Fast track AWS setup for Wraps.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides/aws-setup/quick",
-  },
-};
+  path: "/docs/guides/aws-setup/quick",
+});
 
 export default function QuickStartPage() {
   return (

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import { CliCommandsSection } from "./components/commands-section";
 import { CliConsoleSection } from "./components/console-section";
 import { CliCtaSection } from "./components/cta-section";
@@ -37,33 +38,19 @@ const softwareSchema = {
   programmingLanguage: "TypeScript",
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Wraps CLI - Deploy Amazon SES Infrastructure in 2 Minutes",
   description:
     "Free, open-source CLI and SDK to deploy email infrastructure to your AWS account. One command deploys everything.",
-  openGraph: {
-    title: "CLI & SDK | Wraps",
-    description:
-      "Free, open-source CLI and SDK to deploy email infrastructure to your AWS account. One command deploys everything.",
-    images: [
-      {
-        url: "/wraps-cli-og.webp",
-        width: 1424,
-        height: 752,
-        alt: "Wraps CLI - Deploy email infrastructure with one command",
-      },
-    ],
+  path: "/cli",
+  image: {
+    url: "/wraps-cli-og.webp",
+    width: 1424,
+    height: 752,
+    alt: "Wraps CLI - Deploy email infrastructure with one command",
   },
-  twitter: {
-    title: "CLI & SDK | Wraps",
-    description:
-      "Free, open-source CLI and SDK to deploy email infrastructure to your AWS account. One command deploys everything.",
-    images: ["/wraps-cli-og.webp"],
-  },
-  alternates: {
-    canonical: "https://wraps.dev/cli",
-  },
-};
+  social: { title: "CLI & SDK" },
+});
 
 export default function CliPage() {
   return (

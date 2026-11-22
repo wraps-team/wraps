@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import PlatformQuickstartPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,12 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Platform Quickstart",
   description:
     "Get started with the Wraps Platform for contacts and broadcasts.",
-  openGraph: {
-    title: "Platform Quickstart | Wraps",
-    description:
-      "Get started with the Wraps Platform for contacts and broadcasts.",
-    type: "website",
-    url: "https://wraps.dev/docs/quickstart/platform",
-  },
-  twitter: {
-    title: "Platform Quickstart | Wraps",
-    description:
-      "Get started with the Wraps Platform for contacts and broadcasts.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/quickstart/platform",
-  },
-};
+  path: "/docs/quickstart/platform",
+});
 
 export default function PlatformQuickstartPage() {
   return (

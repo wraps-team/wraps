@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import SMTPPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -27,26 +28,18 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "SMTP Credentials Guide",
   description:
     "Generate SMTP credentials for your AWS SES infrastructure. Use with WordPress, Nodemailer, PHPMailer, or any SMTP-compatible system.",
-  openGraph: {
-    title: "SMTP Credentials Guide | Wraps",
-    description:
-      "Generate SMTP credentials for your AWS SES infrastructure. Use with WordPress, Nodemailer, PHPMailer, or any SMTP-compatible system.",
-    type: "website",
-    url: "https://wraps.dev/docs/guides/smtp",
+  path: "/docs/guides/smtp",
+  social: {
+    twitterCopy: {
+      description:
+        "Generate SMTP credentials for AWS SES. Works with WordPress, Nodemailer, PHPMailer, and any SMTP client.",
+    },
   },
-  twitter: {
-    title: "SMTP Credentials Guide | Wraps",
-    description:
-      "Generate SMTP credentials for AWS SES. Works with WordPress, Nodemailer, PHPMailer, and any SMTP client.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs/guides/smtp",
-  },
-};
+});
 
 export default function SMTPPage() {
   return (

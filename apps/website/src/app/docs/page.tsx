@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import DocsPageContent from "./page-content";
 
 const breadcrumbSchema = {
@@ -15,26 +16,12 @@ const breadcrumbSchema = {
   ],
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Documentation",
   description:
     "Get started with Wraps. Deploy production-ready email infrastructure to your AWS account in minutes.",
-  openGraph: {
-    title: "Documentation | Wraps",
-    description:
-      "Get started with Wraps. Deploy production-ready email infrastructure to your AWS account in minutes.",
-    type: "website",
-    url: "https://wraps.dev/docs",
-  },
-  twitter: {
-    title: "Documentation | Wraps",
-    description:
-      "Get started with Wraps. Deploy production-ready email infrastructure to your AWS account in minutes.",
-  },
-  alternates: {
-    canonical: "https://wraps.dev/docs",
-  },
-};
+  path: "/docs",
+});
 
 export default function DocsPage() {
   return (

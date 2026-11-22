@@ -10,6 +10,7 @@ import type { Metadata } from "next";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { pageMetadata } from "@/lib/page-metadata";
 import { CodeBlock } from "./page-content";
 
 const articleSchema = {
@@ -42,29 +43,19 @@ const articleSchema = {
   },
 };
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Signed Reply-To for Agents",
   description:
     "Cryptographic conversation correlation for email agents. HMAC-signed reply-to addresses verified in a Lambda running in your AWS account.",
-  openGraph: {
-    title: "Signed Reply-To for Agents | Wraps",
-    description:
-      "Cryptographic conversation correlation for email agents built on Wraps.",
-    type: "article",
-    url: "https://wraps.dev/blog/signed-reply-threading",
-    publishedTime: "2026-04-17T00:00:00.000Z",
-    authors: ["Wraps Team"],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Signed Reply-To for Agents | Wraps",
+  path: "/blog/signed-reply-threading",
+  type: "article",
+  publishedTime: "2026-04-17T00:00:00.000Z",
+  authors: ["Wraps Team"],
+  social: {
     description:
       "Cryptographic conversation correlation for email agents built on Wraps.",
   },
-  alternates: {
-    canonical: "https://wraps.dev/blog/signed-reply-threading",
-  },
-};
+});
 
 export default function Page() {
   return (
