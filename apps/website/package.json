@@ -63,7 +63,7 @@
     "date-fns": "^4.4.0",
     "lucide-react": "^1.27.0",
     "motion": "12.23.24",
-    "next": "16.4.3",
+    "next": "16.4.5",
     "next-themes": "^0.4.6",
     "nuqs": "2.7.3",
     "posthog-js": "1.367.0",
@@ -85,7 +85,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
-    "@next/bundle-analyzer": "16.1.5",
+    "@next/bundle-analyzer": "16.4.5",
     "@types/node": "catalog:",
     "@types/react": "19.2.4",
     "@types/react-dom": "19.2.3",
