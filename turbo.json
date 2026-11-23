@@ -61,7 +61,8 @@
         "POSTHOG_ENV_ID",
         "SENTRY_AUTH_TOKEN",
         "SENTRY_ORG",
-        "SENTRY_PROJECT"
+        "SENTRY_PROJECT",
+        "OG_IMAGE_SECRET"
       ]
     },
     "dev": {

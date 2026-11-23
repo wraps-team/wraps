@@ -564,3 +564,16 @@ describe("card font coverage", () => {
     }
   });
 });
+
+describe("OG_IMAGE_SECRET reaches the build", () => {
+  // Pages sign their card URLs while they are prerendered, so the secret must
+  // be in `next build`'s environment. Turbo 2 runs tasks in strict env mode and
+  // drops any variable a task doesn't declare: without this entry Vercel's
+  // build never saw the secret and every page fell back to /og-image.png.
+  it("is declared in turbo.json's build task env", () => {
+    const turbo = JSON.parse(
+      readFileSync(resolve(webRoot, "../../turbo.json"), "utf8")
+    ) as { tasks: { build: { env?: string[] } } };
+    expect(turbo.tasks.build.env).toContain("OG_IMAGE_SECRET");
+  });
+});
