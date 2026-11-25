@@ -64,20 +64,18 @@ export function LandingFooter() {
                 {column.title}
               </h2>
               <ul className="space-y-3 text-sm">
-                {column.links
-                  .filter((link) => !link.hidden)
-                  .map((link) => (
-                    <li key={link.name}>
-                      <a
-                        className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
-                        href={link.href}
-                        rel={link.external ? "noopener noreferrer" : undefined}
-                        target={link.external ? "_blank" : undefined}
-                      >
-                        {link.name}
-                      </a>
-                    </li>
-                  ))}
+                {column.links.map((link) => (
+                  <li key={link.name}>
+                    <a
+                      className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
+                      href={link.href}
+                      rel={link.external ? "noopener noreferrer" : undefined}
+                      target={link.external ? "_blank" : undefined}
+                    >
+                      {link.name}
+                    </a>
+                  </li>
+                ))}
               </ul>
             </nav>
           ))}

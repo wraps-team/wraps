@@ -1,20 +1,11 @@
 // The marketing site's navigation, one source for the navbar and the footer.
 // Every href resolves to a route under src/app (src/__tests__/site-nav.test.ts
-// checks it), except the founders page behind FOUNDERS_PAGE_LIVE.
-
-/**
- * Plan 076 builds /for/founders. Until the route exists its nav and footer
- * links stay hidden, so they never 404. Flip this to true in the same change
- * that adds src/app/for/founders/page.tsx; the test fails if the two disagree.
- */
-export const FOUNDERS_PAGE_LIVE = false;
+// checks it).
 
 export type NavLink = {
   name: string;
   href: string;
   description?: string;
-  /** Not rendered while true (the route it points at does not exist yet). */
-  hidden?: boolean;
 };
 
 export type NavGroup = {
@@ -41,7 +32,6 @@ const founders: NavLink = {
   name: "Founders",
   href: "/for/founders",
   description: "Cut the email bill as you grow",
-  hidden: !FOUNDERS_PAGE_LIVE,
 };
 
 export const NAV_MENUS: NavMenu[] = [
@@ -249,7 +239,7 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
     links: [
       { name: "Marketing teams", href: "/for/marketing" },
       { name: "Email operations", href: "/for/operators" },
-      { name: founders.name, href: founders.href, hidden: founders.hidden },
+      founders,
       { name: "Developers", href: "/cli" },
       { name: "AI agents", href: "/agents" },
       { name: "Compare Wraps", href: "/compare" },
