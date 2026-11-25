@@ -227,7 +227,7 @@ export default function WhyWrapsPage() {
           </div>
           <p className="mt-8 max-w-2xl text-muted-foreground leading-relaxed">
             For scale: 100,000 emails a month costs {allIn100k("alacarte")} on
-            Amazon's $0.10 plan and {allIn100k("essentials")} on the $
+            Amazon's à la carte plan and {allIn100k("essentials")} on the $
             {ESSENTIALS_RATE} plan, including the AWS event pipeline, with the
             Wraps Free plan on top at $0. Against a marketing platform that
             charges per contact, the gap widens with the list. Against a sending
