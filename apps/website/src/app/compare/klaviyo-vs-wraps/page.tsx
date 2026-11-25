@@ -20,23 +20,27 @@ import {
   savingsMultiple,
   wrapsAllIn,
 } from "@/app/compare/components/wraps-cost";
+import {
+  dollars,
+  klaviyoBill,
+  pricingRows,
+} from "@/app/compare/klaviyo-vs-wraps/pricing-rows";
 import { ClosingPanel } from "@/app/landing/components/closing-panel";
 import { FlowBox } from "@/app/landing/components/flow-primitives";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
-import {
-  CONTACT_PRICE_ROWS,
-  CONTACT_PRICES_CHECKED,
-} from "@/config/competitor-contact-pricing";
+import { CONTACT_PRICES_CHECKED } from "@/config/competitor-contact-pricing";
 import { pageMetadata } from "@/lib/page-metadata";
 import { AWS_INFRA_PRICING } from "@/lib/ses-cost";
 
+const PAGE_DESCRIPTION =
+  "Compare Klaviyo and Wraps: a marketing platform you rent and pay for per contact, against email sent through Amazon SES in your own AWS account. All-in pricing at real volumes, what each one is built for, and who should pick which.";
+
 export const metadata: Metadata = pageMetadata({
   title: "Klaviyo vs Wraps: Contact Pricing vs Your Own AWS",
-  description:
-    "Compare Klaviyo and Wraps: a marketing platform you rent and pay for per contact, against email sent through Amazon SES in your own AWS account. All-in pricing at real volumes, what each one is built for, and who should pick which.",
+  description: PAGE_DESCRIPTION,
   path: "/compare/klaviyo-vs-wraps",
   social: {
     title: "Klaviyo vs Wraps",
@@ -70,48 +74,6 @@ const breadcrumbJsonLd = {
   ],
 };
 
-// Klaviyo bills by profile. The 5K to 100K bills are the shared constants (one
-// source for every chart and table); the ~1,000 profile bill is Klaviyo's
-// entry price on klaviyo.com/pricing.
-const KLAVIYO_ENTRY_BILL = 30;
-
-function klaviyoBill(contacts: number): number {
-  if (contacts === 1000) {
-    return KLAVIYO_ENTRY_BILL;
-  }
-  const row = CONTACT_PRICE_ROWS.find((r) => r.contacts === contacts);
-  if (!row) {
-    throw new Error(`No Klaviyo figure for ${contacts} contacts`);
-  }
-  return row.klaviyo;
-}
-
-function dollars(value: number): string {
-  return `$${value.toLocaleString("en-US")}`;
-}
-
-const pricingRows = (
-  [
-    { emails: 10_000, contacts: 1000, tier: "free" },
-    { emails: 50_000, contacts: 5000, tier: "pro" },
-    { emails: 100_000, contacts: 10_000, tier: "pro" },
-    { emails: 500_000, contacts: 50_000, tier: "pro" },
-    { emails: 1_000_000, contacts: 100_000, tier: "pro" },
-  ] as const
-).map(({ emails, contacts, tier }) => {
-  const wraps = wrapsAllIn({ emails, tier });
-  const klaviyo = klaviyoBill(contacts);
-  return {
-    volume: emails.toLocaleString("en-US"),
-    contacts: `~${contacts.toLocaleString("en-US")}`,
-    competitor: `${dollars(klaviyo)}/mo`,
-    wraps: `${wraps.totalLabel}/mo`,
-    wrapsBreakdown: wraps.breakdown,
-    savings: savingsMultiple(klaviyo, wraps.total),
-    savingsNote: "as much as Wraps",
-  };
-});
-
 const MILLION_ESSENTIALS = wrapsAllIn({
   emails: 1_000_000,
   tier: "pro",
@@ -135,12 +97,12 @@ const glanceRows = [
   },
   {
     label: "Who sends the email",
-    competitor: "Klaviyo, on its servers",
+    competitor: "Klaviyo, on its own multi-tenant platform",
     wraps: "Amazon, from your account, watched by the Wraps control plane",
   },
   {
     label: "How you pay",
-    competitor: "Per contact stored",
+    competitor: "Per active profile (contacts)",
     wraps: "Flat plan fee; Amazon bills each send",
   },
   {
@@ -255,7 +217,7 @@ const featureGroups = [
         },
       },
       {
-        name: "Bounce and complaint alerts",
+        name: "Bounce and complaint monitoring",
         competitor: {
           status: "yes",
           text: "Deliverability dashboards; their team owns the sending",
@@ -538,8 +500,7 @@ const articleSchema = {
   "@context": "https://schema.org",
   "@type": "Article",
   headline: "Klaviyo vs Wraps",
-  description:
-    "Compare Klaviyo and Wraps: a profile-based marketing platform you rent against Amazon SES set up and operated in your own AWS account. Pricing at real volumes, what each one is built for, and who should pick which.",
+  description: PAGE_DESCRIPTION,
   datePublished: "2026-03-01T00:00:00.000Z",
   dateModified: "2026-09-15T00:00:00.000Z",
   author: {
@@ -622,8 +583,9 @@ export default function KlaviyoVsWrapsPage() {
                   RFM segmentation.
                 </>,
                 <>
-                  <strong>You want the integration catalogue</strong> connected
-                  out of the box, with nothing to wire up.
+                  <strong>You want the integration catalogue:</strong>{" "}
+                  e-commerce platforms, payment processors and marketing tools
+                  connected out of the box, with nothing to wire up.
                 </>,
                 <>
                   <strong>You need email, SMS, push and WhatsApp</strong> in one
@@ -813,6 +775,7 @@ export default function KlaviyoVsWrapsPage() {
           <AlsoCompare current="/compare/klaviyo-vs-wraps" />
 
           <CompareSourceNote
+            alsoFrom="public documentation"
             competitor="Klaviyo"
             sources={[
               { label: "klaviyo.com", href: "https://www.klaviyo.com/pricing" },

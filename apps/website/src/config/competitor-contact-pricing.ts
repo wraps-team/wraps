@@ -21,3 +21,17 @@ export const CONTACT_PRICE_ROWS: ContactPriceRow[] = [
 
 /** When the competitor figures were last checked (the compare pages' date). */
 export const CONTACT_PRICES_CHECKED = "September 2026";
+
+/** Klaviyo's entry bill, at about 1,000 profiles (klaviyo.com/pricing). */
+export const KLAVIYO_ENTRY = { contacts: 1000, price: 30 };
+
+/**
+ * Customer.io Essentials (customer.io/pricing): the minimum covers
+ * `includedProfiles`, then each extra profile costs `overagePerProfile`.
+ * `CONTACT_PRICE_ROWS` above must equal minimum + overage at every size.
+ */
+export const CUSTOMER_IO_ESSENTIALS = {
+  minimum: 100,
+  includedProfiles: 5000,
+  overagePerProfile: 0.009,
+};

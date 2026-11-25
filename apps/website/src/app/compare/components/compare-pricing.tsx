@@ -83,7 +83,8 @@ export function ComparePricing({
       <div className="hidden overflow-x-auto border sm:block">
         <table className="w-full text-sm tabular-nums">
           <caption className="sr-only">
-            Monthly cost of {competitor} against Wraps, all in, at five volumes
+            Monthly cost of {competitor} against Wraps, all in, at {rows.length}{" "}
+            volumes
           </caption>
           <thead>
             <tr className="border-b bg-muted/50 text-left">

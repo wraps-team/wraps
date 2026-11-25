@@ -1,4 +1,11 @@
-import { ChevronRight } from "lucide-react";
+import {
+  Check,
+  ChevronRight,
+  Circle,
+  type LucideIcon,
+  Minus,
+  X,
+} from "lucide-react";
 
 /** `na` is for "not applicable" and "not documented": a grey dot, never a claim. */
 export type FeatureStatus = "yes" | "no" | "partial" | "na";
@@ -22,11 +29,11 @@ export type FeatureGroup = {
   children?: React.ReactNode;
 };
 
-const DOT: Record<FeatureStatus, string> = {
-  yes: "bg-success",
-  no: "bg-muted-foreground/40",
-  partial: "bg-warning",
-  na: "bg-border",
+const MARK: Record<FeatureStatus, { Icon: LucideIcon; tone: string }> = {
+  yes: { Icon: Check, tone: "text-success" },
+  no: { Icon: X, tone: "text-muted-foreground" },
+  partial: { Icon: Minus, tone: "text-warning" },
+  na: { Icon: Circle, tone: "text-muted-foreground" },
 };
 
 const WORD: Record<FeatureStatus, string> = {
@@ -36,18 +43,32 @@ const WORD: Record<FeatureStatus, string> = {
   na: "Not applicable",
 };
 
+/**
+ * Status never rests on colour: each status has its own icon shape (check,
+ * cross, dash, hollow circle), and a custom cell also carries the status word
+ * for screen readers ("Partial: Available on qualifying plans").
+ */
 function Cell({ label, value }: { label: string; value: FeatureCellValue }) {
+  const { Icon, tone } = MARK[value.status];
   return (
     <div className="flex min-w-0 items-start gap-2.5">
-      <span
+      <Icon
         aria-hidden="true"
-        className={`mt-1.5 size-2 shrink-0 rounded-full ${DOT[value.status]}`}
+        className={`mt-0.5 size-4 shrink-0 ${tone}`}
+        strokeWidth={value.status === "na" ? 1.5 : 2.5}
       />
       <span className="min-w-0 text-sm [overflow-wrap:anywhere]">
         <span className="font-semibold text-muted-foreground text-xs uppercase tracking-eyebrow sm:sr-only">
           {label}:{" "}
         </span>
-        {value.text ?? WORD[value.status]}
+        {value.text ? (
+          <>
+            <span className="sr-only">{WORD[value.status]}: </span>
+            {value.text}
+          </>
+        ) : (
+          WORD[value.status]
+        )}
       </span>
     </div>
   );

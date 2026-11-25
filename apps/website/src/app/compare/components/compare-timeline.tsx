@@ -8,7 +8,8 @@ export type TimelineStep = {
 };
 
 /**
- * Phase dots with durations, in order. One column on a phone, three from `sm`.
+ * Phase dots with durations, in order. One column on a phone, two from `sm`, three from `lg` (two when steps carry a
+ * detail paragraph).
  */
 export function CompareTimeline({ steps }: { steps: TimelineStep[] }) {
   return (

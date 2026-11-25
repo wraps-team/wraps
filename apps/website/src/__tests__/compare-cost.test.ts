@@ -7,6 +7,18 @@ import {
   savingsPercent,
   wrapsAllIn,
 } from "@/app/compare/components/wraps-cost";
+import {
+  CUSTOMER_IO_INPUTS,
+  pricingRows as cioRows,
+} from "@/app/compare/customer-io-vs-wraps/pricing-rows";
+import {
+  KLAVIYO_INPUTS,
+  pricingRows as klaviyoRows,
+} from "@/app/compare/klaviyo-vs-wraps/pricing-rows";
+import {
+  CONTACT_PRICE_ROWS,
+  CUSTOMER_IO_ESSENTIALS,
+} from "@/config/competitor-contact-pricing";
 
 /**
  * Plan 070's corrected totals. The compare pages compute the Wraps column from
@@ -14,35 +26,66 @@ import {
  * that moves them fails here instead of silently shifting a page.
  */
 describe("compare pages: Wraps all-in column", () => {
-  it("Klaviyo rows (Free at 10K, Pro above, à la carte)", () => {
-    const rows = [
-      [10_000, "free", "$1.18", "Free plan + $1.18 Amazon"],
-      [50_000, "pro", "$35.00", "$29 Pro + $6.00 Amazon"],
-      [100_000, "pro", "$41.50", "$29 Pro + $12.50 Amazon"],
-      [500_000, "pro", "$94.10", "$29 Pro + $65.10 Amazon"],
-      [1_000_000, "pro", "$165.09", "$29 Pro + $136.09 Amazon"],
-    ] as const;
-    for (const [emails, tier, total, breakdown] of rows) {
-      const row = wrapsAllIn({ emails, tier });
-      expect(row.totalLabel).toBe(total);
-      expect(row.breakdown).toBe(breakdown);
-    }
+  it("Klaviyo page rows (the page's own tiers)", () => {
+    const expected = [
+      ["free", "$1.18/mo", "Free plan + $1.18 Amazon"],
+      ["pro", "$35.00/mo", "$29 Pro + $6.00 Amazon"],
+      ["pro", "$41.50/mo", "$29 Pro + $12.50 Amazon"],
+      ["pro", "$94.10/mo", "$29 Pro + $65.10 Amazon"],
+      ["pro", "$165.09/mo", "$29 Pro + $136.09 Amazon"],
+    ];
+    expect(KLAVIYO_INPUTS.map((row) => row.tier)).toEqual(
+      expected.map(([tier]) => tier)
+    );
+    expect(klaviyoRows.map((row) => [row.wraps, row.wrapsBreakdown])).toEqual(
+      expected.map(([, total, breakdown]) => [total, breakdown])
+    );
+    expect(klaviyoRows.map((row) => row.savings)).toEqual([
+      "25x",
+      "2.9x",
+      "3.6x",
+      "7.7x",
+      "8.4x",
+    ]);
   });
 
-  it("Customer.io rows (Business at 500K and 1M)", () => {
-    const rows = [
-      [10_000, "free", "$1.18"],
-      [50_000, "pro", "$35.00"],
-      [100_000, "pro", "$41.50"],
-      [500_000, "business", "$264.10"],
-      [1_000_000, "business", "$335.09"],
-    ] as const;
-    for (const [emails, tier, total] of rows) {
-      expect(wrapsAllIn({ emails, tier }).totalLabel).toBe(total);
-    }
-    expect(wrapsAllIn({ emails: 500_000, tier: "business" }).breakdown).toBe(
-      "$199 Business + $65.10 Amazon"
+  it("Customer.io page rows (the page's own tiers)", () => {
+    const expected = [
+      ["free", "$1.18/mo"],
+      ["pro", "$35.00/mo"],
+      ["pro", "$41.50/mo"],
+      ["business", "$264.10/mo"],
+      ["business", "$335.09/mo"],
+    ];
+    expect(CUSTOMER_IO_INPUTS.map((row) => row.tier)).toEqual(
+      expected.map(([tier]) => tier)
     );
+    expect(cioRows.map((row) => row.wraps)).toEqual(
+      expected.map(([, total]) => total)
+    );
+    expect(cioRows[3].wrapsBreakdown).toBe("$199 Business + $65.10 Amazon");
+  });
+
+  it("Customer.io notes reproduce the config price: minimum + overage x profiles", () => {
+    const { minimum, includedProfiles, overagePerProfile } =
+      CUSTOMER_IO_ESSENTIALS;
+    for (const [index, input] of CUSTOMER_IO_INPUTS.entries()) {
+      const shown = Number(cioRows[index].competitor.replace(/[^0-9.]/g, ""));
+      const note = cioRows[index].competitorNote;
+      const over = /\+ (\d+)K overage/.exec(note);
+      const extraProfiles = over ? Number(over[1]) * 1000 : 0;
+      expect(extraProfiles).toBe(
+        Math.max(0, input.contacts - includedProfiles)
+      );
+      expect(shown).toBeCloseTo(minimum + extraProfiles * overagePerProfile, 2);
+    }
+    for (const row of CONTACT_PRICE_ROWS) {
+      const extra = Math.max(0, row.contacts - includedProfiles);
+      expect(row.customerIo).toBeCloseTo(
+        minimum + extra * overagePerProfile,
+        2
+      );
+    }
   });
 
   it("the default Essentials plan at 1M is $225.09 on Pro", () => {
@@ -83,6 +126,9 @@ describe("Klaviyo and Customer.io compare pages: claim rules", () => {
       }
       expect(source).toMatch(/AWS account/);
       expect(source).toMatch(/No Wraps lock-in/);
+      // The Article JSON-LD carries the same description as the metadata.
+      expect(source).toMatch(/description: PAGE_DESCRIPTION,\n\s+path/);
+      expect(source).toMatch(/headline: [^\n]+\n\s+description:\s+PAGE_DESCRIPTION/);
     });
   }
 });

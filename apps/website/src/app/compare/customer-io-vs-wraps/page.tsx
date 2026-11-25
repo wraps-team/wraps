@@ -15,25 +15,23 @@ import {
   CompareTimeline,
 } from "@/app/compare/components/compare-timeline";
 import { CompareVerdict } from "@/app/compare/components/compare-verdict";
-import {
-  savingsDollars,
-  savingsPercent,
-  wrapsAllIn,
-} from "@/app/compare/components/wraps-cost";
+
+import { pricingRows } from "@/app/compare/customer-io-vs-wraps/pricing-rows";
 import { ClosingPanel } from "@/app/landing/components/closing-panel";
 import { FlowBox } from "@/app/landing/components/flow-primitives";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
-import { CONTACT_PRICE_ROWS } from "@/config/competitor-contact-pricing";
 import { getTier } from "@/config/pricing";
 import { pageMetadata } from "@/lib/page-metadata";
 
+const PAGE_DESCRIPTION =
+  "Compare Customer.io and Wraps. Customer.io charges per contact and hosts everything. Wraps sets up the whole SES surface in your AWS account, then runs it day to day from one control plane, with unlimited contacts on every plan. All-in pricing at real volumes.";
+
 export const metadata: Metadata = pageMetadata({
   title: "Customer.io vs Wraps: Contact Pricing vs Unlimited Contacts",
-  description:
-    "Compare Customer.io and Wraps. Customer.io charges per contact and hosts everything. Wraps sets up the whole SES surface in your AWS account, then runs it day to day from one control plane, with unlimited contacts on every plan. All-in pricing at real volumes.",
+  description: PAGE_DESCRIPTION,
   path: "/compare/customer-io-vs-wraps",
   social: {
     title: "Customer.io vs Wraps",
@@ -66,64 +64,6 @@ const breadcrumbJsonLd = {
     },
   ],
 };
-
-// Customer.io Essentials: $100 a month covers 5,000 profiles, then $0.009 per
-// profile (customer.io/pricing). The 5K to 100K bills are the shared constants;
-// the 1,000 profile row sits on the Essentials minimum.
-const ESSENTIALS_MINIMUM = 100;
-const ESSENTIALS_INCLUDED_PROFILES = 5000;
-const OVERAGE_PER_PROFILE = 0.009;
-
-function customerIoBill(contacts: number): number {
-  if (contacts <= ESSENTIALS_INCLUDED_PROFILES) {
-    return ESSENTIALS_MINIMUM;
-  }
-  const row = CONTACT_PRICE_ROWS.find((r) => r.contacts === contacts);
-  if (!row) {
-    throw new Error(`No Customer.io figure for ${contacts} contacts`);
-  }
-  return row.customerIo;
-}
-
-function customerIoNote(contacts: number): string {
-  if (contacts < ESSENTIALS_INCLUDED_PROFILES) {
-    return "Essentials (5K profiles incl.)";
-  }
-  if (contacts === ESSENTIALS_INCLUDED_PROFILES) {
-    return "Essentials (at profile limit)";
-  }
-  const over = contacts - ESSENTIALS_INCLUDED_PROFILES;
-  return `$${ESSENTIALS_MINIMUM} + ${over / 1000}K overage at $${OVERAGE_PER_PROFILE}/profile`;
-}
-
-function dollars(value: number): string {
-  return `$${value.toLocaleString("en-US")}`;
-}
-
-// Tier per row: Free where it covers the volume, Pro from 50K, Business at
-// 500K and above, as the page has always priced it.
-const pricingRows = (
-  [
-    { emails: 10_000, contacts: 1000, tier: "free" },
-    { emails: 50_000, contacts: 5000, tier: "pro" },
-    { emails: 100_000, contacts: 10_000, tier: "pro" },
-    { emails: 500_000, contacts: 50_000, tier: "business" },
-    { emails: 1_000_000, contacts: 100_000, tier: "business" },
-  ] as const
-).map(({ emails, contacts, tier }) => {
-  const wraps = wrapsAllIn({ emails, tier });
-  const cio = customerIoBill(contacts);
-  return {
-    volume: emails.toLocaleString("en-US"),
-    contacts: contacts.toLocaleString("en-US"),
-    competitor: `${dollars(cio)}/mo`,
-    competitorNote: customerIoNote(contacts),
-    wraps: `${wraps.totalLabel}/mo`,
-    wrapsBreakdown: wraps.breakdown,
-    savings: `${savingsDollars(cio, wraps.total)}/mo`,
-    savingsNote: `${savingsPercent(cio, wraps.total)} less`,
-  };
-});
 
 const freeTier = getTier("free");
 const proTier = getTier("pro");
@@ -387,10 +327,10 @@ const featureGroups = [
         wraps: { status: "yes" },
       },
       {
-        name: "No Wraps lock-in",
+        name: "Sending keeps running if you cancel",
         competitor: {
           status: "no",
-          text: "Workflows, templates and data are proprietary",
+          text: "No, workflows, templates and data are proprietary",
         },
         wraps: {
           status: "yes",
@@ -582,8 +522,7 @@ const articleSchema = {
   "@context": "https://schema.org",
   "@type": "Article",
   headline: "Customer.io vs Wraps",
-  description:
-    "Compare Customer.io and Wraps. Customer.io charges per contact and hosts everything. Wraps sets up the whole SES surface in your AWS account in one command, then runs it day to day from one control plane, with unlimited contacts on every tier.",
+  description: PAGE_DESCRIPTION,
   datePublished: "2026-03-01T00:00:00.000Z",
   dateModified: "2026-09-15T00:00:00.000Z",
   author: {
