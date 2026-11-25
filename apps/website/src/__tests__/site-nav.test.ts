@@ -34,7 +34,7 @@ function resolves(href: string): boolean {
 describe("site navigation", () => {
   it("points every visible link at an existing route", () => {
     const broken = allLinks()
-      .filter((link) => !!resolves(link.href))
+      .filter((link) => !resolves(link.href))
       .map((link) => `${link.name} -> ${link.href}`);
     expect(broken).toEqual([]);
   });
