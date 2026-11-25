@@ -374,6 +374,82 @@ describe("CliDeployConnectStep — three-path layout", () => {
     });
   });
 
+  it("reports an agent deployment start when an open-in link is clicked", () => {
+    renderWithQueryClient(
+      <CliDeployConnectStep {...defaultProps} selfHosted={false} />
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /copy the agent prompt/i })
+    );
+    const link = screen.getByRole("link", { name: "Open in Cursor" });
+    link.addEventListener("click", (e) => e.preventDefault());
+    fireEvent.click(link);
+    fireEvent.click(link);
+
+    expect(capturesOf("onboarding_agent_deeplink_clicked")).toHaveLength(2);
+    expect(capturesOf("onboarding_agent_deeplink_clicked")[0][1]).toEqual({
+      step: 4,
+      step_name: "Deploy & Connect",
+      organization_id: "org-123",
+      target: "cursor",
+    });
+    expect(capturesOf("onboarding_deployment_started")).toHaveLength(1);
+    expect(mockCapture).toHaveBeenCalledWith("onboarding_deployment_started", {
+      step: 4,
+      step_name: "Deploy & Connect",
+      organization_id: "org-123",
+      method: "agent",
+      layout: "three_path",
+    });
+  });
+
+  it("keeps the organization ID and webhook secret out of the agent links, copied prompt and shown prompt", async () => {
+    const { getCloudFormationWebhookSecretAction } = await import(
+      "@/actions/aws-accounts"
+    );
+    renderWithQueryClient(
+      <CliDeployConnectStep {...defaultProps} selfHosted={false} />
+    );
+    // The secret query runs on mount, so both values are live in the component.
+    await waitFor(() => {
+      expect(getCloudFormationWebhookSecretAction).toHaveBeenCalledWith(
+        defaultProps.organizationId
+      );
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /copy the agent prompt/i })
+    );
+    const secrets = [defaultProps.organizationId, "f".repeat(64)];
+    const forms = (v: string) => [v, encodeURIComponent(v)];
+
+    const hrefs = screen
+      .getAllByRole("link", { name: /^Open in / })
+      .map((a) => a.getAttribute("href") ?? "");
+    expect(hrefs).toHaveLength(3);
+    for (const href of hrefs) {
+      for (const secret of secrets.flatMap(forms)) {
+        expect(href).not.toContain(secret);
+      }
+    }
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy prompt" }));
+    await waitFor(() => expect(mockWriteText).toHaveBeenCalled());
+    const copied = mockWriteText.mock.calls[0][0] as string;
+    expect(copied).toContain("Test Org");
+
+    fireEvent.click(screen.getByRole("button", { name: /view/i }));
+    const shown = document.querySelector("pre")?.textContent ?? "";
+    expect(shown).toBe(copied);
+
+    for (const text of [copied, shown]) {
+      for (const secret of secrets.flatMap(forms)) {
+        expect(text).not.toContain(secret);
+      }
+    }
+  });
+
   it("reports nothing when the clipboard write fails", async () => {
     mockWriteText.mockRejectedValue(new Error("not allowed"));
     renderWithQueryClient(

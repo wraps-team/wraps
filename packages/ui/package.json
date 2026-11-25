@@ -10,6 +10,7 @@
     },
     "./contexts/theme-context": "./src/contexts/theme-context.ts",
     "./lib/utils": "./src/lib/utils.ts",
+    "./lib/agent-setup": "./src/lib/agent-setup.ts",
     "./hooks/use-theme": "./src/hooks/use-theme.ts",
     "./hooks/use-circular-transition": "./src/hooks/use-circular-transition.ts",
     "./hooks/use-mobile": "./src/hooks/use-mobile.ts",
