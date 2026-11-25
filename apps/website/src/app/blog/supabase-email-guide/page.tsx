@@ -916,7 +916,8 @@ serve(async () => {
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="mt-0.5 h-4 w-4 text-success" />A dedicated
-                    IP at $24.95/mo if you want full control of it
+                    IP at $24.95/mo per IP, billed by AWS, if you want full
+                    control of it
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="mt-0.5 h-4 w-4 text-success" />

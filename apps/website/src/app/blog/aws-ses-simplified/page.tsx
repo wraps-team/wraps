@@ -80,7 +80,7 @@ const faqSchema = {
       name: "How much does AWS SES cost with Wraps?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "AWS SES costs $0.10 per 1,000 emails. Wraps infrastructure costs vary by preset: Starter (~$0.05/mo), Production (~$2-5/mo), or Enterprise (~$50-100/mo). You pay AWS directly with no middleman markup.",
+        text: "AWS SES costs $0.10 (à la carte plan) per 1,000 emails. Wraps infrastructure costs vary by preset: Starter (~$0.05/mo), Production (~$2-5/mo), or Enterprise (~$50-100/mo). You pay AWS directly with no middleman markup.",
       },
     },
     {
@@ -291,8 +291,8 @@ export default function Page() {
                   <strong className="text-foreground">
                     once SES is set up, it&apos;s incredibly cheap
                   </strong>{" "}
-                  ($0.10 per 1,000 emails) and you own the infrastructure. The
-                  problem isn&apos;t SES itself.{" "}
+                  ($0.10 (à la carte plan) per 1,000 emails) and you own the
+                  sending infrastructure. The problem isn&apos;t SES itself.{" "}
                   <span className="font-semibold text-success">
                     It&apos;s the setup.
                   </span>

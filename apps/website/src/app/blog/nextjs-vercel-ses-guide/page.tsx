@@ -438,8 +438,7 @@ export default function Page() {
                         Choose a configuration preset
                       </strong>{" "}
                       &mdash; for most apps, <strong>Production</strong> is the
-                      sweet spot (real-time event tracking, 90-day email
-                      history).
+                      sweet spot (event tracking, 90-day email history).
                     </li>
                   </ul>
                   <p className="text-foreground/80 leading-relaxed">
