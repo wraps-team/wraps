@@ -54,6 +54,31 @@ describe("onboarding agent setup prompt", () => {
     expect(prompt).toContain('choose "Acme Co".');
   });
 
+  it.each([
+    ["newline", "Acme\nCo", "Acme Co"],
+    ["zero-width space", "Acme\u200BCo", "AcmeCo"],
+    ["bidi override", "Acme\u202Eoc", "Acmeoc"],
+    ["double quote", 'Acme "Co"', "Acme 'Co'"],
+  ])("sanitizes an org name with a %s", (_n, input, expected) => {
+    const prompt = buildAgentSetupPrompt({
+      context: "onboarding",
+      orgName: input,
+    });
+    expect(prompt).toContain(
+      `   If it asks which organization to connect, choose "${expected}".`
+    );
+    expect(prompt).not.toMatch(/[\u200B\u202E]/);
+  });
+
+  it("caps the org name at 100 characters", () => {
+    const prompt = buildAgentSetupPrompt({
+      context: "onboarding",
+      orgName: "A".repeat(150),
+    });
+    expect(prompt).toContain(`choose "${"A".repeat(100)}".`);
+    expect(prompt).not.toContain("A".repeat(101));
+  });
+
   it("treats a whitespace-only org name as no org", () => {
     const prompt = buildAgentSetupPrompt({
       context: "onboarding",

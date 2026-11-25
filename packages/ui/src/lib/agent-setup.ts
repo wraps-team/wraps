@@ -18,9 +18,22 @@ export type AgentSetupPromptOptions = {
   context: AgentSetupContext;
 };
 
-/** Collapse runs of whitespace (newlines included) so a name stays on one line. */
+const ORG_NAME_MAX_LENGTH = 100;
+
+/**
+ * Make an organization name safe to quote inside the prompt: drop control and
+ * format characters (zero-width, bidi overrides), collapse whitespace so the
+ * name stays on one line, swap double quotes for single so the name cannot end
+ * the quoted string early, and cap the length.
+ */
 function cleanOrgName(name?: string): string | undefined {
-  const cleaned = name?.replace(/\s+/g, " ").trim();
+  const cleaned = name
+    ?.replace(/\s+/g, " ")
+    .replace(/[\p{Cc}\p{Cf}]/gu, "")
+    .replace(/"/g, "'")
+    .trim()
+    .slice(0, ORG_NAME_MAX_LENGTH)
+    .trim();
   return cleaned || undefined;
 }
 
