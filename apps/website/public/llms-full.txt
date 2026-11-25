@@ -1161,7 +1161,7 @@ if (email.inbox) {
 | Feature | Wraps | Resend | SendGrid | Postmark |
 |---------|-------|--------|----------|----------|
 | You own infrastructure | Yes | No | No | No |
-| Vendor lock-in | None | Yes | Yes | Yes |
+| Lock-in | Wraps lock-in: none; sending keeps running without us | Yes | Yes | Yes |
 | Cost at 100K emails/mo | ~$20-59 | $80+ | $90+ | $120+ |
 | Unlimited contacts | Yes | No | No | No |
 | DKIM/SPF/DMARC auto-setup | Yes | Partial | Partial | Partial |

@@ -71,7 +71,7 @@ export function ChangelogReleasesSection() {
                 </h3>
                 <p className="mt-2 text-muted-foreground text-sm">
                   What if deploying email infrastructure to AWS was as simple as
-                  one command? No vendor lock-in, no markup on AWS pricing, just
+                  one command? No Wraps lock-in, no markup on AWS pricing, just
                   great developer experience.
                 </p>
               </div>

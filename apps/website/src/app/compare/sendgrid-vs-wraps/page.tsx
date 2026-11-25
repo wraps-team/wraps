@@ -301,7 +301,7 @@ const featureComparison = [
       {
         name: "Open source",
         sendgrid: false,
-        wraps: "AGPL-3.0, self-hostable",
+        wraps: "AGPLv3; SDKs MIT",
       },
       {
         name: "What happens when you leave",
@@ -610,7 +610,7 @@ export default function SendGridVsWrapsPage() {
                   <ul className="space-y-2 text-muted-foreground text-sm">
                     <li>
                       Email sends from SES in your AWS account. The domain
-                      identity and the sender reputation are yours.
+                      identity and the sending account are yours.
                     </li>
                     <li>
                       Per-event delivery history lands in your DynamoDB, with

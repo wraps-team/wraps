@@ -23,7 +23,7 @@ const softwareSchema = {
     priceCurrency: "USD",
   },
   description:
-    "Agent mailboxes: give every AI agent its own email address, with send caps, a recipient allowlist, an approval queue, and a kill switch enforced in your own AWS account. No stored credentials, no vendor lock-in.",
+    "Agent mailboxes: give every AI agent its own email address, with send caps, a recipient allowlist, an approval queue, and a kill switch enforced in your own AWS account. No stored credentials, no Wraps lock-in.",
   url: "https://wraps.dev/agents",
   author: {
     "@type": "Organization",

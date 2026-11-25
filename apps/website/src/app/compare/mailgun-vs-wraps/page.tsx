@@ -238,7 +238,7 @@ const featureComparison = [
         wraps: true,
       },
       {
-        name: "Self-hosted / BYOC",
+        name: "Sends from your own AWS account (BYOC)",
         mailgun: false,
         wraps: true,
       },
@@ -302,7 +302,7 @@ const featureComparison = [
       {
         name: "Open source",
         mailgun: false,
-        wraps: "AGPL-3.0, self-hostable",
+        wraps: "AGPLv3; SDKs MIT",
       },
       {
         name: "Cancel impact",

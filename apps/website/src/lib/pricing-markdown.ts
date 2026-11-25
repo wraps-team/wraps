@@ -8,6 +8,7 @@
  * if the checked-in file is stale.
  */
 
+import { LICENSE_STATEMENT } from "../config/license";
 import type { TierId } from "../config/pricing";
 import {
   FEATURE_COMPARISON,
@@ -274,7 +275,7 @@ function whatYouOwnSection(): string {
 
 The infrastructure is deployed into your AWS account with Pulumi and namespaced \`wraps-email-*\`, \`wraps-sms-*\`, \`wraps-cdn-*\`. Nothing pre-existing is modified. Your sending identities, event history, and suppression lists live in your account. If you stop paying Wraps, the infrastructure keeps sending — you lose the dashboard, workflows, and platform tooling, not your ability to send email. \`wraps email destroy\` removes exactly what was deployed.
 
-Wraps is open source (AGPL-3.0). Self-hosting the control plane is available on Enterprise.`;
+${LICENSE_STATEMENT}`;
 }
 
 // =============================================================================

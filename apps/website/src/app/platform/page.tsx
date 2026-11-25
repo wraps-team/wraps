@@ -31,15 +31,9 @@ const softwareSchema = {
 };
 
 export const metadata: Metadata = pageMetadata({
-  title: "Email platform on your own AWS",
+  title: "Email platform for Amazon SES",
   description,
   path: "/platform",
-  image: {
-    url: "/wraps-platform-og.webp",
-    width: 1424,
-    height: 752,
-    alt: "Wraps Platform - templates, newsletters, automations and reports",
-  },
   social: { title: "Everything your team needs to send email" },
 });
 

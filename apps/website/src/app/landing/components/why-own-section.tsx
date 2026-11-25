@@ -1,3 +1,4 @@
+import { LICENSE_STATEMENT } from "@/config/license";
 import { AWS_PRICING } from "@/config/pricing";
 import { FlowBox } from "./flow-primitives";
 import { SectionHead } from "./section-head";
@@ -47,7 +48,7 @@ export function WhyOwnSection() {
     {
       label: "Transparency",
       title: "Nothing hidden",
-      body: "We never store your AWS keys. The code is public under AGPLv3, except the enterprise directories (commercial) and the SDKs (MIT), so your security reviewer can read what Wraps sets up.",
+      body: `We never store your AWS keys. Your security reviewer can read what Wraps sets up. ${LICENSE_STATEMENT}`,
     },
   ];
 

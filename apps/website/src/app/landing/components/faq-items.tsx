@@ -6,6 +6,7 @@
  */
 
 import type { ReactNode } from "react";
+import { LICENSE_STATEMENT } from "@/config/license";
 import { getTier } from "@/config/pricing";
 import { estimateCost, SES_PLANS } from "@/lib/ses-cost";
 
@@ -62,19 +63,18 @@ export const faqItems: FaqItem[] = [
   {
     value: "item-1b",
     question: "How is this different from the free open-source SES wrappers?",
-    answer:
-      "Wraps is one of them: the code is public under AGPLv3, except the enterprise directories, which are under a commercial license. Open source is table stakes in this category rather than the difference. The difference is what happens past the send API. OpenSend, useSend and MillionSend give you an API and a dashboard over your own SES; checked in September 2026, none of them watches your account against the rates AWS suspends over, governs bounces past emitting a webhook, or runs blacklist and authentication audits. They also want AWS credentials in a container you run, where Wraps assumes an IAM role you can revoke. Our CLI and SDKs are free and open source too, so if the deploy is all you want, take that.",
+    answer: `Wraps is one of them. ${LICENSE_STATEMENT} Open source is table stakes in this category rather than the difference. The difference is what happens past the send API. OpenSend, useSend and MillionSend give you an API and a dashboard over your own SES; checked in September 2026, none of them watches your account against the rates AWS suspends over, governs bounces past emitting a webhook, or runs blacklist and authentication audits. They also want AWS credentials in a container you run, where Wraps assumes an IAM role you can revoke. Our CLI and SDKs are free and open source too, so if the deploy is all you want, take that.`,
     richAnswer: (
       <>
-        Wraps is one of them: the code is public under{" "}
+        Wraps is one of them. Open source under{" "}
         <a
           className={faqLink}
           href="https://github.com/wraps-team/wraps/blob/main/LICENSE"
         >
           AGPLv3
         </a>
-        , except the enterprise directories, which are under a commercial
-        license. Open source is table stakes in this category rather than the
+        , except the enterprise (ee) directories, which are under a commercial
+        license. The SDKs are MIT. Open source is table stakes in this category rather than the
         difference. The difference is what happens past the send API. OpenSend,
         useSend and MillionSend give you an API and a dashboard over your own
         SES; checked in September 2026, none of them watches your account
@@ -186,7 +186,7 @@ export const faqItems: FaqItem[] = [
     value: "item-7",
     question: "Can I receive emails too?",
     answer:
-      "Yes! Wraps supports inbound email receiving. Run 'npx @wraps.dev/cli email inbound init' to deploy the infrastructure, then use the SDK to list, read, reply, and forward emails. EventBridge triggers let you build webhooks for real-time processing.",
+      "Yes! Wraps supports inbound email receiving. Run 'npx @wraps.dev/cli email inbound init' to deploy the infrastructure, then use the SDK to list, read, reply, and forward emails. EventBridge triggers let you build webhooks for fast event processing.",
     richAnswer: (
       <>
         Yes! Wraps supports{" "}
@@ -200,7 +200,7 @@ export const faqItems: FaqItem[] = [
           SDK
         </a>{" "}
         to list, read, reply, and forward emails. EventBridge triggers let you
-        build webhooks for real-time processing.
+        build webhooks for fast event processing.
       </>
     ),
   },

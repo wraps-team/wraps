@@ -4,7 +4,7 @@ import { DoorOpen, KeyRound, ShieldCheck } from "lucide-react";
 const reasons = [
   {
     icon: ShieldCheck,
-    title: "Your reputation",
+    title: "Your domain",
     description:
       "DKIM, SPF, and DMARC sign from your domain — not a shared pool. When inbox providers decide whether to trust a sender, they look at you.",
   },

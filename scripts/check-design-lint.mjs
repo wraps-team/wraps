@@ -20,7 +20,7 @@ import { execFileSync } from "node:child_process";
 // never raise one to make a failing run pass.
 export const CEILINGS = {
   "shadcn(no-arbitrary-values) apps/web": 34,
-  "shadcn(no-arbitrary-values) apps/website": 45,
+  "shadcn(no-arbitrary-values) apps/website": 9,
   "shadcn(no-arbitrary-values) packages/console": 1,
   "shadcn(no-arbitrary-values) packages/ui": 4,
   "shadcn(no-inline-styles) apps/web": 70,
@@ -31,7 +31,7 @@ export const CEILINGS = {
   "shadcn(no-raw-colors) apps/website": 0,
   "shadcn(no-raw-colors) packages/console": 23,
   "shadcn(no-restyle) apps/web": 0,
-  "shadcn(no-restyle) apps/website": 35,
+  "shadcn(no-restyle) apps/website": 30,
   "shadcn(no-restyle) packages/console": 0,
   "shadcn(no-restyle) packages/ui": 14,
   "shadcn(require-static-classes) apps/web": 0,

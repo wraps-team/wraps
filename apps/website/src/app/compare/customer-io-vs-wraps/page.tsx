@@ -23,6 +23,7 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
+import { LICENSE_STATEMENT } from "@/config/license";
 import { getTier } from "@/config/pricing";
 import { pageMetadata } from "@/lib/page-metadata";
 
@@ -444,8 +445,7 @@ const featureGroups = [
               keeps running
             </li>
             <li>
-              Open source under AGPLv3, except the enterprise (ee) directories,
-              which are under a commercial license. The SDKs are MIT
+              {LICENSE_STATEMENT}
             </li>
           </ul>
         </FlowBox>

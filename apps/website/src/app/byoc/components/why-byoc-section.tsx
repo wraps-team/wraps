@@ -12,7 +12,7 @@ const cards = [
     icon: LogOut,
     title: "Ownership",
     description:
-      "Your domain reputation and delivery history live in your AWS account, not ours. They stay there, and keep working, if you stop paying Wraps.",
+      "Your sending setup and delivery history live in your AWS account, not ours. They stay there, and keep working, if you stop paying Wraps.",
   },
   {
     icon: Eye,

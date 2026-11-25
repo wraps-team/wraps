@@ -9,7 +9,7 @@
 > the customer's own SES on their own domains. Wraps also
 > deploys SMS (AWS End User Messaging) and CDN (S3 + CloudFront). Open source
 > under AGPLv3, except the enterprise (ee) directories, which are under a
-> commercial license; the SDKs are MIT. Operated by FlatironKids LLC, Colorado, United States.
+> commercial license. The SDKs are MIT. Operated by FlatironKids LLC, Colorado, United States.
 
 Key facts (as of August 2026):
 

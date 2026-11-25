@@ -131,7 +131,7 @@ const faqSchema = {
       name: "What does this cost?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "SES costs $0.10 per 1,000 emails. Events are included in your Wraps plan. You pay AWS directly — no Wraps markup on sending.",
+        text: "SES costs $0.10 per 1,000 emails on à la carte ($0.16 on the Essentials plan new accounts start on). Events are included in your Wraps plan. You pay AWS directly — no Wraps markup on sending.",
       },
     },
     {
@@ -204,7 +204,7 @@ export default function Page() {
               <div>
                 <div className="font-mono text-2xl text-primary">$0.10</div>
                 <div className="text-muted-foreground text-sm">
-                  Per 1K emails
+                  Per 1K emails (à la carte)
                 </div>
               </div>
               <div>
@@ -576,8 +576,9 @@ await onSignup({ email: user.email, name: user.name });`}
 
               <Collapsible title="What does this cost?">
                 <p className="text-muted-foreground text-sm">
-                  SES costs $0.10 per 1,000 emails. Events are included in your
-                  Wraps plan. You pay AWS directly — there's no Wraps markup on
+                  SES costs $0.10 per 1,000 emails on à la carte ($0.16 on the
+                  Essentials plan new accounts start on). Events are included in
+                  your Wraps plan. You pay AWS directly — there's no Wraps markup on
                   sending.
                 </p>
               </Collapsible>

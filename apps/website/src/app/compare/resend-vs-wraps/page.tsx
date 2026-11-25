@@ -240,7 +240,7 @@ const featureComparison = [
         wraps: true,
       },
       {
-        name: "Self-hosted / BYOC",
+        name: "Sends from your own AWS account (BYOC)",
         resend: false,
         wraps: true,
       },
@@ -620,8 +620,8 @@ export default function ResendVsWrapsPage() {
               own account, on a sending reputation shared across their senders
               unless you buy a dedicated IP. On Wraps it happens on yours, on an
               account only you send from. The alarms are CloudWatch resources in
-              your account, so they go on watching your reputation whether or
-              not you keep paying us.
+              your account, so they go on watching your bounce and complaint
+              rates whether or not you keep paying us.
             </p>
           </section>
 
@@ -690,8 +690,7 @@ export default function ResendVsWrapsPage() {
                     </li>
                     <li className="flex items-start gap-2">
                       <Check className="mt-0.5 size-4 shrink-0 text-success" />
-                      The account, the domain identities and the reputation are
-                      yours
+                      The account and the domain identities are yours
                     </li>
                     <li className="flex items-start gap-2">
                       <Check className="mt-0.5 size-4 shrink-0 text-success" />

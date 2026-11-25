@@ -792,14 +792,15 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
   },
   {
     route: "/platform",
-    primaryQuery: "hosted email platform on your aws",
+    primaryQuery: "email platform for amazon ses",
     secondaryQueries: [
-      "email templates broadcasts workflows dashboard",
-      "premium layer on top of ses",
+      "ai email template builder for ses",
+      "newsletters and automations on amazon ses",
+      "ses dashboard for marketers",
     ],
     audience: "evaluating-wraps",
     rationale:
-      'Its own metadata frames the platform explicitly as "the premium layer on top of your AWS infrastructure," which is the specific positioning distinguishing it from both the free CLI and the raw-SES comparison pages.',
+      "Its title names Amazon SES and the page leads with templates written with AI, newsletters and automations in one dashboard, which separates it from the free CLI and the raw-SES comparison pages.",
   },
   {
     route: "/sdk",

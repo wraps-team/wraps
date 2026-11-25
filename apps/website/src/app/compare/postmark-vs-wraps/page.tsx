@@ -101,7 +101,7 @@ const tldrRows = [
     wraps: "Events in your DynamoDB, retention you set",
   },
   {
-    dimension: "Vendor lock-in",
+    dimension: "Lock-in",
     postmark: "Proprietary API, templates, IPs",
     wraps: "Cancel Wraps, keep your SES infra",
   },
@@ -547,7 +547,7 @@ export default function PostmarkVsWrapsPage() {
               and the reputation those IPs carry is pooled across every customer
               on them. That pooled reputation is the product, and it is well
               kept. Wraps inverts the arrangement: the sending infrastructure
-              sits in your AWS account and the reputation is yours alone.
+              sits in your AWS account, on an account only you send from.
             </p>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -595,7 +595,8 @@ export default function PostmarkVsWrapsPage() {
                       Cancel Wraps and the SES infrastructure keeps running
                     </li>
                     <li>
-                      Your sending reputation is yours, and Wraps watches it
+                      Wraps watches your account&apos;s bounce and complaint
+                      rates
                     </li>
                   </ul>
                 </CardContent>
@@ -805,7 +806,7 @@ export default function PostmarkVsWrapsPage() {
                     "You want the sending infrastructure and the delivery history to live in your account, with retention you set rather than a retention add-on you buy",
                     "You're cost-sensitive at volume. AWS SES is $0.10 per 1,000 \u00e0 la carte, $0.16 on Essentials, against Postmark's $1.20-$1.80 overage rate.",
                     "You want SMS alongside email via AWS End User Messaging, from the same platform",
-                    "You care about vendor lock-in: cancel Wraps and your SES infrastructure keeps running with no DNS changes or sender warmup required",
+                    "You care about lock-in to Wraps: cancel Wraps and your SES infrastructure keeps running with no DNS changes or sender warmup required",
                     "You're a TypeScript team that wants React Email templates with type-safe SDK integration",
                   ].map((point) => (
                     <li className="flex items-start gap-3" key={point}>

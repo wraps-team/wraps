@@ -494,9 +494,9 @@ function SESCalculatorInner() {
                 {/* EventBridge */}
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label htmlFor="eventbridge">Real-time EventBridge</Label>
+                    <Label htmlFor="eventbridge">Fast EventBridge processing</Label>
                     <p className="text-muted-foreground text-sm">
-                      Process events in real-time
+                      Process events as they arrive
                     </p>
                   </div>
                   <Switch

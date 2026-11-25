@@ -68,7 +68,7 @@ const comparisons = [
     href: "/compare/sendgrid-vs-wraps",
     tagline: "Rent the sending, or own it",
     description:
-      "SendGrid has the scale and the support desk, and sends from their infrastructure on shared IPs you do not control. Compare what changes when the account, the reputation and the sending data are yours — and what you take on when they are.",
+      "SendGrid has the scale and the support desk, and sends from their infrastructure on shared IPs you do not control. Compare what changes when the sending account and the sending data are yours — and what you take on when they are.",
   },
   {
     competitor: "Customer.io",
@@ -87,16 +87,16 @@ const comparisons = [
   {
     competitor: "Klaviyo",
     href: "/compare/klaviyo-vs-wraps",
-    tagline: "Built for developers, not storefronts",
+    tagline: "Built for teams on Amazon SES",
     description:
       "Klaviyo is excellent at ecommerce lifecycle marketing and a non-engineer can run it. If you are a developer-led team sending transactional and lifecycle email, compare the feature surface you actually use against what contact-based billing charges you for.",
   },
   {
     competitor: "Mailgun",
     href: "/compare/mailgun-vs-wraps",
-    tagline: "Your account, your reputation",
+    tagline: "Sending in your own account",
     description:
-      "Mailgun brings a long track record, EU regions and mature deliverability tooling. Compare pricing at real volumes against sending from an account you own, and what changes when the reputation being built is yours.",
+      "Mailgun brings a long track record, EU regions and mature deliverability tooling. Compare pricing at real volumes against sending from an account you own, and what changes when the sending history sits in your account.",
   },
   {
     competitor: "Hand-rolled bounce handling",
