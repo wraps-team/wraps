@@ -107,6 +107,10 @@ export function InboundPageContent() {
                     <Check aria-hidden="true" className="size-4 text-brand" />
                     Reply from your app, with threading
                   </li>
+                  <li className="flex items-center gap-2">
+                    <Check aria-hidden="true" className="size-4 text-brand" />
+                    No credit card to start with Wraps
+                  </li>
                 </ul>
               </div>
               <AnimatedInbox />
