@@ -218,7 +218,7 @@ export default function Page() {
               mentioned below is now called Business. Existing Growth
               subscriptions keep their $79/mo pricing for life. The AWS SES
               pricing details in this post are unaffected. See{" "}
-              <Link className="underline" href="/platform#pricing">
+              <Link className="underline" href="/#pricing">
                 current Wraps plans
               </Link>
               .

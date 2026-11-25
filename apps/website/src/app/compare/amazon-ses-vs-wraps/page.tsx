@@ -705,7 +705,7 @@ export default function AmazonSesVsWrapsPage() {
                 flat: Free ($0/mo), Pro ($29/mo), Business ($199/mo). They are
                 priced on AWS accounts, dashboard history and governance
                 features, never on send volume.{" "}
-                <a className="text-primary underline" href="/platform#pricing">
+                <a className="text-primary underline" href="/#pricing">
                   See what each plan includes
                 </a>
               </p>

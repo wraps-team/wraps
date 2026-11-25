@@ -27,7 +27,7 @@ export function ScalePlanContent() {
           <strong>Updated 2026-08:</strong> the Scale plan described in this
           post is now called Business. Existing Scale subscriptions keep their
           $199/mo pricing for life. See{" "}
-          <Link className="underline" href="/platform#pricing">
+          <Link className="underline" href="/#pricing">
             current plans
           </Link>
           .

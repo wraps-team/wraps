@@ -42,7 +42,7 @@ type TabKey = "console" | "deploy" | "receive" | "send";
 const consoleFeatures = [
   {
     icon: BarChart3,
-    title: "Real-time Analytics",
+    title: "Delivery Analytics",
     description: "Spot delivery issues before users complain",
   },
   {
