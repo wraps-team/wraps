@@ -78,7 +78,7 @@ const NEEDS = [
 ];
 
 const FIT = [
-  "Your email bill grows every time your list does",
+  "Your contact-based email bill grows with your list",
   "You already use AWS, or you're happy to open an account",
   "Several people send email and you want one place to do it",
 ];
@@ -134,7 +134,7 @@ export function FoundersPageContent() {
           <SectionHead
             body={
               <>
-                Wraps is a flat fee: Free is {formatCurrency(free.price)}, Pro
+                The Wraps fee is flat: Free is {formatCurrency(free.price)}, Pro
                 is {formatCurrency(pro.price)} a month, Business is{" "}
                 {formatCurrency(business.price)}. Amazon bills what you send,
                 straight to you. We add nothing per email.

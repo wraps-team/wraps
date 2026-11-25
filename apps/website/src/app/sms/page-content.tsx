@@ -38,7 +38,7 @@ const TEAM = [
   {
     label: "Credentials",
     title: "No stored AWS keys",
-    body: "Your app authenticates to AWS with OIDC from your hosting provider. We never store your AWS credentials.",
+    body: "Your app can authenticate to AWS with OIDC from your hosting provider. We never store your AWS credentials.",
   },
   {
     label: "Billing",

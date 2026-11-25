@@ -57,8 +57,7 @@ const CONSENT = [
   },
   {
     question: "Did the unsubscribe actually take?",
-    answer:
-      "Status changes at the contact, not at the campaign. Broadcast recipient selection only resolves to contacts still marked active.",
+    answer: "Status changes at the contact, not at the campaign.",
   },
 ];
 
@@ -106,7 +105,7 @@ const OWNERSHIP = [
   {
     label: "If you stop paying us",
     title: "Your app's emails keep going out",
-    body: "The SES configuration, the domain identity and the event pipeline live in your account. Cancelling Wraps costs you the dashboard, workflows and platform tooling, not the ability to send.",
+    body: "The SES configuration, the domain identity and the event pipeline live in your account. Cancelling Wraps costs you the dashboard, workflows and platform tooling. Broadcasts and automations stop.",
   },
   {
     label: "From your terminal",
