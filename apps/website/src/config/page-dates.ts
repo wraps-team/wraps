@@ -264,5 +264,5 @@ export const PAGE_DATES: Record<string, string> = {
   "/versus/postmark-vs-smtp2go": "2026-09-16T19:03:19-06:00",
   "/versus/resend-vs-sendgrid": "2026-09-16T16:57:31-06:00",
   "/versus/resend-vs-smtp2go": "2026-09-16T19:03:19-06:00",
-  "/why-wraps": "2026-11-25T09:22:54-07:00",
+  "/why-wraps": "2026-11-25T09:41:25-07:00",
 };
