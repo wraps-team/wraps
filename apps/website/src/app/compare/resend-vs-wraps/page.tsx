@@ -295,9 +295,13 @@ const featureComparison = [
       {
         name: "SOC 2",
         resend: true,
-        wraps: "Not certified",
+        wraps: "No SOC 2 yet",
       },
-      { name: "HIPAA", resend: false, wraps: "Not offered" },
+      {
+        name: "HIPAA",
+        resend: false,
+        wraps: "We don't have SOC 2 or HIPAA certification yet",
+      },
       {
         name: "Cancel impact",
         resend: "Data deleted",
