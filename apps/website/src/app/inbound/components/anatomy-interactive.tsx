@@ -49,7 +49,7 @@ function FieldTarget({
   return (
     <button
       className={cn(
-        "cursor-pointer rounded-none text-left transition-all",
+        "cursor-pointer rounded-none text-left transition-all motion-reduce:transition-none",
         className,
         isActive && highlight
       )}

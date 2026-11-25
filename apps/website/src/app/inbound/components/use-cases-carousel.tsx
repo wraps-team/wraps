@@ -72,7 +72,7 @@ export function UseCasesCarousel({ useCases }: { useCases: UseCase[] }) {
           return (
             <div
               className={cn(
-                "w-[85vw] max-w-md shrink-0 snap-center overflow-hidden rounded-none border border-border bg-card transition-colors duration-300 sm:w-[70vw] lg:w-[400px]",
+                "w-[85vw] max-w-md shrink-0 snap-center overflow-hidden rounded-none border border-border bg-card transition-colors motion-reduce:transition-none duration-300 sm:w-[70vw] lg:w-[400px]",
                 activeIndex === index && "border-brand/40"
               )}
               data-card
@@ -110,7 +110,7 @@ export function UseCasesCarousel({ useCases }: { useCases: UseCase[] }) {
           <button
             aria-label={`Go to ${useCase.title}`}
             className={cn(
-              "size-2 rounded-full transition-all",
+              "size-2 rounded-full transition-all motion-reduce:transition-none",
               activeIndex === index
                 ? "w-6 bg-brand"
                 : "bg-muted-foreground/30 hover:bg-muted-foreground/50"

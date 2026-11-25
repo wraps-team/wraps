@@ -65,7 +65,7 @@ export function SdkTabs({ examples }: { examples: CodeExamples }) {
         {exampleKeys.map((key) => (
           <button
             className={cn(
-              "cursor-pointer rounded-none px-4 py-2 font-sans font-semibold text-xs uppercase tracking-widest transition-all",
+              "cursor-pointer rounded-none px-4 py-2 font-sans font-semibold text-xs uppercase tracking-widest transition-all motion-reduce:transition-none",
               activeExample === key
                 ? "bg-primary text-primary-foreground"
                 : "border border-border bg-card text-muted-foreground hover:text-foreground"

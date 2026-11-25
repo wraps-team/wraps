@@ -103,7 +103,7 @@ export function AnimatedInbox() {
           return (
             <div
               className={cn(
-                "mb-2 rounded-none border border-transparent p-3 transition-all duration-300",
+                "mb-2 rounded-none border border-transparent p-3 transition-all motion-reduce:transition-none duration-300",
                 isVisible && "translate-x-0 border-border bg-card opacity-100",
                 !isVisible && isAnimating && "translate-x-8 opacity-50",
                 !(isVisible || isAnimating) && "translate-x-full opacity-0",
