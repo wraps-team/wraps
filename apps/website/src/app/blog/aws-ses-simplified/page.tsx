@@ -235,7 +235,7 @@ export default function Page() {
               <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <Shield className="text-success" size={16} />
                 <span className="text-foreground/80 text-sm">
-                  Your AWS, your data
+                  Runs in your AWS
                 </span>
               </div>
             </div>
@@ -895,8 +895,8 @@ wraps email destroy`}
 
             <ul className="mb-6 space-y-3">
               {[
-                "You pay AWS directly for sending ($0.10 per 1,000 emails)",
-                "Your data stays in your AWS account",
+                "You pay AWS directly for sending",
+                "Sending and event data stay in your AWS account",
                 "No vendor lock-in\u2014your infrastructure keeps working even if you stop using Wraps",
               ].map((item) => (
                 <li

@@ -1,7 +1,9 @@
+import { BoxLabel } from "@/app/landing/components/flow-primitives";
+
 const styles = {
-  tip: "border-success/50 bg-success/10",
-  warning: "border-warning/50 bg-warning/10",
-  danger: "border-destructive/50 bg-destructive/10",
+  tip: "border-success/50",
+  warning: "border-warning/50",
+  danger: "border-destructive/50",
 };
 
 const iconStyles = {
@@ -21,7 +23,8 @@ export const InfoCard = ({
   title: string;
   children: React.ReactNode;
 }) => (
-  <div className={`my-6 rounded-xl border p-4 ${styles[type]}`}>
+  <div className={`relative my-6 border px-4 pt-5 pb-4 ${styles[type]}`}>
+    <BoxLabel tone="text-muted-foreground">{type}</BoxLabel>
     <div
       className={`mb-2 flex items-center gap-2 font-semibold ${iconStyles[type]}`}
     >

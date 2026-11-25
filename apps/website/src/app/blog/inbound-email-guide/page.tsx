@@ -194,7 +194,7 @@ export default function Page() {
                   </strong>{" "}
                   working together.{" "}
                   <span className="font-semibold text-brand-text">
-                    Your data never leaves your AWS account.
+                    Inbound mail is processed inside your AWS account.
                   </span>
                 </p>
               </div>

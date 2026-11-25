@@ -152,8 +152,8 @@ export default function Page() {
               Option two is a vendor SDK. You get the ergonomics immediately,
               and you get them by putting someone else's API key in your
               environment and someone else's servers in your request path. Your
-              sending reputation, your suppression list, and your delivery data
-              stop being yours.
+              sending history, your suppression list, and your delivery data
+              move onto their servers.
             </p>
 
             <p className="text-foreground/80 text-lg leading-relaxed">

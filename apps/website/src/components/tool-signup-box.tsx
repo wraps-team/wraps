@@ -1,11 +1,11 @@
 "use client";
 
 import { Button } from "@wraps/ui/components/ui/button";
-import { Card, CardContent } from "@wraps/ui/components/ui/card";
 import { ArrowRight, Check, Copy } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { FlowBox } from "@/app/landing/components/flow-primitives";
 import {
   type ToolCta,
   type ToolCtaContext,
@@ -63,8 +63,8 @@ export function ToolSignupBox({
 
   return (
     <div ref={ref}>
-      <Card className="border-border bg-card">
-        <CardContent>
+      <FlowBox className="p-5 pt-7 sm:p-6 sm:pt-7" dashed label="Wraps">
+        <div>
           <div
             className={
               layout === "row"
@@ -131,8 +131,8 @@ export function ToolSignupBox({
               </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </FlowBox>
     </div>
   );
 }

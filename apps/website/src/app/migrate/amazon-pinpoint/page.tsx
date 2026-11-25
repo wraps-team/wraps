@@ -3,6 +3,7 @@ import { Card } from "@wraps/ui/components/ui/card";
 import { AlertTriangle, ArrowRight, Check, Minus, X } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ClosingPanel } from "@/app/landing/components/closing-panel";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
@@ -633,7 +634,7 @@ export default function MigrateFromAmazonPinpointPage() {
             <ol className="grid gap-7">
               {steps.map((step, i) => (
                 <li className="flex gap-4" key={step.title}>
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted font-mono font-semibold text-foreground text-xs">
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted font-sans font-semibold text-foreground text-xs">
                     {i + 1}
                   </span>
                   <div>
@@ -707,31 +708,29 @@ export default function MigrateFromAmazonPinpointPage() {
           </section>
 
           {/* ================= CTA ================= */}
-          <section className="rounded-xl border border-border bg-muted/30 p-8">
-            <h2 className="mb-3 font-heading font-semibold text-2xl tracking-tight">
-              Start with the part that has a clock on it
-            </h2>
-            <p className="mb-6 max-w-2xl text-muted-foreground">
-              Export your Pinpoint data, then stand up SES so the production
-              access request is already in flight. Both are reversible; waiting
-              is not.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <Button asChild className="cursor-pointer">
-                <Link href="/docs/quickstart/email">
-                  Deploy SES in 2 minutes
-                  <ArrowRight aria-hidden="true" className="ml-1.5 size-4" />
-                </Link>
-              </Button>
-              <Button asChild className="cursor-pointer" variant="outline">
-                <Link href="/compare/amazon-ses-vs-wraps">
-                  Amazon SES vs Wraps
-                </Link>
-              </Button>
-            </div>
-          </section>
         </div>
       </main>
+
+      <ClosingPanel
+        actions={
+          <div className="flex flex-wrap gap-3">
+            <Button asChild size="lg" variant="brand">
+              <Link href="/docs/quickstart/email">
+                Deploy SES with one command
+                <ArrowRight aria-hidden="true" className="ml-1.5 size-4" />
+              </Link>
+            </Button>
+            <Button asChild size="lg" variant="outline">
+              <Link href="/compare/amazon-ses-vs-wraps">
+                Amazon SES vs Wraps
+              </Link>
+            </Button>
+          </div>
+        }
+        body="Export your Pinpoint data, then stand up SES so the production access request is already in flight. Both are reversible; waiting is not."
+        kicker="Next step"
+        title="Start with the part that has a clock on it"
+      />
 
       <LandingFooter />
     </div>

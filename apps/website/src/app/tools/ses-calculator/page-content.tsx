@@ -760,7 +760,7 @@ function SESCalculatorInner() {
                           </p>
                         )}
                       </div>
-                      <span className="tabular-nums font-mono text-sm">
+                      <span className="tabular-nums text-sm">
                         {formatCost(item.cost)}
                       </span>
                     </div>
@@ -808,7 +808,7 @@ function SESCalculatorInner() {
                         {isLastMonth && "+ (steady-state)"}:
                       </span>
                       <div className="flex items-center gap-2">
-                        <span className="tabular-nums font-mono">
+                        <span className="tabular-nums">
                           {point.storageGB.toFixed(3)} GB
                         </span>
                         <span className="tabular-nums text-muted-foreground">

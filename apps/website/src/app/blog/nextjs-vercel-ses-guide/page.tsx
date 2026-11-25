@@ -370,7 +370,7 @@ export default function Page() {
                 title="AWS Economics"
               />
               <FeatureCard
-                description="Infrastructure deploys to YOUR AWS account. Your domain, your data, your reputation. Leave anytime, keep everything."
+                description="Infrastructure deploys to YOUR AWS account. Your domain, your SES account. Sending keeps running if you leave Wraps."
                 icon={Database}
                 title="You Own Everything"
               />
@@ -1044,8 +1044,8 @@ npm install @wraps.dev/email
             />
 
             <p className="mt-8 text-center font-semibold text-foreground/80 text-lg">
-              Minutes to production email infrastructure. Your AWS, your data,
-              no stored credentials.
+              Minutes to production email infrastructure. Runs in your AWS, no
+              stored credentials.
             </p>
           </div>
         </section>
@@ -1057,7 +1057,7 @@ npm install @wraps.dev/email
             <p className="mb-8 text-muted-foreground text-xl">
               Deploy production email infrastructure in minutes.
               <br />
-              Your AWS, your data, no stored credentials.
+              Runs in your AWS account, no stored credentials.
             </p>
 
             <Card className="mb-8 p-6">

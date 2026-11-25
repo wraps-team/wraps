@@ -2,6 +2,7 @@ import { Badge } from "@wraps/ui/components/ui/badge";
 import { ChevronRight } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { FlowBox } from "@/app/landing/components/flow-primitives";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
@@ -218,9 +219,9 @@ function ProsAndCons({
       </h2>
       <div className="grid gap-6 sm:grid-cols-2">
         {columns.map((column) => (
-          <div className="rounded-lg border p-5" key={column.vendor.id}>
+          <FlowBox key={column.vendor.id} label="Pros and cons">
             <h3 className="mb-4 font-semibold text-lg">{column.vendor.name}</h3>
-            <p className="mb-2 font-mono text-muted-foreground text-xs uppercase tracking-widest">
+            <p className="mb-2 font-sans font-semibold text-muted-foreground text-xs uppercase tracking-eyebrow">
               Strengths
             </p>
             <ul className="mb-5 list-disc space-y-2 pl-5 text-muted-foreground text-sm">
@@ -228,7 +229,7 @@ function ProsAndCons({
                 <li key={item}>{item}</li>
               ))}
             </ul>
-            <p className="mb-2 font-mono text-muted-foreground text-xs uppercase tracking-widest">
+            <p className="mb-2 font-sans font-semibold text-muted-foreground text-xs uppercase tracking-eyebrow">
               Trade-offs
             </p>
             <ul className="list-disc space-y-2 pl-5 text-muted-foreground text-sm">
@@ -236,7 +237,7 @@ function ProsAndCons({
                 <li key={item}>{item}</li>
               ))}
             </ul>
-          </div>
+          </FlowBox>
         ))}
       </div>
     </section>
@@ -337,22 +338,16 @@ export function VersusArticle({ page }: { page: VersusPage }) {
                     {dimension.heading}
                   </h3>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="rounded-lg border p-4">
-                      <p className="mb-2 font-mono text-muted-foreground text-xs uppercase tracking-widest">
-                        {a.name}
-                      </p>
+                    <FlowBox label={a.name}>
                       <p className="text-muted-foreground leading-relaxed">
                         {dimension.a}
                       </p>
-                    </div>
-                    <div className="rounded-lg border p-4">
-                      <p className="mb-2 font-mono text-muted-foreground text-xs uppercase tracking-widest">
-                        {b.name}
-                      </p>
+                    </FlowBox>
+                    <FlowBox label={b.name}>
                       <p className="text-muted-foreground leading-relaxed">
                         {dimension.b}
                       </p>
-                    </div>
+                    </FlowBox>
                   </div>
                 </div>
               ))}
@@ -397,25 +392,24 @@ export function VersusArticle({ page }: { page: VersusPage }) {
           <BuyingQuestions items={page.buyingQuestions} />
 
           {page.thirdOption ? (
-            <section
-              aria-labelledby="third-option"
-              className="mt-12 rounded-lg border bg-muted/40 p-6"
-            >
-              <h2
-                className="mb-3 font-heading font-bold text-xl tracking-tight"
-                id="third-option"
-              >
-                A third shape of answer
-              </h2>
-              <p className="text-muted-foreground leading-relaxed">
-                {page.thirdOption}
-              </p>
-              <p className="mt-3 text-muted-foreground text-xs">
-                Wraps publishes this page. We are not one of the two vendors
-                being compared here, and this note is on it because the tension
-                above is one owning the AWS account actually addresses — not
-                because it is on every page.
-              </p>
+            <section aria-labelledby="third-option" className="mt-12">
+              <FlowBox className="p-6 pt-7" dashed label="A third option">
+                <h2
+                  className="mb-3 font-heading font-bold text-xl tracking-tight"
+                  id="third-option"
+                >
+                  A third shape of answer
+                </h2>
+                <p className="text-muted-foreground leading-relaxed">
+                  {page.thirdOption}
+                </p>
+                <p className="mt-3 text-muted-foreground text-xs">
+                  Wraps publishes this page. We are not one of the two vendors
+                  being compared here, and this note is on it because the
+                  tension above is one owning the AWS account actually addresses
+                  — not because it is on every page.
+                </p>
+              </FlowBox>
             </section>
           ) : null}
 

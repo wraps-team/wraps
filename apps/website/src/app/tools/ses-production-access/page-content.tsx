@@ -102,7 +102,7 @@ function CopyBox({
   return (
     <div className="rounded-lg border border-border bg-muted/40">
       <div className="flex items-center justify-between gap-3 border-border border-b px-4 py-2">
-        <span className="font-mono text-2xs text-muted-foreground uppercase tracking-eyebrow">
+        <span className="font-sans font-semibold text-2xs text-muted-foreground uppercase tracking-eyebrow">
           {label}
         </span>
         <Button
