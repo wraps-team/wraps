@@ -128,7 +128,9 @@ describe("Klaviyo and Customer.io compare pages: claim rules", () => {
       expect(source).toMatch(/No Wraps lock-in/);
       // The Article JSON-LD carries the same description as the metadata.
       expect(source).toMatch(/description: PAGE_DESCRIPTION,\n\s+path/);
-      expect(source).toMatch(/headline: [^\n]+\n\s+description:\s+PAGE_DESCRIPTION/);
+      expect(source).toMatch(
+        /headline: [^\n]+\n\s+description:\s+PAGE_DESCRIPTION/
+      );
     });
   }
 });
