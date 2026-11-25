@@ -5,7 +5,7 @@ import { pageMetadata } from "@/lib/page-metadata";
 import { FoundersPageContent } from "./page-content";
 
 const description =
-  "An email platform for founders on your own AWS account. Newsletters, automations and app emails in one tool, with a flat Wraps fee and unlimited contacts on every plan. Amazon bills sending to you directly.";
+  "An email platform for founders that sends through your own AWS account. Newsletters, automations and app emails in one tool, with a flat Wraps fee and unlimited contacts on every plan. Amazon bills sending to you directly.";
 
 const free = getTier("free");
 const pro = getTier("pro");

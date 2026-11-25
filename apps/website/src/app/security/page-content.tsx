@@ -87,18 +87,13 @@ const posture: { claim: string; status: "yes" | "no"; detail: string }[] = [
   {
     claim: "SOC 2",
     status: "no",
-    detail: "We don't have SOC 2 yet.",
+    detail:
+      "We don't have SOC 2 or HIPAA certification yet. Don't send protected health information through the Wraps platform layer.",
   },
   {
     claim: "ISO 27001",
     status: "no",
     detail: "Not certified.",
-  },
-  {
-    claim: "HIPAA",
-    status: "no",
-    detail:
-      "We don't have HIPAA certification yet. Don't send protected health information through the Wraps platform layer.",
   },
   {
     claim: "GDPR data processing agreement",
@@ -172,8 +167,9 @@ const steps = [
       <>
         Delete the role, or just the external ID condition's trust, and Wraps
         loses access immediately. No ticket, no waiting on us. Your
-        infrastructure keeps running and your mail keeps sending, because none
-        of it depends on Wraps being reachable.
+        infrastructure keeps running and your app's emails keep going out,
+        because none of it depends on Wraps being reachable. Broadcasts and
+        automations stop.
       </>
     ),
   },

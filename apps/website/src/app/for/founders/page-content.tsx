@@ -10,7 +10,7 @@ import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { CONTACT_PRICE_ROWS } from "@/config/competitor-contact-pricing";
 import { LICENSE_STATEMENT } from "@/config/license";
 import { AWS_PRICING, formatCurrency, getTier } from "@/config/pricing";
-import { estimateCost } from "@/lib/ses-cost";
+import { estimateCost, SES_PLANS } from "@/lib/ses-cost";
 import {
   FoundersClosingActions,
   FoundersHeroCTA,
@@ -18,13 +18,14 @@ import {
 
 // The headline is decided at review; it lives here so it changes in one place.
 export const FOUNDERS_HEADLINE =
-  "Your email bill shouldn't grow every time your list does.";
+  "Your platform bill shouldn't grow every time your list does.";
 
 const pro = getTier("pro");
 const free = getTier("free");
 const business = getTier("business");
 const largest = CONTACT_PRICE_ROWS.at(-1);
 
+const ESSENTIALS_RATE = SES_PLANS.essentials.perThousandEmails.toFixed(2);
 const AMAZON_VOLUMES = [10_000, 100_000, 1_000_000] as const;
 const amazonBill = (emails: number, sesPlan: "alacarte" | "essentials") =>
   `$${estimateCost({ emailsPerMonth: emails, tier: "free", sesPlan }).total.toFixed(2)}`;
@@ -33,7 +34,7 @@ const PRODUCT = [
   {
     label: "Newsletters",
     title: "Send to your whole list",
-    body: "Write it once, or ask the AI to draft it, then see who opened and clicked. Sending to all contacts is free. Segments and scheduling come with Pro.",
+    body: "Write it once, or ask the AI to draft it, then see who opened and clicked. Sending to all contacts is included on every plan. Segments and scheduling come with Pro.",
   },
   {
     label: "Automations",
@@ -43,12 +44,12 @@ const PRODUCT = [
   {
     label: "App emails",
     title: "Receipts and password resets",
-    body: "Your product sends them through the same account, and they show up in the same dashboard as your newsletters. Your developer connects it once with an SDK.",
+    body: "Your product sends them through the same account, and they show up in the same dashboard as your newsletters. Hooking up your app takes a developer once, with an SDK.",
   },
   {
     label: "Contacts",
     title: "One list behind all of it",
-    body: "Unlimited contacts on every plan. Group them by what they did, and let them pick the topics they want. Contacts and templates are stored by Wraps and can be exported.",
+    body: "Unlimited contacts on every plan. Segments and topics, which let you group people and let them pick what they get, are on Pro. Contacts and templates are stored by Wraps and can be exported.",
   },
 ];
 
@@ -155,8 +156,8 @@ export function FoundersPageContent() {
                     </p>
                     <p className="text-muted-foreground text-sm tabular-nums">
                       {amazonBill(emails, "alacarte")} on Amazon's $0.10 plan,{" "}
-                      {amazonBill(emails, "essentials")} on the $0.16 plan AWS
-                      gives new accounts
+                      {amazonBill(emails, "essentials")} on the $
+                      {ESSENTIALS_RATE} plan AWS gives new accounts
                     </p>
                   </div>
                 ))}
@@ -164,8 +165,8 @@ export function FoundersPageContent() {
               <p className="mt-4 text-muted-foreground text-xs leading-relaxed">
                 Add $0 for the Wraps Free plan. Includes the AWS event pipeline
                 that records opens and clicks, with 90-day history and no
-                dedicated IP. An account AWS put on the $0.16 plan can switch
-                back to $0.10.
+                dedicated IP. An account AWS put on the ${ESSENTIALS_RATE} plan
+                can switch back to $0.10.
               </p>
             </FlowBox>
             <div className="grid content-start gap-4 text-muted-foreground leading-relaxed">
@@ -216,7 +217,7 @@ export function FoundersPageContent() {
           <SectionHead
             body="Three steps. One is minutes of clicking, two are waiting on AWS."
             kicker="What it takes"
-            title="Up and running without an engineer."
+            title="Set up the platform without an engineer."
           />
           <ol className="mb-10 grid gap-x-6 gap-y-8 md:grid-cols-3">
             {STEPS.map((step, index) => (
@@ -319,7 +320,7 @@ export function FoundersPageContent() {
 
         <ClosingPanel
           actions={<FoundersClosingActions />}
-          body={`Newsletters to all contacts are free. Segments, topics and scheduling start at ${formatCurrency(pro.price)} a month.`}
+          body={`Newsletters to all contacts are included on every plan. Segments, topics and scheduling start at ${formatCurrency(pro.price)} a month. AWS bills each email you send, at its own rates.`}
           title="Unlimited contacts. Even on the free plan."
         />
       </main>

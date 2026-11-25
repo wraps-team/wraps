@@ -10,7 +10,7 @@ import { TrackedClosingActions } from "@/components/tracked-closing-actions";
 import { LICENSE_STATEMENT } from "@/config/license";
 import { AWS_PRICING, formatCurrency, getTier } from "@/config/pricing";
 import { pageMetadata } from "@/lib/page-metadata";
-import { estimateCost } from "@/lib/ses-cost";
+import { estimateCost, SES_PLANS } from "@/lib/ses-cost";
 import { CopyLinkButton } from "./components/copy-link-button";
 import { FaqSection } from "./components/faq-section";
 
@@ -97,13 +97,14 @@ const planRows = [
   },
 ];
 
+const ESSENTIALS_RATE = SES_PLANS.essentials.perThousandEmails.toFixed(2);
 const allIn100k = (sesPlan: "alacarte" | "essentials") =>
   `$${estimateCost({ emailsPerMonth: 100_000, tier: "free", sesPlan }).total.toFixed(2)}`;
 
 const exitPoints = [
   {
     title: "The sending setup is already in your account",
-    body: "SES identities, Lambdas, EventBridge rules and DynamoDB tables are created in your AWS account, namespaced wraps-email-*, and none of them call us to keep working. Stop paying and mail keeps sending.",
+    body: "SES identities, Lambdas, EventBridge rules and DynamoDB tables are created in your AWS account, namespaced wraps-email-*, and none of them call us to keep working. Stop paying and your app's emails keep going out. Broadcasts and automations stop.",
   },
   {
     title: "Our access is a role you delete",
@@ -205,9 +206,9 @@ export default function WhyWrapsPage() {
                 Two lines on two invoices. A flat platform fee from us, and AWS
                 billing you directly for the sending: $
                 {AWS_PRICING.sesPerThousand.toFixed(2)} per 1,000 emails on à la
-                carte, or $0.16 on the Essentials plan AWS puts new accounts on.
-                There is no per-seat, per-contact or per-email fee from Wraps on
-                any plan.
+                carte, or ${ESSENTIALS_RATE} on the Essentials plan AWS puts new
+                accounts on. There is no per-seat, per-contact or per-email fee
+                from Wraps on any plan.
               </>
             }
             kicker="02 · Cost"
@@ -227,10 +228,11 @@ export default function WhyWrapsPage() {
           </div>
           <p className="mt-8 max-w-2xl text-muted-foreground leading-relaxed">
             For scale: 100,000 emails a month costs {allIn100k("alacarte")} on
-            Amazon's $0.10 plan and {allIn100k("essentials")} on the $0.16 plan,
-            including the AWS event pipeline, with the Wraps Free plan on top at
-            $0. Against a marketing platform that charges per contact, the gap
-            widens with the list. Against a sending API, work it out with the{" "}
+            Amazon's $0.10 plan and {allIn100k("essentials")} on the $
+            {ESSENTIALS_RATE} plan, including the AWS event pipeline, with the
+            Wraps Free plan on top at $0. Against a marketing platform that
+            charges per contact, the gap widens with the list. Against a sending
+            API, work it out with the{" "}
             <Link
               className="text-foreground underline underline-offset-4"
               href="/tools/ses-calculator"

@@ -8,6 +8,7 @@ import {
 } from "@wraps/ui/components/ui/accordion";
 import { Band, SectionHead } from "@/app/landing/components/page-band";
 import { LICENSE_STATEMENT } from "@/config/license";
+import { getTier } from "@/config/pricing";
 
 /*
  * Written for the person who did not choose Wraps and now has to approve it.
@@ -44,13 +45,12 @@ const faqItems = [
   {
     id: "support",
     question: "What is the support commitment?",
-    answer:
-      "Free is community support, with no response-time commitment. Pro at $29/mo adds email support. Business at $199/mo adds priority support. There is no phone number and no dedicated CSM at any tier — if your team needs one, say so now rather than after signing.",
+    answer: `Free is community support, with no response-time commitment. Pro at $${getTier("pro").price}/mo adds email support. Business at $${getTier("business").price}/mo adds priority support. There is no phone number and no dedicated CSM at any tier — if your team needs one, say so now rather than after signing.`,
   },
   {
     id: "stop-paying",
     question: "What happens if we stop paying, or you go away?",
-    answer: `Sending keeps working. SES, the Lambdas, the EventBridge rules and the DynamoDB tables are in your account, namespaced wraps-email-*, and nothing about them depends on us being alive. What you lose is the platform: the dashboard, and the contacts, templates and workflows stored in our database. Contacts and templates can be exported, so export them before you leave. The code is public, so your reviewer can read it. ${LICENSE_STATEMENT}`,
+    answer: `Your app's emails keep going out. SES, the Lambdas, the EventBridge rules and the DynamoDB tables are in your account, namespaced wraps-email-*, and nothing about them depends on us being alive. Broadcasts and automations stop. What you lose is the platform: the dashboard, and the contacts, templates and workflows stored in our database. Contacts and templates can be exported, so export them before you leave. The code is public, so your reviewer can read it. ${LICENSE_STATEMENT}`,
   },
   {
     id: "wrapper",

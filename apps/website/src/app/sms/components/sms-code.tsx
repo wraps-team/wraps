@@ -1,26 +1,10 @@
 "use client";
 
-import {
-  CodeBlock,
-  CodeBlockBody,
-  CodeBlockContent,
-  CodeBlockCopyButton,
-  CodeBlockFilename,
-  CodeBlockFiles,
-  CodeBlockHeader,
-  CodeBlockItem,
-} from "@/components/ui/shadcn-io/code-block";
+import { CodeTabs } from "@/components/ui/shadcn-io/code-tabs";
 
-const files = [
-  {
-    language: "bash",
-    filename: "deploy",
-    code: "npx @wraps.dev/cli sms init",
-  },
-  {
-    language: "typescript",
-    filename: "send.ts",
-    code: `import { WrapsSMS } from "@wraps.dev/sms";
+const DEPLOY = "npx @wraps.dev/cli sms init";
+
+const SEND = `import { WrapsSMS } from "@wraps.dev/sms";
 
 const sms = new WrapsSMS();
 
@@ -30,37 +14,14 @@ if (!(await sms.optOuts.check("+14155551234"))) {
     to: "+14155551234",
     message: "Your code is 123456",
   });
-}`,
-  },
-];
+}`;
 
-/** The deploy command and one SDK call, in the shared CodeBlock. */
+/** The deploy command and one SDK call, each in its own shared code block. */
 export function SmsCode() {
   return (
-    <CodeBlock className="h-auto" data={files} defaultValue="bash">
-      <CodeBlockHeader>
-        <CodeBlockFiles>
-          {(item) => (
-            <CodeBlockFilename key={item.language} value={item.language}>
-              {item.filename}
-            </CodeBlockFilename>
-          )}
-        </CodeBlockFiles>
-        <CodeBlockCopyButton />
-      </CodeBlockHeader>
-      <CodeBlockBody>
-        {(item) => (
-          <CodeBlockItem
-            key={item.language}
-            lineNumbers={false}
-            value={item.language}
-          >
-            <CodeBlockContent language={item.language}>
-              {item.code}
-            </CodeBlockContent>
-          </CodeBlockItem>
-        )}
-      </CodeBlockBody>
-    </CodeBlock>
+    <div className="grid gap-4">
+      <CodeTabs codes={{ Deploy: DEPLOY }} lang="bash" variant="flush" />
+      <CodeTabs codes={{ "send.ts": SEND }} lang="typescript" variant="flush" />
+    </div>
   );
 }

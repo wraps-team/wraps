@@ -6,6 +6,7 @@ import { LandingNavbar } from "@/app/landing/components/navbar";
 import { Band, SectionHead } from "@/app/landing/components/page-band";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { AWS_PRICING, formatCurrency, getTier } from "@/config/pricing";
+import { SES_PLANS } from "@/lib/ses-cost";
 import {
   OperatorsClosingActions,
   OperatorsHeroCTA,
@@ -104,7 +105,7 @@ const HISTORY: [string, string][] = [
 const OWNERSHIP = [
   {
     label: "If you stop paying us",
-    title: "Sending keeps working",
+    title: "Your app's emails keep going out",
     body: "The SES configuration, the domain identity and the event pipeline live in your account. Cancelling Wraps costs you the dashboard, workflows and platform tooling, not the ability to send.",
   },
   {
@@ -115,7 +116,7 @@ const OWNERSHIP = [
   {
     label: "AWS pricing plan",
     title: "Know which plan you're on",
-    body: "New AWS accounts are put on the Essentials plan at $0.16 per 1,000 emails rather than à la carte at $0.10. wraps email plan reads the plan per region and can move you back.",
+    body: `New AWS accounts are put on the Essentials plan at $${SES_PLANS.essentials.perThousandEmails.toFixed(2)} per 1,000 emails rather than à la carte at $${SES_PLANS.alacarte.perThousandEmails.toFixed(2)}. wraps email plan reads the plan per region and can move you back.`,
   },
 ];
 

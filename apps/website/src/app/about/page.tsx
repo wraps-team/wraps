@@ -52,7 +52,7 @@ const values = [
   {
     icon: Zap,
     label: "Setup",
-    title: "Minutes, not a project",
+    title: "A few clicks, then AWS reviews",
     description:
       "Connect your AWS account from the browser, or run one command. Then wait on AWS: it checks your domain within 48 hours and reviews production access in 1 to 72 hours.",
   },

@@ -5,6 +5,7 @@ import { Button } from "@wraps/ui/components/ui/button";
 import { XLogo } from "@/components/icons/x-logo";
 import { Logo } from "@/components/logo";
 import { Github } from "@/components/ui/svgs/brand-icons";
+import { LICENSE_STATEMENT } from "@/config/license";
 import { FOOTER_COLUMNS, GITHUB_URL } from "@/config/site-nav";
 
 const LICENSE_URL = "https://github.com/wraps-team/wraps/blob/main/LICENSE";
@@ -84,8 +85,7 @@ export function LandingFooter() {
         <div className="mt-12 flex flex-col gap-2 border-border border-t pt-6 text-muted-foreground text-sm">
           <span>&copy; {new Date().getFullYear()} Wraps.</span>
           <p className="max-w-3xl">
-            Open source under AGPLv3, except the enterprise (ee) directories,
-            which are under a commercial license. The SDKs are MIT.{" "}
+            {LICENSE_STATEMENT}{" "}
             <a
               className="underline underline-offset-4 hover:text-foreground"
               href={LICENSE_URL}

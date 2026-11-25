@@ -262,7 +262,7 @@ export function InboundPageContent() {
           actions={<InboundClosingActions />}
           body="Add inbound to your email setup with one command. AWS bills the S3 and Lambda usage to you."
           kicker="Ready to receive?"
-          title="Receive your first email today."
+          title="Add inbound to your setup."
         />
       </main>
       <LandingFooter />

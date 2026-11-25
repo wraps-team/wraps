@@ -56,7 +56,13 @@ export function UseCasesCarousel({ useCases }: { useCases: UseCase[] }) {
     const cards = scrollContainer.querySelectorAll("[data-card]");
     const card = cards[index] as HTMLElement;
     if (card) {
-      card.scrollIntoView({ behavior: "smooth", inline: "center" });
+      const reduced = window.matchMedia(
+        "(prefers-reduced-motion: reduce)"
+      ).matches;
+      card.scrollIntoView({
+        behavior: reduced ? "auto" : "smooth",
+        inline: "center",
+      });
     }
   };
 
@@ -64,7 +70,7 @@ export function UseCasesCarousel({ useCases }: { useCases: UseCase[] }) {
     <>
       {/* Horizontal scroll container */}
       <div
-        className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-4 pb-4 sm:-mx-6 sm:gap-6 sm:px-6 lg:px-8"
+        className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-4 motion-reduce:scroll-auto pb-4 sm:-mx-6 sm:gap-6 sm:px-6 lg:px-8"
         ref={scrollRef}
       >
         {useCases.map((useCase, index) => {

@@ -431,7 +431,7 @@ Definitions written from the code that actually checks each mechanism (SPF, DKIM
 - [BYOC](https://wraps.dev/byoc): SES, EventBridge, and DynamoDB deployed into your own AWS with one CLI command
 - [For Marketing](https://wraps.dev/for/marketing): Broadcasts, segments, topics, and a hosted preference center, priced flat by plan rather than by contacts stored
 - [For Operators](https://wraps.dev/for/operators): Preflight a broadcast, hold consent as a record, and trace a single message end to end
-- [For Founders](https://wraps.dev/for/founders): An email platform for founders that runs on your own AWS account, with a flat Wraps fee and unlimited contacts on every plan
+- [For Founders](https://wraps.dev/for/founders): An email platform for founders that sends through your own AWS account, with a flat Wraps fee and unlimited contacts on every plan
 
 ## Alternatives
 

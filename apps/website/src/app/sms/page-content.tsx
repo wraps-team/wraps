@@ -36,9 +36,14 @@ const TEAM = [
     body: "Toll-free numbers need carrier registration. A command walks you through what it asks for and opens the AWS console at the right page. 10DLC is guidance only: you file it yourself.",
   },
   {
+    label: "Credentials",
+    title: "No stored AWS keys",
+    body: "Your app authenticates to AWS with OIDC from your hosting provider. We never store your AWS credentials.",
+  },
+  {
     label: "Billing",
     title: "AWS bills you directly",
-    body: "No monthly Wraps subscription for SMS infrastructure, no per-seat fees and no markup from us. The platform dashboard is sold separately.",
+    body: "No monthly Wraps subscription for SMS infrastructure, no per-seat fees and no markup from us.",
   },
 ];
 
@@ -219,7 +224,7 @@ export function SmsPageContent() {
           <SectionHead
             body="Deploy with the CLI, send with the SDK. A batch call sends a list of messages and returns a result for each, so one failure doesn't lose the run."
             kicker="For developers"
-            title="Two commands and a function call."
+            title="One command to deploy, one call to send."
           />
           <div className="max-w-3xl">
             <SmsCode />

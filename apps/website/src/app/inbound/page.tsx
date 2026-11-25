@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { getTier } from "@/config/pricing";
 import { pageMetadata } from "@/lib/page-metadata";
 import { InboundPageContent } from "./page-content";
 
@@ -11,7 +12,7 @@ const softwareSchema = {
   operatingSystem: "AWS",
   offers: {
     "@type": "Offer",
-    price: "0",
+    price: String(getTier("free").price),
     priceCurrency: "USD",
   },
   description:
