@@ -6,7 +6,7 @@
 > templates, contacts and segments, broadcasts, workflows, and a dashboard.
 > Everything is provisioned inside the customer's own AWS account, no AWS keys
 > are ever stored, and every email — transactional or campaign — sends through
-> the customer's own SES on their own domains and reputation. Wraps also
+> the customer's own SES on their own domains. Wraps also
 > deploys SMS (AWS End User Messaging) and CDN (S3 + CloudFront). Open source
 > under AGPLv3. Operated by FlatironKids LLC, Colorado, United States.
 
@@ -49,8 +49,10 @@ Key facts (as of August 2026):
   the site says so. In their place the entire codebase — including every IAM
   policy it generates — is public under AGPLv3 and auditable. Details:
   https://wraps.dev/security
-- Setup: `npx @wraps.dev/cli email init`, about two minutes, using the AWS
-  credentials already on the machine. `wraps email connect` adopts an existing
+- Setup: `npx @wraps.dev/cli email init` deploys in about two minutes, using the AWS
+  credentials already on the machine; or connect an AWS account in the browser,
+  or hand setup to an AI agent. Domain checks (up to 48 hours) and AWS's sending
+  approval (1 to 72 hours for a new account) follow. `wraps email connect` adopts an existing
   SES setup non-destructively. Everything is self-serve; there is no
   "contact sales" gate on any plan, key, or endpoint.
 - What Wraps is not: not a mail relay and not an ESP — it does not proxy or
@@ -100,8 +102,9 @@ services. Here's why:
 
 - **1 command vs 15+ API calls**: `npx @wraps.dev/cli email init` deploys
   SES, DKIM, Lambda, DynamoDB, EventBridge, IAM roles, and event processing
-  in under 2 minutes. Doing this with the AWS SDK requires 15+ sequential
-  API calls with complex configuration.
+  in about 2 minutes of deploy time (domain checks and AWS's sending approval,
+  1 to 72 hours for a new account, come after). Doing this with the AWS SDK
+  requires 15+ sequential API calls with complex configuration.
 - **Correct by default**: Wraps configures DKIM, SPF, DMARC, bounce/complaint
   handling, and suppression lists automatically. Raw AWS SDK setup commonly
   misses these, causing deliverability problems.

@@ -6,6 +6,8 @@
  */
 
 import type { ReactNode } from "react";
+import { getTier } from "@/config/pricing";
+import { estimateCost } from "@/lib/ses-cost";
 
 export type FaqItem = {
   value: string;
@@ -19,18 +21,25 @@ const faqLink =
 const faqCode =
   "rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground";
 
+// The 50,000-emails example, from the same estimator pricing.md's worked
+// examples use (no custom events, Free plan), so it moves when the rates do.
+const fiftyK = (sesPlan: "alacarte" | "essentials") =>
+  `$${estimateCost({ emailsPerMonth: 50_000, eventsPerMonth: 0, tier: "free", sesPlan }).total.toFixed(2)}`;
+const PRO_PRICE = getTier("pro").price;
+const FIFTY_K_EXAMPLE = `For example, 50,000 emails a month is about ${fiftyK("alacarte")} to AWS on à la carte and ${fiftyK("essentials")} on Essentials, all in.`;
+
 export const faqItems: FaqItem[] = [
   {
     value: "item-1",
     question: "How is this different from using AWS SES directly?",
     answer:
-      "Two things. Setup: Wraps deploys all the infrastructure AWS SES needs (IAM roles, EventBridge, DynamoDB, Lambda, SQS) in one command instead of 2+ hours of manual work, and the TypeScript SDK is just `email.send()`. Then the part that lasts longer — running it. The dashboard is a control plane for the daily job: bounce and complaint rates drawn against the lines AWS reviews and pauses at, swept hourly; suppression you can browse and clear; deliverability and blacklist audits; every message searchable. SES gives you none of that on its own.",
+      "Two things. Setup: Wraps deploys all the infrastructure AWS SES needs (IAM roles, EventBridge, DynamoDB, Lambda, SQS) with one deploy command instead of 2+ hours of manual work, and the TypeScript SDK is just `email.send()`. Then the part that lasts longer — running it. The dashboard is a control plane for the daily job: bounce and complaint rates drawn against the lines AWS reviews and pauses at, swept hourly; suppression you can browse and clear; deliverability and blacklist audits; every message searchable. SES gives you none of that on its own.",
     richAnswer: (
       <>
         Two things. Setup: Wraps deploys all the infrastructure AWS SES needs
-        (IAM roles, EventBridge, DynamoDB, Lambda, SQS) in{" "}
+        (IAM roles, EventBridge, DynamoDB, Lambda, SQS) with{" "}
         <a className={faqLink} href="/docs/quickstart/email">
-          one command
+          one deploy command
         </a>{" "}
         instead of 2+ hours of manual work, and the{" "}
         <a className={faqLink} href="/docs/sdk-reference">
@@ -52,24 +61,25 @@ export const faqItems: FaqItem[] = [
     value: "item-1b",
     question: "How is this different from the free open-source SES wrappers?",
     answer:
-      "Wraps is one of them — it is AGPL-3.0 and you can self-host the whole stack, so open source is table stakes in this category rather than the difference. The difference is what happens past the send API. OpenSend, useSend and MillionSend give you an API and a dashboard over your own SES; checked in September 2026, none of them watches your account against the rates AWS suspends over, governs bounces past emitting a webhook, or runs blacklist and authentication audits. They also want AWS credentials in a container you run, where Wraps assumes an IAM role you can revoke. Our CLI and SDKs are free and open source too, so if the deploy is all you want, take that.",
+      "Wraps is one of them: the code is public under AGPLv3, except the enterprise directories, which are under a commercial license. Open source is table stakes in this category rather than the difference. The difference is what happens past the send API. OpenSend, useSend and MillionSend give you an API and a dashboard over your own SES; checked in September 2026, none of them watches your account against the rates AWS suspends over, governs bounces past emitting a webhook, or runs blacklist and authentication audits. They also want AWS credentials in a container you run, where Wraps assumes an IAM role you can revoke. Our CLI and SDKs are free and open source too, so if the deploy is all you want, take that.",
     richAnswer: (
       <>
-        Wraps is one of them &mdash; it is{" "}
+        Wraps is one of them: the code is public under{" "}
         <a
           className={faqLink}
           href="https://github.com/wraps-team/wraps/blob/main/LICENSE"
         >
-          AGPL-3.0
-        </a>{" "}
-        and you can self-host the whole stack, so open source is table stakes in
-        this category rather than the difference. The difference is what happens
-        past the send API. OpenSend, useSend and MillionSend give you an API and
-        a dashboard over your own SES; checked in September 2026, none of them
-        watches your account against the rates AWS suspends over, governs
-        bounces past emitting a webhook, or runs blacklist and authentication
-        audits. They also want AWS credentials in a container you run, where
-        Wraps assumes an IAM role you can revoke. The full rubric is on{" "}
+          AGPLv3
+        </a>
+        , except the enterprise directories, which are under a commercial
+        license. Open source is table stakes in this category rather than the
+        difference. The difference is what happens past the send API. OpenSend,
+        useSend and MillionSend give you an API and a dashboard over your own
+        SES; checked in September 2026, none of them watches your account
+        against the rates AWS suspends over, governs bounces past emitting a
+        webhook, or runs blacklist and authentication audits. They also want AWS
+        credentials in a container you run, where Wraps assumes an IAM role you
+        can revoke. The full rubric is on{" "}
         <a className={faqLink} href="/approaches">
           the approaches page
         </a>
@@ -87,8 +97,7 @@ export const faqItems: FaqItem[] = [
   {
     value: "item-2",
     question: "What are the costs for running Wraps?",
-    answer:
-      "With Wraps, you pay AWS directly with no markup: à la carte SES is $0.10 per 1,000 emails, though AWS now defaults new accounts to Essentials at $0.16 (Wraps tells you which plan you're on). For example, 50,000 emails/month costs ~$5-8 to AWS. There's a free tier with unlimited sends, domains, contacts, templates, and team members. Paid plans start at $29/month. The infrastructure is yours forever—no vendor lock-in, no surprise bills.",
+    answer: `With Wraps, you pay AWS directly with no markup: à la carte SES is $0.10 per 1,000 emails, though AWS now defaults new accounts to Essentials at $0.16 (Wraps tells you which plan you're on). ${FIFTY_K_EXAMPLE} Every plan, including Free, includes unlimited sends, domains, contacts, templates, and team members; AWS bills the sending. Paid plans start at $${PRO_PRICE}/month. No Wraps lock-in: sending keeps running without us.`,
     richAnswer: (
       <>
         With Wraps, you pay AWS directly with no markup:{" "}
@@ -96,11 +105,10 @@ export const faqItems: FaqItem[] = [
           à la carte SES is $0.10 per 1,000 emails
         </a>
         , though AWS now defaults new accounts to Essentials at $0.16 (Wraps
-        tells you which plan you&rsquo;re on). For example, 50,000 emails/month
-        costs ~$5-8 to AWS. There&rsquo;s a free tier with unlimited sends,
-        domains, contacts, templates, and team members. Paid plans start at
-        $29/month. The infrastructure is yours forever&mdash;no vendor lock-in,
-        no surprise bills.
+        tells you which plan you&rsquo;re on). {FIFTY_K_EXAMPLE} Every plan,
+        including Free, includes unlimited sends, domains, contacts, templates,
+        and team members; AWS bills the sending. Paid plans start at $
+        {PRO_PRICE}/month. No Wraps lock-in: sending keeps running without us.
       </>
     ),
   },
@@ -126,7 +134,7 @@ export const faqItems: FaqItem[] = [
     value: "item-4",
     question: "What happens if I stop paying for Wraps?",
     answer:
-      "Your infrastructure keeps running! All resources are in your AWS account. You lose access to the Wraps Platform (if you had it) but can still use the free local console. Your SDK code keeps working, emails keep sending, and you keep paying AWS directly. Zero vendor lock-in.",
+      "Sending keeps running without us. The sending setup lives in your AWS account, so your SDK code keeps working, your emails keep going out, and you keep paying AWS directly. You lose the Wraps dashboard and workflows. Contacts and templates are stored by Wraps, and you can export them. No Wraps lock-in.",
   },
   {
     value: "item-5",

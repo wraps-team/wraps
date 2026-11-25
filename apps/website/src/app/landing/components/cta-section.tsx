@@ -8,9 +8,9 @@ export function CTASection() {
     <ClosingCtaView>
       <ClosingPanel
         actions={<CTAButtons />}
-        body="Start free. Nothing already in your account is touched, and the infrastructure is yours if you ever leave."
+        body="Connect your AWS account and add your domain. Send test emails while AWS reviews your account."
         id="get-started"
-        title="Your email, on your own AWS, in about two minutes."
+        title="Own your email."
       />
     </ClosingCtaView>
   );

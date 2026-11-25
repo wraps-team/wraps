@@ -21,10 +21,10 @@ export const AGENT_CONTENT: Record<string, string> = {
   "/tools/ses-calculator": SES_CALCULATOR_MARKDOWN,
   "/": `# Wraps
 
-> Deploy email, SMS, and CDN infrastructure to your AWS account with one command.
-> Modern DX. AWS economics. Full ownership.
+> Deploy email, SMS, and CDN infrastructure to your AWS account with one deploy command per service.
+> Modern DX. AWS economics. No Wraps lock-in: sending keeps running without us.
 
-Wraps is a CLI and TypeScript SDK that deploys production-ready AWS infrastructure (SES, Lambda, DynamoDB, EventBridge, CloudFront) to your account. Zero credentials stored. OIDC authentication. You own everything.
+Wraps is a CLI and TypeScript SDK that deploys production-ready AWS infrastructure (SES, Lambda, DynamoDB, EventBridge, CloudFront) to your account. Zero credentials stored. OIDC authentication. Sending runs in your AWS account; contacts and templates are stored by Wraps and are exportable.
 
 ## Quick Start
 

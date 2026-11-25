@@ -1,123 +1,132 @@
 import { Button } from "@wraps/ui/components/ui/button";
 import { Check } from "lucide-react";
-import Link from "next/link";
-import {
-  PRICING_COPY,
-  PRICING_TIERS,
-  type PricingTier,
-} from "@/config/pricing";
-import { SectionKicker } from "./section-kicker";
+import { getTier, TIER_LIMITS, type TierId } from "@/config/pricing";
+import { FlowBox } from "./flow-primitives";
+import { SectionHead } from "./section-head";
 
-function tierLabel(tier: PricingTier): string {
-  if (tier.id === "free") {
-    return "Free forever";
-  }
-  if (tier.highlight) {
-    return "Most popular";
-  }
-  return "";
-}
+const history = (tier: TierId) => {
+  const days = TIER_LIMITS[tier].historyDays;
+  return days >= 365 ? `${days / 365}-year history` : `${days}-day history`;
+};
+
+// The mock's wording for each plan, with every figure read from config/pricing.ts.
+// PRICING_TIERS.features stays as it is: pricing.md and other pages render it.
+const PLANS: {
+  id: TierId;
+  label: string;
+  desc: string;
+  cta: string;
+  bullets: string[];
+}[] = [
+  {
+    id: "free",
+    label: "Start here",
+    desc: "Try it with your AWS account.",
+    cta: "Start free",
+    bullets: [
+      "Unlimited sends, domains and contacts",
+      "Newsletters to all contacts",
+      `${TIER_LIMITS.free.workflows} automations`,
+      history("free"),
+    ],
+  },
+  {
+    id: "pro",
+    label: "Recommended",
+    desc: "For small teams sending every week.",
+    cta: "Start with Pro",
+    bullets: [
+      "Everything in Free",
+      "Unlimited automations",
+      "Send to segments, schedule sends",
+      `${TIER_LIMITS.pro.aiGenerations} AI-written templates a month`,
+      history("pro"),
+    ],
+  },
+  {
+    id: "business",
+    label: "For larger teams",
+    desc: "For companies with several AWS accounts.",
+    cta: "Start with Business",
+    bullets: [
+      "Everything in Pro",
+      "Unlimited AWS accounts",
+      "Single sign-on and audit log",
+      `${history("business")}, priority support`,
+    ],
+  },
+];
 
 export function PricingSection() {
   return (
-    <section className="border-border border-b py-20 md:py-24" id="pricing">
+    <section className="border-border border-b py-16 md:py-20" id="pricing">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-        <SectionKicker>Pricing</SectionKicker>
-        <h2 className="mb-2 max-w-[28ch] font-heading font-semibold text-3xl text-foreground leading-none tracking-tight md:text-4xl">
-          {PRICING_COPY.headline}
-        </h2>
-        <p className="mb-8 max-w-[52ch] text-lg text-muted-foreground leading-relaxed">
-          {PRICING_COPY.subheadline}
-        </p>
-
-        {/* Tier grid — hairline rules, no boxed border (echoes the compare table) */}
-        <div className="grid grid-cols-1 border-border border-y sm:grid-cols-2 lg:grid-cols-3">
-          {PRICING_TIERS.map((tier) => {
-            const label = tierLabel(tier);
+        <SectionHead
+          kicker="Plans"
+          title="Start free. Keep control as you grow."
+        >
+          Every plan includes unlimited sends, contacts, domains and team
+          members.
+        </SectionHead>
+        <div className="grid gap-8 md:grid-cols-3">
+          {PLANS.map((plan) => {
+            const tier = getTier(plan.id);
             return (
-              <div
-                className={`flex flex-col border-border p-7 [&:not(:last-child)]:border-b sm:[&:nth-child(odd)]:border-r lg:[&:not(:last-child)]:border-r lg:[&:not(:last-child)]:border-b-0 ${
-                  tier.highlight
-                    ? "border-l-2 border-l-brand bg-brand/[0.03]"
-                    : ""
-                }`}
-                key={tier.id}
+              <FlowBox
+                className="flex h-full flex-col"
+                dashed={plan.id === "pro"}
+                key={plan.id}
+                label={plan.label}
               >
-                <div className="mb-2.5 min-h-4 font-mono text-2xs text-brand-text uppercase tracking-widest">
-                  {label}
-                </div>
-                <h3 className="mb-1 font-semibold text-lg text-foreground">
+                <h3 className="font-semibold text-foreground text-lg">
                   {tier.name}
                 </h3>
-                <p className="mb-5 min-h-[34px] text-sm text-muted-foreground">
-                  {tier.description}
+                <p className="mt-3 font-heading font-semibold text-4xl text-foreground tracking-tight">
+                  ${tier.price}{" "}
+                  <small className="font-sans font-normal text-muted-foreground text-sm">
+                    {tier.price === 0 ? "you pay AWS directly" : "per month"}
+                  </small>
                 </p>
-                <div className="font-bold text-3xl text-foreground tracking-tight">
-                  {tier.price === 0 ? "$0" : `$${tier.price}`}
-                </div>
-                <div className="mb-5 text-xs text-muted-foreground">
-                  {tier.price === 0 ? "you pay AWS directly" : "per month"}
-                </div>
-                <ul className="mb-6 grid flex-1 content-start gap-2.5">
-                  {tier.features.map((feature) => (
+                <p className="mt-2 text-muted-foreground text-sm">
+                  {plan.desc}
+                </p>
+                <ul className="my-5 grid flex-1 content-start gap-2.5">
+                  {plan.bullets.map((bullet) => (
                     <li
-                      className="flex gap-2.5 text-sm text-muted-foreground leading-normal"
-                      key={feature}
+                      className="flex gap-2.5 text-muted-foreground text-sm leading-normal"
+                      key={bullet}
                     >
                       <Check
                         aria-hidden="true"
-                        className="mt-0.5 size-[15px] shrink-0 text-brand-text"
+                        className="mt-0.5 size-4 shrink-0 text-brand-text"
                       />
-                      {feature}
+                      {bullet}
                     </li>
                   ))}
                 </ul>
-                <Button
-                  asChild
-                  className="w-full cursor-pointer"
-                  variant={tier.highlight ? "brand" : "outline"}
-                >
-                  <a href={tier.ctaLink}>{tier.cta}</a>
-                </Button>
-              </div>
+                <div className="mt-auto grid">
+                  <Button
+                    asChild
+                    variant={plan.id === "pro" ? "brand" : "outline"}
+                  >
+                    <a href={tier.ctaLink}>{plan.cta}</a>
+                  </Button>
+                </div>
+              </FlowBox>
             );
           })}
         </div>
-
-        {/* Unlimited-set note */}
-        <p className="mt-6 text-center text-muted-foreground text-sm">
-          Every plan includes unlimited sends, domains, contacts, templates, and
-          team members.
-        </p>
-
-        {/* Enterprise note */}
-        <p className="mt-6 text-center text-muted-foreground text-sm">
-          {PRICING_COPY.enterpriseNote.split("Contact us")[0]}
+        <p className="mt-6 text-muted-foreground text-sm">
+          No sales call on any plan. Amazon&apos;s sending charges are billed to
+          you by AWS.{" "}
           <a
-            className="text-brand-text hover:underline"
-            href="mailto:support@wraps.dev"
+            className="text-foreground underline underline-offset-4 hover:text-brand-text"
+            href="/tools/ses-calculator"
           >
-            Contact us for Enterprise
+            Estimate your sending costs
           </a>
+          .
         </p>
-
-        {/* AWS Cost Note */}
-        <div className="relative mt-8 rounded-xl border border-border bg-muted/30 p-6">
-          <p className="mb-2 font-semibold text-foreground">
-            AWS costs are separate
-          </p>
-          <p className="mb-4 text-muted-foreground text-sm">
-            You pay AWS directly for sending at{" "}
-            <strong className="text-foreground">$0.10 per 1,000 emails</strong>{" "}
-            on à la carte — AWS now defaults new accounts to $0.16, and Wraps
-            tells you which plan applies — plus infrastructure (~$2-5/mo). The
-            infrastructure lives in your account, so you can leave anytime and
-            keep everything.
-          </p>
-          <Button asChild className="cursor-pointer" variant="outline">
-            <Link href="/tools/ses-calculator">Calculate Your Costs</Link>
-          </Button>
-        </div>
       </div>
     </section>
   );

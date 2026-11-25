@@ -35,15 +35,13 @@ describe("closing CTA analytics", () => {
 
   it("reports each click as cta_click with the text the visitor read", () => {
     trackClosingCtaClick("primary");
-    trackClosingCtaClick("docs");
-    trackClosingCtaClick("github");
+    trackClosingCtaClick("how");
 
     expect(
       trackEvent.mock.calls.map(([name, p]) => [name, p.cta_text])
     ).toEqual([
       ["cta_click", "Start free"],
-      ["cta_click", "Read the docs"],
-      ["cta_click", "View on GitHub"],
+      ["cta_click", "See how it works"],
     ]);
   });
 
@@ -62,5 +60,6 @@ describe("closing CTA analytics", () => {
   it("uses a variant name that tells the new design apart from the old one", () => {
     expect(CLOSING_CTA.variant).not.toBe("");
     expect(CLOSING_CTA.variant).not.toBe("closing_v1");
+    expect(CLOSING_CTA.variant).not.toBe("closing_v2");
   });
 });
