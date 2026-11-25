@@ -34,7 +34,7 @@ export function ClosingPanel({
   return (
     <section className="py-16 md:py-20" id={id}>
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-        <div className="dark relative isolate grid min-h-88 content-center justify-items-start gap-5 overflow-hidden bg-terminal p-8 text-terminal-foreground sm:p-12 lg:p-16">
+        <div className="dark relative isolate grid min-h-88 content-center justify-items-start gap-5 overflow-hidden border border-terminal-border bg-terminal p-8 text-terminal-foreground sm:p-12 lg:p-16">
           <DotPattern
             className="-z-10"
             fadeStyle="ellipse"
@@ -43,7 +43,7 @@ export function ClosingPanel({
           />
           <WrapsMotif
             aria-hidden="true"
-            className="-right-12 -bottom-12 -z-10 absolute h-auto w-3/4 max-w-120 text-brand opacity-35 sm:w-1/2 sm:opacity-100"
+            className="-right-12 -bottom-12 -z-10 absolute h-auto w-3/4 max-w-120 text-brand opacity-25 lg:w-1/2 lg:opacity-100"
           />
           <SectionKicker className="mb-0">{kicker}</SectionKicker>
           <h2 className="max-w-2xl text-balance font-heading font-semibold text-4xl text-terminal-foreground leading-tight tracking-tight md:text-5xl">

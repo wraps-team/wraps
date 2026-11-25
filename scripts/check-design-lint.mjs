@@ -23,7 +23,7 @@ export const CEILINGS = {
   "shadcn(no-arbitrary-values) apps/website": 45,
   "shadcn(no-arbitrary-values) packages/console": 1,
   "shadcn(no-arbitrary-values) packages/ui": 4,
-  "shadcn(no-inline-styles) apps/web": 73,
+  "shadcn(no-inline-styles) apps/web": 70,
   "shadcn(no-inline-styles) apps/website": 1,
   "shadcn(no-inline-styles) packages/console": 1,
   "shadcn(no-inline-styles) packages/ui": 2,

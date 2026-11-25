@@ -35,8 +35,6 @@ export type NavMenu = {
   href?: string;
   groups?: NavGroup[];
   feature?: NavFeature;
-  /** Align the dropdown to the right edge of its trigger. */
-  alignEnd?: boolean;
 };
 
 const founders: NavLink = {
@@ -109,7 +107,7 @@ export const NAV_MENUS: NavMenu[] = [
     feature: {
       name: "The Wraps platform",
       description:
-        "Contacts, newsletters, automations and reports on your own AWS.",
+        "Contacts, newsletters, automations and reports. Sending runs in your AWS account.",
       href: "/platform",
       cta: "See the platform",
     },
@@ -163,7 +161,7 @@ export const NAV_MENUS: NavMenu[] = [
           {
             name: "Quickstart",
             href: "/docs/quickstart",
-            description: "Deploy and send in minutes",
+            description: "Set up and send your first email",
           },
           { name: "Docs", href: "/docs", description: "Guides and references" },
           {
@@ -198,7 +196,6 @@ export const NAV_MENUS: NavMenu[] = [
   { name: "Pricing", href: "/#pricing" },
   {
     name: "Resources",
-    alignEnd: true,
     groups: [
       {
         heading: "Learn",

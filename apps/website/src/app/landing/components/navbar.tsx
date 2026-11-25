@@ -143,7 +143,7 @@ export function LandingNavbar() {
                         {menu.feature && (
                           <NavigationMenuLink asChild>
                             <a
-                              className="relative flex w-52 shrink-0 flex-col gap-2 bg-terminal p-4 text-terminal-foreground no-underline outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              className="relative flex w-52 shrink-0 flex-col gap-2 bg-terminal p-4 text-terminal-foreground no-underline outline-none hover:bg-terminal hover:text-terminal-foreground focus:bg-terminal focus:text-terminal-foreground focus-visible:bg-terminal focus-visible:text-terminal-foreground focus-visible:ring-2 focus-visible:ring-ring"
                               href={menu.feature.href}
                             >
                               <WrapsMotif
