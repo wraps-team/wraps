@@ -709,28 +709,27 @@ export default function MigrateFromAmazonPinpointPage() {
 
           {/* ================= CTA ================= */}
         </div>
+        <ClosingPanel
+          actions={
+            <div className="flex flex-wrap gap-3">
+              <Button asChild size="lg" variant="brand">
+                <Link href="/docs/quickstart/email">
+                  Deploy SES with one command
+                  <ArrowRight aria-hidden="true" className="ml-1.5 size-4" />
+                </Link>
+              </Button>
+              <Button asChild size="lg" variant="outline">
+                <Link href="/compare/amazon-ses-vs-wraps">
+                  Amazon SES vs Wraps
+                </Link>
+              </Button>
+            </div>
+          }
+          body="Export your Pinpoint data, then stand up SES so the production access request is already in flight. Both are reversible; waiting is not."
+          kicker="Next step"
+          title="Start with the part that has a clock on it"
+        />
       </main>
-
-      <ClosingPanel
-        actions={
-          <div className="flex flex-wrap gap-3">
-            <Button asChild size="lg" variant="brand">
-              <Link href="/docs/quickstart/email">
-                Deploy SES with one command
-                <ArrowRight aria-hidden="true" className="ml-1.5 size-4" />
-              </Link>
-            </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link href="/compare/amazon-ses-vs-wraps">
-                Amazon SES vs Wraps
-              </Link>
-            </Button>
-          </div>
-        }
-        body="Export your Pinpoint data, then stand up SES so the production access request is already in flight. Both are reversible; waiting is not."
-        kicker="Next step"
-        title="Start with the part that has a clock on it"
-      />
 
       <LandingFooter />
     </div>

@@ -184,7 +184,7 @@ export function SesErrorArticle({ error }: { error: SesError }) {
           </section>
 
           <section aria-labelledby="wraps" className="mt-12">
-            <FlowBox className="p-6 pt-7" dashed label="What Wraps does">
+            <FlowBox dashed label="Wraps">
               <h2 className="mb-3 font-bold text-xl tracking-tight" id="wraps">
                 What Wraps does about this
               </h2>

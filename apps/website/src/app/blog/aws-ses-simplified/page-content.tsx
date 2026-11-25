@@ -248,7 +248,7 @@ export function ArchitectureDiagram() {
     "Email sent through SES triggers delivery events",
     "EventBridge captures and routes SES events",
     "SQS buffers events for reliable processing",
-    "Lambda processes events in real-time",
+    "Lambda processes events as they arrive",
     "DynamoDB stores your complete email history",
   ];
 
@@ -441,10 +441,10 @@ export function PresetCards() {
       cost: "~$2-5",
       description: "Most production apps",
       features: [
-        "Real-time event tracking",
+        "Event tracking",
         "90-day email history",
         "All event types",
-        "Reputation metrics",
+        "Bounce and complaint metrics",
       ],
     },
     {

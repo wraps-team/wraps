@@ -205,7 +205,8 @@ export default function Page() {
               in minutes.
               <br />
               <span className="text-success">
-                No stored credentials. No access keys. You own everything.
+                No stored credentials. No access keys. Sending runs in your AWS
+                account.
               </span>
             </p>
 
@@ -372,7 +373,7 @@ export default function Page() {
               <FeatureCard
                 description="Infrastructure deploys to YOUR AWS account. Your domain, your SES account. Sending keeps running if you leave Wraps."
                 icon={Database}
-                title="You Own Everything"
+                title="Sending Runs in Your Account"
               />
             </div>
           </div>
@@ -848,7 +849,7 @@ await email.send({
             <div className="mx-auto max-w-3xl">
               <ul className="mb-6 space-y-3 pl-6">
                 <li className="text-foreground/80 leading-relaxed">
-                  Your SES domain and reputation
+                  Your SES domain and sending configuration
                 </li>
                 <li className="text-foreground/80 leading-relaxed">
                   Your event data in DynamoDB
@@ -862,7 +863,7 @@ await email.send({
               </ul>
               <p className="text-foreground/80 leading-relaxed">
                 If you ever stop using Wraps, your email infrastructure keeps
-                working. No lock-in.
+                working. No Wraps lock-in.
               </p>
             </div>
           </div>

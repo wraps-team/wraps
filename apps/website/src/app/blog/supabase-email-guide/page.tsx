@@ -71,7 +71,7 @@ const faqSchema = {
       name: "Do I need an AWS account to use SES with Supabase?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Yes. AWS SES requires an AWS account. The upside: you own the infrastructure, pay AWS directly for sending, and sending keeps running if you stop using Wraps.",
+        text: "Yes — that's the tradeoff. SES, your domain verification and your raw delivery events live in your AWS account, so you need one. The upside: you own the sending infrastructure, you pay AWS directly for sending, and sending keeps running if you stop using Wraps. If you don't want AWS, Resend is probably your best bet for transactional email.",
       },
     },
     {
@@ -993,11 +993,11 @@ wraps email send --to user@example.com --subject "Hello from Wraps"`}
               <Collapsible title="Do I need an AWS account?">
                 <p className="text-muted-foreground text-sm">
                   Yes — that's the tradeoff. SES, your domain verification and
-                  your email event data live in your AWS account, so you need
-                  one. The upside: you pay AWS directly for sending, sending
-                  keeps running without Wraps, and you can audit what is
-                  deployed. If you don't want AWS, Resend is probably your best
-                  bet for transactional email.
+                  your raw delivery events live in your AWS account, so you need
+                  one. The upside: you own the sending infrastructure, you pay
+                  AWS directly for sending, and sending keeps running if you
+                  stop using Wraps. If you don't want AWS, Resend is probably
+                  your best bet for transactional email.
                 </p>
               </Collapsible>
 

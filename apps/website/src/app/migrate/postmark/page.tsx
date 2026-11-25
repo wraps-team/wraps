@@ -548,28 +548,27 @@ export default function MigrateFromPostmarkPage() {
             </div>
           </section>
         </div>
+        <ClosingPanel
+          actions={
+            <div className="flex flex-wrap gap-3">
+              <Button asChild size="lg" variant="brand">
+                <Link href="/tools/ses-calculator">
+                  Run the numbers
+                  <ArrowRight aria-hidden="true" className="ml-1.5 size-4" />
+                </Link>
+              </Button>
+              <Button asChild size="lg" variant="outline">
+                <Link href="/alternatives/postmark">
+                  Other Postmark alternatives
+                </Link>
+              </Button>
+            </div>
+          }
+          body="Postmark is a good product at a price that stops working at volume. If your volume has not reached that point, the honest answer is to stay and come back later."
+          kicker="Next step"
+          title="Do the arithmetic before the migration"
+        />
       </main>
-
-      <ClosingPanel
-        actions={
-          <div className="flex flex-wrap gap-3">
-            <Button asChild size="lg" variant="brand">
-              <Link href="/tools/ses-calculator">
-                Run the numbers
-                <ArrowRight aria-hidden="true" className="ml-1.5 size-4" />
-              </Link>
-            </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link href="/alternatives/postmark">
-                Other Postmark alternatives
-              </Link>
-            </Button>
-          </div>
-        }
-        body="Postmark is a good product at a price that stops working at volume. If your volume has not reached that point, the honest answer is to stay and come back later."
-        kicker="Next step"
-        title="Do the arithmetic before the migration"
-      />
 
       <LandingFooter />
     </div>

@@ -181,7 +181,7 @@ function BuildMode() {
   const advisories = built.warnings.filter((warning) => !warning.blocking);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+    <div className="grid grid-cols-[minmax(0,1fr)] wrap-anywhere gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
       <Card className="border-border bg-card">
         <CardHeader>
           <CardTitle className="font-heading text-lg tracking-tight">

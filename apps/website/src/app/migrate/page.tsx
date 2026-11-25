@@ -240,26 +240,27 @@ export default function MigrateHubPage() {
             </div>
           </section>
         </div>
+        <ClosingPanel
+          actions={
+            <div className="flex flex-wrap gap-3">
+              <Button asChild size="lg" variant="brand">
+                <Link href="/docs/quickstart/email">
+                  Deploy SES
+                  <ArrowRight aria-hidden="true" className="ml-1.5 size-4" />
+                </Link>
+              </Button>
+              <Button asChild size="lg" variant="outline">
+                <Link href="/docs/guides/migration">
+                  General migration guide
+                </Link>
+              </Button>
+            </div>
+          }
+          body="Whichever guide you are reading, the sending stack is the same work. Wraps deploys SES with its event pipeline into your own AWS account, or adopts the one you already have without touching it."
+          kicker="Next step"
+          title="The SES half, in one command"
+        />
       </main>
-
-      <ClosingPanel
-        actions={
-          <div className="flex flex-wrap gap-3">
-            <Button asChild size="lg" variant="brand">
-              <Link href="/docs/quickstart/email">
-                Deploy SES
-                <ArrowRight aria-hidden="true" className="ml-1.5 size-4" />
-              </Link>
-            </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link href="/docs/guides/migration">General migration guide</Link>
-            </Button>
-          </div>
-        }
-        body="Whichever guide you are reading, the sending stack is the same work. Wraps deploys SES with its event pipeline into your own AWS account, or adopts the one you already have without touching it."
-        kicker="Next step"
-        title="The SES half, in one command"
-      />
 
       <LandingFooter />
     </div>

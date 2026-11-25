@@ -148,7 +148,7 @@ export default function DmarcBuilderPage() {
                   <h2 className="mb-3 font-heading font-semibold text-2xl tracking-tight">
                     {section.heading}
                   </h2>
-                  <div className="space-y-3 text-muted-foreground">
+                  <div className="space-y-3 wrap-anywhere text-muted-foreground">
                     {section.paragraphs.map((paragraph) => (
                       <p key={paragraph}>{paragraph}</p>
                     ))}

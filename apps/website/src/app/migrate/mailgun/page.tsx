@@ -571,28 +571,27 @@ export default function MigrateFromMailgunPage() {
             </div>
           </section>
         </div>
+        <ClosingPanel
+          actions={
+            <div className="flex flex-wrap gap-3">
+              <Button asChild size="lg" variant="brand">
+                <Link href="/docs/quickstart/email">
+                  Deploy SES with one command
+                  <ArrowRight aria-hidden="true" className="ml-1.5 size-4" />
+                </Link>
+              </Button>
+              <Button asChild size="lg" variant="outline">
+                <Link href="/alternatives/mailgun">
+                  Other Mailgun alternatives
+                </Link>
+              </Button>
+            </div>
+          }
+          body="The Region choice is hard to reverse and the AWS approval is a queue. Do both this week and the rest is code you can schedule."
+          kicker="Next step"
+          title="Pick the Region, then start the clock"
+        />
       </main>
-
-      <ClosingPanel
-        actions={
-          <div className="flex flex-wrap gap-3">
-            <Button asChild size="lg" variant="brand">
-              <Link href="/docs/quickstart/email">
-                Deploy SES with one command
-                <ArrowRight aria-hidden="true" className="ml-1.5 size-4" />
-              </Link>
-            </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link href="/alternatives/mailgun">
-                Other Mailgun alternatives
-              </Link>
-            </Button>
-          </div>
-        }
-        body="The Region choice is hard to reverse and the AWS approval is a queue. Do both this week and the rest is code you can schedule."
-        kicker="Next step"
-        title="Pick the Region, then start the clock"
-      />
 
       <LandingFooter />
     </div>

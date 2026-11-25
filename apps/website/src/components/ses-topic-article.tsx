@@ -286,7 +286,7 @@ export function SesTopicArticle({ topic }: { topic: SesTopic }) {
           ))}
 
           <section aria-labelledby="limits" className="mt-12">
-            <FlowBox className="p-6 pt-7" label="Limits">
+            <FlowBox label="Limits">
               <h2 className="mb-3 font-bold text-xl tracking-tight" id="limits">
                 {topic.limits.heading}
               </h2>

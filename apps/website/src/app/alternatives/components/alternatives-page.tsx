@@ -182,26 +182,25 @@ export function AlternativesPageLayout({ page }: { page: AlternativesPage }) {
             </p>
           </div>
         </div>
+        <ClosingPanel
+          actions={
+            <div className="flex flex-wrap gap-3">
+              <Button asChild size="lg" variant="brand">
+                <Link href="/docs/quickstart/email">
+                  Read the quickstart
+                  <ArrowRight className="ml-2 size-4" />
+                </Link>
+              </Button>
+              <Button asChild size="lg" variant="outline">
+                <Link href="/tools/ses-calculator">Price your volume</Link>
+              </Button>
+            </div>
+          }
+          body="Wraps deploys email infrastructure into your own AWS account, then gives you the platform on top. Free to start, no credit card, and the infrastructure keeps running whether or not you keep paying us."
+          kicker="Get started"
+          title="If the AWS row is the one that fits"
+        />
       </main>
-
-      <ClosingPanel
-        actions={
-          <div className="flex flex-wrap gap-3">
-            <Button asChild size="lg" variant="brand">
-              <Link href="/docs/quickstart/email">
-                Read the quickstart
-                <ArrowRight className="ml-2 size-4" />
-              </Link>
-            </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link href="/tools/ses-calculator">Price your volume</Link>
-            </Button>
-          </div>
-        }
-        body="Wraps deploys email infrastructure into your own AWS account, then gives you the platform on top. Free to start, no credit card, and the infrastructure keeps running whether or not you keep paying us."
-        kicker="Get started"
-        title="If the AWS row is the one that fits"
-      />
 
       <LandingFooter />
     </div>

@@ -559,28 +559,27 @@ export default function MigrateFromSendGridPage() {
             </div>
           </section>
         </div>
+        <ClosingPanel
+          actions={
+            <div className="flex flex-wrap gap-3">
+              <Button asChild size="lg" variant="brand">
+                <Link href="/docs/quickstart/email">
+                  Deploy SES with one command
+                  <ArrowRight aria-hidden="true" className="ml-1.5 size-4" />
+                </Link>
+              </Button>
+              <Button asChild size="lg" variant="outline">
+                <Link href="/alternatives/sendgrid">
+                  Other SendGrid alternatives
+                </Link>
+              </Button>
+            </div>
+          }
+          body="Verify the domain and file for production access first. Everything else on this page is work you control; that one is a queue you wait in."
+          kicker="Next step"
+          title="Start with the request AWS has to approve"
+        />
       </main>
-
-      <ClosingPanel
-        actions={
-          <div className="flex flex-wrap gap-3">
-            <Button asChild size="lg" variant="brand">
-              <Link href="/docs/quickstart/email">
-                Deploy SES with one command
-                <ArrowRight aria-hidden="true" className="ml-1.5 size-4" />
-              </Link>
-            </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link href="/alternatives/sendgrid">
-                Other SendGrid alternatives
-              </Link>
-            </Button>
-          </div>
-        }
-        body="Verify the domain and file for production access first. Everything else on this page is work you control; that one is a queue you wait in."
-        kicker="Next step"
-        title="Start with the request AWS has to approve"
-      />
 
       <LandingFooter />
     </div>

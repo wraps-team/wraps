@@ -219,8 +219,8 @@ function ProsAndCons({
       </h2>
       <div className="grid gap-6 sm:grid-cols-2">
         {columns.map((column) => (
-          <FlowBox key={column.vendor.id} label="Pros and cons">
-            <h3 className="mb-4 font-semibold text-lg">{column.vendor.name}</h3>
+          <FlowBox key={column.vendor.id} label={column.vendor.name}>
+            <h3 className="sr-only">{column.vendor.name}</h3>
             <p className="mb-2 font-sans font-semibold text-muted-foreground text-xs uppercase tracking-eyebrow">
               Strengths
             </p>
@@ -393,7 +393,7 @@ export function VersusArticle({ page }: { page: VersusPage }) {
 
           {page.thirdOption ? (
             <section aria-labelledby="third-option" className="mt-12">
-              <FlowBox className="p-6 pt-7" dashed label="A third option">
+              <FlowBox dashed label="A third option">
                 <h2
                   className="mb-3 font-heading font-bold text-xl tracking-tight"
                   id="third-option"

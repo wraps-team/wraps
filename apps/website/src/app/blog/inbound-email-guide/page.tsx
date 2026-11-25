@@ -54,7 +54,7 @@ const faqSchema = {
       name: "How does Wraps inbound email work?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Wraps deploys AWS infrastructure to receive emails: SES Receipt Rules capture incoming mail, S3 stores the raw email, Lambda parses headers/body/attachments, and EventBridge triggers your webhooks for real-time processing.",
+        text: "Wraps deploys AWS infrastructure to receive emails: SES Receipt Rules capture incoming mail, S3 stores the raw email, Lambda parses headers/body/attachments, and EventBridge triggers your webhooks as each email arrives.",
       },
     },
     {
@@ -137,7 +137,7 @@ export default function Page() {
             <p className="max-w-2xl text-muted-foreground text-xl leading-relaxed">
               Build support inboxes, automate order processing, and create
               email-to-ticket workflows. All infrastructure deploys to your AWS
-              account with EventBridge webhooks for real-time processing.
+              account with EventBridge webhooks that fire as each email arrives.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-4">
@@ -150,7 +150,7 @@ export default function Page() {
               <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <Zap className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
-                  Real-time webhooks
+                  Webhooks on arrival
                 </span>
               </div>
               <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">

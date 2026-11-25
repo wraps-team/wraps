@@ -485,26 +485,27 @@ export default function MigrateFromResendPage() {
             </div>
           </section>
         </div>
+        <ClosingPanel
+          actions={
+            <div className="flex flex-wrap gap-3">
+              <Button asChild size="lg" variant="brand">
+                <Link href="/docs/quickstart/email">
+                  Deploy SES with one command
+                  <ArrowRight aria-hidden="true" className="ml-1.5 size-4" />
+                </Link>
+              </Button>
+              <Button asChild size="lg" variant="outline">
+                <Link href="/alternatives/resend">
+                  Other Resend alternatives
+                </Link>
+              </Button>
+            </div>
+          }
+          body="Everything else here is reversible. A thirty-day purge is not, so do that step whether or not you end up moving."
+          kicker="Next step"
+          title="Export the logs first"
+        />
       </main>
-
-      <ClosingPanel
-        actions={
-          <div className="flex flex-wrap gap-3">
-            <Button asChild size="lg" variant="brand">
-              <Link href="/docs/quickstart/email">
-                Deploy SES with one command
-                <ArrowRight aria-hidden="true" className="ml-1.5 size-4" />
-              </Link>
-            </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link href="/alternatives/resend">Other Resend alternatives</Link>
-            </Button>
-          </div>
-        }
-        body="Everything else here is reversible. A thirty-day purge is not, so do that step whether or not you end up moving."
-        kicker="Next step"
-        title="Export the logs first"
-      />
 
       <LandingFooter />
     </div>
