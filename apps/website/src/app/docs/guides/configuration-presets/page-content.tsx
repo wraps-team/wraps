@@ -111,8 +111,8 @@ export default function ConfigurationPresetsPageContent() {
           full-featured stack for high-volume senders.
         </p>
         <p className="text-muted-foreground">
-          All presets deploy to your AWS account. You own the infrastructure and
-          pay AWS directly at transparent pricing.
+          All presets deploy to your AWS account. You own the sending
+          infrastructure and pay AWS directly at its published rates.
         </p>
       </section>
 

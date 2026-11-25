@@ -30,8 +30,8 @@ export default function DocsPage() {
       <nav aria-hidden="true" className="sr-only">
         <h2>Wraps Documentation</h2>
         <p>
-          Deploy email, SMS, and CDN infrastructure to your AWS account. You own
-          everything — we provide the tooling.
+          Deploy email, SMS, and CDN infrastructure to your AWS account. The
+          sending infrastructure is yours; Wraps provides the tooling.
         </p>
         <h3>Build</h3>
         <ul>
