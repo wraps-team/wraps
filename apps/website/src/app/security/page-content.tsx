@@ -234,8 +234,7 @@ export function SecurityPageContent() {
                 architecture, so this page describes the architecture.
               </p>
               <p className="text-lg text-muted-foreground">
-                It also says what we don't have. As of {LAST_UPDATED}, that
-                includes SOC 2.
+                It also says what we don't have. We don't have SOC 2 yet.
               </p>
             </div>
           </div>
