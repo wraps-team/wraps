@@ -152,12 +152,10 @@ describe("homepage claim rules", () => {
   });
 
   it("every homepage dollar figure is a reference, not pasted prose", () => {
-    // Allowed literal "$" digits: the worked FAQ rates (named plans) and the
-    // $0 stat. Everything else must come from config or the estimator.
+    // Allowed literal "$" digits: the $0 stat only. Everything else, the FAQ
+    // rates included, must come from config or the estimator.
     const offenders: string[] = [];
-    for (const file of HOMEPAGE_FILES.filter(
-      (f) => !f.endsWith("faq-items.tsx")
-    )) {
+    for (const file of HOMEPAGE_FILES) {
       read(file)
         .split("\n")
         .forEach((line, i) => {
