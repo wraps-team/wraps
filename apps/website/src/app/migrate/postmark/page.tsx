@@ -250,7 +250,7 @@ const gaps: { capability: string; postmark: string; afterwards: string }[] = [
     capability: "Deliverability support",
     postmark:
       "Humans who answer placement questions, and a reputation they manage",
-    afterwards: "AWS support, on your own reputation and your own thresholds",
+    afterwards: "AWS support, on your own thresholds",
   },
   {
     capability: "Activity history",

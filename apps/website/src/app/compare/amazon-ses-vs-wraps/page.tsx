@@ -93,7 +93,7 @@ const tldrComparison = [
   {
     dimension: "Source",
     ses: "AWS service",
-    wraps: "AGPLv3; SDKs MIT",
+    wraps: LICENSE_STATEMENT,
   },
 ];
 
@@ -321,7 +321,7 @@ const featureComparison: {
         ses: "no",
         sesNote: "AWS service",
         wraps: "yes",
-        wrapsNote: "AGPLv3, except the enterprise (ee) directories; SDKs MIT",
+        wrapsNote: LICENSE_STATEMENT,
       },
       {
         name: "Team access",
@@ -406,8 +406,8 @@ export default function AmazonSesVsWrapsPage() {
             <p className="mb-3 max-w-2xl text-lg text-muted-foreground">
               <strong className="text-foreground">Amazon SES</strong> is the
               cheapest way to send email, and the only one where the account,
-              the sending account and the data stay yours. If you are willing
-              to hold an AWS account, it is the right call.
+              the sending account and the data stay yours. If you are willing to
+              hold an AWS account, it is the right call.
             </p>
             <p className="max-w-2xl text-lg text-muted-foreground">
               So this is not SES versus Wraps. It is raw SES versus{" "}
@@ -614,9 +614,9 @@ export default function AmazonSesVsWrapsPage() {
               <CardContent className="space-y-3 text-sm">
                 <p>
                   That is the product, and the name. {LICENSE_STATEMENT} You can
-                  read the code that sets up your account. Wraps reaches your account through an IAM role you
-                  create and can revoke, assumed for an hour at a time. No AWS
-                  access keys are stored anywhere.
+                  read the code that sets up your account. Wraps reaches your
+                  account through an IAM role you create and can revoke, assumed
+                  for an hour at a time. No AWS access keys are stored anywhere.
                 </p>
                 <p className="text-muted-foreground">
                   The limit, stated plainly: sending and the per-event delivery

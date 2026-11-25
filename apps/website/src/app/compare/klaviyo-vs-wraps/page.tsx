@@ -527,8 +527,12 @@ const timelineSteps = [
   { duration: "1 to 2 days", label: "Audit your existing Klaviyo setup" },
   { duration: "Same day", label: "Deploy Wraps into your AWS account" },
   {
-    duration: "24 to 48 hours",
+    duration: "Up to 48 hours",
     label: "DNS records and domain verification",
+  },
+  {
+    duration: "1 to 72 hours",
+    label: "AWS reviews your production access request",
   },
   { duration: "2 to 4 weeks", label: "Warm up the sending domain and IPs" },
   {

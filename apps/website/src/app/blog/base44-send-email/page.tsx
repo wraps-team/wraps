@@ -578,8 +578,8 @@ await onSignup({ email: user.email, name: user.name });`}
                 <p className="text-muted-foreground text-sm">
                   SES costs $0.10 per 1,000 emails on à la carte ($0.16 on the
                   Essentials plan new accounts start on). Events are included in
-                  your Wraps plan. You pay AWS directly — there's no Wraps markup on
-                  sending.
+                  your Wraps plan. You pay AWS directly — there's no Wraps
+                  markup on sending.
                 </p>
               </Collapsible>
 

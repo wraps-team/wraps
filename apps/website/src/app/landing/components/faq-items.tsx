@@ -74,14 +74,14 @@ export const faqItems: FaqItem[] = [
           AGPLv3
         </a>
         , except the enterprise (ee) directories, which are under a commercial
-        license. The SDKs are MIT. Open source is table stakes in this category rather than the
-        difference. The difference is what happens past the send API. OpenSend,
-        useSend and MillionSend give you an API and a dashboard over your own
-        SES; checked in September 2026, none of them watches your account
-        against the rates AWS suspends over, governs bounces past emitting a
-        webhook, or runs blacklist and authentication audits. They also want AWS
-        credentials in a container you run, where Wraps assumes an IAM role you
-        can revoke. The full rubric is on{" "}
+        license. The SDKs are MIT. Open source is table stakes in this category
+        rather than the difference. The difference is what happens past the send
+        API. OpenSend, useSend and MillionSend give you an API and a dashboard
+        over your own SES; checked in September 2026, none of them watches your
+        account against the rates AWS suspends over, governs bounces past
+        emitting a webhook, or runs blacklist and authentication audits. They
+        also want AWS credentials in a container you run, where Wraps assumes an
+        IAM role you can revoke. The full rubric is on{" "}
         <a className={faqLink} href="/approaches">
           the approaches page
         </a>

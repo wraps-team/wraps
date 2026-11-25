@@ -1,6 +1,6 @@
 {
   "name": "Wraps",
-  "description": "CLI and TypeScript SDK that deploys email (SES), SMS, and CDN infrastructure to your AWS account. One command, full ownership, AWS pricing. No credentials stored.",
+  "description": "CLI and TypeScript SDK that deploys email (SES), SMS, and CDN infrastructure to your AWS account. One command, sending in your own AWS account, AWS pricing. No credentials stored.",
   "url": "https://wraps.dev",
   "provider": {
     "organization": "Wraps",

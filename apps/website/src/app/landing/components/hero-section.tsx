@@ -26,9 +26,8 @@ export function HeroSection() {
             </h1>
             <p className="mt-5 max-w-[48ch] text-pretty text-lg text-muted-foreground leading-relaxed">
               Newsletters, automations, contacts and app emails in one platform
-              your whole team can use. It runs on your own AWS account, so every
-              email goes out from your domain, through your account, at
-              Amazon&apos;s own rates.
+              your whole team can use. Sending runs in your own AWS account, so
+              every email goes out from your domain at Amazon&apos;s own rates.
             </p>
             <div className="mt-7">
               <HomeHeroCtas />

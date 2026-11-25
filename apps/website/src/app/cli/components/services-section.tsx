@@ -78,7 +78,7 @@ export function CliServicesSection() {
           <SectionKicker>Services</SectionKicker>
           <p className="text-lg text-muted-foreground">
             One command deploys production-ready AWS infrastructure.{" "}
-            <span className="text-foreground">You own everything.</span>
+            <span className="text-foreground">The sending setup is yours.</span>
           </p>
         </div>
 

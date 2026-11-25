@@ -125,7 +125,7 @@ Open source under AGPLv3, except the enterprise (ee) directories, which are unde
 
 ## Enterprise
 
-Custom data retention, self-hosted control plane, SSO/SCIM, dedicated support, and SLAs. Contact https://wraps.dev/contact.
+Custom data retention, SSO/SCIM, dedicated support, and SLAs. Contact https://wraps.dev/contact.
 
 ## Links
 

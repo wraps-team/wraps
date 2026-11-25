@@ -13,6 +13,7 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { ResendForgeNotice } from "@/components/resend-forge-notice";
+import { CONTACT_PRICE_ROWS } from "@/config/competitor-contact-pricing";
 import { pageMetadata } from "@/lib/page-metadata";
 
 export const metadata: Metadata = pageMetadata({
@@ -48,6 +49,9 @@ const breadcrumbJsonLd = {
   ],
 };
 
+const customerIoAt100k =
+  CONTACT_PRICE_ROWS.find((row) => row.contacts === 100_000)?.customerIo ?? 0;
+
 const comparisons = [
   {
     competitor: "Resend",
@@ -74,8 +78,7 @@ const comparisons = [
     competitor: "Customer.io",
     href: "/compare/customer-io-vs-wraps",
     tagline: "Unlimited contacts, no surprise bills",
-    description:
-      "Customer.io charges per contact — $100/mo at 5K profiles, ~$1,000/mo at 100K. Wraps charges a flat platform fee with unlimited contacts. Compare the full cost at every volume.",
+    description: `Customer.io charges per contact — $100/mo at 5K profiles, $${customerIoAt100k.toLocaleString("en-US")}/mo at 100K. Wraps charges a flat platform fee with unlimited contacts. Compare the full cost at every volume.`,
   },
   {
     competitor: "Postmark",
@@ -89,7 +92,7 @@ const comparisons = [
     href: "/compare/klaviyo-vs-wraps",
     tagline: "Built for teams on Amazon SES",
     description:
-      "Klaviyo is excellent at ecommerce lifecycle marketing and a non-engineer can run it. If you are a developer-led team sending transactional and lifecycle email, compare the feature surface you actually use against what contact-based billing charges you for.",
+      "Klaviyo is excellent at ecommerce lifecycle marketing, and a marketer can run it without an engineer. If your list is growing and the bill grows with it, compare the features you use against what contact-based billing charges, and what changes when sending runs through Amazon SES in your own AWS account.",
   },
   {
     competitor: "Mailgun",

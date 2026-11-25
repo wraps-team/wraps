@@ -444,9 +444,7 @@ const featureGroups = [
               No Wraps lock-in: if you stop using Wraps, the infrastructure
               keeps running
             </li>
-            <li>
-              {LICENSE_STATEMENT}
-            </li>
+            <li>{LICENSE_STATEMENT}</li>
           </ul>
         </FlowBox>
       </div>

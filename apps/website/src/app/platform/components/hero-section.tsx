@@ -63,7 +63,7 @@ export function PlatformHeroSection() {
             <SectionKicker>The Wraps platform</SectionKicker>
             <h1 className="mb-6 text-pretty font-heading font-semibold text-4xl leading-tight tracking-tight sm:text-5xl">
               Everything your team needs to send email,{" "}
-              <span className="text-brand-text">on your own AWS.</span>
+              <span className="text-brand-text">through your own AWS.</span>
             </h1>
             <p className="mb-8 max-w-lg text-lg text-muted-foreground leading-relaxed">
               Templates, newsletters, automations, contacts and reports in one

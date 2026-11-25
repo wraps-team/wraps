@@ -9,8 +9,17 @@ import { Band, SectionHead } from "@/app/landing/components/page-band";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { CONTACT_PRICE_ROWS } from "@/config/competitor-contact-pricing";
 import { LICENSE_STATEMENT } from "@/config/license";
-import { AWS_PRICING, formatCurrency, getTier } from "@/config/pricing";
-import { estimateCost, SES_PLANS } from "@/lib/ses-cost";
+import {
+  AWS_PRICING,
+  formatCurrency,
+  getTier,
+  TIER_LIMITS,
+} from "@/config/pricing";
+import {
+  AWS_NEW_ACCOUNT_CREDIT,
+  estimateCost,
+  SES_PLANS,
+} from "@/lib/ses-cost";
 import {
   FoundersClosingActions,
   FoundersHeroCTA,
@@ -26,6 +35,7 @@ const business = getTier("business");
 const largest = CONTACT_PRICE_ROWS.at(-1);
 
 const ESSENTIALS_RATE = SES_PLANS.essentials.perThousandEmails.toFixed(2);
+const ALACARTE_RATE = SES_PLANS.alacarte.perThousandEmails.toFixed(2);
 const AMAZON_VOLUMES = [10_000, 100_000, 1_000_000] as const;
 const amazonBill = (emails: number, sesPlan: "alacarte" | "essentials") =>
   `$${estimateCost({ emailsPerMonth: emails, tier: "free", sesPlan }).total.toFixed(2)}`;
@@ -39,7 +49,7 @@ const PRODUCT = [
   {
     label: "Automations",
     title: "Emails that send themselves",
-    body: "Send the welcome email when someone signs up, then the next one two days later. Free includes 2 automations. Pro has no limit.",
+    body: `Send the welcome email when someone signs up, then the next one two days later. Free includes ${TIER_LIMITS.free.workflows} automations. Pro has no limit.`,
   },
   {
     label: "App emails",
@@ -72,9 +82,10 @@ const STEPS = [
 ];
 
 const NEEDS = [
-  "An AWS account. New accounts get a $200 AWS credit.",
+  `An AWS account. Creating one is free, and new accounts get up to $${AWS_NEW_ACCOUNT_CREDIT} in AWS credit.`,
   "Access to your domain's settings, or someone who has it.",
   "On the browser path, open and click links use an AWS-shared tracking domain. A branded one needs the CLI.",
+  "Nothing to install, no servers to run.",
 ];
 
 const FIT = [
@@ -155,8 +166,8 @@ export function FoundersPageContent() {
                       {emails.toLocaleString("en-US")} emails a month
                     </p>
                     <p className="text-muted-foreground text-sm tabular-nums">
-                      {amazonBill(emails, "alacarte")} on Amazon's $0.10 plan,{" "}
-                      {amazonBill(emails, "essentials")} on the $
+                      {amazonBill(emails, "alacarte")} on the ${ALACARTE_RATE} à
+                      la carte plan, {amazonBill(emails, "essentials")} on the $
                       {ESSENTIALS_RATE} plan AWS gives new accounts
                     </p>
                   </div>
@@ -166,7 +177,7 @@ export function FoundersPageContent() {
                 Add $0 for the Wraps Free plan. Includes the AWS event pipeline
                 that records opens and clicks, with 90-day history and no
                 dedicated IP. An account AWS put on the ${ESSENTIALS_RATE} plan
-                can switch back to $0.10.
+                can switch back to the ${ALACARTE_RATE} à la carte plan.
               </p>
             </FlowBox>
             <div className="grid content-start gap-4 text-muted-foreground leading-relaxed">

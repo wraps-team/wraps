@@ -392,7 +392,7 @@ ${whatYouOwnSection()}
 
 ## Enterprise
 
-Custom data retention, self-hosted control plane, SSO/SCIM, dedicated support, and SLAs. Contact ${SITE}/contact.
+Custom data retention, SSO/SCIM, dedicated support, and SLAs. Contact ${SITE}/contact.
 
 ## Links
 

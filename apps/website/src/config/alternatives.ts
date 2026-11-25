@@ -420,7 +420,7 @@ export const VENDORS: Record<VendorId, Vendor> = {
     // trimming everyone else's would quietly tilt the list in our favour, and
     // src/__tests__/alternatives.test.ts asserts each of these four facts.
     watchOut:
-      "You need an AWS account and SES production access, an AWS approval taking 1–72 hours that is not ours to grant. SDKs are TypeScript and Python only. Contacts, templates, and workflow state live in our database, not yours — only sending data and delivery events land in your AWS. We are not SOC 2 certified.",
+      "You need an AWS account and SES production access, an AWS approval taking 1–72 hours that is not ours to grant. SDKs are TypeScript and Python only. Contacts, templates, and workflow state live in our database, not yours — only sending data and delivery events land in your AWS. We don't have SOC 2 yet.",
     url: "https://wraps.dev",
     isUs: true,
   },
@@ -790,7 +790,7 @@ const MAILGUN_PAGE: AlternativesPage = {
   router: [
     {
       condition: "You want the pay-as-you-go model Flex used to be",
-      pick: "Amazon SES at $0.10 per 1,000, or AhaSend at $0.50 if you do not want AWS.",
+      pick: "Amazon SES at $0.10 per 1,000 on à la carte ($0.16 on Essentials), or AhaSend at $0.50 if you do not want AWS.",
     },
     {
       condition: "Deliverability is why you are leaving",
@@ -817,7 +817,7 @@ const MAILGUN_PAGE: AlternativesPage = {
     {
       vendor: "amazon-ses",
       verdict:
-        "The closest thing to what Flex actually was: real pay-as-you-go, no plan brackets, no monthly minimum, at $0.10 per 1,000 against the doubled legacy rate of $2. At 500K a month that is about $50 against Scale's $400. It is also the biggest step down in tooling on this page, because everything Mailgun gave you above the SMTP layer becomes yours to build, including the inbound routing that Mailgun users lean on more than most. Production access is an application AWS can deny.",
+        "The closest thing to what Flex actually was: real pay-as-you-go, no plan brackets, no monthly minimum, at $0.10 per 1,000 on SES à la carte ($0.16 on Essentials) against the doubled legacy rate of $2. At 500K a month that is about $50 against Scale's $400. It is also the biggest step down in tooling on this page, because everything Mailgun gave you above the SMTP layer becomes yours to build, including the inbound routing that Mailgun users lean on more than most. Production access is an application AWS can deny.",
     },
     {
       vendor: "postmark",

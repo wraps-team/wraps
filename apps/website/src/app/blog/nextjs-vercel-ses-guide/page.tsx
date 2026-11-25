@@ -64,7 +64,7 @@ const faqSchema = {
       name: "How much does it cost to send emails with AWS SES vs Resend or SendGrid?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "AWS SES costs $0.10 per 1,000 emails on à la carte ($0.16 on the Essentials plan new accounts start on). With Wraps, you pay AWS directly — about $7/month at 50K emails vs $50+ for Resend or SendGrid. At 100K emails, it's ~$12 vs $90+. No middleman markup.",
+        text: "AWS SES costs $0.10 per 1,000 emails on à la carte ($0.16 on the Essentials plan new accounts start on). With Wraps, you pay AWS directly — about $6 a month on à la carte or $9 on Essentials, all in, at 50K emails vs $50+ for Resend or SendGrid. At 100K emails, it's ~$12 vs $90+. No middleman markup.",
       },
     },
     {
@@ -791,8 +791,8 @@ await email.send({
               ))}
             </div>
             <p className="mt-4 text-center text-muted-foreground text-sm">
-              AWS costs only: SES sending ($0.10/1K emails on à la carte) + infrastructure
-              (~$2-5/mo). Wraps free tier included.
+              AWS costs only: SES sending ($0.10/1K emails on à la carte) +
+              infrastructure (~$2-5/mo). Wraps free tier included.
             </p>
 
             <div className="mx-auto mt-10 max-w-3xl">

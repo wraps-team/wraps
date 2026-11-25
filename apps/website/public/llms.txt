@@ -4,7 +4,7 @@
 > complete email platform: one-command infrastructure deployment, per-message
 > event tracking, bounce and complaint handling, suppression, React Email
 > templates, contacts and segments, broadcasts, workflows, and a dashboard.
-> Everything is provisioned inside the customer's own AWS account, no AWS keys
+> The sending infrastructure is provisioned inside the customer's own AWS account, no AWS keys
 > are ever stored, and every email — transactional or campaign — sends through
 > the customer's own SES on their own domains. Wraps also
 > deploys SMS (AWS End User Messaging) and CDN (S3 + CloudFront). Open source

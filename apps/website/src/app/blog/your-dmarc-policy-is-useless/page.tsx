@@ -901,7 +901,7 @@ export default function Page() {
               </p>
               <p className="mx-auto mt-1 max-w-md text-muted-foreground text-sm">
                 Wraps deploys production-ready email infrastructure to your AWS
-                account. You own everything.
+                account. The sending setup is yours.
               </p>
               <div className="mt-4 flex flex-col justify-center gap-3 sm:flex-row">
                 <a

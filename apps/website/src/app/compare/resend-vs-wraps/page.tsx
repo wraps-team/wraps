@@ -164,7 +164,7 @@ const featureComparison = [
         wraps: "One command into your AWS account",
       },
       {
-        name: "Whose sending account and reputation",
+        name: "Whose sending account",
         resend: "Resend's",
         wraps: "Yours",
       },

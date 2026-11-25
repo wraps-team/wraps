@@ -1062,7 +1062,8 @@ export default function SandboxGuideContent() {
               <p className="text-muted-foreground">
                 Wraps deploys production-ready SES (DKIM, SPF, DMARC, bounce
                 handling, SNS, suppression) to your AWS account in minutes.
-                Still your AWS, still $0.10/1K on à la carte — just no boilerplate.
+                Still your AWS, still $0.10/1K on à la carte — just no
+                boilerplate.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row md:flex-col lg:flex-row">
@@ -1278,11 +1279,11 @@ export default function SandboxGuideContent() {
 
             <Collapsible title="Should I use SES or a third-party provider?">
               <p className="text-muted-foreground text-sm">
-                SES is significantly cheaper at scale ($0.10/1000 emails on à la carte) but
-                requires more setup and management. If you want hands-off
-                deliverability with dedicated IPs and better support, consider
-                SendGrid, Postmark, or Mailgun. If you're comfortable with AWS
-                and want to minimize costs, SES is excellent.
+                SES is significantly cheaper at scale ($0.10/1000 emails on à la
+                carte) but requires more setup and management. If you want
+                hands-off deliverability with dedicated IPs and better support,
+                consider SendGrid, Postmark, or Mailgun. If you're comfortable
+                with AWS and want to minimize costs, SES is excellent.
               </p>
             </Collapsible>
           </div>

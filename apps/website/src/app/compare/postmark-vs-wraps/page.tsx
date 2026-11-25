@@ -136,17 +136,17 @@ const pricingRows = [
     volume: "500K/mo",
     postmark: "$606-$654",
     postmarkDetail: "Pro/Platform + overage",
-    wraps: "$264.10",
-    wrapsDetail: "$199 Business + $65.10 AWS",
-    savings: "56-60%",
+    wraps: "$94.10",
+    wrapsDetail: "$29 Pro + $65.10 AWS",
+    savings: "84-86%",
   },
   {
     volume: "1M/mo",
     postmark: "~$1,200-$1,300",
     postmarkDetail: "Pro/Platform + overage (custom deals at 1.5M+)",
-    wraps: "$335.09",
-    wrapsDetail: "$199 Business + $136.09 AWS",
-    savings: "72%+",
+    wraps: "$165.09",
+    wrapsDetail: "$29 Pro + $136.09 AWS",
+    savings: "86%+",
   },
 ];
 

@@ -4,6 +4,7 @@ import { Button } from "@wraps/ui/components/ui/button";
 import { Check, ClipboardCopy } from "lucide-react";
 import { Tabs } from "radix-ui";
 import { useState } from "react";
+import { AWS_NEW_ACCOUNT_CREDIT } from "@/lib/ses-cost";
 import { trackEvent } from "@/utils/analytics";
 import { FlowBox } from "./flow-primitives";
 
@@ -195,8 +196,9 @@ export function SetupPaths({ links }: { links: SetupAgentLinks }) {
           <FlowBox label="What you need">
             <Notes
               items={[
-                "An AWS account. Creating one is free.",
+                `An AWS account. Creating one is free, and new accounts get up to $${AWS_NEW_ACCOUNT_CREDIT} in AWS credit.`,
                 "Access to your domain's settings, or someone who has it.",
+                "On the browser path, open and click links use an AWS-shared tracking domain. A branded one needs the CLI.",
                 "Nothing to install, no servers to run.",
               ]}
             />

@@ -345,7 +345,7 @@ const steps: { title: string; body: React.ReactNode }[] = [
         This is the part AWS routes through Amazon Connect. If you are not
         running a contact center, Wraps covers the same ground as contacts,
         segments, broadcasts, and workflows — sending through the SES account
-        you just stood up, on your own domains and your own reputation.
+        you just stood up, on your own domains.
       </>
     ),
   },

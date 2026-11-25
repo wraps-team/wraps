@@ -11,7 +11,7 @@ export function LeavingSection() {
             Stop paying Wraps. Your sending infrastructure keeps running.
           </h2>
           <p className="mb-4 text-muted-foreground">
-            Your SES setup, domain reputation, IAM roles, and the{" "}
+            Your SES setup, IAM roles, and the{" "}
             <code className="rounded bg-muted px-1 py-0.5 text-sm">
               wraps-email-history
             </code>{" "}

@@ -1031,10 +1031,10 @@ wraps email send --to user@example.com --subject "Hello from Wraps"`}
               <Collapsible title="What if I'm not on AWS yet?">
                 <p className="text-muted-foreground text-sm">
                   Creating an AWS account is free. You only pay for what you use
-                  (SES is $0.10/1K emails on à la carte). Many Supabase developers already
-                  have AWS accounts for other services. If AWS is a non-starter
-                  for your team, Resend + a separate broadcast tool is the next
-                  best option.
+                  (SES is $0.10/1K emails on à la carte). Many Supabase
+                  developers already have AWS accounts for other services. If
+                  AWS is a non-starter for your team, Resend + a separate
+                  broadcast tool is the next best option.
                 </p>
               </Collapsible>
 
@@ -1076,10 +1076,10 @@ wraps email send --to user@example.com --subject "Hello from Wraps"`}
                 risks. A workflow builder is safer for production.
               </p>
               <p className="pt-2 text-foreground">
-                If you're on AWS (or open to it), SES at $0.10/1K (à la carte) is 4-12x
-                cheaper than managed providers. The question isn't whether to
-                set up email infrastructure — it's whether you want to rent it
-                or own it.
+                If you're on AWS (or open to it), SES at $0.10/1K (à la carte)
+                is 4-12x cheaper than managed providers. The question isn't
+                whether to set up email infrastructure — it's whether you want
+                to rent it or own it.
               </p>
             </div>
           </section>

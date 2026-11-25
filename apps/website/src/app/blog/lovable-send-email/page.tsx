@@ -579,8 +579,8 @@ await supabase.functions.invoke("track-event", {
                 <p className="text-muted-foreground text-sm">
                   AWS SES costs $0.10 per 1,000 emails on à la carte ($0.16 on
                   the Essentials plan new accounts start on). Events are
-                  included in your Wraps plan. You pay AWS directly for sending — no Wraps
-                  markup.
+                  included in your Wraps plan. You pay AWS directly for sending
+                  — no Wraps markup.
                 </p>
               </Collapsible>
 

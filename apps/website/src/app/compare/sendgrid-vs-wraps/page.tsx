@@ -26,6 +26,7 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
+import { LICENSE_STATEMENT } from "@/config/license";
 import { pageMetadata } from "@/lib/page-metadata";
 
 export const metadata: Metadata = pageMetadata({
@@ -301,7 +302,7 @@ const featureComparison = [
       {
         name: "Open source",
         sendgrid: false,
-        wraps: "AGPLv3; SDKs MIT",
+        wraps: LICENSE_STATEMENT,
       },
       {
         name: "What happens when you leave",
