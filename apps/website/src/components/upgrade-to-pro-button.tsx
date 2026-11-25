@@ -46,9 +46,7 @@ export function UpgradeToProButton() {
             <h3 className="flex items-center gap-2 py-2 font-bold text-lg">
               <Rocket className="text-primary" size={18} />
               Unlock Premium Blocks
-              <Badge variant="destructive">
-                Live
-              </Badge>
+              <Badge variant="destructive">Live</Badge>
             </h3>
             <p className="mb-4 text-muted-foreground text-sm">
               Get access to exclusive premium blocks and dashboards for your
@@ -77,9 +75,7 @@ export function UpgradeToProButton() {
                   Pro Dashboards
                 </Button>
                 <span className="-top-5 -right-1 absolute">
-                  <Badge variant="warning">
-                    Coming soon
-                  </Badge>
+                  <Badge variant="warning">Coming soon</Badge>
                 </span>
               </div>
             </div>

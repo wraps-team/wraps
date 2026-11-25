@@ -50,7 +50,8 @@ export function ContactPriceCurve() {
       <div className="border-border border-t bg-muted/40 px-4 py-3">
         <p className="text-xs text-muted-foreground leading-relaxed">
           Wraps' fee is flat by plan, not by list size, and sending is billed by
-          AWS directly at SES rates. Competitor figures verified {CONTACT_PRICES_CHECKED}.
+          AWS directly at SES rates. Competitor figures verified{" "}
+          {CONTACT_PRICES_CHECKED}.
         </p>
       </div>
     </div>
