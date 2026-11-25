@@ -30,7 +30,6 @@ import { WrapsMotif } from "@/components/wraps-motif";
 import {
   GITHUB_URL,
   NAV_MENUS,
-  type NavMenu,
   SIGN_IN_URL,
   SIGN_UP_URL,
 } from "@/config/site-nav";
