@@ -24,9 +24,9 @@ export function PlatformAutomationsSection() {
             Emails that send themselves.
           </h2>
           <p className="mb-5 max-w-md text-lg text-muted-foreground leading-relaxed">
-            Start a sequence when someone signs up, buys or goes quiet. Wait,
-            check what they did, then send the next email or text. Describe it
-            to the AI, or have a developer write it in code.
+            Start a sequence when someone signs up or buys. Wait, check what
+            they did, then send the next email or text. Describe it to the AI,
+            or have a developer write it in code.
           </p>
           <p className="text-muted-foreground text-xs">
             {TIER_LIMITS.free.workflows} automations on Free.{" "}

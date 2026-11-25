@@ -36,8 +36,8 @@ export function PlatformTemplatesSection() {
             ))}
           </ul>
           <p className="text-muted-foreground text-xs">
-            AI drafts on every plan: {TIER_LIMITS.free.aiGenerations} a month on
-            Free, {TIER_LIMITS.pro.aiGenerations} on Pro.
+            AI generations on every plan: {TIER_LIMITS.free.aiGenerations} a
+            month on Free, {TIER_LIMITS.pro.aiGenerations} on Pro.
           </p>
         </div>
 

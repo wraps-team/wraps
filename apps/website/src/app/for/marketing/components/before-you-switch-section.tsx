@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { FlowBox } from "@/app/landing/components/flow-primitives";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 
@@ -47,6 +48,18 @@ export function MarketingBeforeYouSwitchSection() {
             </FlowBox>
           ))}
         </div>
+
+        <p className="mt-8 max-w-3xl text-muted-foreground text-sm leading-relaxed">
+          Engineers can push templates from the repo while you edit copy in the
+          dashboard, so it is worth agreeing up front on{" "}
+          <Link
+            className="text-foreground underline underline-offset-4"
+            href="/docs/guides/template-handoff"
+          >
+            what happens when you both edit the same one
+          </Link>
+          .
+        </p>
       </div>
     </section>
   );

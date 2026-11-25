@@ -17,7 +17,7 @@ const cards = [
   {
     label: "Topics · they decide",
     title: "Subscriptions people choose",
-    body: "Contacts opt into the topics they care about, with double opt-in and a hosted preference page linked from every email.",
+    body: "Contacts opt into the topics they care about, with double opt-in and a hosted preference page you can link from any email.",
     examples: [
       "Someone tired of the newsletter drops one topic, not you",
       "You style the preference page; we host it",
@@ -68,7 +68,7 @@ export function MarketingSegmentsTopicsSection() {
 
         <p className="mt-6 text-muted-foreground text-xs">
           Segments, topics and scheduling are on Pro, ${proPrice} a month.
-          Sending to everyone is free on every plan.
+          Sending to everyone is included on every plan.
         </p>
       </div>
     </section>

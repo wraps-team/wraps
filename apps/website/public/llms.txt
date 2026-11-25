@@ -426,7 +426,7 @@ Definitions written from the code that actually checks each mechanism (SPF, DKIM
 - [Why Wraps](https://wraps.dev/why-wraps): Value proposition and differentiators
 - [The Four Approaches](https://wraps.dev/approaches): The four ways to send application email — run SES yourself, rent a sending API, rent a marketing platform, or self-host an open-source wrapper — with what each is good at and who should pick it
 - [BYOC](https://wraps.dev/byoc): SES, EventBridge, and DynamoDB deployed into your own AWS with one CLI command
-- [For Marketing](https://wraps.dev/for/marketing): Newsletters, segments, topics and a hosted preference center with unlimited contacts on every plan; the Wraps fee is flat by plan
+- [For Marketing](https://wraps.dev/for/marketing): Newsletters, segments, topics and a hosted preference center (segments, topics and scheduling are on Pro), with unlimited contacts on every plan; the Wraps fee is flat by plan
 - [For Operators](https://wraps.dev/for/operators): Preflight a broadcast, hold consent as a record, and trace a single message end to end
 
 ## Alternatives

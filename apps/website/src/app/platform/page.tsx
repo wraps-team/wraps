@@ -5,6 +5,9 @@ import { pageMetadata } from "@/lib/page-metadata";
 import DashboardPageContent from "./page-content";
 
 const description =
+  "Templates written with AI, newsletters, automations and delivery reports in one dashboard. Sending runs in your own AWS account.";
+
+const schemaDescription =
   "Templates written with AI, newsletters, automations, contacts and delivery reports in one dashboard. Sending runs through Amazon in your own AWS account, and Amazon bills you directly.";
 
 const softwareSchema = {
@@ -18,7 +21,7 @@ const softwareSchema = {
     price: String(getTier("pro").price),
     priceCurrency: "USD",
   },
-  description,
+  description: schemaDescription,
   url: "https://wraps.dev/platform",
   author: {
     "@type": "Organization",
@@ -28,7 +31,7 @@ const softwareSchema = {
 };
 
 export const metadata: Metadata = pageMetadata({
-  title: "Email platform for your own AWS: templates, newsletters, automations",
+  title: "Email platform on your own AWS",
   description,
   path: "/platform",
   image: {

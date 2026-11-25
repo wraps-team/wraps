@@ -4,7 +4,7 @@ import { SectionKicker } from "@/app/landing/components/section-kicker";
 // Plan gates: apps/web/src/lib/plans.ts (batch on Free; topics, segments and
 // campaigns, meaning scheduling, from Pro).
 const FEATURES = [
-  { name: "Send to everyone", pro: false, note: "Free on every plan" },
+  { name: "Send to everyone", pro: false, note: "Included on every plan" },
   {
     name: "Segments",
     pro: true,

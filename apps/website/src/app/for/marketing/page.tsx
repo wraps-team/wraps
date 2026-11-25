@@ -12,7 +12,10 @@ import { MarketingNewslettersSection } from "./components/newsletters-section";
 import { MarketingReportingSection } from "./components/reporting-section";
 import { MarketingSegmentsTopicsSection } from "./components/segments-topics-section";
 
-const description = `Newsletters, segments, topics and a hosted preference center for marketing teams. Unlimited contacts on every plan, so your Wraps fee never grows with your list. Pro is $${getTier("pro").price} a month; Amazon bills sending separately.`;
+const description =
+  "Newsletters, segments and topics with unlimited contacts on every plan. Your Wraps fee never grows with your list. Amazon bills sending separately.";
+
+const schemaDescription = `Newsletters, segments, topics and a hosted preference center for marketing teams. Unlimited contacts on every plan, so your Wraps fee never grows with your list. Pro is $${getTier("pro").price} a month; Amazon bills sending separately.`;
 
 const softwareSchema = {
   "@context": "https://schema.org",
@@ -25,7 +28,7 @@ const softwareSchema = {
     price: String(getTier("pro").price),
     priceCurrency: "USD",
   },
-  description,
+  description: schemaDescription,
   url: "https://wraps.dev/for/marketing",
   author: {
     "@type": "Organization",
@@ -35,7 +38,7 @@ const softwareSchema = {
 };
 
 export const metadata: Metadata = pageMetadata({
-  title: "Email marketing with unlimited contacts on every plan",
+  title: "Email marketing with unlimited contacts",
   description,
   path: "/for/marketing",
   social: {
@@ -59,14 +62,14 @@ export default function ForMarketingPage() {
           <ClosingPanel
             actions={
               <TrackedCtaPair
-                location="for_marketing_closing"
+                location="for_marketing_cta"
                 secondary={{
                   label: "Estimate your sending cost",
                   href: "/tools/ses-calculator",
                 }}
               />
             }
-            body={`Newsletters to all contacts are free. Segments, topics and scheduling start at $${getTier("pro").price} a month.`}
+            body={`Newsletters to all contacts are included on every plan. Segments, topics and scheduling start at $${getTier("pro").price} a month. AWS bills each email you send, at its own rates.`}
             title="Unlimited contacts. Even on the free plan."
           />
         </main>

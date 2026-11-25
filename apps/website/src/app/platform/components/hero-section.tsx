@@ -7,7 +7,7 @@ const STEPS = [
   { title: "Sign up free", body: "No credit card." },
   {
     title: "Connect your AWS",
-    body: "In your browser, with one command, or with your AI agent.",
+    body: "In your browser, from the command line, or with your AI agent.",
   },
   {
     title: "Describe it to the AI",

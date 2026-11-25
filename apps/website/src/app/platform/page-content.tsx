@@ -26,8 +26,13 @@ export default function DashboardPageContent() {
 
       // Once images above the anchor load and layout is stable, smooth-scroll
       // to the final position (it may have shifted)
+      const reduceMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)"
+      ).matches;
       const timeoutId = setTimeout(() => {
-        element.scrollIntoView({ behavior: "smooth" });
+        element.scrollIntoView({
+          behavior: reduceMotion ? "instant" : "smooth",
+        } as ScrollIntoViewOptions);
       }, 300);
 
       return () => clearTimeout(timeoutId);
