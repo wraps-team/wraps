@@ -292,7 +292,7 @@ function RankedCard({ entry, rank }: { entry: RankedEntry; rank: number }) {
 
 function Badge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="rounded-full border px-2 py-0.5 font-mono text-3xs text-muted-foreground uppercase tracking-widest">
+    <span className="rounded-none border px-2 py-0.5 font-mono text-3xs text-muted-foreground uppercase tracking-widest">
       {children}
     </span>
   );

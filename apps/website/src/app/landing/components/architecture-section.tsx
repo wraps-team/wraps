@@ -69,7 +69,7 @@ function IconBox({
 }) {
   const iconElement = (
     <div
-      className={`flex aspect-square items-center justify-center rounded-full border-2 bg-background transition-all ${
+      className={`flex aspect-square items-center justify-center rounded-none border-2 bg-background transition-all ${
         compact ? "size-10" : "size-14"
       } ${
         highlighted
@@ -115,7 +115,7 @@ function SimpleNode({
       ref={nodeRef}
     >
       <div
-        className={`flex aspect-square items-center justify-center rounded-full border-2 bg-background transition-all ${
+        className={`flex aspect-square items-center justify-center rounded-none border-2 bg-background transition-all ${
           compact ? "size-11" : "size-14"
         } ${
           highlighted
@@ -243,7 +243,7 @@ function MobileNode({
   return (
     <div className="flex flex-col items-center gap-1">
       <div
-        className={`flex aspect-square size-14 items-center justify-center rounded-full border-2 ${
+        className={`flex aspect-square size-14 items-center justify-center rounded-none border-2 ${
           highlighted
             ? "border-brand bg-brand/5 text-brand-text"
             : "border-border bg-background text-muted-foreground"
@@ -621,10 +621,10 @@ export function InteractiveArchitectureDiagram({
         {/* Tab bar - optional */}
         {showTabBar && (
           <div className="flex justify-center border-b bg-background/50 py-4">
-            <div className="inline-flex rounded-full border bg-background p-1">
+            <div className="inline-flex rounded-none border bg-background p-1">
               {(["send", "track", "deploy"] as const).map((tab) => (
                 <button
-                  className={`rounded-full px-5 py-2 font-medium text-sm transition-all ${
+                  className={`rounded-none px-5 py-2 font-medium text-sm transition-all ${
                     activeTab === tab
                       ? "bg-foreground text-background"
                       : "text-muted-foreground hover:text-foreground"

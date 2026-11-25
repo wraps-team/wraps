@@ -104,9 +104,9 @@ function BounceMeter() {
           {BOUNCE.to.toFixed(2)}%
         </span>
       </p>
-      <div className="relative mt-5 h-2.5 w-full rounded-full bg-muted">
+      <div className="relative mt-5 h-2.5 w-full rounded-none bg-muted">
         <div
-          className="hero-bounce-fill h-full w-(--to) rounded-full bg-warning"
+          className="hero-bounce-fill h-full w-(--to) rounded-none bg-warning"
           style={
             {
               "--from": pct(from.valuePct),
@@ -135,9 +135,9 @@ function ComplaintMeter() {
       <p className="mt-2 font-mono font-semibold text-4xl text-foreground tabular-nums tracking-tight sm:text-3xl lg:text-5xl">
         {COMPLAINT.value.toFixed(2)}%
       </p>
-      <div className="relative mt-5 h-2.5 w-full rounded-full bg-muted">
+      <div className="relative mt-5 h-2.5 w-full rounded-none bg-muted">
         <div
-          className="h-full w-(--to) rounded-full bg-foreground"
+          className="h-full w-(--to) rounded-none bg-foreground"
           style={{ "--to": pct(g.valuePct) } as React.CSSProperties}
         />
         <Ticks
@@ -164,9 +164,9 @@ function QuotaMeter() {
           / {QUOTA.max.toLocaleString("en-US")}
         </span>
       </p>
-      <div className="relative mt-5 h-2.5 w-full rounded-full bg-muted">
+      <div className="relative mt-5 h-2.5 w-full rounded-none bg-muted">
         <div
-          className="h-full w-(--to) rounded-full bg-foreground"
+          className="h-full w-(--to) rounded-none bg-foreground"
           style={{ "--to": pct(ratio * 100) } as React.CSSProperties}
         />
         <span

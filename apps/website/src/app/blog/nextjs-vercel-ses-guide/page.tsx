@@ -125,7 +125,7 @@ type StepProps = {
 function Step({ number, title, children }: StepProps) {
   return (
     <div className="relative border-l-2 pb-12 pl-12 last:border-transparent last:pb-0 border-success">
-      <div className="absolute -left-5 flex h-10 w-10 items-center justify-center rounded-full font-bold text-lg bg-success text-success-foreground">
+      <div className="absolute -left-5 flex h-10 w-10 items-center justify-center rounded-none font-bold text-lg bg-success text-success-foreground">
         {number}
       </div>
       <div className="pt-1">
@@ -185,7 +185,7 @@ export default function Page() {
           <div className="relative mx-auto max-w-6xl px-6 pt-20 pb-16">
             {/* Badge */}
             <div className="mb-8 flex justify-center">
-              <div className="inline-flex items-center gap-2 rounded-full border border-success/20 bg-success/10 px-4 py-2 text-success text-sm">
+              <div className="inline-flex items-center gap-2 rounded-none border border-success/20 bg-success/10 px-4 py-2 text-success text-sm">
                 <Zap className="h-4 w-4" />
                 <span>Next.js + Vercel + AWS SES</span>
               </div>

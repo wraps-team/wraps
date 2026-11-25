@@ -91,7 +91,7 @@ function TemplatesContent() {
         <div className="flex flex-wrap justify-center gap-3">
           {templateFeatures.map((feature) => (
             <div
-              className="flex items-center gap-2 rounded-full border bg-background px-4 py-2 transition-colors hover:border-brand/50"
+              className="flex items-center gap-2 rounded-none border bg-background px-4 py-2 transition-colors hover:border-brand/50"
               key={feature.title}
             >
               <feature.icon className="size-4 text-brand-text" />
@@ -134,7 +134,7 @@ function BroadcastsContent() {
         <div className="flex flex-wrap justify-center gap-3">
           {broadcastFeatures.map((feature) => (
             <div
-              className="flex items-center gap-2 rounded-full border bg-background px-4 py-2 transition-colors hover:border-brand/50"
+              className="flex items-center gap-2 rounded-none border bg-background px-4 py-2 transition-colors hover:border-brand/50"
               key={feature.title}
             >
               <feature.icon className="size-4 text-brand-text" />
@@ -177,7 +177,7 @@ function AutomationsContent() {
         <div className="flex flex-wrap justify-center gap-3">
           {automationFeatures.map((feature) => (
             <div
-              className="flex items-center gap-2 rounded-full border bg-background px-4 py-2 transition-colors hover:border-brand/50"
+              className="flex items-center gap-2 rounded-none border bg-background px-4 py-2 transition-colors hover:border-brand/50"
               key={feature.title}
             >
               <feature.icon className="size-4 text-brand-text" />
@@ -341,7 +341,7 @@ function EventsContent() {
         <div className="flex flex-wrap justify-center gap-3">
           {eventFeatures.map((feature) => (
             <div
-              className="flex items-center gap-2 rounded-full border bg-background px-4 py-2 transition-colors hover:border-brand/50"
+              className="flex items-center gap-2 rounded-none border bg-background px-4 py-2 transition-colors hover:border-brand/50"
               key={feature.title}
             >
               <feature.icon className="size-4 text-brand-text" />
@@ -376,14 +376,14 @@ function GlowingTabBar({ activeIndex, onTabClick }: GlowingTabProps) {
     <div className="mb-8 flex flex-col items-center gap-4">
       <div className="relative">
         <div className="absolute inset-0 rounded-full bg-brand/20 blur-xl" />
-        <div className="relative inline-flex gap-1 rounded-full border border-brand/20 bg-background/80 p-1.5 shadow-lg backdrop-blur-sm dark:bg-background/50">
+        <div className="relative inline-flex gap-1 rounded-none border border-brand/20 bg-background/80 p-1.5 shadow-lg backdrop-blur-sm dark:bg-background/50">
           {tabs.map((tab, index) => {
             const isActive = activeIndex === index;
             const Icon = tab.icon;
             return (
               <button
                 className={cn(
-                  "group relative flex items-center gap-2 overflow-hidden rounded-full px-5 py-2.5 font-medium text-sm transition-all duration-300",
+                  "group relative flex items-center gap-2 overflow-hidden rounded-none px-5 py-2.5 font-medium text-sm transition-all duration-300",
                   isActive
                     ? "bg-primary text-primary-foreground shadow-lg shadow-brand/30 scale-105"
                     : "text-muted-foreground hover:bg-brand/10 hover:text-foreground dark:hover:bg-brand/20"

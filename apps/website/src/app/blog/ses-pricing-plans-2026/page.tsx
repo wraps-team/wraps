@@ -187,19 +187,19 @@ export default function Page() {
             </p>
 
             <div className="mt-8 flex flex-wrap gap-4">
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <Globe className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Set per account, per Region
                 </span>
               </div>
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <Layers className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   À la carte survives at $0.10/1K
                 </span>
               </div>
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <Calculator className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Defaulted accounts can leave immediately

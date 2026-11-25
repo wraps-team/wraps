@@ -167,9 +167,9 @@ export function HeroFlow() {
             </span>
           </div>
         </div>
-        <div className="mt-3 h-1 overflow-hidden rounded-full bg-muted">
+        <div className="mt-3 h-1 overflow-hidden rounded-none bg-muted">
           <div
-            className={`h-full rounded-full bg-brand transition-all duration-1000 ease-out motion-reduce:transition-none ${
+            className={`h-full rounded-none bg-brand transition-all duration-1000 ease-out motion-reduce:transition-none ${
               stage >= 9 ? "w-full" : "w-0"
             }`}
           />

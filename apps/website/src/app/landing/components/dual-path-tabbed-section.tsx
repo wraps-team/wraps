@@ -73,14 +73,14 @@ function TabBar({
     <div className="mb-8 flex justify-center">
       <div className="relative">
         <div className="absolute inset-0 rounded-full bg-brand/20 blur-xl" />
-        <div className="relative inline-flex gap-1 rounded-full border border-brand/20 bg-background/80 p-1.5 shadow-lg backdrop-blur-sm dark:bg-background/50">
+        <div className="relative inline-flex gap-1 rounded-none border border-brand/20 bg-background/80 p-1.5 shadow-lg backdrop-blur-sm dark:bg-background/50">
           {tabs.map((tab, index) => {
             const isActive = activeIndex === index;
             const Icon = tab.icon;
             return (
               <button
                 className={cn(
-                  "group relative flex items-center gap-2 overflow-hidden rounded-full px-5 py-2.5 font-medium text-sm transition-all duration-300",
+                  "group relative flex items-center gap-2 overflow-hidden rounded-none px-5 py-2.5 font-medium text-sm transition-all duration-300",
                   isActive
                     ? "bg-primary text-primary-foreground shadow-lg shadow-brand/30"
                     : "text-muted-foreground hover:bg-brand/10 hover:text-foreground dark:hover:bg-brand/20"
@@ -134,10 +134,10 @@ function ComparisonPanel({
       {/* Code side */}
       <div className="flex min-w-0 flex-col">
         <Link
-          className="mb-3 flex items-center gap-2 rounded-full w-fit px-1 transition-colors hover:bg-success/5"
+          className="mb-3 flex items-center gap-2 rounded-none w-fit px-1 transition-colors hover:bg-success/5"
           href="/sdk"
         >
-          <span className="inline-flex items-center rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-medium text-success">
+          <span className="inline-flex items-center rounded-none bg-success/10 px-2.5 py-0.5 text-xs font-medium text-success">
             Code
           </span>
           <span className="text-sm text-muted-foreground">for engineers</span>
@@ -177,10 +177,10 @@ function ComparisonPanel({
       {/* Visual side */}
       <div className="flex min-w-0 flex-col">
         <Link
-          className="mb-3 flex items-center gap-2 rounded-full w-fit px-1 transition-colors hover:bg-brand/5"
+          className="mb-3 flex items-center gap-2 rounded-none w-fit px-1 transition-colors hover:bg-brand/5"
           href="/platform"
         >
-          <span className="inline-flex items-center rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-medium text-brand-text">
+          <span className="inline-flex items-center rounded-none bg-brand/10 px-2.5 py-0.5 text-xs font-medium text-brand-text">
             Visual
           </span>
           <span className="text-sm text-muted-foreground">for your team</span>

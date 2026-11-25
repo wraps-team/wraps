@@ -13,7 +13,7 @@ import { CopyCommand } from "./copy-command";
 /** One primary action, the command as a quiet alternative, two text links. */
 export function CTAButtons() {
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-start">
       <Button
         asChild
         className="w-full cursor-pointer sm:w-auto"
@@ -29,7 +29,7 @@ export function CTAButtons() {
         </a>
       </Button>
 
-      <div className="mt-6 hidden flex-col items-center gap-2 sm:flex">
+      <div className="mt-6 hidden flex-col items-start gap-2 sm:flex">
         <p className="text-muted-foreground text-xs">
           or set it up from your terminal
         </p>
@@ -40,7 +40,7 @@ export function CTAButtons() {
         />
       </div>
 
-      <p className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
+      <p className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
         <a
           className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
           href="/docs/quickstart"

@@ -102,7 +102,7 @@ export function CliServicesSection() {
                       {service.name}
                     </h3>
                     {service.status === "beta" && (
-                      <span className="rounded-full border border-border px-2 py-0.5 font-mono text-3xs text-muted-foreground uppercase tracking-eyebrow">
+                      <span className="rounded-none border border-border px-2 py-0.5 font-mono text-3xs text-muted-foreground uppercase tracking-eyebrow">
                         Beta
                       </span>
                     )}

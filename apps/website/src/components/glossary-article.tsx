@@ -186,7 +186,7 @@ export function GlossaryArticle({ term }: { term: GlossaryTerm }) {
                 {related.map((relatedTerm) => (
                   <li key={relatedTerm.slug}>
                     <Link
-                      className="inline-block rounded-full border px-3 py-1 text-sm hover:bg-muted"
+                      className="inline-block rounded-none border px-3 py-1 text-sm hover:bg-muted"
                       href={`/glossary/${relatedTerm.slug}`}
                     >
                       {relatedTerm.term}

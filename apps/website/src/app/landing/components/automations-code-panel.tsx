@@ -144,17 +144,17 @@ function ViewToggle({
   onChange: (value: ViewMode) => void;
 }) {
   return (
-    <div className="relative inline-flex rounded-full border bg-muted/50 p-1">
+    <div className="relative inline-flex rounded-none border bg-muted/50 p-1">
       <div
         className={cn(
-          "absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full bg-background shadow-sm transition-transform duration-200 ease-out",
+          "absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-none bg-background shadow-sm transition-transform duration-200 ease-out",
           value === "visual" ? "translate-x-[calc(100%+4px)]" : "translate-x-0"
         )}
       />
       <button
         aria-pressed={value === "code"}
         className={cn(
-          "relative z-10 flex items-center gap-1.5 rounded-full px-3 py-1 font-medium text-xs transition-colors",
+          "relative z-10 flex items-center gap-1.5 rounded-none px-3 py-1 font-medium text-xs transition-colors",
           value === "code"
             ? "text-foreground"
             : "text-muted-foreground hover:text-foreground"
@@ -168,7 +168,7 @@ function ViewToggle({
       <button
         aria-pressed={value === "visual"}
         className={cn(
-          "relative z-10 flex items-center gap-1.5 rounded-full px-3 py-1 font-medium text-xs transition-colors",
+          "relative z-10 flex items-center gap-1.5 rounded-none px-3 py-1 font-medium text-xs transition-colors",
           value === "visual"
             ? "text-foreground"
             : "text-muted-foreground hover:text-foreground"
@@ -223,7 +223,7 @@ export function AutomationsCodePanel() {
 
       {/* Deploy pill */}
       <FadeIn className="text-center" delay={0.1}>
-        <div className="inline-flex items-center gap-2 rounded-full border bg-muted/50 px-4 py-2">
+        <div className="inline-flex items-center gap-2 rounded-none border bg-muted/50 px-4 py-2">
           <code className="text-sm">
             <span className="text-brand-text">wraps email workflows push</span>
           </code>
@@ -243,7 +243,7 @@ export function AutomationsCodePanel() {
                 className="flex flex-col items-center rounded-xl border bg-background p-6 text-center"
                 key={feature.title}
               >
-                <div className="mb-3 flex size-12 items-center justify-center rounded-full bg-brand/10">
+                <div className="mb-3 flex size-12 items-center justify-center rounded-none bg-brand/10">
                   <Icon className="size-6 text-brand-text" />
                 </div>
                 <h4 className="mb-1 font-semibold text-sm">{feature.title}</h4>

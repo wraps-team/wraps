@@ -138,9 +138,9 @@ export function BroadcastFlow() {
           })}
         </ul>
 
-        <div className="mt-3 h-1 overflow-hidden rounded-full bg-muted">
+        <div className="mt-3 h-1 overflow-hidden rounded-none bg-muted">
           <div
-            className={`h-full rounded-full bg-brand transition-all duration-1000 ease-out motion-reduce:transition-none ${
+            className={`h-full rounded-none bg-brand transition-all duration-1000 ease-out motion-reduce:transition-none ${
               stage >= 5 ? "w-full" : "w-0"
             }`}
           />
@@ -161,9 +161,9 @@ export function BroadcastFlow() {
               <span className="w-16 shrink-0 text-muted-foreground sm:w-20">
                 {row.label}
               </span>
-              <span className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+              <span className="h-2 flex-1 overflow-hidden rounded-none bg-muted">
                 <span
-                  className={`block h-full rounded-full transition-all duration-700 ease-out motion-reduce:transition-none ${row.bar} ${
+                  className={`block h-full rounded-none transition-all duration-700 ease-out motion-reduce:transition-none ${row.bar} ${
                     stage >= 6 + i ? row.width : "w-0"
                   }`}
                 />

@@ -150,19 +150,19 @@ export default function Page() {
             </p>
 
             <div className="mt-8 flex flex-wrap gap-4">
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <FileCode className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   React Email templates
                 </span>
               </div>
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <Zap className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   TypeScript workflows
                 </span>
               </div>
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <GitBranch className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Git-native version control

@@ -96,19 +96,19 @@ export default function Page() {
             </p>
 
             <div className="mt-8 flex flex-wrap gap-4">
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <Shield className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   HMAC-signed reply-to
                 </span>
               </div>
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <KeyRound className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Per-domain secret in SSM
                 </span>
               </div>
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <Code2 className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Wraps never sees the key

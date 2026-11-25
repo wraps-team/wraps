@@ -82,7 +82,7 @@ function EmailPreview({
             isActive={highlighted === "from"}
             onHover={onHover}
           >
-            <span className="flex size-10 items-center justify-center rounded-full bg-muted">
+            <span className="flex size-10 items-center justify-center rounded-none bg-muted">
               <User className="size-5 text-muted-foreground" />
             </span>
             <span className="block">

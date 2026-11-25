@@ -20,13 +20,13 @@ export function BillingToggle({
       {/* Segmented control */}
       <div
         aria-label="Billing frequency"
-        className="relative inline-flex rounded-full border bg-muted/50 p-1"
+        className="relative inline-flex rounded-none border bg-muted/50 p-1"
         role="radiogroup"
       >
         {/* Sliding background */}
         <div
           className={cn(
-            "absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full bg-background shadow-sm transition-transform duration-200 ease-out",
+            "absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-none bg-background shadow-sm transition-transform duration-200 ease-out",
             value === "annual"
               ? "translate-x-[calc(100%+4px)]"
               : "translate-x-0"
@@ -37,7 +37,7 @@ export function BillingToggle({
         <button
           aria-checked={value === "monthly"}
           className={cn(
-            "relative z-10 rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+            "relative z-10 rounded-none px-4 py-1.5 text-sm font-medium transition-colors",
             value === "monthly"
               ? "text-foreground"
               : "text-muted-foreground hover:text-foreground"
@@ -53,7 +53,7 @@ export function BillingToggle({
         <button
           aria-checked={value === "annual"}
           className={cn(
-            "relative z-10 rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+            "relative z-10 rounded-none px-4 py-1.5 text-sm font-medium transition-colors",
             value === "annual"
               ? "text-foreground"
               : "text-muted-foreground hover:text-foreground"

@@ -20,13 +20,13 @@ export function ChangelogReleasesSection() {
                 node: (
                   <div className="relative pl-16">
                     {/* Timeline dot - outer circle */}
-                    <div className="absolute left-0 flex size-12 items-center justify-center rounded-full bg-background">
+                    <div className="absolute left-0 flex size-12 items-center justify-center rounded-none bg-background">
                       {/* Inner node — orange only marks the latest release */}
                       <div
                         className={
                           index === 0
-                            ? "flex size-10 items-center justify-center rounded-full border border-brand/40 bg-brand/10 text-brand-text"
-                            : "flex size-10 items-center justify-center rounded-full border border-border bg-card text-muted-foreground"
+                            ? "flex size-10 items-center justify-center rounded-none border border-brand/40 bg-brand/10 text-brand-text"
+                            : "flex size-10 items-center justify-center rounded-none border border-border bg-card text-muted-foreground"
                         }
                       >
                         <Icon className="size-5" />
@@ -52,8 +52,8 @@ export function ChangelogReleasesSection() {
             <div className="-top-12 absolute left-[24px] h-[72px] w-[1.5px] bg-border" />
 
             {/* Timeline terminator dot - covers end of line */}
-            <div className="absolute left-0 flex size-12 items-center justify-center rounded-full bg-background">
-              <div className="flex size-10 items-center justify-center rounded-full border border-border bg-card text-muted-foreground">
+            <div className="absolute left-0 flex size-12 items-center justify-center rounded-none bg-background">
+              <div className="flex size-10 items-center justify-center rounded-none border border-border bg-card text-muted-foreground">
                 <Lightbulb className="size-5" />
               </div>
             </div>

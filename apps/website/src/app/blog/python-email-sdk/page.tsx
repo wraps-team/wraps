@@ -98,19 +98,19 @@ export default function Page() {
             </p>
 
             <div className="mt-8 flex flex-wrap gap-4">
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <Terminal className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   pip install wraps-email
                 </span>
               </div>
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <Shield className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   SigV4 straight to SES
                 </span>
               </div>
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <KeyRound className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Python 3.10 &ndash; 3.13

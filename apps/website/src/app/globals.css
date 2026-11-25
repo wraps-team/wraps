@@ -16,6 +16,11 @@
   --color-terminal-foreground: var(--terminal-foreground);
   --color-terminal-muted: var(--terminal-muted);
   --color-terminal-border: var(--terminal-border);
+  /* The marketing site has no rounded corners. The shared theme leaves 2xl-4xl
+     rounded for the dashboard's outer cards; zero them here, never there. */
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-4xl: 0;
 }
 
 /* The terminal is dark in both themes. --terminal-muted carries prompt and

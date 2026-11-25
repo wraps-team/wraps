@@ -17,7 +17,7 @@ export function ResendForgeNotice({
     return (
       // A span, not a link: this tag sits inside card links on index pages.
       <span
-        className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-foreground text-xs ${className}`}
+        className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-none border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-foreground text-xs ${className}`}
       >
         <Info aria-hidden="true" className="h-3 w-3 text-primary" />
         <time dateTime={RESEND_FORGE.updatedIso}>

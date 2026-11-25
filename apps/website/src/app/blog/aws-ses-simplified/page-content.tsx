@@ -405,7 +405,7 @@ export function ComparisonTable() {
                 <div className="flex items-center gap-2">
                   <span className="text-success text-sm">{row.wraps}</span>
                   {hoveredRow === index && (
-                    <span className="animate-fade-in rounded-full bg-success/10 dark:bg-success/20 px-2 py-0.5 text-success text-xs">
+                    <span className="animate-fade-in rounded-none bg-success/10 dark:bg-success/20 px-2 py-0.5 text-success text-xs">
                       {row.savings} less work
                     </span>
                   )}

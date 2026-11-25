@@ -1,14 +1,11 @@
 // Contact-based pricing, drawn as the thing it actually is: a bill indexed to
-// list size. Competitor figures verified July 2026 —
-// Customer.io Essentials $100/mo per 5K profiles then $0.009/profile;
-// Klaviyo $150 @10K, $720 @50K, $1,380 @100K profiles.
-
-const rows = [
-  { contacts: "5,000", customerIo: "$100", klaviyo: "$100", wraps: "$29" },
-  { contacts: "10,000", customerIo: "$145", klaviyo: "$150", wraps: "$29" },
-  { contacts: "50,000", customerIo: "$505", klaviyo: "$720", wraps: "$29" },
-  { contacts: "100,000", customerIo: "$955", klaviyo: "$1,380", wraps: "$29" },
-];
+// list size. Figures and their check date live in
+// config/competitor-contact-pricing.ts; the Wraps fee is the Pro plan's.
+import {
+  CONTACT_PRICE_ROWS,
+  CONTACT_PRICES_CHECKED,
+} from "@/config/competitor-contact-pricing";
+import { formatCurrency, formatNumber, getTier } from "@/config/pricing";
 
 export function ContactPriceCurve() {
   return (
@@ -31,19 +28,19 @@ export function ContactPriceCurve() {
           </tr>
         </thead>
         <tbody className="divide-y divide-border/60 font-mono text-xs tabular-nums">
-          {rows.map((row) => (
+          {CONTACT_PRICE_ROWS.map((row) => (
             <tr key={row.contacts}>
               <td className="px-4 py-2.5 text-muted-foreground">
-                {row.contacts}
+                {formatNumber(row.contacts)}
               </td>
               <td className="px-3 py-2.5 text-muted-foreground">
-                {row.customerIo}
+                {formatCurrency(row.customerIo)}
               </td>
               <td className="px-3 py-2.5 text-muted-foreground">
-                {row.klaviyo}
+                {formatCurrency(row.klaviyo)}
               </td>
               <td className="px-4 py-2.5 text-right font-medium text-foreground">
-                {row.wraps}
+                {formatCurrency(getTier("pro").price)}
               </td>
             </tr>
           ))}
@@ -53,7 +50,7 @@ export function ContactPriceCurve() {
       <div className="border-border border-t bg-muted/40 px-4 py-3">
         <p className="text-xs text-muted-foreground leading-relaxed">
           Wraps' fee is flat by plan, not by list size, and sending is billed by
-          AWS directly at SES rates. Competitor figures verified July 2026.
+          AWS directly at SES rates. Competitor figures verified {CONTACT_PRICES_CHECKED}.
         </p>
       </div>
     </div>

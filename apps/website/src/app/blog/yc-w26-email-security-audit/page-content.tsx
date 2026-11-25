@@ -70,7 +70,7 @@ export function GradeBar({
   return (
     <div className="flex items-center gap-4">
       <div
-        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 font-bold text-lg ${color}`}
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-none border-2 font-bold text-lg ${color}`}
       >
         {grade}
       </div>
@@ -81,9 +81,9 @@ export function GradeBar({
           </span>
           <span className="text-muted-foreground text-xs">{description}</span>
         </div>
-        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+        <div className="h-2 w-full overflow-hidden rounded-none bg-muted">
           <div
-            className={`h-full w-(--pct) rounded-full transition-all duration-700 ${color.replace("text-", "bg-").replace("border-", "bg-")}`}
+            className={`h-full w-(--pct) rounded-none transition-all duration-700 ${color.replace("text-", "bg-").replace("border-", "bg-")}`}
             style={{ "--pct": `${pct}%` } as React.CSSProperties}
           />
         </div>

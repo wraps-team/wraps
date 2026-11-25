@@ -118,7 +118,7 @@ export const FeaturesSection = memo(function FeaturesSection() {
                     </h3>
                     {feature.status && (
                       <span
-                        className={`rounded-full px-2 py-0.5 text-xs ${
+                        className={`rounded-none px-2 py-0.5 text-xs ${
                           feature.status === "Available"
                             ? "bg-success/10 text-success"
                             : feature.status === "Next"

@@ -165,10 +165,10 @@ export const ChapterNav = () => {
 
   return (
     <nav className="sticky top-2 z-40 mx-auto mb-12 max-w-4xl">
-      <div className="flex gap-1 overflow-x-auto rounded-full border bg-background/80 px-2 py-1.5 shadow-sm backdrop-blur-sm">
+      <div className="flex gap-1 overflow-x-auto rounded-none border bg-background/80 px-2 py-1.5 shadow-sm backdrop-blur-sm">
         {CHAPTERS.map((ch) => (
           <button
-            className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+            className={`whitespace-nowrap rounded-none px-3 py-1 text-xs font-medium transition-colors ${
               activeId === ch.id
                 ? "bg-foreground text-background"
                 : "text-muted-foreground hover:text-foreground"
@@ -1088,12 +1088,12 @@ export const RelayMap = () => {
           >
             {/* Node */}
             {prefersReduced ? (
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary font-bold text-primary-foreground">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-none bg-primary font-bold text-primary-foreground">
                 {i + 1}
               </div>
             ) : (
               <motion.div
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary font-bold text-primary-foreground"
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-none bg-primary font-bold text-primary-foreground"
                 initial={{ scale: 0, opacity: 0 }}
                 transition={{
                   delay: i * 0.2,
@@ -1128,10 +1128,10 @@ export const RelayMap = () => {
       {/* Connection line (desktop) */}
       <div className="relative mx-auto mt-4 hidden h-1 w-4/5 sm:block">
         {prefersReduced ? (
-          <div className="h-full rounded-full bg-gradient-to-r from-brand to-warning" />
+          <div className="h-full rounded-none bg-gradient-to-r from-brand to-warning" />
         ) : (
           <motion.div
-            className="h-full origin-left rounded-full bg-gradient-to-r from-brand to-warning"
+            className="h-full origin-left rounded-none bg-gradient-to-r from-brand to-warning"
             initial={{ scaleX: 0 }}
             transition={{
               duration: 1,

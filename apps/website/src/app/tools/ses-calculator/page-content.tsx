@@ -212,7 +212,7 @@ function SESCalculatorInner() {
                   <button
                     aria-pressed={isActive}
                     className={cn(
-                      "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+                      "rounded-none border px-3 py-1.5 text-sm font-medium transition-colors touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
                       isActive
                         ? "border-primary bg-primary text-primary-foreground"
                         : "border-muted-foreground/25 text-muted-foreground hover:border-foreground/50 hover:text-foreground"

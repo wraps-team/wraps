@@ -188,7 +188,7 @@ export default function Context7PageContent() {
                 documentation.
               </p>
               <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">
+                <span className="rounded-none bg-primary/10 px-2 py-0.5 text-primary">
                   142 snippets
                 </span>
               </div>
@@ -221,7 +221,7 @@ export default function Context7PageContent() {
                 ).
               </p>
               <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">
+                <span className="rounded-none bg-primary/10 px-2 py-0.5 text-primary">
                   BYOC pattern
                 </span>
               </div>

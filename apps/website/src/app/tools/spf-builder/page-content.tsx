@@ -617,7 +617,7 @@ export default function SPFBuilderWidget() {
               aria-valuemax={10}
               aria-valuemin={0}
               aria-valuenow={lookupCount}
-              className="h-3 overflow-hidden rounded-full bg-muted"
+              className="h-3 overflow-hidden rounded-none bg-muted"
               role="progressbar"
             >
               <div

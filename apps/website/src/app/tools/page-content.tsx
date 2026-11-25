@@ -210,7 +210,7 @@ function GradeDisplay({ grade, score }: { grade: string; score: number }) {
   return (
     <div className="flex flex-col items-center gap-2">
       <div
-        className={`flex h-24 w-24 items-center justify-center rounded-full border-4 font-bold text-4xl ${colorClass}`}
+        className={`flex h-24 w-24 items-center justify-center rounded-none border-4 font-bold text-4xl ${colorClass}`}
       >
         {grade}
       </div>
@@ -253,7 +253,7 @@ function StatusBadge({
 
   return (
     <div
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-none border px-3 py-1 text-sm ${className}`}
     >
       <Icon className="h-3.5 w-3.5" />
       {label}
@@ -1076,7 +1076,7 @@ export default function ToolsPageContent({
                         aria-valuemax={data.max}
                         aria-valuemin={0}
                         aria-valuenow={data.score}
-                        className="h-2 overflow-hidden rounded-full bg-muted"
+                        className="h-2 overflow-hidden rounded-none bg-muted"
                         role="progressbar"
                       >
                         <div
@@ -1122,7 +1122,7 @@ export default function ToolsPageContent({
                         aria-valuemax={result.score.breakdown.bonus.possible}
                         aria-valuemin={0}
                         aria-valuenow={result.score.breakdown.bonus.earned}
-                        className="h-2 overflow-hidden rounded-full bg-muted"
+                        className="h-2 overflow-hidden rounded-none bg-muted"
                         role="progressbar"
                       >
                         <div

@@ -302,7 +302,7 @@ export default function SESCalculatorPage() {
                 <CardContent className="p-6 md:p-8">
                   <div className="flex flex-col items-start gap-6 md:flex-row md:items-center">
                     <div className="flex-1">
-                      <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 font-mono text-primary text-xs uppercase tracking-wider">
+                      <div className="mb-3 inline-flex items-center gap-2 rounded-none border border-primary/30 bg-primary/10 px-3 py-1 font-mono text-primary text-xs uppercase tracking-wider">
                         One command
                       </div>
                       <h3 className="mb-2 font-bold text-2xl tracking-tight">

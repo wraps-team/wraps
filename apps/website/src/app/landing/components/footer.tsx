@@ -2,100 +2,41 @@
 
 import { ModeToggle } from "@wraps/ui/components/mode-toggle";
 import { Button } from "@wraps/ui/components/ui/button";
-import { Separator } from "@wraps/ui/components/ui/separator";
-import { Heart } from "lucide-react";
 import { XLogo } from "@/components/icons/x-logo";
 import { Logo } from "@/components/logo";
 import { Github } from "@/components/ui/svgs/brand-icons";
-import { WrapsMotifLayers } from "@/components/wraps-motif-layers";
+import { FOOTER_COLUMNS, GITHUB_URL } from "@/config/site-nav";
 
-const footerLinks = {
-  product: [
-    { name: "CLI & SDK", href: "/cli" },
-    { name: "Inbound Email", href: "/inbound" },
-    { name: "Agents", href: "/agents" },
-    { name: "MCP Server", href: "/mcp" },
-    { name: "Platform", href: "/platform" },
-    { name: "For Marketing", href: "/for/marketing" },
-    { name: "For Email Ops", href: "/for/operators" },
-    { name: "Pricing", href: "/#pricing" },
-  ],
-  developers: [
-    { name: "Documentation", href: "/docs" },
-    { name: "Quickstart", href: "/docs/quickstart" },
-    { name: "CLI Reference", href: "/docs/cli-reference" },
-    { name: "SDK Reference", href: "/docs/sdk-reference" },
-    { name: "MCP Reference", href: "/docs/mcp-reference" },
-    { name: "CDK Reference", href: "/docs/cdk-reference" },
-    { name: "Pulumi Reference", href: "/docs/pulumi-reference" },
-    { name: "llms.txt", href: "/llms.txt" },
-  ],
-  company: [
-    { name: "About", href: "/about" },
-    { name: "Contact", href: "/contact" },
-    { name: "Why Wraps", href: "/why-wraps" },
-    { name: "Four Approaches", href: "/approaches" },
-    { name: "BYOC", href: "/byoc" },
-    { name: "Changelog", href: "/changelog" },
-  ],
-  resources: [
-    { name: "Alternatives", href: "/alternatives" },
-    { name: "Migration Guides", href: "/migrate" },
-    { name: "Email Tools", href: "/tools" },
-    { name: "SES Cost Calculator", href: "/tools/ses-calculator" },
-    {
-      name: "Community",
-      href: "https://github.com/wraps-team/wraps/discussions",
-      external: true,
-    },
-    {
-      name: "Report Issue",
-      href: "https://github.com/wraps-team/wraps/issues",
-      external: true,
-    },
-  ],
-  legal: [
-    { name: "Security", href: "/security" },
-    { name: "Subprocessors", href: "/subprocessors" },
-    { name: "DPA", href: "/dpa" },
-    { name: "Privacy Policy", href: "/privacy" },
-    { name: "Terms of Service", href: "/terms" },
-    {
-      name: "License (AGPLv3)",
-      href: "https://github.com/wraps-team/wraps/blob/main/LICENSE",
-      external: true,
-    },
-  ],
-};
+const LICENSE_URL = "https://github.com/wraps-team/wraps/blob/main/LICENSE";
+const EE_LICENSE_URL =
+  "https://github.com/wraps-team/wraps/blob/main/ee/LICENSE.md";
 
 export function LandingFooter() {
   return (
-    <footer className="dark relative overflow-hidden border-border border-t bg-background text-foreground">
-      <WrapsMotifLayers
-        className="pointer-events-none absolute bottom-4 right-4 h-[280px] w-[310px] md:h-[340px] md:w-[375px]"
-        strokeColor="#ff6600"
-      />
-
-      <div className="relative container mx-auto px-4 py-16 sm:px-6 lg:px-8">
-        {/* Main Footer Content */}
-        <div className="grid grid-cols-4 gap-8 lg:grid-cols-7">
-          {/* Brand Column */}
-          <div className="col-span-4 max-w-2xl lg:col-span-2">
-            <div className="mb-4 flex w-full items-center max-lg:justify-center">
-              <a className="flex w-full cursor-pointer items-center" href="/">
-                <Logo className="aspect-[3/1] h-auto w-full" />
-              </a>
-            </div>
-            <p className="mb-6 text-muted-foreground max-lg:flex max-lg:justify-center max-lg:text-center">
-              Email infrastructure with tracking, suppression and analytics.
+    <footer className="border-border border-t bg-background text-foreground">
+      <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-10 md:grid-cols-3 lg:grid-cols-[2.2fr_repeat(5,minmax(0,1fr))]">
+          {/* Brand column */}
+          <div className="col-span-2 grid content-start gap-4 md:col-span-3 lg:col-span-1">
+            <a
+              aria-label="Wraps home"
+              className="block w-full max-w-sm"
+              href="/"
+            >
+              <Logo className="aspect-[3/1] h-auto w-full" />
+            </a>
+            <p className="text-muted-foreground text-sm">
+              Email on your own AWS.
+            </p>
+            <p className="max-w-sm text-muted-foreground text-sm">
               Sending runs in your AWS account; you pay AWS directly.
             </p>
-            <div className="flex space-x-4 max-lg:justify-center">
+            <div className="flex items-center gap-2">
               <Button asChild size="icon" variant="ghost">
                 <a
                   aria-label="GitHub"
                   className="cursor-pointer"
-                  href="https://github.com/wraps-team/wraps"
+                  href={GITHUB_URL}
                   rel="noopener noreferrer"
                   target="_blank"
                 >
@@ -117,145 +58,54 @@ export function LandingFooter() {
             </div>
           </div>
 
-          {/* Links Columns */}
-          <div className="max-md:col-span-2 lg:col-span-1">
-            <h4 className="mb-4 font-mono font-semibold text-foreground text-xs uppercase tracking-widest">
-              Product
-            </h4>
-            <ul className="space-y-3">
-              {footerLinks.product.map((link) => (
-                <li key={link.name}>
-                  <a
-                    className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
-                    href={link.href}
-                  >
-                    {link.name}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="max-md:col-span-2 lg:col-span-1">
-            <h4 className="mb-4 font-mono font-semibold text-foreground text-xs uppercase tracking-widest">
-              Developers
-            </h4>
-            <ul className="space-y-3">
-              {footerLinks.developers.map((link) => (
-                <li key={link.name}>
-                  <a
-                    className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
-                    href={link.href}
-                  >
-                    {link.name}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="max-md:col-span-2 lg:col-span-1">
-            <h4 className="mb-4 font-mono font-semibold text-foreground text-xs uppercase tracking-widest">
-              Company
-            </h4>
-            <ul className="space-y-3">
-              {footerLinks.company.map((link) => (
-                <li key={link.name}>
-                  <a
-                    className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
-                    href={link.href}
-                  >
-                    {link.name}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="max-md:col-span-2 lg:col-span-1">
-            <h4 className="mb-4 font-mono font-semibold text-foreground text-xs uppercase tracking-widest">
-              Resources
-            </h4>
-            <ul className="space-y-3">
-              {footerLinks.resources.map((link) => (
-                <li key={link.name}>
-                  <a
-                    className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
-                    href={link.href}
-                    rel={link.external ? "noopener noreferrer" : undefined}
-                    target={link.external ? "_blank" : undefined}
-                  >
-                    {link.name}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="max-md:col-span-2 lg:col-span-1">
-            <h4 className="mb-4 font-mono font-semibold text-foreground text-xs uppercase tracking-widest">
-              Legal
-            </h4>
-            <ul className="space-y-3">
-              {footerLinks.legal.map((link) => (
-                <li key={link.name}>
-                  <a
-                    className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
-                    href={link.href}
-                    rel={link.external ? "noopener noreferrer" : undefined}
-                    target={link.external ? "_blank" : undefined}
-                  >
-                    {link.name}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {FOOTER_COLUMNS.map((column) => (
+            <nav aria-label={column.title} key={column.title}>
+              <h2 className="mb-4 font-sans font-semibold text-foreground text-xs uppercase tracking-eyebrow">
+                {column.title}
+              </h2>
+              <ul className="space-y-3 text-sm">
+                {column.links
+                  .filter((link) => !link.hidden)
+                  .map((link) => (
+                    <li key={link.name}>
+                      <a
+                        className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
+                        href={link.href}
+                        rel={link.external ? "noopener noreferrer" : undefined}
+                        target={link.external ? "_blank" : undefined}
+                      >
+                        {link.name}
+                      </a>
+                    </li>
+                  ))}
+              </ul>
+            </nav>
+          ))}
         </div>
 
-        <Separator className="my-8" />
-
-        {/* Bottom Footer */}
-        <div className="flex flex-col items-center justify-between gap-2 lg:flex-row">
-          <div className="flex flex-col items-center gap-2 text-muted-foreground text-sm sm:flex-row">
-            <div className="flex items-center gap-1">
-              <span>Built with</span>
-              <Heart
-                aria-hidden="true"
-                className="h-4 w-4 fill-current text-destructive"
-              />
-              <span className="sr-only">love</span>
-              <span>for developers</span>
-            </div>
-            <span className="hidden sm:inline">•</span>
-            <span>
-              © {new Date().getFullYear()} Wraps. Open source under AGPLv3.
-            </span>
-          </div>
-          <div className="mt-4 flex items-center space-x-4 text-muted-foreground text-sm md:mt-0">
+        <div className="mt-12 flex flex-col gap-2 border-border border-t pt-6 text-muted-foreground text-sm">
+          <span>&copy; {new Date().getFullYear()} Wraps.</span>
+          <p className="max-w-3xl">
+            Open source under AGPLv3, except the enterprise (ee) directories,
+            which are under a commercial license. The SDKs are MIT.{" "}
             <a
-              className="cursor-pointer transition-colors hover:text-foreground"
-              href="/privacy"
-            >
-              Privacy
-            </a>
-            <span>•</span>
-            <a
-              className="cursor-pointer transition-colors hover:text-foreground"
-              href="/terms"
-            >
-              Terms
-            </a>
-            <span>•</span>
-            <a
-              className="cursor-pointer transition-colors hover:text-foreground"
-              href="https://github.com/wraps-team/wraps/blob/main/LICENSE"
+              className="underline underline-offset-4 hover:text-foreground"
+              href={LICENSE_URL}
               rel="noopener noreferrer"
               target="_blank"
             >
-              License
+              LICENSE
             </a>
-          </div>
+            {" · "}
+            <a
+              className="underline underline-offset-4 hover:text-foreground"
+              href={EE_LICENSE_URL}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              ee/LICENSE.md
+            </a>
+          </p>
         </div>
       </div>
     </footer>

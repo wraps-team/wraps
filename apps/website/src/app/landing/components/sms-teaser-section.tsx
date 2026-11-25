@@ -101,12 +101,12 @@ export function SmsTeaserSection() {
                       <Icon className="size-5" />
                     </div>
                     {isAvailable ? (
-                      <span className="flex items-center gap-1 rounded-full bg-success/10 px-2 py-1 text-3xs font-medium text-success">
+                      <span className="flex items-center gap-1 rounded-none bg-success/10 px-2 py-1 text-3xs font-medium text-success">
                         <Check className="size-2.5" />
                         Available
                       </span>
                     ) : (
-                      <span className="rounded-full bg-brand/10 px-2 py-1 text-3xs font-medium text-brand-text">
+                      <span className="rounded-none bg-brand/10 px-2 py-1 text-3xs font-medium text-brand-text">
                         Coming Soon
                       </span>
                     )}

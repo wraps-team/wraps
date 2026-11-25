@@ -87,7 +87,7 @@ export function OIDCDiagram() {
         {steps.map((step, i) => (
           <div className="relative z-10 flex flex-col items-center" key={i}>
             <div
-              className={`flex h-12 w-12 items-center justify-center rounded-full transition-all duration-300 ${
+              className={`flex h-12 w-12 items-center justify-center rounded-none transition-all duration-300 ${
                 i <= activeStep
                   ? "scale-110 bg-success text-success-foreground"
                   : "bg-muted text-muted-foreground"
