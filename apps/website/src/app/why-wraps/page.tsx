@@ -82,18 +82,17 @@ const planRows = [
   {
     plan: "Free",
     price: formatCurrency(getTier("free").price),
-    forWho: "One AWS account, 30 days of history. Most first deploys.",
+    forWho: `One AWS account, ${getTier("free").limits.historyDisplay} of history. Most first deploys.`,
   },
   {
     plan: "Pro",
     price: `${formatCurrency(getTier("pro").price)}/mo`,
-    forWho: "One AWS account, 90 days of history, email support.",
+    forWho: `One AWS account, ${getTier("pro").limits.historyDisplay} of history, email support.`,
   },
   {
     plan: "Business",
     price: `${formatCurrency(getTier("business").price)}/mo`,
-    forWho:
-      "Unlimited AWS accounts, 1 year of history, SSO and SCIM, audit log with CSV export, priority support.",
+    forWho: `Unlimited AWS accounts, ${getTier("business").limits.historyDisplay} of history, SSO and SCIM, audit log with CSV export, priority support.`,
   },
 ];
 

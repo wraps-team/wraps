@@ -41,7 +41,13 @@ describe("site navigation", () => {
 
   it("links Founders from the nav and the footer to a route that exists", () => {
     expect(existsSync(resolve(appDir, "for/founders/page.tsx"))).toBe(true);
-    const founders = allLinks().filter((link) => link.href === "/for/founders");
-    expect(founders.length).toBeGreaterThan(0);
+    const inNav = NAV_MENUS.flatMap((menu) =>
+      (menu.groups ?? []).flatMap((group) => group.links)
+    ).filter((link) => link.href === "/for/founders");
+    const inFooter = FOOTER_COLUMNS.flatMap((column) => column.links).filter(
+      (link) => link.href === "/for/founders"
+    );
+    expect(inNav.length).toBeGreaterThan(0);
+    expect(inFooter.length).toBeGreaterThan(0);
   });
 });
