@@ -449,8 +449,8 @@ stated catch on every entry including ours, and the incumbent kept on the list.
 - [Resend vs Wraps](https://wraps.dev/compare/resend-vs-wraps)
 - [SendGrid vs Wraps](https://wraps.dev/compare/sendgrid-vs-wraps)
 - [Postmark vs Wraps](https://wraps.dev/compare/postmark-vs-wraps)
-- [Customer.io vs Wraps](https://wraps.dev/compare/customer-io-vs-wraps)
-- [Klaviyo vs Wraps](https://wraps.dev/compare/klaviyo-vs-wraps)
+- [Customer.io vs Wraps](https://wraps.dev/compare/customer-io-vs-wraps): Who should pick which, all-in cost at five volumes (per-contact billing against a flat plan fee), a feature-by-feature table and switching steps
+- [Klaviyo vs Wraps](https://wraps.dev/compare/klaviyo-vs-wraps): Who should pick which, all-in cost at five volumes (per-profile billing against a flat plan fee), a feature-by-feature table and a four-to-eight-week switching timeline
 - [Mailgun vs Wraps](https://wraps.dev/compare/mailgun-vs-wraps)
 - [SES Bounce Handling: Hand-Rolled vs Wraps](https://wraps.dev/compare/ses-bounce-handling-hand-rolled-vs-wraps): The full 85-line SNS signature verification implementation, honest line counts, and what hand-rolled bounce handling does not cover
 
