@@ -1,10 +1,11 @@
 import { DotPattern } from "@wraps/ui/components/dot-pattern";
-import { ContactPriceCurve } from "./contact-price-curve";
-import { MarketingHeroCTA } from "./hero-cta";
+import { ContactFeeChart } from "@/app/landing/components/contact-fee-chart";
+import { SectionKicker } from "@/app/landing/components/section-kicker";
+import { TrackedCtaPair } from "@/components/tracked-cta-pair";
 
 export function MarketingHeroSection() {
   return (
-    <section className="relative overflow-hidden bg-linear-to-b from-background to-background/80 pt-20 pb-16 sm:pt-28">
+    <section className="relative overflow-hidden pt-20 pb-16 sm:pt-28">
       <div className="absolute inset-0">
         <DotPattern className="opacity-100" fadeStyle="ellipse" size="md" />
       </div>
@@ -12,32 +13,47 @@ export function MarketingHeroSection() {
       <div className="container relative mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:gap-14">
           <div>
-            <div className="mb-5 inline-flex items-center gap-2 font-mono text-2xs text-muted-foreground uppercase tracking-eyebrow">
-              <span className="size-1.5 rounded-full bg-brand" />
-              <span>wraps · for marketing</span>
-            </div>
+            <nav aria-label="Breadcrumb" className="mb-6">
+              <ol className="flex flex-wrap items-center gap-2 text-muted-foreground text-xs">
+                <li>
+                  <a
+                    className="underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:text-foreground focus-visible:underline focus-visible:ring-2 focus-visible:ring-ring"
+                    href="/"
+                  >
+                    Home
+                  </a>
+                </li>
+                <li aria-hidden="true">/</li>
+                <li>Solutions</li>
+                <li aria-hidden="true">/</li>
+                <li aria-current="page">Marketing teams</li>
+              </ol>
+            </nav>
+
+            <SectionKicker>For marketing teams</SectionKicker>
 
             <h1 className="mb-6 text-pretty font-heading font-semibold text-4xl leading-tight tracking-tight sm:text-5xl">
-              Grow the list.{" "}
-              <span className="text-brand-text">Pay nothing per contact.</span>
+              Grow your list without paying{" "}
+              <span className="text-brand-text">per contact.</span>
             </h1>
 
-            <p className="mb-6 max-w-md text-muted-foreground">
-              Broadcasts, segments, topics, and a hosted preference center — the
-              lifecycle toolkit you expect, priced flat by plan instead of by
-              the contacts you store. Every plan carries unlimited contacts, so
-              a good acquisition month never arrives as an invoice problem.
+            <p className="mb-8 max-w-lg text-lg text-muted-foreground leading-relaxed">
+              Newsletters, segments, topics and a hosted preference center.
+              Every plan has unlimited contacts, so a good signup month never
+              turns into a bigger invoice from us. Amazon bills each email you
+              send, at its own rates.
             </p>
 
-            <MarketingHeroCTA />
+            <TrackedCtaPair
+              location="for_marketing_hero"
+              secondary={{
+                label: "Compare with Klaviyo",
+                href: "/compare/klaviyo-vs-wraps",
+              }}
+            />
           </div>
 
-          <div className="relative">
-            <div className="absolute -inset-4 rounded-3xl bg-brand/10 opacity-60 blur-2xl" />
-            <div className="relative">
-              <ContactPriceCurve />
-            </div>
-          </div>
+          <ContactFeeChart note="Wraps' fee is flat by plan; Amazon bills sending separately at its own rates." />
         </div>
       </div>
     </section>

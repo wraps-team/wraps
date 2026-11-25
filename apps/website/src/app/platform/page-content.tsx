@@ -1,16 +1,15 @@
 "use client";
 
 import { useEffect } from "react";
+import { ClosingPanel } from "@/app/landing/components/closing-panel";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
-import { DashboardAutomationsSection } from "./components/automations-section";
-import { DashboardBroadcastsSection } from "./components/broadcasts-section";
-import { DashboardCtaSection } from "./components/cta-section";
-import { DashboardFeaturesSection } from "./components/features-section";
-import { DashboardHeroSection } from "./components/hero-section";
-import { HowItWorksSection } from "./components/how-it-works-section";
-import { SlantTransition } from "./components/slant-transition";
-import { DashboardTemplatesSection } from "./components/templates-section";
+import { TrackedCtaPair } from "@/components/tracked-cta-pair";
+import { PlatformAutomationsSection } from "./components/automations-section";
+import { PlatformEverythingElseSection } from "./components/everything-else-section";
+import { PlatformHeroSection } from "./components/hero-section";
+import { PlatformNewslettersSection } from "./components/newsletters-section";
+import { PlatformTemplatesSection } from "./components/templates-section";
 
 export default function DashboardPageContent() {
   // Handle hash scrolling after page layout settles
@@ -38,14 +37,21 @@ export default function DashboardPageContent() {
     <div className="min-h-screen bg-background">
       <LandingNavbar />
       <main>
-        <DashboardHeroSection />
-        <HowItWorksSection />
-        <DashboardTemplatesSection />
-        <DashboardBroadcastsSection />
-        <SlantTransition />
-        <DashboardAutomationsSection />
-        <DashboardFeaturesSection />
-        <DashboardCtaSection />
+        <PlatformHeroSection />
+        <PlatformTemplatesSection />
+        <PlatformNewslettersSection />
+        <PlatformAutomationsSection />
+        <PlatformEverythingElseSection />
+        <ClosingPanel
+          actions={
+            <TrackedCtaPair
+              location="platform_closing"
+              secondary={{ label: "See plans", href: "/#pricing" }}
+            />
+          }
+          body="Amazon handles the sending. Wraps gives your team the tools. Unlimited contacts on every plan."
+          title="Create. Reach. Automate."
+        />
       </main>
       <LandingFooter />
     </div>

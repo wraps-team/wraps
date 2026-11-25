@@ -1,119 +1,62 @@
-import { Badge } from "@wraps/ui/components/ui/badge";
-import {
-  CheckCircle,
-  Code,
-  Eye,
-  LayoutGrid,
-  Palette,
-  Sparkles,
-} from "lucide-react";
+import { FlowBox } from "@/app/landing/components/flow-primitives";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
-import { assetUrl } from "@/lib/utils";
+import { TIER_LIMITS } from "@/config/pricing";
 
-const features = [
-  {
-    icon: Sparkles,
-    title: "AI-Powered",
-    description: "Generate emails from prompts",
-    badge: "AI",
-  },
-  {
-    icon: LayoutGrid,
-    title: "React Email",
-    description: "20+ typed components",
-  },
-  {
-    icon: CheckCircle,
-    title: "Every Client",
-    description: "React Email powered",
-  },
-  {
-    icon: Eye,
-    title: "Live Preview",
-    description: "Desktop, tablet, mobile",
-  },
-  {
-    icon: Code,
-    title: "Export",
-    description: "HTML, JSON, React",
-  },
-  {
-    icon: Palette,
-    title: "Brand Kits",
-    description: "Auto-apply your styles",
-  },
+// Brand kits: emails/brand-kits; history: version-history-panel.tsx;
+// editor: Monaco TSX (code-template-editor.tsx) with an AI chat panel.
+const PILLS = [
+  "Written with AI",
+  "Brand kits",
+  "Live preview",
+  "Version history",
 ];
 
-export function DashboardTemplatesSection() {
+export function PlatformTemplatesSection() {
   return (
-    <section className="relative overflow-x-clip py-24" id="templates">
-      {/* Chapter indicator */}
-      <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-14">
-          <SectionKicker>Create</SectionKicker>
-          <h2 className="font-heading font-semibold text-2xl tracking-tight sm:text-3xl">
-            Build Templates
+    <section
+      className="scroll-mt-20 border-border border-y bg-muted/30 py-16 sm:py-24"
+      id="templates"
+    >
+      <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:gap-16 lg:px-8">
+        <div>
+          <SectionKicker>Templates</SectionKicker>
+          <h2 className="mb-4 font-heading font-semibold text-3xl tracking-tight sm:text-4xl">
+            Describe the email. The AI writes it.
           </h2>
+          <p className="mb-5 max-w-md text-lg text-muted-foreground leading-relaxed">
+            Ask the AI for the email you want, preview it live and ask for
+            changes. Your colors and logo apply automatically, and developers
+            can edit the template code directly.
+          </p>
+          <ul className="mb-4 flex flex-wrap gap-2 text-sm">
+            {PILLS.map((pill) => (
+              <li className="border border-border px-3 py-1" key={pill}>
+                {pill}
+              </li>
+            ))}
+          </ul>
+          <p className="text-muted-foreground text-xs">
+            AI drafts on every plan: {TIER_LIMITS.free.aiGenerations} a month on
+            Free, {TIER_LIMITS.pro.aiGenerations} on Pro.
+          </p>
         </div>
-      </div>
 
-      {/* Full-width screenshot - larger on desktop */}
-      <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:max-w-7xl lg:px-8 xl:max-w-[90rem]">
-        <div className="relative overflow-hidden">
-          {/* Light mode image */}
-          <img
-            alt="Template Editor - Light Mode"
-            className="block w-full object-cover dark:hidden"
-            decoding="async"
-            loading="lazy"
-            src={assetUrl("template-editor-full-light.webp")}
-          />
-          {/* Dark mode image */}
-          <img
-            alt="Template Editor - Dark Mode"
-            className="hidden w-full object-cover dark:block"
-            decoding="async"
-            loading="lazy"
-            src={assetUrl("template-editor-full-dark.webp")}
-          />
-
-          {/* Bottom fade effect */}
-          <div className="absolute bottom-0 left-0 h-32 w-full bg-linear-to-t from-background via-background/80 to-transparent" />
-        </div>
-      </div>
-
-      {/* Content below screenshot */}
-      <div className="mx-auto max-w-5xl px-4 pt-12 sm:px-6 lg:px-8">
-        <p className="mb-10 max-w-2xl text-lg text-muted-foreground">
-          AI-first editor with raw code access. Built on React Email for
-          pixel-perfect rendering across Gmail, Outlook, Apple Mail, and every
-          other client.
-        </p>
-
-        {/* Feature Pills */}
-        <div className="flex flex-wrap gap-3">
-          {features.map((feature) => (
-            <div
-              className="flex items-center gap-2 rounded-none border border-border bg-background px-4 py-2 transition-colors hover:border-brand/40"
-              key={feature.title}
-            >
-              <feature.icon
-                aria-hidden="true"
-                className="size-4 text-muted-foreground"
-              />
-              <span className="font-medium text-sm">{feature.title}</span>
-              {feature.badge && (
-                <Badge className="font-mono" variant="secondary">
-                  {feature.badge}
-                </Badge>
-              )}
+        <FlowBox label="Template · AI draft">
+          <div aria-hidden="true" className="grid gap-3">
+            <p className="border border-border p-2.5 text-xs leading-relaxed">
+              <b>Describe your email:</b> a monthly newsletter with three
+              sections and a link to the blog
+            </p>
+            <div className="grid gap-1.5 border border-border bg-muted/40 p-3">
+              <span className="h-2.5 w-[40%] bg-brand/40" />
+              <span className="h-1.5 w-[92%] bg-border" />
+              <span className="h-1.5 w-[80%] bg-border" />
+              <span className="h-1.5 w-[60%] bg-border" />
+              <span className="h-1.5 w-[88%] bg-border" />
+              <span className="mt-1 h-5 w-[35%] bg-brand" />
             </div>
-          ))}
-        </div>
-
-        <p className="mt-8 text-muted-foreground text-sm">
-          Included in all plans — even Free
-        </p>
+          </div>
+        </FlowBox>
       </div>
     </section>
   );

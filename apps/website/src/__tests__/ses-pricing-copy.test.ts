@@ -34,7 +34,6 @@ const FILES = [
   "apps/website/src/app/landing/components/product-tabbed-section.tsx",
   "apps/website/src/app/landing/components/sms-teaser-section.tsx",
   "apps/website/src/app/page.tsx",
-  "apps/website/src/app/platform/components/pricing-section.tsx",
   "apps/website/src/app/terms/page.tsx",
   "apps/website/src/app/tools/ses-calculator/page-content.tsx",
   "apps/website/src/app/tools/ses-calculator/page.tsx",
