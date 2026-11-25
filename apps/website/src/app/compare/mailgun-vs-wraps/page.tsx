@@ -102,7 +102,7 @@ const pricingComparison = [
     wrapsPlatform: "$0",
     awsSes: "$1",
     wrapsTotal: "$1",
-    savings: "93%",
+    savings: "92%",
   },
   {
     volume: "50K/mo",
@@ -110,8 +110,8 @@ const pricingComparison = [
     mailgunCost: "$35",
     wrapsTier: "Pro",
     wrapsPlatform: "$29",
-    awsSes: "$5",
-    wrapsTotal: "$34",
+    awsSes: "$6",
+    wrapsTotal: "$35",
     savings: "",
   },
   {
@@ -120,9 +120,9 @@ const pricingComparison = [
     mailgunCost: "$75-90",
     wrapsTier: "Pro",
     wrapsPlatform: "$29",
-    awsSes: "$10",
-    wrapsTotal: "$39",
-    savings: "48-57%",
+    awsSes: "$13",
+    wrapsTotal: "$42",
+    savings: "45-54%",
   },
   {
     volume: "500K/mo",
@@ -130,9 +130,9 @@ const pricingComparison = [
     mailgunCost: "$400",
     wrapsTier: "Pro",
     wrapsPlatform: "$29",
-    awsSes: "$50",
-    wrapsTotal: "$79",
-    savings: "80%",
+    awsSes: "$65",
+    wrapsTotal: "$94",
+    savings: "76%",
   },
 ];
 
@@ -667,7 +667,7 @@ export default function MailgunVsWrapsPage() {
                           <div className="font-medium">{row.wrapsTotal}/mo</div>
                           <div className="text-xs text-muted-foreground">
                             {row.wrapsTier} ({row.wrapsPlatform}) + {row.awsSes}{" "}
-                            SES
+                            AWS
                           </div>
                         </td>
                         <td className="hidden p-4 sm:table-cell">
@@ -698,7 +698,7 @@ export default function MailgunVsWrapsPage() {
               </p>
               <p>
                 At 50K the two are level, which is worth saying plainly. The gap
-                opens above that: at 100K, $39/mo against $75 to $90.
+                opens above that: at 100K, $42/mo against $75 to $90.
               </p>
             </div>
           </section>

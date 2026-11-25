@@ -109,7 +109,7 @@ const pricingComparison = [
     wrapsPlatform: "$0",
     awsSes: "$1",
     wrapsTotal: "$1",
-    savings: "95%",
+    savings: "94%",
   },
   {
     volume: "50K/mo",
@@ -117,8 +117,8 @@ const pricingComparison = [
     resendCost: "$20",
     wrapsTier: "Pro",
     wrapsPlatform: "$29",
-    awsSes: "$5",
-    wrapsTotal: "$34",
+    awsSes: "$6",
+    wrapsTotal: "$35",
     savings: null,
   },
   {
@@ -127,8 +127,8 @@ const pricingComparison = [
     resendCost: "$35-90",
     wrapsTier: "Pro",
     wrapsPlatform: "$29",
-    awsSes: "$10",
-    wrapsTotal: "$39",
+    awsSes: "$13",
+    wrapsTotal: "$42",
     savings: null,
   },
   {
@@ -137,9 +137,9 @@ const pricingComparison = [
     resendCost: "$350",
     wrapsTier: "Pro",
     wrapsPlatform: "$29",
-    awsSes: "$50",
-    wrapsTotal: "$79",
-    savings: "77%",
+    awsSes: "$65",
+    wrapsTotal: "$94",
+    savings: "73%",
   },
 ];
 
@@ -725,7 +725,9 @@ export default function ResendVsWrapsPage() {
               Resend bundles sending cost into their platform fee with $0.90/1K
               overage. Wraps charges a platform fee separately -- you pay AWS
               directly at $0.10/1K emails on à la carte (AWS defaults new
-              accounts to $0.16 — Wraps tells you which plan applies).
+              accounts to $0.16 — Wraps tells you which plan applies). The AWS
+              figures include the event pipeline (EventBridge, SQS, Lambda,
+              DynamoDB).
             </p>
             <Card className="overflow-hidden py-0">
               <div className="overflow-x-auto">
@@ -752,7 +754,7 @@ export default function ResendVsWrapsPage() {
                           <div className="font-medium">{row.wrapsTotal}/mo</div>
                           <div className="text-xs text-muted-foreground">
                             {row.wrapsTier} ({row.wrapsPlatform}) + {row.awsSes}{" "}
-                            SES
+                            AWS
                           </div>
                         </td>
                         <td className="hidden p-4 sm:table-cell">

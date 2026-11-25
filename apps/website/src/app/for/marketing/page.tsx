@@ -21,7 +21,7 @@ const softwareSchema = {
   operatingSystem: "Web",
   offers: {
     "@type": "Offer",
-    price: "19",
+    price: "29",
     priceCurrency: "USD",
   },
   description,
@@ -39,7 +39,7 @@ export const metadata: Metadata = pageMetadata({
   description,
   path: "/for/marketing",
   social: {
-    title: "Grow the list. Watch the bill stay put.",
+    title: "Grow the list. Pay nothing per contact.",
     titleSuffix: null,
   },
 });

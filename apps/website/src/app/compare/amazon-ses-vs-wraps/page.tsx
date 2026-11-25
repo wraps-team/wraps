@@ -120,29 +120,29 @@ const pricingComparison = [
     volume: "10K/mo",
     sesRaw: "$1.00",
     wrapsTier: "Free",
-    wrapsCost: "$1.00",
-    wrapsBreakdown: "$0 plan + $1 SES",
+    wrapsCost: "$1.18",
+    wrapsBreakdown: "$0 plan + $1.00 SES + $0.18 pipeline",
   },
   {
     volume: "50K/mo",
     sesRaw: "$5.00",
     wrapsTier: "Pro",
-    wrapsCost: "$34.00",
-    wrapsBreakdown: "$29 plan + $5 SES",
+    wrapsCost: "$35.00",
+    wrapsBreakdown: "$29 plan + $5.00 SES + $1.00 pipeline",
   },
   {
     volume: "100K/mo",
     sesRaw: "$10.00",
     wrapsTier: "Pro",
-    wrapsCost: "$39.00",
-    wrapsBreakdown: "$29 plan + $10 SES",
+    wrapsCost: "$41.50",
+    wrapsBreakdown: "$29 plan + $10.00 SES + $2.50 pipeline",
   },
   {
     volume: "500K/mo",
     sesRaw: "$50.00",
     wrapsTier: "Pro",
-    wrapsCost: "$79.00",
-    wrapsBreakdown: "$29 plan + $50 SES",
+    wrapsCost: "$94.10",
+    wrapsBreakdown: "$29 plan + $50.00 SES + $15.10 pipeline",
   },
 ];
 
@@ -696,9 +696,9 @@ export default function AmazonSesVsWrapsPage() {
                 charged by AWS at $0.10 per 1,000 emails on à la carte pricing.
                 AWS defaults new accounts to the Essentials plan at $0.16 per
                 1,000, so add roughly 60% to that column if you are on it. The
-                supporting AWS services Wraps deploys — Lambda, DynamoDB, SQS,
-                EventBridge, CloudWatch — bill at normal AWS rates and stay
-                small at these volumes.
+                event pipeline Wraps deploys — EventBridge, SQS, Lambda,
+                DynamoDB — bills at normal AWS rates and is included in your
+                total.
               </p>
               <p>
                 <strong className="text-foreground">Wraps plans</strong> are

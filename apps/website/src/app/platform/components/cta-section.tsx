@@ -28,7 +28,7 @@ export function DashboardCtaSection() {
               size="lg"
               variant="outline"
             >
-              <a href="#pricing">View Pricing</a>
+              <a href="/#pricing">View Pricing</a>
             </Button>
           </div>
         </div>

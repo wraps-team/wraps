@@ -88,7 +88,8 @@ export function LandingFooter() {
             </div>
             <p className="mb-6 text-muted-foreground max-lg:flex max-lg:justify-center max-lg:text-center">
               Deploy email infrastructure with tracking, suppression, and
-              analytics to your AWS account. Own your data, pay AWS directly.
+              analytics to your AWS account. Sending runs in your AWS account;
+              you pay AWS directly.
             </p>
             <div className="flex space-x-4 max-lg:justify-center">
               <Button asChild size="icon" variant="ghost">

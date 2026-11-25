@@ -113,40 +113,40 @@ const pricingRows = [
     postmark: "$16.50",
     postmarkDetail: "Pro tier, 10K included",
     wraps: "$1",
-    wrapsDetail: "Free tier + $1 SES",
-    savings: "94%",
+    wrapsDetail: "Free tier + $1 AWS",
+    savings: "93%",
   },
   {
     volume: "50K/mo",
     postmark: "$68.50",
     postmarkDetail: "Pro + 40K overage @ $1.30/1K",
-    wraps: "$34",
-    wrapsDetail: "$29 Pro + $5 SES",
-    savings: "50%",
+    wraps: "$35",
+    wrapsDetail: "$29 Pro + $6 AWS",
+    savings: "49%",
   },
   {
     volume: "100K/mo",
     postmark: "$126-$134",
     postmarkDetail: "Pro/Platform + overage",
-    wraps: "$39",
-    wrapsDetail: "$29 Pro + $10 SES",
-    savings: "69-71%",
+    wraps: "$42",
+    wrapsDetail: "$29 Pro + $13 AWS",
+    savings: "67-69%",
   },
   {
     volume: "500K/mo",
     postmark: "$606-$654",
     postmarkDetail: "Pro/Platform + overage",
-    wraps: "$249",
-    wrapsDetail: "$199 Business + $50 SES",
-    savings: "59-62%",
+    wraps: "$264",
+    wrapsDetail: "$199 Business + $65 AWS",
+    savings: "56-60%",
   },
   {
     volume: "1M/mo",
     postmark: "~$1,200-$1,300",
     postmarkDetail: "Pro/Platform + overage (custom deals at 1.5M+)",
-    wraps: "$299",
-    wrapsDetail: "$199 Business + $100 SES",
-    savings: "75%+",
+    wraps: "$335",
+    wrapsDetail: "$199 Business + $136 AWS",
+    savings: "72%+",
   },
 ];
 
@@ -642,7 +642,7 @@ export default function PostmarkVsWrapsPage() {
                         Postmark (Pro/Platform)
                       </th>
                       <th className="p-4 text-left font-medium text-primary">
-                        Wraps + SES
+                        Wraps + AWS
                       </th>
                       <th className="p-4 text-left font-medium">Savings</th>
                     </tr>
@@ -678,8 +678,9 @@ export default function PostmarkVsWrapsPage() {
             <p className="mt-4 text-muted-foreground text-sm">
               Postmark pricing shows their Pro and Platform plans, computed from
               published base + overage rates. Wraps pricing includes the
-              platform fee plus AWS SES at $0.10/1K emails on à la carte (AWS
-              defaults new accounts to $0.16). You pay AWS directly &mdash;
+              platform fee plus the AWS bill: SES at $0.10/1K emails on à la
+              carte (AWS defaults new accounts to $0.16) and the event pipeline
+              (EventBridge, SQS, Lambda, DynamoDB). You pay AWS directly &mdash;
               Wraps never touches your email spend.{" "}
               <a
                 className="text-primary underline"

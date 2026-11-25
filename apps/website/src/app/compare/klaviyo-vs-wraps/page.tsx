@@ -115,15 +115,15 @@ const pricingComparison = [
     wrapsPlatform: "$0",
     awsSes: "$1",
     wrapsTotal: "$1",
-    savings: "30x",
+    savings: "25x",
   },
   {
     volume: "50K",
     klaviyoProfiles: "~5,000",
     klaviyoCost: "$100",
     wrapsPlatform: "$29",
-    awsSes: "$5",
-    wrapsTotal: "$34",
+    awsSes: "$6",
+    wrapsTotal: "$35",
     savings: "2.9x",
   },
   {
@@ -131,27 +131,27 @@ const pricingComparison = [
     klaviyoProfiles: "~10,000",
     klaviyoCost: "$150",
     wrapsPlatform: "$29",
-    awsSes: "$10",
-    wrapsTotal: "$39",
-    savings: "3.8x",
+    awsSes: "$13",
+    wrapsTotal: "$42",
+    savings: "3.6x",
   },
   {
     volume: "500K",
     klaviyoProfiles: "~50,000",
     klaviyoCost: "$720",
     wrapsPlatform: "$29",
-    awsSes: "$50",
-    wrapsTotal: "$79",
-    savings: "9.1x",
+    awsSes: "$65",
+    wrapsTotal: "$94",
+    savings: "7.7x",
   },
   {
     volume: "1M",
     klaviyoProfiles: "~100,000",
     klaviyoCost: "$1,380",
     wrapsPlatform: "$29",
-    awsSes: "$100",
-    wrapsTotal: "$129",
-    savings: "10.7x",
+    awsSes: "$136",
+    wrapsTotal: "$165",
+    savings: "8.4x",
   },
 ];
 
@@ -739,7 +739,7 @@ export default function KlaviyoVsWrapsPage() {
                         <td className="p-4 text-primary">
                           <div className="font-medium">{row.wrapsTotal}/mo</div>
                           <div className="text-muted-foreground text-xs">
-                            {row.wrapsPlatform} plan + {row.awsSes} SES
+                            {row.wrapsPlatform} plan + {row.awsSes} AWS
                           </div>
                         </td>
                         <td className="p-4">
@@ -755,11 +755,12 @@ export default function KlaviyoVsWrapsPage() {
             </Card>
             <div className="mt-4 space-y-2 text-muted-foreground text-sm">
               <p>
-                Wraps total = platform fee + AWS SES ($0.10/1K emails à la
-                carte, or $0.16/1K on AWS&apos;s default plan), paid directly to
-                AWS. The savings column uses the à la carte rate, so on the
-                default Essentials plan at $0.16 the 1M row is about 7x rather
-                than 10.7x — still the largest gap on this page.{" "}
+                Wraps total = platform fee + the AWS bill: SES ($0.10/1K emails
+                à la carte, or $0.16/1K on AWS&apos;s default plan) plus the
+                event pipeline (EventBridge, SQS, Lambda, DynamoDB), paid
+                directly to AWS. The savings column uses the à la carte rate, so
+                on the default Essentials plan at $0.16 the 1M row is about 6x
+                rather than 8.4x.{" "}
                 <a
                   className="text-primary underline"
                   href="/tools/ses-calculator"
@@ -912,8 +913,9 @@ export default function KlaviyoVsWrapsPage() {
                       <strong>A non-engineer needs to run the program.</strong>{" "}
                       Klaviyo&rsquo;s visual flow builder, drag-and-drop
                       templates and AI content tools mean a marketer can build,
-                      send and measure without opening a terminal. Wraps assumes
-                      someone on the team is comfortable with AWS.
+                      send and measure without opening a terminal. Wraps needs
+                      an AWS account. Setup can run from the browser without a
+                      terminal, but someone still owns that account.
                     </span>
                   </li>
                   <li className="flex items-start gap-3">

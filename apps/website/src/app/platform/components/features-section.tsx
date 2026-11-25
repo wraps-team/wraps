@@ -4,8 +4,8 @@ import { SectionKicker } from "@/app/landing/components/section-kicker";
 const features = [
   {
     icon: BarChart3,
-    title: "Real-time Analytics",
-    description: "Track opens, clicks, bounces, and complaints as they happen",
+    title: "Delivery Analytics",
+    description: "Opens, clicks, bounces and complaints for every message.",
   },
   {
     icon: History,
