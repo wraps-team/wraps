@@ -65,7 +65,7 @@ export function SdkTabs({ examples }: { examples: CodeExamples }) {
         {exampleKeys.map((key) => (
           <button
             className={cn(
-              "cursor-pointer rounded-lg px-4 py-2 font-mono text-xs uppercase tracking-widest transition-all",
+              "cursor-pointer rounded-none px-4 py-2 font-sans font-semibold text-xs uppercase tracking-widest transition-all",
               activeExample === key
                 ? "bg-primary text-primary-foreground"
                 : "border border-border bg-card text-muted-foreground hover:text-foreground"
@@ -80,9 +80,9 @@ export function SdkTabs({ examples }: { examples: CodeExamples }) {
       </div>
 
       {/* Split view */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Code example */}
-        <div>
+        <div className="min-w-0">
           <CodeBlock
             className="h-full"
             data={[
@@ -121,12 +121,12 @@ export function SdkTabs({ examples }: { examples: CodeExamples }) {
         </div>
 
         {/* JSON preview */}
-        <div className="overflow-hidden rounded-lg border border-border bg-card">
+        <div className="min-w-0 overflow-hidden rounded-none border border-border bg-card">
           <div className="flex items-center justify-between border-border border-b bg-muted/30 px-4 py-3">
             <span className="font-mono text-muted-foreground text-xs">
               InboundEmail Response
             </span>
-            <span className="font-mono text-2xs text-muted-foreground uppercase tracking-eyebrow">
+            <span className="font-sans font-semibold text-2xs text-muted-foreground uppercase tracking-eyebrow">
               JSON
             </span>
           </div>

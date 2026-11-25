@@ -50,7 +50,7 @@ function AnimatedArrow({
           className="absolute inset-0 flex items-center justify-center"
           style={{ animationDelay: `${delay}ms` }}
         >
-          <div className="size-1.5 animate-ping rounded-full bg-brand" />
+          <div className="size-1.5 animate-ping motion-reduce:animate-none rounded-full bg-brand" />
         </div>
       )}
     </div>
@@ -147,7 +147,7 @@ export function PipelineInteractive({ steps }: { steps: PipelineStep[] }) {
                 >
                   <div
                     className={cn(
-                      "relative flex size-12 items-center justify-center rounded-lg border border-border bg-card transition-all duration-300 sm:size-14",
+                      "relative flex size-12 items-center justify-center rounded-none border border-border bg-card transition-all duration-300 sm:size-14",
                       isActive && "border-brand/40 bg-brand/10",
                       isCurrent && "scale-110 ring-2 ring-brand/40",
                       selectedStep === step.id &&
@@ -162,13 +162,13 @@ export function PipelineInteractive({ steps }: { steps: PipelineStep[] }) {
                     />
 
                     {isCurrent && (
-                      <div className="absolute inset-0 animate-ping rounded-lg bg-brand/20 opacity-40" />
+                      <div className="absolute inset-0 animate-ping motion-reduce:animate-none rounded-none bg-brand/20 opacity-40" />
                     )}
                   </div>
 
                   <span
                     className={cn(
-                      "mt-2 font-mono text-2xs uppercase tracking-widest transition-all duration-300 sm:text-xs",
+                      "mt-2 font-sans font-semibold text-2xs uppercase tracking-widest transition-all duration-300 sm:text-xs",
                       isActive ? "text-foreground" : "text-muted-foreground"
                     )}
                   >
@@ -192,7 +192,7 @@ export function PipelineInteractive({ steps }: { steps: PipelineStep[] }) {
       {/* Selected step detail panel */}
       <div
         className={cn(
-          "mx-auto max-w-md overflow-hidden rounded-lg border bg-card transition-all duration-300",
+          "mx-auto max-w-md overflow-hidden rounded-none border bg-card transition-all duration-300",
           selectedInfo
             ? "border-brand/40 opacity-100"
             : "border-border opacity-70"

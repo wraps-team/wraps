@@ -49,7 +49,7 @@ function FieldTarget({
   return (
     <button
       className={cn(
-        "cursor-pointer rounded-lg text-left transition-all",
+        "cursor-pointer rounded-none text-left transition-all",
         className,
         isActive && highlight
       )}
@@ -72,7 +72,7 @@ function EmailPreview({
   onHover: (key: HighlightKey) => void;
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-card">
+    <div className="overflow-hidden rounded-none border border-border bg-card">
       {/* Email header */}
       <div className="border-border border-b bg-muted/30 p-4">
         <div className="mb-3 flex items-start justify-between">
@@ -82,7 +82,7 @@ function EmailPreview({
             isActive={highlighted === "from"}
             onHover={onHover}
           >
-            <span className="flex size-10 items-center justify-center rounded-full bg-muted">
+            <span className="flex size-10 items-center justify-center rounded-none bg-muted">
               <User className="size-5 text-muted-foreground" />
             </span>
             <span className="block">
@@ -192,7 +192,7 @@ function JsonPreview({
 }) {
   const renderLine = (key: string, value: string, isLast = false) => (
     <FieldTarget
-      className="block w-full rounded px-2 py-1"
+      className="block w-full rounded-none px-2 py-1"
       field={key as Exclude<HighlightKey, null>}
       isActive={highlighted === key}
       key={key}
@@ -213,7 +213,7 @@ function JsonPreview({
   );
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-card">
+    <div className="overflow-hidden rounded-none border border-border bg-card">
       {/* Header */}
       <div className="flex items-center gap-2 border-border border-b bg-muted/30 px-4 py-3">
         <Mail aria-hidden="true" className="size-3.5 text-brand-text" />
@@ -247,10 +247,10 @@ export function AnatomyInteractive() {
   return (
     <>
       {/* Split view */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Email preview */}
-        <div>
-          <p className="mb-3 font-mono text-2xs text-muted-foreground uppercase tracking-eyebrow">
+        <div className="min-w-0">
+          <p className="mb-3 font-sans font-semibold text-2xs text-muted-foreground uppercase tracking-eyebrow">
             Email Preview
           </p>
           <EmailPreview highlighted={highlighted} onHover={setHighlighted} />
@@ -258,7 +258,7 @@ export function AnatomyInteractive() {
 
         {/* JSON structure */}
         <div>
-          <p className="mb-3 font-mono text-2xs text-muted-foreground uppercase tracking-eyebrow">
+          <p className="mb-3 font-sans font-semibold text-2xs text-muted-foreground uppercase tracking-eyebrow">
             Parsed Data
           </p>
           <JsonPreview highlighted={highlighted} onHover={setHighlighted} />

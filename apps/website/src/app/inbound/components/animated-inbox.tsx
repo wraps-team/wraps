@@ -80,7 +80,7 @@ export function AnimatedInbox() {
   }, []);
 
   return (
-    <div className="relative overflow-hidden rounded-lg border border-border bg-card shadow-2xl">
+    <div className="relative overflow-hidden rounded-none border border-border bg-card">
       {/* Inbox header */}
       <div className="flex items-center justify-between border-border border-b bg-muted/30 px-4 py-3">
         <div className="flex items-center gap-3">
@@ -89,7 +89,7 @@ export function AnimatedInbox() {
             inbox@yourapp.com
           </span>
         </div>
-        <span className="font-mono text-2xs text-muted-foreground uppercase tracking-eyebrow">
+        <span className="font-sans font-semibold text-2xs text-muted-foreground uppercase tracking-eyebrow">
           {visibleEmails.length} emails
         </span>
       </div>
@@ -103,7 +103,7 @@ export function AnimatedInbox() {
           return (
             <div
               className={cn(
-                "mb-2 rounded-lg border border-transparent p-3 transition-all duration-300",
+                "mb-2 rounded-none border border-transparent p-3 transition-all duration-300",
                 isVisible && "translate-x-0 border-border bg-card opacity-100",
                 !isVisible && isAnimating && "translate-x-8 opacity-50",
                 !(isVisible || isAnimating) && "translate-x-full opacity-0",
@@ -143,7 +143,7 @@ export function AnimatedInbox() {
         {/* Incoming email indicator */}
         {animatingEmail !== null && (
           <div className="pointer-events-none absolute inset-y-0 right-0 flex w-8 items-center justify-center">
-            <div className="size-2 animate-ping rounded-full bg-brand" />
+            <div className="size-2 animate-ping motion-reduce:animate-none rounded-full bg-brand" />
           </div>
         )}
       </div>

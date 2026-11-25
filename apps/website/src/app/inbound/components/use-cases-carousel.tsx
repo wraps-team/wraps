@@ -72,7 +72,7 @@ export function UseCasesCarousel({ useCases }: { useCases: UseCase[] }) {
           return (
             <div
               className={cn(
-                "w-[85vw] max-w-md shrink-0 snap-center overflow-hidden rounded-lg border border-border bg-card transition-colors duration-300 sm:w-[70vw] lg:w-[400px]",
+                "w-[85vw] max-w-md shrink-0 snap-center overflow-hidden rounded-none border border-border bg-card transition-colors duration-300 sm:w-[70vw] lg:w-[400px]",
                 activeIndex === index && "border-brand/40"
               )}
               data-card
@@ -81,7 +81,7 @@ export function UseCasesCarousel({ useCases }: { useCases: UseCase[] }) {
               {/* Card header */}
               <div className="border-border border-b p-6">
                 <div className="mb-4 flex items-center gap-3">
-                  <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
+                  <div className="flex size-10 items-center justify-center rounded-none bg-muted">
                     <Icon className="size-5 text-brand-text" />
                   </div>
                   <h3 className="font-heading font-semibold text-lg tracking-tight">
