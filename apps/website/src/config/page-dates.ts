@@ -63,7 +63,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/compare/ses-bounce-handling-hand-rolled-vs-wraps":
     "2026-11-25T10:38:44-07:00",
   "/contact": "2026-11-22T11:03:47-07:00",
-  "/docs": "2026-11-25T10:38:44-07:00",
+  "/docs": "2026-11-25T10:49:42-07:00",
   "/docs/cdk-reference": "2026-11-22T11:03:47-07:00",
   "/docs/cli-reference": "2026-11-22T11:03:47-07:00",
   "/docs/cli-reference/auth": "2026-11-22T11:03:47-07:00",
@@ -83,7 +83,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/docs/guides/aws-setup/troubleshooting": "2026-11-22T11:03:47-07:00",
   "/docs/guides/better-auth": "2026-11-22T11:03:47-07:00",
   "/docs/guides/bounce-handling": "2026-11-22T11:03:47-07:00",
-  "/docs/guides/configuration-presets": "2026-11-25T10:38:44-07:00",
+  "/docs/guides/configuration-presets": "2026-11-25T10:49:42-07:00",
   "/docs/guides/context7": "2026-11-25T00:06:02-07:00",
   "/docs/guides/custom-events": "2026-11-22T11:03:47-07:00",
   "/docs/guides/domain-verification": "2026-11-22T11:03:47-07:00",
