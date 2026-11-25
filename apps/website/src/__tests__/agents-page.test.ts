@@ -154,10 +154,10 @@ describe("MCP surfaces — /mcp page and docs reference", () => {
     expect(source).toContain("WRAPS_WRITE_ENABLED");
   });
 
-  it("landing navbar Products mega-menu includes an MCP Server entry linking to /mcp", () => {
-    const source = read("src/app/landing/components/navbar.tsx");
+  it("site navigation (Developers menu) includes an MCP server entry linking to /mcp", () => {
+    const source = read("src/config/site-nav.ts");
     expect(source).toMatch(
-      /name:\s*"MCP Server",\s*href:\s*"\/mcp",\s*description:/
+      /name:\s*"MCP server",\s*href:\s*"\/mcp",\s*description:/
     );
   });
 
@@ -201,10 +201,10 @@ describe("Chunk 5 — Agent-forward differentiation", () => {
 });
 
 describe("Chunk 6 — Internal discovery links to /agents", () => {
-  it("landing navbar Products mega-menu includes an Agents entry linking to /agents", () => {
-    const source = read("src/app/landing/components/navbar.tsx");
+  it("site navigation (Solutions menu) includes an AI agents entry linking to /agents", () => {
+    const source = read("src/config/site-nav.ts");
     expect(source).toMatch(
-      /name:\s*"Agents",\s*href:\s*"\/agents",\s*description:/
+      /name:\s*"AI agents",\s*href:\s*"\/agents",\s*description:/
     );
   });
 
