@@ -99,19 +99,19 @@ export default function Page() {
             </p>
 
             <div className="mt-8 flex flex-wrap gap-4">
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <FileText className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Per-page markdown for 11 pages
                 </span>
               </div>
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <Link2 className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   RFC 9727 api-catalog
                 </span>
               </div>
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <Bot className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Content-Signal: ai-train=no

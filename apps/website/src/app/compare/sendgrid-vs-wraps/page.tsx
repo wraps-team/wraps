@@ -26,6 +26,7 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
+import { LICENSE_STATEMENT } from "@/config/license";
 import { pageMetadata } from "@/lib/page-metadata";
 
 export const metadata: Metadata = pageMetadata({
@@ -85,12 +86,12 @@ const tldrComparison = [
   {
     dimension: "Pricing (100K emails/mo)",
     sendgrid: "$89.95/mo",
-    wraps: "$29 + $10 AWS = $39/mo",
+    wraps: "$29 + $12.50 AWS = $41.50/mo",
   },
   {
     dimension: "Pricing (500K emails/mo)",
     sendgrid: "~$499/mo",
-    wraps: "$29 + $50 AWS = $79/mo",
+    wraps: "$29 + $65.10 AWS = $94.10/mo",
   },
   {
     dimension: "If you leave",
@@ -106,9 +107,9 @@ const pricingComparison = [
     sendgridCost: "$19.95/mo",
     wrapsTier: "Free",
     wrapsPlatform: "$0",
-    wrapsAws: "$1.00",
-    wrapsTotal: "$1.00/mo",
-    savings: "95%",
+    wrapsAws: "$1.18",
+    wrapsTotal: "$1.18/mo",
+    savings: "94%",
   },
   {
     volume: "50K/mo",
@@ -116,8 +117,8 @@ const pricingComparison = [
     sendgridCost: "$19.95/mo",
     wrapsTier: "Pro",
     wrapsPlatform: "$29",
-    wrapsAws: "$5.00",
-    wrapsTotal: "$34.00/mo",
+    wrapsAws: "$6.00",
+    wrapsTotal: "$35.00/mo",
     savings: null,
   },
   {
@@ -126,9 +127,9 @@ const pricingComparison = [
     sendgridCost: "$89.95/mo",
     wrapsTier: "Pro",
     wrapsPlatform: "$29",
-    wrapsAws: "$10.00",
-    wrapsTotal: "$39.00/mo",
-    savings: "57%",
+    wrapsAws: "$12.50",
+    wrapsTotal: "$41.50/mo",
+    savings: "54%",
   },
   {
     volume: "500K/mo",
@@ -136,9 +137,9 @@ const pricingComparison = [
     sendgridCost: "~$499/mo",
     wrapsTier: "Pro",
     wrapsPlatform: "$29",
-    wrapsAws: "$50.00",
-    wrapsTotal: "$79.00/mo",
-    savings: "84%",
+    wrapsAws: "$65.10",
+    wrapsTotal: "$94.10/mo",
+    savings: "81%",
   },
 ];
 
@@ -301,7 +302,7 @@ const featureComparison = [
       {
         name: "Open source",
         sendgrid: false,
-        wraps: "AGPL-3.0, self-hostable",
+        wraps: LICENSE_STATEMENT,
       },
       {
         name: "What happens when you leave",
@@ -610,7 +611,7 @@ export default function SendGridVsWrapsPage() {
                   <ul className="space-y-2 text-muted-foreground text-sm">
                     <li>
                       Email sends from SES in your AWS account. The domain
-                      identity and the sender reputation are yours.
+                      identity and the sending account are yours.
                     </li>
                     <li>
                       Per-event delivery history lands in your DynamoDB, with
@@ -654,7 +655,8 @@ export default function SendGridVsWrapsPage() {
               Wraps charges a flat platform fee for tooling (dashboard,
               analytics, templates). You pay AWS directly for sending at
               $0.10/1,000 emails on à la carte (AWS defaults new accounts to
-              $0.16/1,000). SendGrid charges per plan tier with separate billing
+              $0.16/1,000), plus the event pipeline (EventBridge, SQS, Lambda,
+              DynamoDB). SendGrid charges per plan tier with separate billing
               for marketing and transactional email.
             </p>
             <Card className="overflow-hidden py-0">
@@ -754,8 +756,10 @@ export default function SendGridVsWrapsPage() {
               >
                 sendgrid.com/pricing
               </a>
-              . Wraps AWS cost = $0.10 per 1,000 emails via SES à la carte (AWS
-              defaults new accounts to $0.16/1,000). All prices as of July 2026.{" "}
+              . Wraps AWS cost = SES at $0.10 per 1,000 emails à la carte (AWS
+              defaults new accounts to $0.16/1,000) plus the event pipeline
+              (EventBridge, SQS, Lambda, DynamoDB), from the wraps.dev pricing
+              estimator. All prices as of July 2026.{" "}
               <a
                 className="text-primary underline"
                 href="/tools/ses-calculator"
@@ -861,7 +865,7 @@ export default function SendGridVsWrapsPage() {
                     "You want someone watching the account. Bounce and complaint rates are checked hourly against AWS's own review and pause lines, and your owners and admins hear about it before it matters. On the Production and Enterprise presets, CloudWatch alarms sit in your own account too, at thresholds below AWS's.",
                     "You want the deliverability checks on hand. wraps email check runs DKIM, SPF, DMARC, MX, MX-TLS, BIMI, RDAP, and public blacklists on demand.",
                     "You are already on AWS and do not want another vendor in the sending path.",
-                    "You care about cost at scale. At 500K emails a month Wraps runs $79 all in — the $29 plan plus about $50 of SES sending — against SendGrid's ~$499. That is $420 a month you keep, and the gap widens as you send more.",
+                    "You care about cost at scale. At 500K emails a month Wraps runs about $94 all in — the $29 plan plus about $65 of AWS, SES sending and the event pipeline — against SendGrid's ~$499. That is about $405 a month you keep, and the gap widens as you send more.",
                     "You want to keep the sending. SES, DynamoDB, Lambda, and EventBridge stay in your account if you stop paying us.",
                   ].map((point) => (
                     <li className="flex items-start gap-3" key={point}>

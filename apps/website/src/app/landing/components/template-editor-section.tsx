@@ -64,7 +64,7 @@ function _PlaceholderImage({
       className={`relative aspect-video w-full overflow-hidden rounded-2xl border-2 border-muted-foreground/25 border-dashed bg-muted/50 ${className}`}
     >
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center">
-        <div className="flex aspect-square size-16 items-center justify-center rounded-full border-2 border-brand bg-brand/5">
+        <div className="flex aspect-square size-16 items-center justify-center rounded-none border-2 border-brand bg-brand/5">
           <LayoutGrid className="size-8 text-brand-text" />
         </div>
         <div>
@@ -150,13 +150,13 @@ export function TemplateEditorSection() {
               className="rounded-xl border bg-background p-6 transition-all hover:border-brand/50"
               key={feature.title}
             >
-              <div className="mb-4 flex aspect-square size-10 items-center justify-center rounded-full border-2 border-brand bg-brand/5">
+              <div className="mb-4 flex aspect-square size-10 items-center justify-center rounded-none border-2 border-brand bg-brand/5">
                 <feature.icon className="size-5 text-brand-text" />
               </div>
               <div className="mb-2 flex items-center gap-2">
                 <h3 className="font-semibold text-lg">{feature.title}</h3>
                 {"premium" in feature && feature.premium && (
-                  <span className="rounded-full bg-brand/10 px-2 py-0.5 text-brand-text text-xs">
+                  <span className="rounded-none bg-brand/10 px-2 py-0.5 text-brand-text text-xs">
                     AI
                   </span>
                 )}
@@ -175,7 +175,7 @@ export function TemplateEditorSection() {
         <div className="flex flex-col gap-6">
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="flex aspect-square size-10 items-center justify-center rounded-full border-2 border-brand bg-brand/5">
+              <div className="flex aspect-square size-10 items-center justify-center rounded-none border-2 border-brand bg-brand/5">
                 <Sparkles className="size-5 text-brand-text" />
               </div>
               <h3 className="font-semibold text-xl">AI Content Assistant</h3>
@@ -213,7 +213,7 @@ export function TemplateEditorSection() {
         <div className="flex flex-col gap-6">
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="flex aspect-square size-10 items-center justify-center rounded-full border-2 border-brand bg-brand/5">
+              <div className="flex aspect-square size-10 items-center justify-center rounded-none border-2 border-brand bg-brand/5">
                 <LayoutGrid className="size-5 text-brand-text" />
               </div>
               <h3 className="font-semibold text-xl">Raw Code Editor</h3>

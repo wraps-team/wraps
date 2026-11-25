@@ -312,7 +312,7 @@ Every public method has an explicit typed signature, and the package ships a PEP
 
 const FULL_PAGE_MD = `# wraps-email (Python SDK)
 
-Send email through your Wraps-deployed AWS SES infrastructure from Python. Typed, lightweight (built on \`httpx\` + \`botocore\` signing, no \`boto3\`), and BYOC — your AWS account, no vendor lock-in.
+Send email through your Wraps-deployed AWS SES infrastructure from Python. Typed, lightweight (built on \`httpx\` + \`botocore\` signing, no \`boto3\`), and BYOC — your AWS account, no Wraps lock-in.
 
 ${SECTION_MD.installation}
 

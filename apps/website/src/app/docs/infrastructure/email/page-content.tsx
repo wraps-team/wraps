@@ -358,7 +358,7 @@ export default function InfrastructureEmailPageContent() {
           <p className="font-medium text-sm">Best for</p>
           <p className="mt-1 text-muted-foreground text-sm">
             MVPs, side projects, and low-volume senders who need reliable email
-            delivery without event history or real-time analytics.
+            delivery without event history or delivery analytics.
           </p>
         </div>
       </section>
@@ -372,7 +372,7 @@ export default function InfrastructureEmailPageContent() {
         </h2>
         <p className="mb-4 text-muted-foreground">
           The Production preset includes everything in Starter plus a full event
-          processing pipeline for real-time tracking and email history.
+          processing pipeline for fast event processing and email history.
         </p>
 
         <div className="space-y-4">
@@ -493,8 +493,8 @@ export default function InfrastructureEmailPageContent() {
           </p>
           <p className="mt-1 text-muted-foreground text-sm">
             The Production preset gives you full visibility into email delivery
-            with real-time event tracking, a 90-day email history, and
-            reputation metrics through the dashboard.
+            with fast event processing, a 90-day email history, and reputation
+            metrics through the dashboard.
           </p>
         </div>
       </section>

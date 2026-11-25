@@ -1,9 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ClosingPanel } from "@/app/landing/components/closing-panel";
+import { FlowBox } from "@/app/landing/components/flow-primitives";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
+import { Band, SectionHead } from "@/app/landing/components/page-band";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
+import { TrackedClosingActions } from "@/components/tracked-closing-actions";
+import { LICENSE_STATEMENT } from "@/config/license";
+import { AWS_PRICING, formatCurrency, getTier } from "@/config/pricing";
 import { pageMetadata } from "@/lib/page-metadata";
+import { estimateCost, SES_PLANS } from "@/lib/ses-cost";
 import { CopyLinkButton } from "./components/copy-link-button";
 import { FaqSection } from "./components/faq-section";
 
@@ -74,255 +81,225 @@ const riskRegister = [
 const planRows = [
   {
     plan: "Free",
-    price: "$0",
-    forWho: "One AWS account, 30 days of history. Most first deploys.",
+    price: formatCurrency(getTier("free").price),
+    forWho: `One AWS account, ${getTier("free").limits.historyDisplay} of history. Most first deploys.`,
   },
   {
     plan: "Pro",
-    price: "$29/mo",
-    forWho: "One AWS account, 90 days of history, email support.",
+    price: `${formatCurrency(getTier("pro").price)}/mo`,
+    forWho: `One AWS account, ${getTier("pro").limits.historyDisplay} of history, email support.`,
   },
   {
     plan: "Business",
-    price: "$199/mo",
-    forWho:
-      "Unlimited AWS accounts, 365 days of history, SSO and SCIM, audit log with CSV export, priority SLA.",
+    price: `${formatCurrency(getTier("business").price)}/mo`,
+    forWho: `Unlimited AWS accounts, ${getTier("business").limits.historyDisplay} of history, SSO and SCIM, audit log with CSV export, priority support.`,
   },
 ];
 
+const ESSENTIALS_RATE = SES_PLANS.essentials.perThousandEmails.toFixed(2);
+const allIn100k = (sesPlan: "alacarte" | "essentials") =>
+  `$${estimateCost({ emailsPerMonth: 100_000, tier: "free", sesPlan }).total.toFixed(2)}`;
+
 const exitPoints = [
   {
-    title: "The infrastructure is already yours",
-    body: "SES identities, Lambdas, EventBridge rules and DynamoDB tables are created in your AWS account, namespaced wraps-email-*, and none of them call us to keep working. Stop paying and mail keeps sending.",
+    title: "The sending setup is already in your account",
+    body: "SES identities, Lambdas, EventBridge rules and DynamoDB tables are created in your AWS account, namespaced wraps-email-*, and none of them call us to keep working. Stop paying and your app's emails keep going out. Broadcasts and automations stop.",
   },
   {
     title: "Our access is a role you delete",
     body: "Wraps assumes an IAM role with an external ID. No access keys exist on our side, so revoking access is a change you make in your own account without involving us.",
   },
   {
-    title: "The code outlives the company",
-    body: "The platform is AGPL-3.0, with an enterprise kernel under a separate licence, and the SDKs are MIT. If Wraps disappears, the thing you deployed is still a fork you can run.",
+    title: "The code is public",
+    body: `Your reviewer can read what Wraps sets up, including every IAM policy it generates. ${LICENSE_STATEMENT}`,
   },
   {
     title: "What you would lose, stated plainly",
-    body: "The dashboard, and everything that lives in our database rather than yours: contacts, templates, broadcasts, workflows, and the per-message send records that drive the dashboard list and analytics. Export them before you go. The SES infrastructure and the event history in your own DynamoDB stay where they are.",
+    body: "The dashboard, and everything that lives in our database rather than yours: contacts, templates, broadcasts, workflows, and the per-message send records that drive the dashboard list and analytics. Contacts and templates can be exported, so export them before you go. The SES setup and the event history in your own DynamoDB stay where they are.",
   },
 ];
 
 const badFit = [
   "You have no AWS account and no appetite for one. Everything on this page depends on holding one, so a hosted sending API is the right shape for you.",
-  "Your review requires SOC 2, HIPAA or a BAA today. We have none of them.",
+  "You need SOC 2 today. We don't have SOC 2 yet.",
   "You expect to be refused SES production access. Wraps cannot change that outcome, and a sandboxed account sends to nobody.",
+  "You need a drag-and-drop email editor or A/B testing today. Templates are code, with an AI that writes the first draft, and there is no split testing.",
   "Your stack is not TypeScript or Python. Those are the SDKs that exist.",
-  "A non-engineer needs to own email day to day. A marketing platform will fit their hands better than ours will.",
-  "You are shopping purely on price below about 100,000 emails a month. The gap at that volume is small enough that it should not be the deciding factor.",
 ];
 
 export default function WhyWrapsPage() {
   return (
     <div className="min-h-screen bg-background">
       <LandingNavbar />
-      <main className="container mx-auto px-4 pt-24 pb-12">
-        <div className="mx-auto max-w-4xl">
-          <div className="mb-14">
-            <SectionKicker>Wraps · Evaluation guide</SectionKicker>
-            <h1 className="mb-4 font-heading font-semibold text-4xl tracking-tight">
-              Why Wraps
-            </h1>
-            <p className="max-w-2xl text-lg text-muted-foreground">
-              Written to be forwarded. If you are the person being asked to
-              approve this, the sections below are the risk it reduces, what it
-              costs in total, what happens to your infrastructure if we
-              disappear, and the questions your review will raise — including
-              the ones where our answer is no.
-            </p>
-            <CopyLinkButton />
+      <main>
+        <section className="pt-24 pb-12">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+            <div className="max-w-3xl">
+              <SectionKicker>Evaluation guide</SectionKicker>
+              <h1 className="mb-4 text-pretty font-heading font-semibold text-4xl leading-tight tracking-tight sm:text-5xl">
+                Why Wraps
+              </h1>
+              <p className="max-w-2xl text-lg text-muted-foreground">
+                Written to be forwarded. If you are the person being asked to
+                approve this, the sections below cover the risk it reduces, what
+                it costs in total, what happens to your setup if we disappear,
+                and the questions your review will raise, including the ones
+                where our answer is no.
+              </p>
+              <CopyLinkButton />
+            </div>
           </div>
+        </section>
 
-          {/* 01 — risk */}
-          <section className="mb-16">
-            <div className="mb-3 flex items-baseline gap-3">
-              <span className="font-mono text-brand-text text-xs">01</span>
-              <h2 className="font-heading font-semibold text-2xl tracking-tight">
-                What you are actually buying down
-              </h2>
-            </div>
-            <p className="mb-7 max-w-2xl text-muted-foreground">
-              Not a cheaper send. The failure mode that costs a company real
-              money is Amazon switching the account off, and every number in the
-              second column is AWS's, not ours.
-            </p>
-
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] border-collapse text-left">
-                <thead>
-                  <tr>
-                    {[
-                      "Risk",
-                      "AWS's line",
-                      "What Wraps does",
-                      "What it cannot do",
-                    ].map((h) => (
-                      <th
-                        className="border-border border-b px-3 py-3 font-mono font-medium text-muted-foreground text-xs uppercase tracking-widest"
-                        key={h}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {riskRegister.map((row) => (
-                    <tr key={row.risk}>
-                      <td className="border-border border-b px-3 py-4 align-top font-medium text-foreground text-sm">
-                        {row.risk}
-                      </td>
-                      <td className="border-border border-b px-3 py-4 align-top text-muted-foreground text-sm">
-                        {row.awsLine}
-                      </td>
-                      <td className="border-border border-b px-3 py-4 align-top text-foreground/90 text-sm">
-                        {row.wraps}
-                      </td>
-                      <td className="border-border border-b px-3 py-4 align-top text-muted-foreground text-sm">
-                        {row.limit}
-                      </td>
-                    </tr>
+        <Band sunken>
+          <SectionHead
+            body="Not a cheaper send. The failure that costs a company real money is Amazon switching the account off, and every number in the second column is AWS's, not ours."
+            kicker="01 · Risk"
+            title="What can go wrong with sending"
+          />
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] border-collapse text-left">
+              <thead>
+                <tr>
+                  {[
+                    "Risk",
+                    "AWS's line",
+                    "What Wraps does",
+                    "What it cannot do",
+                  ].map((h) => (
+                    <th
+                      className="border-border border-b px-3 py-3 font-sans font-semibold text-muted-foreground text-xs uppercase tracking-eyebrow"
+                      key={h}
+                    >
+                      {h}
+                    </th>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
+                </tr>
+              </thead>
+              <tbody>
+                {riskRegister.map((row) => (
+                  <tr key={row.risk}>
+                    <td className="border-border border-b px-3 py-4 align-top font-medium text-foreground text-sm">
+                      {row.risk}
+                    </td>
+                    <td className="border-border border-b px-3 py-4 align-top text-muted-foreground text-sm">
+                      {row.awsLine}
+                    </td>
+                    <td className="border-border border-b px-3 py-4 align-top text-foreground/90 text-sm">
+                      {row.wraps}
+                    </td>
+                    <td className="border-border border-b px-3 py-4 align-top text-muted-foreground text-sm">
+                      {row.limit}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Band>
 
-          {/* 02 — cost */}
-          <section className="mb-16">
-            <div className="mb-3 flex items-baseline gap-3">
-              <span className="font-mono text-brand-text text-xs">02</span>
-              <h2 className="font-heading font-semibold text-2xl tracking-tight">
-                What it costs, all in
-              </h2>
-            </div>
-            <p className="mb-7 max-w-2xl text-muted-foreground">
-              Two lines on two invoices. A flat platform fee from us, and AWS
-              billing you directly for the sending at{" "}
-              <strong className="text-foreground">
-                $0.10 per 1,000 emails
-              </strong>{" "}
-              on à la carte, or $0.16 on the Essentials plan new AWS accounts
-              default to. There is no per-seat, per-contact or per-send meter on
-              any tier.
-            </p>
+        <Band>
+          <SectionHead
+            body={
+              <>
+                Two lines on two invoices. A flat platform fee from us, and AWS
+                billing you directly for the sending: $
+                {AWS_PRICING.sesPerThousand.toFixed(2)} per 1,000 emails on à la
+                carte, or ${ESSENTIALS_RATE} on the Essentials plan AWS puts new
+                accounts on. There is no per-seat, per-contact or per-email fee
+                from Wraps on any plan.
+              </>
+            }
+            kicker="02 · Cost"
+            title="What it costs, all in"
+          />
+          <div className="grid gap-x-6 gap-y-8 md:grid-cols-3">
+            {planRows.map((row) => (
+              <FlowBox key={row.plan} label={row.plan}>
+                <p className="mb-2 font-heading font-semibold text-2xl">
+                  {row.price}
+                </p>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  {row.forWho}
+                </p>
+              </FlowBox>
+            ))}
+          </div>
+          <p className="mt-8 max-w-2xl text-muted-foreground leading-relaxed">
+            For scale: 100,000 emails a month costs {allIn100k("alacarte")} on
+            Amazon's à la carte plan and {allIn100k("essentials")} on the $
+            {ESSENTIALS_RATE} plan, including the AWS event pipeline, with the
+            Wraps Free plan on top at $0. Against a marketing platform that
+            charges per contact, the gap widens with the list. Against a sending
+            API, work it out with the{" "}
+            <Link
+              className="text-foreground underline underline-offset-4"
+              href="/tools/ses-calculator"
+            >
+              cost calculator
+            </Link>{" "}
+            for your own volume.
+          </p>
+        </Band>
 
-            <dl className="space-y-4">
-              {planRows.map((row) => (
-                <div
-                  className="grid gap-1 border-border border-t pt-4 sm:grid-cols-[8rem_1fr]"
-                  key={row.plan}
-                >
-                  <dt className="font-semibold text-foreground text-sm">
-                    {row.plan}
-                    <span className="ml-2 font-mono font-normal text-muted-foreground">
-                      {row.price}
-                    </span>
-                  </dt>
-                  <dd className="text-muted-foreground text-sm leading-relaxed">
-                    {row.forWho}
-                  </dd>
-                </div>
-              ))}
-            </dl>
+        <Band sunken>
+          <SectionHead
+            body="The question a careful reviewer asks about any vendor in the send path. Here it has a mechanical answer rather than a reassuring one."
+            kicker="03 · Exit"
+            title="What happens if Wraps goes away"
+          />
+          <div className="grid gap-x-6 gap-y-8 sm:grid-cols-2">
+            {exitPoints.map((point, i) => (
+              <FlowBox dashed={i === 0} key={point.title} label={point.title}>
+                <p className="text-muted-foreground leading-relaxed">
+                  {point.body}
+                </p>
+              </FlowBox>
+            ))}
+          </div>
+        </Band>
 
-            <p className="mt-7 max-w-2xl text-muted-foreground text-sm leading-relaxed">
-              Where the money actually moves: against a contact-priced marketing
-              platform the gap is large immediately and widens with the list.
-              Against a hosted sending API it is small under roughly 100,000
-              emails a month and grows from there. Either way the platform fee
-              stays flat while theirs scales, which is the part that compounds.
-            </p>
-          </section>
+        <FaqSection />
 
-          {/* 03 — exit */}
-          <section className="mb-16">
-            <div className="mb-3 flex items-baseline gap-3">
-              <span className="font-mono text-brand-text text-xs">03</span>
-              <h2 className="font-heading font-semibold text-2xl tracking-tight">
-                What happens if Wraps goes away
-              </h2>
-            </div>
-            <p className="mb-7 max-w-2xl text-muted-foreground">
-              The question a careful reviewer asks about any vendor in the send
-              path. Here it has a mechanical answer rather than a reassuring
-              one.
-            </p>
-
-            <div className="grid gap-6 sm:grid-cols-2">
-              {exitPoints.map((point) => (
-                <div className="border-border border-t pt-4" key={point.title}>
-                  <h3 className="mb-2 font-semibold text-foreground text-sm">
-                    {point.title}
-                  </h3>
-                  <p className="text-muted-foreground text-sm leading-relaxed">
-                    {point.body}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* 04 — the meeting questions */}
-          <FaqSection />
-
-          {/* 05 — bad fit */}
-          <section className="mb-16">
-            <div className="mb-3 flex items-baseline gap-3">
-              <span className="font-mono text-brand-text text-xs">05</span>
-              <h2 className="font-heading font-semibold text-2xl tracking-tight">
-                When the answer is no
-              </h2>
-            </div>
-            <p className="mb-7 max-w-2xl text-muted-foreground">
-              If one of these describes your team, a decision against Wraps is
-              the correct one, and this page is a faster way to reach it than a
-              trial.
-            </p>
-            <ul className="space-y-4">
+        <Band sunken>
+          <SectionHead
+            body="If one of these describes your team, a decision against Wraps is the correct one, and this page is a faster way to reach it than a trial."
+            kicker="05 · Fit"
+            title="When the answer is no"
+          />
+          <FlowBox label="Not the right fit if">
+            <ul className="space-y-3 text-muted-foreground leading-relaxed">
               {badFit.map((item) => (
-                <li
-                  className="border-border border-t pt-4 text-muted-foreground text-sm leading-relaxed"
-                  key={item}
-                >
-                  {item}
-                </li>
+                <li key={item}>{item}</li>
               ))}
             </ul>
-            <p className="mt-7 max-w-2xl text-muted-foreground text-sm">
-              Still deciding which category you belong in?{" "}
-              <Link
-                className="text-foreground underline underline-offset-4"
-                href="/approaches"
-              >
-                The four approaches
-              </Link>{" "}
-              lays out every option, including the ones that are not us.
-            </p>
-          </section>
-
-          <section className="rounded-lg border bg-muted/30 p-8 text-center">
-            <h2 className="mb-2 font-heading font-semibold text-xl tracking-tight">
-              Try it against a real AWS account
-            </h2>
-            <p className="mx-auto mb-6 max-w-xl text-muted-foreground">
-              One command, about two minutes, non-destructive. Nothing existing
-              in the account is modified, so a trial deploy is reversible.
-            </p>
+          </FlowBox>
+          <p className="mt-7 max-w-2xl text-muted-foreground text-sm">
+            Still deciding which category you belong in?{" "}
             <Link
-              className="inline-flex items-center rounded-md bg-foreground px-5 py-2.5 font-medium text-background text-sm transition-opacity hover:opacity-90"
-              href="/docs/quickstart/email"
+              className="text-foreground underline underline-offset-4"
+              href="/approaches"
             >
-              Read the quickstart
-            </Link>
-          </section>
-        </div>
+              The four approaches
+            </Link>{" "}
+            lays out every option, including the ones that are not us.
+          </p>
+        </Band>
+
+        <ClosingPanel
+          actions={
+            <TrackedClosingActions
+              location="why_wraps_closing"
+              primary={{
+                label: "Read the quickstart",
+                href: "/docs/quickstart/email",
+              }}
+              secondary={{ label: "See the security page", href: "/security" }}
+            />
+          }
+          body="Connect an AWS account and look at it. Nothing already in the account is modified, so a trial deploy is reversible."
+          title="Try it against a real AWS account."
+        />
       </main>
       <LandingFooter />
     </div>

@@ -180,10 +180,10 @@ export function DualPathSection() {
         <div className="mb-12">
           <div className="mb-8 flex flex-wrap items-center justify-center gap-3 sm:gap-6">
             <Link
-              className="flex items-center gap-2 rounded-full px-3 py-1 transition-colors hover:bg-success/5"
+              className="flex items-center gap-2 rounded-none px-3 py-1 transition-colors hover:bg-success/5"
               href="/sdk"
             >
-              <span className="inline-flex items-center rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-medium text-success">
+              <span className="inline-flex items-center rounded-none bg-success/10 px-2.5 py-0.5 text-xs font-medium text-success">
                 Code
               </span>
               <span className="text-sm text-muted-foreground">
@@ -192,10 +192,10 @@ export function DualPathSection() {
             </Link>
             <span className="text-sm text-muted-foreground">+</span>
             <Link
-              className="flex items-center gap-2 rounded-full px-3 py-1 transition-colors hover:bg-brand/5"
+              className="flex items-center gap-2 rounded-none px-3 py-1 transition-colors hover:bg-brand/5"
               href="/platform"
             >
-              <span className="inline-flex items-center rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-medium text-brand-text">
+              <span className="inline-flex items-center rounded-none bg-brand/10 px-2.5 py-0.5 text-xs font-medium text-brand-text">
                 Visual
               </span>
               <span className="text-sm text-muted-foreground">

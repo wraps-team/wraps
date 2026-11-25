@@ -22,7 +22,7 @@ const AXES: Axis[] = [
     byoc: "You do. SES, queues, and event storage sit in your AWS account under your own IAM.",
   },
   {
-    axis: "Whose reputation you send on",
+    axis: "Whose sending account you send from",
     managed:
       "Theirs, usually a shared IP pool. A noisy neighbor is your problem too.",
     byoc: "Yours. Your SES account, your domain, your complaint rate — good and bad.",

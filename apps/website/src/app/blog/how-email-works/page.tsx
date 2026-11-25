@@ -616,7 +616,7 @@ export default function Page() {
                 <p className="mx-auto max-w-xl text-muted-foreground">
                   Wraps deploys production-ready email infrastructure — DKIM,
                   SPF, DMARC, bounce handling, and sending — to your AWS
-                  account. One command. You own everything.
+                  account. One command. The sending setup is yours.
                 </p>
 
                 <div className="overflow-hidden rounded-xl border bg-muted/50">

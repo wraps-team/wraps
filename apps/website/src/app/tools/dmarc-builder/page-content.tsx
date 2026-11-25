@@ -72,7 +72,7 @@ function CopyBox({ text, label }: { text: string; label: string }) {
   return (
     <div className="rounded-lg border border-border bg-muted/40">
       <div className="flex items-center justify-between gap-3 border-border border-b px-4 py-2">
-        <span className="font-mono text-2xs text-muted-foreground uppercase tracking-eyebrow">
+        <span className="font-sans font-semibold text-2xs text-muted-foreground uppercase tracking-eyebrow">
           {label}
         </span>
         <Button
@@ -134,7 +134,7 @@ export default function DmarcBuilderPageContent() {
   const notes = result.warnings.filter((w) => w.severity === "info");
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+    <div className="grid grid-cols-[minmax(0,1fr)] wrap-anywhere gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
       <Card className="border-border bg-card">
         <CardHeader>
           <CardTitle className="font-heading text-lg tracking-tight">

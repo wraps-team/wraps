@@ -1819,7 +1819,7 @@ export default function CLIReferenceEmailPageContent() {
           <CardContent>
             <ul className="list-disc space-y-2 pl-5 text-muted-foreground text-sm">
               <li>
-                Starter → Production: Adds real-time event tracking and 90-day
+                Starter → Production: Adds fast event processing and 90-day
                 history
               </li>
               <li>

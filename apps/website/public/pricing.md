@@ -121,11 +121,11 @@ Every plan includes: the CLI, the TypeScript SDKs (`@wraps.dev/email`, `@wraps.d
 
 The infrastructure is deployed into your AWS account with Pulumi and namespaced `wraps-email-*`, `wraps-sms-*`, `wraps-cdn-*`. Nothing pre-existing is modified. Your sending identities, event history, and suppression lists live in your account. If you stop paying Wraps, the infrastructure keeps sending — you lose the dashboard, workflows, and platform tooling, not your ability to send email. `wraps email destroy` removes exactly what was deployed.
 
-Wraps is open source (AGPL-3.0). Self-hosting the control plane is available on Enterprise.
+Open source under AGPLv3, except the enterprise (ee) directories, which are under a commercial license. The SDKs are MIT.
 
 ## Enterprise
 
-Custom data retention, self-hosted control plane, SSO/SCIM, dedicated support, and SLAs. Contact https://wraps.dev/contact.
+Custom data retention, SSO/SCIM, dedicated support, and SLAs. Contact https://wraps.dev/contact.
 
 ## Links
 

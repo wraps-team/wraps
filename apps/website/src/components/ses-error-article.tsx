@@ -1,6 +1,7 @@
 import { Badge } from "@wraps/ui/components/ui/badge";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { FlowBox } from "@/app/landing/components/flow-primitives";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
@@ -182,16 +183,15 @@ export function SesErrorArticle({ error }: { error: SesError }) {
             </div>
           </section>
 
-          <section
-            aria-labelledby="wraps"
-            className="mt-12 rounded-lg border bg-muted/40 p-6"
-          >
-            <h2 className="mb-3 font-bold text-xl tracking-tight" id="wraps">
-              What Wraps does about this
-            </h2>
-            <p className="text-muted-foreground leading-relaxed">
-              {error.wrapsNote}
-            </p>
+          <section aria-labelledby="wraps" className="mt-12">
+            <FlowBox dashed label="Wraps">
+              <h2 className="mb-3 font-bold text-xl tracking-tight" id="wraps">
+                What Wraps does about this
+              </h2>
+              <p className="text-muted-foreground leading-relaxed">
+                {error.wrapsNote}
+              </p>
+            </FlowBox>
           </section>
 
           <nav aria-label="Related" className="mt-12 border-t pt-8">

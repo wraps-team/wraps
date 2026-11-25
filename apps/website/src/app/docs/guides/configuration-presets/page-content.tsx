@@ -111,8 +111,8 @@ export default function ConfigurationPresetsPageContent() {
           full-featured stack for high-volume senders.
         </p>
         <p className="text-muted-foreground">
-          All presets deploy to your AWS account. You own the infrastructure and
-          pay AWS directly at transparent pricing.
+          All presets deploy to your AWS account. You own the sending
+          infrastructure and pay AWS directly at its published rates.
         </p>
       </section>
 
@@ -164,7 +164,7 @@ export default function ConfigurationPresetsPageContent() {
               </tr>
               <tr className="border-b">
                 <td className="py-3 pr-4 font-medium text-foreground">
-                  Real-time Event Tracking
+                  Fast Event Processing
                 </td>
                 <td className="py-3 px-4 text-center text-muted-foreground">
                   &mdash;
@@ -297,7 +297,7 @@ export default function ConfigurationPresetsPageContent() {
         </Badge>
         <p className="mb-4 text-muted-foreground">
           Recommended for most applications. Includes everything in Starter plus
-          a full event processing pipeline with real-time tracking, email
+          a full event processing pipeline with fast event processing, email
           history storage, and reputation metrics.
         </p>
         <Card className="mb-4">
@@ -319,7 +319,7 @@ export default function ConfigurationPresetsPageContent() {
               <li className="flex items-start gap-3">
                 <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
                 <span className="text-muted-foreground">
-                  Real-time event tracking
+                  Fast event processing
                 </span>
               </li>
               <li className="flex items-start gap-3">
@@ -412,7 +412,7 @@ export default function ConfigurationPresetsPageContent() {
         <h2 className="mb-4 font-bold text-2xl">Cost by Volume</h2>
         <p className="mb-4 text-muted-foreground">
           Estimated monthly costs including AWS email sending charges ($0.10 per
-          1,000 emails) and infrastructure costs.
+          1,000 emails on à la carte) and infrastructure costs.
         </p>
         <div className="overflow-x-auto mb-4">
           <table className="w-full text-sm">
@@ -461,8 +461,9 @@ export default function ConfigurationPresetsPageContent() {
           </table>
         </div>
         <p className="text-muted-foreground text-sm">
-          Costs are AWS charges only. Email sending is $0.10 per 1,000 emails.
-          Infrastructure costs vary by preset and usage patterns.
+          Costs are AWS charges only. Email sending is $0.10 per 1,000 emails on
+          à la carte ($0.16 on Essentials). Infrastructure costs vary by preset
+          and usage patterns.
         </p>
       </section>
 

@@ -49,7 +49,7 @@ export function ApproachesTeaserSection() {
         </ul>
 
         <p className="mt-9 max-w-[62ch] text-[15px] text-muted-foreground leading-[1.6]">
-          Open source, your own AWS account, your own reputation — that row is
+          Open source, your own AWS account, your own domain — that row is
           getting crowded, and it should. The thing that still separates the
           wrappers is whether anything watches the account once you are sending.
         </p>

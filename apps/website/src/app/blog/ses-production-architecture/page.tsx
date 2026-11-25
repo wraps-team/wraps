@@ -800,8 +800,9 @@ resource "aws_cloudwatch_metric_alarm" "ses_complaint_rate" {
                   storage. All wired together and ready to send.
                 </p>
                 <p className="text-muted-foreground mb-6 max-w-lg mx-auto text-sm">
-                  You own everything—no vendor lock-in. Pay only AWS pricing
-                  (~$0.10 per 1,000 emails). Don't like it?{" "}
+                  No Wraps lock-in: the sending setup lives in your AWS account.
+                  Pay only AWS pricing (~$0.10 per 1,000 emails on à la carte).
+                  Don't like it?{" "}
                   <code className="text-primary">wraps email destroy</code>{" "}
                   removes everything cleanly.
                 </p>

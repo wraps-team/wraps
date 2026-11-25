@@ -792,14 +792,15 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
   },
   {
     route: "/platform",
-    primaryQuery: "hosted email platform on your aws",
+    primaryQuery: "email platform for amazon ses",
     secondaryQueries: [
-      "email templates broadcasts workflows dashboard",
-      "premium layer on top of ses",
+      "ai email template builder for ses",
+      "newsletters and automations on amazon ses",
+      "ses dashboard for marketers",
     ],
     audience: "evaluating-wraps",
     rationale:
-      'Its own metadata frames the platform explicitly as "the premium layer on top of your AWS infrastructure," which is the specific positioning distinguishing it from both the free CLI and the raw-SES comparison pages.',
+      "Its title names Amazon SES and the page leads with templates written with AI, newsletters and automations in one dashboard, which separates it from the free CLI and the raw-SES comparison pages.",
   },
   {
     route: "/sdk",
@@ -856,6 +857,18 @@ export const SEARCH_INTENT: readonly SearchIntentEntry[] = [
     audience: "evaluating-wraps",
     rationale:
       "Targets the person accountable for the send rather than the marketer composing it — preflight checks, consent as a record, and end-to-end message tracing are operator concerns distinct from /for/marketing's campaign-authoring framing.",
+  },
+
+  {
+    route: "/for/founders",
+    primaryQuery: "email platform for startups on aws",
+    secondaryQueries: [
+      "email marketing without per contact pricing",
+      "cheaper alternative to klaviyo for a small company",
+    ],
+    audience: "evaluating-wraps",
+    rationale:
+      "Speaks to the founder paying a per-contact bill: a flat Wraps fee, unlimited contacts on every plan, and what the Amazon side costs all in, from pricing.md's worked examples. Distinct from /for/marketing, which is about authoring the campaign, and from the compare pages, which are about leaving one named product.",
   },
 
   // --- Amazon SES ---

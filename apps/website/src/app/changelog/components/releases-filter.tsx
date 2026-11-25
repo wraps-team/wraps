@@ -21,7 +21,7 @@ type ReleasesFilterProps = {
 };
 
 const chipClass =
-  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-3xs uppercase tracking-eyebrow transition-colors focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2";
+  "inline-flex items-center gap-1.5 rounded-none border px-3 py-1 font-mono text-3xs uppercase tracking-eyebrow transition-colors focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2";
 const chipIdle =
   "border-border text-muted-foreground hover:border-brand/40 hover:text-foreground";
 const chipActive = "border-brand/40 bg-brand/10 text-brand-text";

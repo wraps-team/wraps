@@ -27,7 +27,7 @@ const dataPlaneItems: {
   {
     icon: AwsEventbridgeIcon,
     label: "EventBridge",
-    text: "Real-time event capture",
+    text: "Fast event capture",
   },
   {
     icon: AwsSqsIcon,

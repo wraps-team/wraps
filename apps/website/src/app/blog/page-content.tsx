@@ -388,7 +388,7 @@ const posts: BlogPost[] = [
   },
 ];
 
-const META_RULE = "font-mono text-2xs uppercase tracking-widest";
+const META_RULE = "font-sans font-semibold text-2xs uppercase tracking-widest";
 
 const TRAILING_READ = /\s*read$/;
 
@@ -418,7 +418,7 @@ function PostArt({ post }: { post: BlogPost }) {
   return (
     <div className="flex size-full flex-col justify-between bg-muted/40 p-6">
       <div>
-        <span className="font-mono text-xl text-foreground uppercase leading-none tracking-widest md:text-2xl">
+        <span className="font-sans font-semibold text-xl text-foreground uppercase leading-none tracking-widest md:text-2xl">
           {post.category}
         </span>
         <span aria-hidden="true" className="mt-4 block h-px w-10 bg-brand" />

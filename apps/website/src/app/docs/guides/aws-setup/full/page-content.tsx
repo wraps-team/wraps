@@ -96,21 +96,24 @@ export default function FullGuidePageContent() {
           <li className="flex items-start gap-2">
             <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
             <span>
-              <strong className="text-foreground">You own everything</strong> —
-              Infrastructure runs in your account
+              <strong className="text-foreground">
+                Sending runs in your account
+              </strong>{" "}
+              — The sending setup is yours
             </span>
           </li>
           <li className="flex items-start gap-2">
             <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
             <span>
               <strong className="text-foreground">Transparent pricing</strong> —
-              Pay AWS directly at $0.10/1,000 emails
+              Pay AWS directly at $0.10/1,000 emails on à la carte ($0.16 on
+              Essentials)
             </span>
           </li>
           <li className="flex items-start gap-2">
             <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
             <span>
-              <strong className="text-foreground">No vendor lock-in</strong> —
+              <strong className="text-foreground">No Wraps lock-in</strong> —
               Infrastructure stays even if you stop using Wraps
             </span>
           </li>

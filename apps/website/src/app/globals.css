@@ -16,6 +16,11 @@
   --color-terminal-foreground: var(--terminal-foreground);
   --color-terminal-muted: var(--terminal-muted);
   --color-terminal-border: var(--terminal-border);
+  /* The marketing site has no rounded corners. The shared theme leaves 2xl-4xl
+     rounded for the dashboard's outer cards; zero them here, never there. */
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-4xl: 0;
 }
 
 /* The terminal is dark in both themes. --terminal-muted carries prompt and
@@ -269,28 +274,6 @@ html {
   .hero-toast {
     animation: none;
   }
-}
-
-/* Homepage hero pixel grid. The tile must match PITCH/DOT in hero-dot-field.tsx.
-   The mask thins the grid behind the headline and fades it out toward the
-   bottom, so the panel stays the focal point. */
-.hero-dots {
-  background-color: var(--color-muted-foreground);
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect width='2' height='2'/%3E%3C/svg%3E");
-  mask-size: 16px 16px;
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect width='2' height='2'/%3E%3C/svg%3E");
-  -webkit-mask-size: 16px 16px;
-}
-
-.hero-dots-mask {
-  mask-image:
-    radial-gradient(ellipse 55% 42% at 50% 30%, rgb(0 0 0 / 0.3), black 90%),
-    linear-gradient(to bottom, black 55%, transparent 100%);
-  mask-composite: intersect;
-  -webkit-mask-image:
-    radial-gradient(ellipse 55% 42% at 50% 30%, rgb(0 0 0 / 0.3), black 90%),
-    linear-gradient(to bottom, black 55%, transparent 100%);
-  -webkit-mask-composite: source-in;
 }
 
 /* The pulse is the one thing allowed to reach the bottom of the hero; it only

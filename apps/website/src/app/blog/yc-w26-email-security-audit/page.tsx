@@ -292,7 +292,7 @@ export default function Page() {
               className="group flex items-start gap-4 rounded-lg border p-5 transition-colors hover:bg-muted/30"
               href="/blog/your-dmarc-policy-is-useless"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-none bg-primary/10 text-primary">
                 <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-0.5" />
               </div>
               <div>

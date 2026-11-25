@@ -428,7 +428,7 @@ const chooseWrapsReasons = [
   "You want CloudWatch alarms at 2% and 4% bounce sitting in your own account — the Production and Enterprise presets deploy them, Starter does not",
   "You want per-message event history you can query without designing a schema for it",
   "You would rather your team's next stretch of work go to product than to email plumbing",
-  "You still want to own everything: it all deploys into your AWS account and can be torn down",
+  "You want the sending setup to stay yours: it all deploys into your AWS account and can be torn down",
 ];
 
 export default function SesBounceHandlingHandRolledVsWrapsPage() {

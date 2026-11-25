@@ -3,6 +3,7 @@ import { Card } from "@wraps/ui/components/ui/card";
 import { ArrowRight, Check, X } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ClosingPanel } from "@/app/landing/components/closing-panel";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
@@ -409,7 +410,7 @@ export default function MigrateFromMailgunPage() {
             <ol className="grid gap-7">
               {steps.map((step, index) => (
                 <li className="flex gap-4" key={step.title}>
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted font-mono font-semibold text-foreground text-xs">
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted font-sans font-semibold text-foreground text-xs">
                     {index + 1}
                   </span>
                   <div>
@@ -569,30 +570,27 @@ export default function MigrateFromMailgunPage() {
               ))}
             </div>
           </section>
-
-          <section className="rounded-xl border border-border bg-muted/30 p-8">
-            <h2 className="mb-3 font-heading font-semibold text-2xl tracking-tight">
-              Pick the Region, then start the clock
-            </h2>
-            <p className="mb-6 max-w-2xl text-muted-foreground">
-              The Region choice is hard to reverse and the AWS approval is a
-              queue. Do both this week and the rest is code you can schedule.
-            </p>
+        </div>
+        <ClosingPanel
+          actions={
             <div className="flex flex-wrap gap-3">
-              <Button asChild className="cursor-pointer">
+              <Button asChild size="lg" variant="brand">
                 <Link href="/docs/quickstart/email">
                   Deploy SES with one command
                   <ArrowRight aria-hidden="true" className="ml-1.5 size-4" />
                 </Link>
               </Button>
-              <Button asChild className="cursor-pointer" variant="outline">
+              <Button asChild size="lg" variant="outline">
                 <Link href="/alternatives/mailgun">
                   Other Mailgun alternatives
                 </Link>
               </Button>
             </div>
-          </section>
-        </div>
+          }
+          body="The Region choice is hard to reverse and the AWS approval is a queue. Do both this week and the rest is code you can schedule."
+          kicker="Next step"
+          title="Pick the Region, then start the clock"
+        />
       </main>
 
       <LandingFooter />

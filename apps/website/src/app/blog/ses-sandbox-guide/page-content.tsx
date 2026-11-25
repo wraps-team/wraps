@@ -829,9 +829,9 @@ const ProgressHeader = ({
 }) => (
   <div className="sticky top-16 z-40 border-b bg-background/95 py-3 backdrop-blur-sm">
     <div className="container mx-auto flex items-center gap-4 px-4">
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+      <div className="h-2 flex-1 overflow-hidden rounded-none bg-muted">
         <div
-          className="h-full w-(--progress) rounded-full bg-gradient-to-r from-primary/80 via-primary to-primary/80 transition-all duration-500"
+          className="h-full w-(--progress) rounded-none bg-gradient-to-r from-primary/80 via-primary to-primary/80 transition-all duration-500"
           style={{ "--progress": `${progress}%` } as React.CSSProperties}
         />
       </div>
@@ -1053,7 +1053,7 @@ export default function SandboxGuideContent() {
         <section className="rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 via-background to-background p-6 md:p-8">
           <div className="flex flex-col items-start gap-6 md:flex-row md:items-center">
             <div className="flex-1">
-              <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 font-mono text-primary text-xs uppercase tracking-wider">
+              <div className="mb-2 inline-flex items-center gap-2 rounded-none border border-primary/30 bg-primary/10 px-3 py-1 font-mono text-primary text-xs uppercase tracking-wider">
                 <Zap className="h-3 w-3" /> One command
               </div>
               <h3 className="mb-2 font-bold text-xl md:text-2xl">
@@ -1062,7 +1062,8 @@ export default function SandboxGuideContent() {
               <p className="text-muted-foreground">
                 Wraps deploys production-ready SES (DKIM, SPF, DMARC, bounce
                 handling, SNS, suppression) to your AWS account in minutes.
-                Still your AWS, still $0.10/1K — just no boilerplate.
+                Still your AWS, still $0.10/1K on à la carte — just no
+                boilerplate.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row md:flex-col lg:flex-row">
@@ -1278,11 +1279,11 @@ export default function SandboxGuideContent() {
 
             <Collapsible title="Should I use SES or a third-party provider?">
               <p className="text-muted-foreground text-sm">
-                SES is significantly cheaper at scale ($0.10/1000 emails) but
-                requires more setup and management. If you want hands-off
-                deliverability with dedicated IPs and better support, consider
-                SendGrid, Postmark, or Mailgun. If you're comfortable with AWS
-                and want to minimize costs, SES is excellent.
+                SES is significantly cheaper at scale ($0.10/1000 emails on à la
+                carte) but requires more setup and management. If you want
+                hands-off deliverability with dedicated IPs and better support,
+                consider SendGrid, Postmark, or Mailgun. If you're comfortable
+                with AWS and want to minimize costs, SES is excellent.
               </p>
             </Collapsible>
           </div>

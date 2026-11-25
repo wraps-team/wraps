@@ -248,7 +248,7 @@ export function ArchitectureDiagram() {
     "Email sent through SES triggers delivery events",
     "EventBridge captures and routes SES events",
     "SQS buffers events for reliable processing",
-    "Lambda processes events in real-time",
+    "Lambda processes events as they arrive",
     "DynamoDB stores your complete email history",
   ];
 
@@ -405,7 +405,7 @@ export function ComparisonTable() {
                 <div className="flex items-center gap-2">
                   <span className="text-success text-sm">{row.wraps}</span>
                   {hoveredRow === index && (
-                    <span className="animate-fade-in rounded-full bg-success/10 dark:bg-success/20 px-2 py-0.5 text-success text-xs">
+                    <span className="animate-fade-in rounded-none bg-success/10 dark:bg-success/20 px-2 py-0.5 text-success text-xs">
                       {row.savings} less work
                     </span>
                   )}
@@ -441,10 +441,10 @@ export function PresetCards() {
       cost: "~$2-5",
       description: "Most production apps",
       features: [
-        "Real-time event tracking",
+        "Event tracking",
         "90-day email history",
         "All event types",
-        "Reputation metrics",
+        "Bounce and complaint metrics",
       ],
     },
     {

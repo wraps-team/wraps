@@ -47,7 +47,7 @@ const faqSchema = {
       name: "Should I use AWS SES or a third-party email provider?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "SES is significantly cheaper at scale ($0.10/1000 emails) but requires more setup and management. If you want hands-off deliverability with dedicated IPs and better support, consider SendGrid, Postmark, or Mailgun. If you're comfortable with AWS and want to minimize costs, SES is excellent.",
+        text: "SES is significantly cheaper at scale ($0.10/1000 emails on à la carte) but requires more setup and management. If you want hands-off deliverability with dedicated IPs and better support, consider SendGrid, Postmark, or Mailgun. If you're comfortable with AWS and want to minimize costs, SES is excellent.",
       },
     },
   ],

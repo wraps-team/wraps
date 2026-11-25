@@ -1,27 +1,49 @@
 "use client";
 
-import { BotIcon, CheckIcon, ChevronDownIcon, CopyIcon } from "lucide-react";
-import { useState } from "react";
+import {
+  AGENT_SKILLS_INSTALL,
+  agentDeepLinks,
+} from "@wraps/ui/lib/agent-setup";
+import {
+  BotIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  CopyIcon,
+  ExternalLinkIcon,
+} from "lucide-react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 
-const SKILLS_INSTALL = "npx add-skill wraps-team/skills";
+export type AgentDeepLinkTarget = "claude_app" | "claude_code" | "cursor";
 
 type AgentPromptOptionProps = {
   prompt: string;
   onCopyPrompt?: () => void;
+  onDeepLinkClick?: (target: AgentDeepLinkTarget) => void;
 };
 
 export function AgentPromptOption({
   prompt,
   onCopyPrompt,
+  onDeepLinkClick,
 }: AgentPromptOptionProps) {
   const [copied, setCopied] = useState<"prompt" | "skills" | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const links = useMemo(() => agentDeepLinks(prompt), [prompt]);
+  const targets: {
+    target: AgentDeepLinkTarget;
+    label: string;
+    href: string;
+  }[] = [
+    { target: "claude_app", label: "Claude app", href: links.claudeApp },
+    { target: "claude_code", label: "Claude Code", href: links.claudeCode },
+    { target: "cursor", label: "Cursor", href: links.cursor },
+  ];
 
   const handleCopy = async (type: "prompt" | "skills") => {
     try {
       await navigator.clipboard.writeText(
-        type === "prompt" ? prompt : SKILLS_INSTALL
+        type === "prompt" ? prompt : AGENT_SKILLS_INSTALL
       );
       setCopied(type);
       if (type === "prompt") {
@@ -47,18 +69,6 @@ export function AgentPromptOption({
         </div>
         <div className="flex items-center gap-2">
           <Button
-            className="gap-2"
-            onClick={() => handleCopy("prompt")}
-            size="sm"
-          >
-            {copied === "prompt" ? (
-              <CheckIcon className="h-4 w-4" />
-            ) : (
-              <CopyIcon className="h-4 w-4" />
-            )}
-            {copied === "prompt" ? "Copied" : "Copy prompt"}
-          </Button>
-          <Button
             aria-expanded={expanded}
             className="gap-1"
             onClick={() => setExpanded((v) => !v)}
@@ -66,7 +76,7 @@ export function AgentPromptOption({
             variant="outline"
           >
             <ChevronDownIcon
-              className={`h-3.5 w-3.5 transition-transform ${expanded ? "rotate-180" : ""}`}
+              className={`h-3.5 w-3.5 transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`}
             />
             <span className="hidden sm:inline">
               {expanded ? "Hide" : "View"}
@@ -74,6 +84,33 @@ export function AgentPromptOption({
           </Button>
         </div>
       </div>
+
+      <div className="flex flex-wrap items-center gap-2 px-4 pb-3">
+        {targets.map(({ target, label, href }) => (
+          <Button asChild key={target} size="sm" variant="outline">
+            <a href={href} onClick={() => onDeepLinkClick?.(target)}>
+              <ExternalLinkIcon aria-hidden="true" className="h-3.5 w-3.5" />
+              Open in {label}
+            </a>
+          </Button>
+        ))}
+        <Button
+          className="gap-2"
+          onClick={() => handleCopy("prompt")}
+          size="sm"
+        >
+          {copied === "prompt" ? (
+            <CheckIcon className="h-4 w-4" />
+          ) : (
+            <CopyIcon className="h-4 w-4" />
+          )}
+          {copied === "prompt" ? "Copied" : "Copy prompt"}
+        </Button>
+      </div>
+      <p className="px-4 pb-4 text-muted-foreground text-xs">
+        Nothing opened? Claude Code links work after you&apos;ve used Claude
+        Code once on this computer. Copy the prompt instead.
+      </p>
 
       {expanded && (
         <pre className="overflow-x-auto whitespace-pre-wrap break-words border-t bg-muted/50 px-4 py-4 font-mono text-[13px] text-foreground leading-relaxed">
@@ -90,7 +127,7 @@ export function AgentPromptOption({
           onClick={() => handleCopy("skills")}
           type="button"
         >
-          {SKILLS_INSTALL}
+          {AGENT_SKILLS_INSTALL}
           {copied === "skills" ? (
             <CheckIcon className="h-3 w-3 text-primary" />
           ) : (

@@ -87,7 +87,7 @@ export function SectionWrapper({
     orange: "border-brand/30 bg-brand/10 text-brand-text",
   };
 
-  const badgeClass = `mb-4 inline-block rounded-full border px-3 py-1 font-medium text-xs transition-colors ${
+  const badgeClass = `mb-4 inline-block rounded-none border px-3 py-1 font-medium text-xs transition-colors ${
     premium ? badgeColorClasses.orange : badgeColorClasses[badgeColor]
   } ${badgeLink ? "hover:opacity-80" : ""}`;
 
@@ -143,7 +143,7 @@ export function IconBox({
 
   return (
     <div
-      className={`flex aspect-square items-center justify-center rounded-full border-2 bg-background transition-all ${sizeClasses[size]} ${
+      className={`flex aspect-square items-center justify-center rounded-none border-2 bg-background transition-all ${sizeClasses[size]} ${
         highlighted
           ? "border-brand bg-brand/5 text-brand-text"
           : "border-border text-muted-foreground"
@@ -191,10 +191,10 @@ type TabBarProps = {
 export function TabBar({ tabs, activeTab, onTabChange }: TabBarProps) {
   return (
     <div className="flex justify-center">
-      <div className="inline-flex rounded-full border bg-background p-1">
+      <div className="inline-flex rounded-none border bg-background p-1">
         {tabs.map((tab) => (
           <button
-            className={`rounded-full px-5 py-2 font-medium text-sm transition-all ${
+            className={`rounded-none px-5 py-2 font-medium text-sm transition-all ${
               activeTab === tab.key
                 ? "bg-foreground text-background"
                 : "text-muted-foreground hover:text-foreground"

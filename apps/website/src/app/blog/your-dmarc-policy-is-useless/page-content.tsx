@@ -553,7 +553,7 @@ export const BreachTimeline = () => {
               {/* Timeline node */}
               <div className="relative z-10 shrink-0">
                 <div
-                  className={`flex h-10 w-10 items-center justify-center rounded-full ${colors.bg} shadow-lg ring-4 ring-background`}
+                  className={`flex h-10 w-10 items-center justify-center rounded-none ${colors.bg} shadow-lg ring-4 ring-background`}
                 >
                   <breach.icon className="h-5 w-5" />
                 </div>
@@ -582,7 +582,7 @@ export const BreachTimeline = () => {
                           {breach.company}
                         </span>
                         <span
-                          className={`rounded-full px-2.5 py-0.5 font-mono text-sm ${colors.bgLight} ${colors.text}`}
+                          className={`rounded-none px-2.5 py-0.5 font-mono text-sm ${colors.bgLight} ${colors.text}`}
                         >
                           {breach.loss}
                         </span>
@@ -941,7 +941,7 @@ export const DomainChecker = () => {
                   <span className="w-14 text-muted-foreground text-xs">
                     {label}
                   </span>
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                  <div className="h-2 flex-1 overflow-hidden rounded-none bg-muted">
                     <div
                       className={`h-full w-(--score) transition-all ${
                         data.score === data.max

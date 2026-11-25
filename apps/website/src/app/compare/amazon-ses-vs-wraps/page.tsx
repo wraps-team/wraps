@@ -16,6 +16,7 @@ import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
 import { JsonLd } from "@/components/json-ld";
+import { LICENSE_STATEMENT } from "@/config/license";
 import { pageMetadata } from "@/lib/page-metadata";
 
 const PAGE_DESCRIPTION =
@@ -92,7 +93,7 @@ const tldrComparison = [
   {
     dimension: "Source",
     ses: "AWS service",
-    wraps: "AGPL-3.0, self-hostable",
+    wraps: LICENSE_STATEMENT,
   },
 ];
 
@@ -120,29 +121,29 @@ const pricingComparison = [
     volume: "10K/mo",
     sesRaw: "$1.00",
     wrapsTier: "Free",
-    wrapsCost: "$1.00",
-    wrapsBreakdown: "$0 plan + $1 SES",
+    wrapsCost: "$1.18",
+    wrapsBreakdown: "$0 plan + $1.00 SES + $0.18 pipeline",
   },
   {
     volume: "50K/mo",
     sesRaw: "$5.00",
     wrapsTier: "Pro",
-    wrapsCost: "$34.00",
-    wrapsBreakdown: "$29 plan + $5 SES",
+    wrapsCost: "$35.00",
+    wrapsBreakdown: "$29 plan + $5.00 SES + $1.00 pipeline",
   },
   {
     volume: "100K/mo",
     sesRaw: "$10.00",
     wrapsTier: "Pro",
-    wrapsCost: "$39.00",
-    wrapsBreakdown: "$29 plan + $10 SES",
+    wrapsCost: "$41.50",
+    wrapsBreakdown: "$29 plan + $10.00 SES + $2.50 pipeline",
   },
   {
     volume: "500K/mo",
     sesRaw: "$50.00",
     wrapsTier: "Pro",
-    wrapsCost: "$79.00",
-    wrapsBreakdown: "$29 plan + $50 SES",
+    wrapsCost: "$94.10",
+    wrapsBreakdown: "$29 plan + $50.00 SES + $15.10 pipeline",
   },
 ];
 
@@ -320,7 +321,7 @@ const featureComparison: {
         ses: "no",
         sesNote: "AWS service",
         wraps: "yes",
-        wrapsNote: "AGPL-3.0; SDKs MIT; self-hostable",
+        wrapsNote: LICENSE_STATEMENT,
       },
       {
         name: "Team access",
@@ -330,7 +331,7 @@ const featureComparison: {
         wrapsNote: "Organizations with roles; SSO and SCIM on Business",
       },
       {
-        name: "No vendor lock-in",
+        name: "No Wraps lock-in",
         ses: "yes",
         wraps: "yes",
         wrapsNote: "Standard AWS resources; they keep running if you leave",
@@ -377,7 +378,7 @@ const chooseWrapsReasons = [
   "You want SES prices and SES ownership without hand-building the event pipeline that goes around it.",
   "You want bounce and complaint rates checked against AWS's lines every hour, with a name on the notification.",
   "You already run SES and want a dashboard, suppression UI, message search and deliverability checks on top of it, without touching DNS.",
-  "You want the tooling to be open source, with the option to self-host all of it.",
+  "You want tooling whose code you can read before it touches your account.",
   "Your team's time is better spent on the product than on plumbing every SES user builds the same way.",
 ];
 
@@ -405,8 +406,8 @@ export default function AmazonSesVsWrapsPage() {
             <p className="mb-3 max-w-2xl text-lg text-muted-foreground">
               <strong className="text-foreground">Amazon SES</strong> is the
               cheapest way to send email, and the only one where the account,
-              the domain reputation and the data stay yours. If you are willing
-              to hold an AWS account, it is the right call.
+              the sending account and the data stay yours. If you are willing to
+              hold an AWS account, it is the right call.
             </p>
             <p className="max-w-2xl text-lg text-muted-foreground">
               So this is not SES versus Wraps. It is raw SES versus{" "}
@@ -612,12 +613,10 @@ export default function AmazonSesVsWrapsPage() {
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <p>
-                  That is the product, and the name. The repository is AGPL-3.0
-                  with an enterprise kernel under a separate licence, and the
-                  SDKs are MIT. You can read it, fork it, or self-host the whole
-                  stack. Wraps reaches your account through an IAM role you
-                  create and can revoke, assumed for an hour at a time. No AWS
-                  access keys are stored anywhere.
+                  That is the product, and the name. {LICENSE_STATEMENT} You can
+                  read the code that sets up your account. Wraps reaches your
+                  account through an IAM role you create and can revoke, assumed
+                  for an hour at a time. No AWS access keys are stored anywhere.
                 </p>
                 <p className="text-muted-foreground">
                   The limit, stated plainly: sending and the per-event delivery
@@ -626,7 +625,7 @@ export default function AmazonSesVsWrapsPage() {
                   workflow state and a row per message — recipient, subject,
                   sender, template variables, delivery and open timestamps —
                   live in the Wraps database. If that split does not work for
-                  you, self-host it.
+                  you, plain SES with your own tooling is the better fit.
                 </p>
               </CardContent>
             </Card>
@@ -696,16 +695,16 @@ export default function AmazonSesVsWrapsPage() {
                 charged by AWS at $0.10 per 1,000 emails on à la carte pricing.
                 AWS defaults new accounts to the Essentials plan at $0.16 per
                 1,000, so add roughly 60% to that column if you are on it. The
-                supporting AWS services Wraps deploys — Lambda, DynamoDB, SQS,
-                EventBridge, CloudWatch — bill at normal AWS rates and stay
-                small at these volumes.
+                event pipeline Wraps deploys — EventBridge, SQS, Lambda,
+                DynamoDB — bills at normal AWS rates and is included in your
+                total.
               </p>
               <p>
                 <strong className="text-foreground">Wraps plans</strong> are
                 flat: Free ($0/mo), Pro ($29/mo), Business ($199/mo). They are
                 priced on AWS accounts, dashboard history and governance
                 features, never on send volume.{" "}
-                <a className="text-primary underline" href="/platform#pricing">
+                <a className="text-primary underline" href="/#pricing">
                   See what each plan includes
                 </a>
               </p>

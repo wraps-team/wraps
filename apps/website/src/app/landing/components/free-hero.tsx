@@ -8,7 +8,7 @@ export function FreeHero() {
   return (
     <div className="mx-auto max-w-2xl">
       <div className="group relative overflow-hidden rounded-2xl border-2 border-brand bg-background p-8 transition-shadow hover:shadow-lg hover:shadow-brand/10">
-        <span className="mb-4 inline-block rounded-full bg-brand/10 px-3 py-1 font-semibold text-brand-text text-xs">
+        <span className="mb-4 inline-block rounded-none bg-brand/10 px-3 py-1 font-semibold text-brand-text text-xs">
           Free Forever
         </span>
         <h3 className="mb-2 font-bold text-2xl tracking-tight">

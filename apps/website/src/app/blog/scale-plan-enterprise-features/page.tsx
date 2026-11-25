@@ -92,7 +92,7 @@ export default function Page() {
                 "1-year history",
               ].map((tag) => (
                 <span
-                  className="rounded-full border bg-muted/30 px-3 py-1 text-muted-foreground text-sm"
+                  className="rounded-none border bg-muted/30 px-3 py-1 text-muted-foreground text-sm"
                   key={tag}
                 >
                   {tag}

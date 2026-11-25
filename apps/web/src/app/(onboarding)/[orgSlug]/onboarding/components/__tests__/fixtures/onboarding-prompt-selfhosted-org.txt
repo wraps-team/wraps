@@ -1,0 +1,18 @@
+Deploy Wraps email infrastructure into my AWS account and connect it to my Wraps dashboard.
+
+1. Check my AWS credentials: aws sts get-caller-identity
+   If that fails, help me set up credentials before continuing — AWS SSO, access keys, environment variables, and AWS_PROFILE all work.
+2. Install the CLI: npm install -g @wraps.dev/cli
+   (or: curl -fsSL https://get.wraps.dev | sh)
+3. Sign in: wraps selfhost login
+   This is a device-code flow — it prints a code like XXXX-XXXX and tries to open a browser. Show me the code and wait for me to confirm I approved it before moving on.
+4. Deploy the infrastructure: wraps email init
+   It prompts for an AWS region and a preset (starter / production / enterprise), then shows estimated monthly AWS cost. Show me those and let me choose — don't accept the deploy on my behalf.
+5. Connect the deployment to my dashboard: wraps selfhost connect
+   If it asks which organization to connect, choose "Acme Co".
+6. Confirm it worked: wraps email status --json
+   Report the region, the SES configuration set, and whether the account is still in the SES sandbox (sandbox means I can only send to verified addresses until AWS grants production access).
+
+When you're done, tell me — I'll click "I've finished — check connection" in the Wraps onboarding tab.
+
+Full Wraps docs (agent-readable): https://wraps.dev/llms-full.txt

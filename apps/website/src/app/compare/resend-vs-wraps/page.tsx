@@ -107,9 +107,9 @@ const pricingComparison = [
     resendCost: "$20",
     wrapsTier: "Free",
     wrapsPlatform: "$0",
-    awsSes: "$1",
-    wrapsTotal: "$1",
-    savings: "95%",
+    awsSes: "$1.18",
+    wrapsTotal: "$1.18",
+    savings: "94%",
   },
   {
     volume: "50K/mo",
@@ -117,8 +117,8 @@ const pricingComparison = [
     resendCost: "$20",
     wrapsTier: "Pro",
     wrapsPlatform: "$29",
-    awsSes: "$5",
-    wrapsTotal: "$34",
+    awsSes: "$6.00",
+    wrapsTotal: "$35.00",
     savings: null,
   },
   {
@@ -127,8 +127,8 @@ const pricingComparison = [
     resendCost: "$35-90",
     wrapsTier: "Pro",
     wrapsPlatform: "$29",
-    awsSes: "$10",
-    wrapsTotal: "$39",
+    awsSes: "$12.50",
+    wrapsTotal: "$41.50",
     savings: null,
   },
   {
@@ -137,9 +137,9 @@ const pricingComparison = [
     resendCost: "$350",
     wrapsTier: "Pro",
     wrapsPlatform: "$29",
-    awsSes: "$50",
-    wrapsTotal: "$79",
-    savings: "77%",
+    awsSes: "$65.10",
+    wrapsTotal: "$94.10",
+    savings: "73%",
   },
 ];
 
@@ -164,7 +164,7 @@ const featureComparison = [
         wraps: "One command into your AWS account",
       },
       {
-        name: "Whose sending account and reputation",
+        name: "Whose sending account",
         resend: "Resend's",
         wraps: "Yours",
       },
@@ -240,7 +240,7 @@ const featureComparison = [
         wraps: true,
       },
       {
-        name: "Self-hosted / BYOC",
+        name: "Sends from your own AWS account (BYOC)",
         resend: false,
         wraps: true,
       },
@@ -295,9 +295,13 @@ const featureComparison = [
       {
         name: "SOC 2",
         resend: true,
-        wraps: "Not certified",
+        wraps: "No SOC 2 yet",
       },
-      { name: "HIPAA", resend: false, wraps: "Not offered" },
+      {
+        name: "HIPAA",
+        resend: false,
+        wraps: "We don't have SOC 2 or HIPAA certification yet",
+      },
       {
         name: "Cancel impact",
         resend: "Data deleted",
@@ -620,8 +624,8 @@ export default function ResendVsWrapsPage() {
               own account, on a sending reputation shared across their senders
               unless you buy a dedicated IP. On Wraps it happens on yours, on an
               account only you send from. The alarms are CloudWatch resources in
-              your account, so they go on watching your reputation whether or
-              not you keep paying us.
+              your account, so they go on watching your bounce and complaint
+              rates whether or not you keep paying us.
             </p>
           </section>
 
@@ -690,8 +694,7 @@ export default function ResendVsWrapsPage() {
                     </li>
                     <li className="flex items-start gap-2">
                       <Check className="mt-0.5 size-4 shrink-0 text-success" />
-                      The account, the domain identities and the reputation are
-                      yours
+                      The account and the domain identities are yours
                     </li>
                     <li className="flex items-start gap-2">
                       <Check className="mt-0.5 size-4 shrink-0 text-success" />
@@ -725,7 +728,9 @@ export default function ResendVsWrapsPage() {
               Resend bundles sending cost into their platform fee with $0.90/1K
               overage. Wraps charges a platform fee separately -- you pay AWS
               directly at $0.10/1K emails on à la carte (AWS defaults new
-              accounts to $0.16 — Wraps tells you which plan applies).
+              accounts to $0.16 — Wraps tells you which plan applies). The AWS
+              figures include the event pipeline (EventBridge, SQS, Lambda,
+              DynamoDB).
             </p>
             <Card className="overflow-hidden py-0">
               <div className="overflow-x-auto">
@@ -752,7 +757,7 @@ export default function ResendVsWrapsPage() {
                           <div className="font-medium">{row.wrapsTotal}/mo</div>
                           <div className="text-xs text-muted-foreground">
                             {row.wrapsTier} ({row.wrapsPlatform}) + {row.awsSes}{" "}
-                            SES
+                            AWS
                           </div>
                         </td>
                         <td className="hidden p-4 sm:table-cell">
@@ -784,13 +789,12 @@ export default function ResendVsWrapsPage() {
                 contacts billed separately ($40/mo for 5K contacts).
               </p>
               <p>
-                At 50K/mo the two are priced about the same, so price is not the
-                reason to move. What changes is who sets the account up, who
-                watches it, and where the events live: with Wraps they land in
-                your own DynamoDB at the retention you choose, against
-                Resend&apos;s 30-day cap. (Wraps dashboard history runs 30 days
-                to 1 year depending on plan; the underlying events are always
-                yours.)
+                At 50K/mo Resend is the cheaper of the two. What changes is who
+                sets the account up, who watches it, and where the events live:
+                with Wraps they land in your own DynamoDB at the retention you
+                choose, against Resend&apos;s 30-day cap. (Wraps dashboard
+                history runs 30 days to 1 year depending on plan; the underlying
+                events are always yours.)
               </p>
             </div>
           </section>

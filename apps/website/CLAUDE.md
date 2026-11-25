@@ -157,6 +157,19 @@ type NavItem = {
 | `hooks/` | useTheme, useMobile, useSidebarConfig, useSharedInView |
 | `config/` | Theme tokens, customizer constants |
 
+## Copy, prices and shape
+
+- Claims: before writing or changing any page copy, metadata or JSON-LD, check it against the
+  `wraps-tone` skill's "Standing decisions" and the BANNED CLAIMS list it points to. When an
+  edit touches a block, fix any banned wording in that block too, not only the line you
+  changed.
+- Prices: never type a price or a cost figure. Read plan prices from `src/config/pricing.ts`,
+  competitor figures from `src/config/competitor-contact-pricing.ts`, and compute AWS costs
+  with `estimateCost` (`src/lib/ses-cost.ts`), including in JSON-LD, FAQ schema, llms.txt and
+  the markdown served to crawlers (`lib/agent-content.ts`).
+- Shape: the marketing site has square corners (`globals.css` zeroes `--radius-2xl` to
+  `--radius-4xl`). Use no `rounded-*` except on real dots. The dashboard keeps its radii.
+
 ## SEO Patterns
 
 ### Page Metadata

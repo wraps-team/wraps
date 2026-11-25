@@ -7,18 +7,14 @@ const read = (relativePath: string) =>
   readFileSync(resolve(webRoot, relativePath), "utf8");
 
 describe("Chunk 1 — Homepage", () => {
-  it("hero subcopy names the agent buyer while preserving ownership framing", () => {
+  it("hero subcopy says it runs on the visitor's own AWS account", () => {
     const source = read("src/app/landing/components/hero-section.tsx");
-    expect(source).toContain("your agent");
-    expect(source).toMatch(/your AWS\s+account/);
-    // The SES rate used to be asserted here too. It moved to the pricing
-    // section on 2026-09-14: price is the third value theme and the one that
-    // loses outright to the free open-source SES wrappers, so the hero leads
-    // on the operations layer instead. See ops/sops/positioning.md.
-    //
-    // This is not a loosening of the pricing guardrail — the property that
-    // matters, "no unqualified $0.10 claim on a tier-1 marketing surface", is
-    // enforced for this file and 26 others by ses-pricing-copy.test.ts.
+    expect(source).toMatch(/your\s+own\s+AWS\s+account/);
+    expect(source).toMatch(/Amazon&apos;s\s+own\s+rates/);
+    // The SES rate lives in the economics and pricing sections, where it names
+    // its plan. The property that matters, "no unqualified $0.10 claim on a
+    // tier-1 marketing surface", is enforced for this file and 26 others by
+    // ses-pricing-copy.test.ts.
     expect(source).not.toContain("$0.10");
   });
 
@@ -154,10 +150,10 @@ describe("MCP surfaces — /mcp page and docs reference", () => {
     expect(source).toContain("WRAPS_WRITE_ENABLED");
   });
 
-  it("landing navbar Products mega-menu includes an MCP Server entry linking to /mcp", () => {
-    const source = read("src/app/landing/components/navbar.tsx");
+  it("site navigation (Developers menu) includes an MCP server entry linking to /mcp", () => {
+    const source = read("src/config/site-nav.ts");
     expect(source).toMatch(
-      /name:\s*"MCP Server",\s*href:\s*"\/mcp",\s*description:/
+      /name:\s*"MCP server",\s*href:\s*"\/mcp",\s*description:/
     );
   });
 
@@ -201,10 +197,10 @@ describe("Chunk 5 — Agent-forward differentiation", () => {
 });
 
 describe("Chunk 6 — Internal discovery links to /agents", () => {
-  it("landing navbar Products mega-menu includes an Agents entry linking to /agents", () => {
-    const source = read("src/app/landing/components/navbar.tsx");
+  it("site navigation (Solutions menu) includes an AI agents entry linking to /agents", () => {
+    const source = read("src/config/site-nav.ts");
     expect(source).toMatch(
-      /name:\s*"Agents",\s*href:\s*"\/agents",\s*description:/
+      /name:\s*"AI agents",\s*href:\s*"\/agents",\s*description:/
     );
   });
 

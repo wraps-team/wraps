@@ -25,7 +25,7 @@ const breadcrumbSchema = {
 export const metadata: Metadata = pageMetadata({
   title: "Python Email SDK Reference",
   description:
-    "Complete API reference for the wraps-email Python SDK. Send emails, attachments, SES-stored templates, batch sends, and suppression management via AWS SES — your AWS account, no vendor lock-in.",
+    "Complete API reference for the wraps-email Python SDK. Send emails, attachments, SES-stored templates, batch sends, and suppression management via AWS SES — your AWS account, no Wraps lock-in.",
   path: "/docs/python-sdk-reference",
   social: {
     description:

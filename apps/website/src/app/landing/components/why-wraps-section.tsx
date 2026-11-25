@@ -45,7 +45,7 @@ export function WhyWrapsSection() {
                 I spent years at SendGrid watching companies pay hundreds a
                 month to send emails through infrastructure they didn&rsquo;t
                 own. When they change pricing or get acquired, your sending
-                history, reputation, and templates go with them.
+                history, domain setup, and templates go with them.
               </p>
 
               <p className="text-lg leading-relaxed text-muted-foreground md:text-xl">
@@ -85,7 +85,7 @@ export function WhyWrapsSection() {
           <div className="flex flex-col items-center">
             <Image
               alt="Jarod, founder of Wraps"
-              className="rounded-full"
+              className="rounded-none"
               height={140}
               src="/team/jarod-medium-smile.webp"
               width={140}

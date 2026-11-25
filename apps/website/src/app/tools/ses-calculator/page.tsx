@@ -249,7 +249,7 @@ export default function SESCalculatorPage() {
                             : formatUsd(plan.monthlyFee)}
                         </TableCell>
                         {SES_VOLUME_BANDS.map((band, index) => (
-                          <TableCell className="font-mono" key={band}>
+                          <TableCell className="tabular-nums" key={band}>
                             {formatRate(sesBandRate(SES_PLANS[id], index))}
                           </TableCell>
                         ))}
@@ -302,7 +302,7 @@ export default function SESCalculatorPage() {
                 <CardContent className="p-6 md:p-8">
                   <div className="flex flex-col items-start gap-6 md:flex-row md:items-center">
                     <div className="flex-1">
-                      <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 font-mono text-primary text-xs uppercase tracking-wider">
+                      <div className="mb-3 inline-flex items-center gap-2 rounded-none border border-primary/30 bg-primary/10 px-3 py-1 font-sans font-semibold text-primary text-xs uppercase tracking-wider">
                         One command
                       </div>
                       <h3 className="mb-2 font-bold text-2xl tracking-tight">
@@ -311,7 +311,7 @@ export default function SESCalculatorPage() {
                       <p className="text-muted-foreground">
                         Wraps provisions every service in your breakdown —
                         Lambda, SQS, DynamoDB, EventBridge — to your AWS
-                        account. Still AWS pricing, still your data, no
+                        account. Still AWS pricing, still your AWS account, no
                         boilerplate.
                       </p>
                     </div>
@@ -363,7 +363,7 @@ export default function SESCalculatorPage() {
                         {emails.toLocaleString("en-US")}
                       </TableCell>
                       {SES_PLAN_IDS.map((id) => (
-                        <TableCell className="font-mono" key={id}>
+                        <TableCell className="tabular-nums" key={id}>
                           {formatUsd(monthlyTotal(id, emails))}
                         </TableCell>
                       ))}

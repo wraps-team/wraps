@@ -103,17 +103,21 @@ export default function MigrationGuidePageContent() {
               <li className="flex items-start gap-3">
                 <Check className="mt-0.5 h-5 w-5 shrink-0 text-success" />
                 <div>
-                  <span className="font-medium">Own your infrastructure</span>
+                  <span className="font-medium">
+                    Sending runs in your AWS account
+                  </span>
                   <p className="text-muted-foreground text-sm">
-                    Email infrastructure deploys to your AWS account. No
-                    middleman, no vendor lock-in.
+                    Email sending infrastructure deploys to your AWS account. No
+                    middleman, no Wraps lock-in.
                   </p>
                 </div>
               </li>
               <li className="flex items-start gap-3">
                 <Check className="mt-0.5 h-5 w-5 shrink-0 text-success" />
                 <div>
-                  <span className="font-medium">$0.10 per 1,000 emails</span>
+                  <span className="font-medium">
+                    $0.10 per 1,000 emails (à la carte)
+                  </span>
                   <p className="text-muted-foreground text-sm">
                     Pay AWS directly at transparent pricing. No markup, no
                     surprise bills.
@@ -123,10 +127,11 @@ export default function MigrationGuidePageContent() {
               <li className="flex items-start gap-3">
                 <Check className="mt-0.5 h-5 w-5 shrink-0 text-success" />
                 <div>
-                  <span className="font-medium">No vendor lock-in</span>
+                  <span className="font-medium">No Wraps lock-in</span>
                   <p className="text-muted-foreground text-sm">
-                    Infrastructure stays in your account even if you stop using
-                    Wraps. Your data is always yours.
+                    Sending keeps running in your account even if you stop using
+                    Wraps. Contacts and templates are stored by Wraps and can be
+                    exported.
                   </p>
                 </div>
               </li>
@@ -396,7 +401,7 @@ export default function MigrationGuidePageContent() {
         <h2 className="mb-4 font-bold text-2xl">Cost Comparison</h2>
         <p className="mb-4 text-muted-foreground">
           Monthly cost by email volume. Wraps uses AWS SES pricing at $0.10 per
-          1,000 emails with no markup.
+          1,000 emails on à la carte ($0.16 on Essentials) with no markup.
         </p>
         <Card>
           <CardContent className="p-0">

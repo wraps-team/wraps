@@ -23,7 +23,7 @@ export function ByocHeroSection() {
 
           <p className="mb-8 max-w-xl text-lg text-muted-foreground">
             Wraps deploys email sending infrastructure into your AWS account
-            with one CLI command. Your SES, your reputation, your delivery data.
+            with one CLI command. Your SES, your domain, your delivery data.
             Self-serve, no Kubernetes, no sales call.
           </p>
 

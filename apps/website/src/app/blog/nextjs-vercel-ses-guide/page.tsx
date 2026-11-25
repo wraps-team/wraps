@@ -64,7 +64,7 @@ const faqSchema = {
       name: "How much does it cost to send emails with AWS SES vs Resend or SendGrid?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "AWS SES costs $0.10 per 1,000 emails. With Wraps, you pay AWS directly — about $7/month at 50K emails vs $50+ for Resend or SendGrid. At 100K emails, it's ~$12 vs $90+. No middleman markup.",
+        text: "AWS SES costs $0.10 per 1,000 emails on à la carte ($0.16 on the Essentials plan new accounts start on). With Wraps, you pay AWS directly — about $6 a month on à la carte or $9 on Essentials, all in, at 50K emails vs $50+ for Resend or SendGrid. At 100K emails, it's ~$12 vs $90+. No middleman markup.",
       },
     },
     {
@@ -125,7 +125,7 @@ type StepProps = {
 function Step({ number, title, children }: StepProps) {
   return (
     <div className="relative border-l-2 pb-12 pl-12 last:border-transparent last:pb-0 border-success">
-      <div className="absolute -left-5 flex h-10 w-10 items-center justify-center rounded-full font-bold text-lg bg-success text-success-foreground">
+      <div className="absolute -left-5 flex h-10 w-10 items-center justify-center rounded-none font-bold text-lg bg-success text-success-foreground">
         {number}
       </div>
       <div className="pt-1">
@@ -185,7 +185,7 @@ export default function Page() {
           <div className="relative mx-auto max-w-6xl px-6 pt-20 pb-16">
             {/* Badge */}
             <div className="mb-8 flex justify-center">
-              <div className="inline-flex items-center gap-2 rounded-full border border-success/20 bg-success/10 px-4 py-2 text-success text-sm">
+              <div className="inline-flex items-center gap-2 rounded-none border border-success/20 bg-success/10 px-4 py-2 text-success text-sm">
                 <Zap className="h-4 w-4" />
                 <span>Next.js + Vercel + AWS SES</span>
               </div>
@@ -205,7 +205,8 @@ export default function Page() {
               in minutes.
               <br />
               <span className="text-success">
-                No stored credentials. No access keys. You own everything.
+                No stored credentials. No access keys. Sending runs in your AWS
+                account.
               </span>
             </p>
 
@@ -365,14 +366,14 @@ export default function Page() {
                 title="Zero Stored Credentials"
               />
               <FeatureCard
-                description="Pay AWS directly for sending ($0.10/1K emails). No middleman markup. A startup sending 50K emails/month pays ~$5 to AWS."
+                description="Pay AWS directly for sending ($0.10/1K emails on à la carte). No middleman markup. A startup sending 50K emails/month pays ~$5 to AWS."
                 icon={DollarSign}
                 title="AWS Economics"
               />
               <FeatureCard
-                description="Infrastructure deploys to YOUR AWS account. Your domain, your data, your reputation. Leave anytime, keep everything."
+                description="Infrastructure deploys to YOUR AWS account. Your domain, your SES account. Sending keeps running if you leave Wraps."
                 icon={Database}
-                title="You Own Everything"
+                title="Sending Runs in Your Account"
               />
             </div>
           </div>
@@ -437,8 +438,7 @@ export default function Page() {
                         Choose a configuration preset
                       </strong>{" "}
                       &mdash; for most apps, <strong>Production</strong> is the
-                      sweet spot (real-time event tracking, 90-day email
-                      history).
+                      sweet spot (event tracking, 90-day email history).
                     </li>
                   </ul>
                   <p className="text-foreground/80 leading-relaxed">
@@ -791,8 +791,8 @@ await email.send({
               ))}
             </div>
             <p className="mt-4 text-center text-muted-foreground text-sm">
-              AWS costs only: SES sending ($0.10/1K emails) + infrastructure
-              (~$2-5/mo). Wraps free tier included.
+              AWS costs only: SES sending ($0.10/1K emails on à la carte) +
+              infrastructure (~$2-5/mo). Wraps free tier included.
             </p>
 
             <div className="mx-auto mt-10 max-w-3xl">
@@ -848,7 +848,7 @@ await email.send({
             <div className="mx-auto max-w-3xl">
               <ul className="mb-6 space-y-3 pl-6">
                 <li className="text-foreground/80 leading-relaxed">
-                  Your SES domain and reputation
+                  Your SES domain and sending configuration
                 </li>
                 <li className="text-foreground/80 leading-relaxed">
                   Your event data in DynamoDB
@@ -862,7 +862,7 @@ await email.send({
               </ul>
               <p className="text-foreground/80 leading-relaxed">
                 If you ever stop using Wraps, your email infrastructure keeps
-                working. No lock-in.
+                working. No Wraps lock-in.
               </p>
             </div>
           </div>
@@ -1044,8 +1044,8 @@ npm install @wraps.dev/email
             />
 
             <p className="mt-8 text-center font-semibold text-foreground/80 text-lg">
-              Minutes to production email infrastructure. Your AWS, your data,
-              no stored credentials.
+              Minutes to production email infrastructure. Runs in your AWS, no
+              stored credentials.
             </p>
           </div>
         </section>
@@ -1057,7 +1057,7 @@ npm install @wraps.dev/email
             <p className="mb-8 text-muted-foreground text-xl">
               Deploy production email infrastructure in minutes.
               <br />
-              Your AWS, your data, no stored credentials.
+              Runs in your AWS account, no stored credentials.
             </p>
 
             <Card className="mb-8 p-6">

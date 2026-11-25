@@ -54,7 +54,7 @@ const faqSchema = {
       name: "How does Wraps inbound email work?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Wraps deploys AWS infrastructure to receive emails: SES Receipt Rules capture incoming mail, S3 stores the raw email, Lambda parses headers/body/attachments, and EventBridge triggers your webhooks for real-time processing.",
+        text: "Wraps deploys AWS infrastructure to receive emails: SES Receipt Rules capture incoming mail, S3 stores the raw email, Lambda parses headers/body/attachments, and EventBridge triggers your webhooks as each email arrives.",
       },
     },
     {
@@ -137,23 +137,23 @@ export default function Page() {
             <p className="max-w-2xl text-muted-foreground text-xl leading-relaxed">
               Build support inboxes, automate order processing, and create
               email-to-ticket workflows. All infrastructure deploys to your AWS
-              account with EventBridge webhooks for real-time processing.
+              account with EventBridge webhooks that fire as each email arrives.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-4">
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <Clock className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Deploy in minutes
                 </span>
               </div>
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <Zap className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
-                  Real-time webhooks
+                  Webhooks on arrival
                 </span>
               </div>
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <Shield className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Spam &amp; virus detection
@@ -194,7 +194,7 @@ export default function Page() {
                   </strong>{" "}
                   working together.{" "}
                   <span className="font-semibold text-brand-text">
-                    Your data never leaves your AWS account.
+                    Inbound mail is processed inside your AWS account.
                   </span>
                 </p>
               </div>
@@ -469,7 +469,8 @@ TTL: 3600`}
               </h2>
               <p className="mx-auto mb-8 max-w-lg text-muted-foreground">
                 Deploy inbound infrastructure to your AWS account in minutes.
-                Build support inboxes, automate workflows, and own your data.
+                Build support inboxes, automate workflows, and keep inbound mail
+                in your own AWS account.
               </p>
               <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
                 <div className="rounded-xl border bg-muted/30 px-6 py-3 font-mono text-brand-text">

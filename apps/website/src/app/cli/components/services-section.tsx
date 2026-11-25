@@ -78,7 +78,7 @@ export function CliServicesSection() {
           <SectionKicker>Services</SectionKicker>
           <p className="text-lg text-muted-foreground">
             One command deploys production-ready AWS infrastructure.{" "}
-            <span className="text-foreground">You own everything.</span>
+            <span className="text-foreground">The sending setup is yours.</span>
           </p>
         </div>
 
@@ -102,7 +102,7 @@ export function CliServicesSection() {
                       {service.name}
                     </h3>
                     {service.status === "beta" && (
-                      <span className="rounded-full border border-border px-2 py-0.5 font-mono text-3xs text-muted-foreground uppercase tracking-eyebrow">
+                      <span className="rounded-none border border-border px-2 py-0.5 font-mono text-3xs text-muted-foreground uppercase tracking-eyebrow">
                         Beta
                       </span>
                     )}

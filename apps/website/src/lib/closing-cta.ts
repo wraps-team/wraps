@@ -7,18 +7,18 @@ import { trackEvent } from "@/utils/analytics";
  * from one people see and skip. `cta_click` carries the text the visitor read.
  * Both carry `cta_variant`, so this design can be compared with the one it
  * replaced (`closing_v1`, whose primary button read "Start building" but
- * reported "Free CLI Quickstart"). Signup clicks are also captured globally as
+ * reported "Free CLI Quickstart"; `closing_v2`, the command, docs and GitHub
+ * links, before the closing panel read "Own your email."). Signup clicks are also captured globally as
  * `signup_click` by the analytics provider.
  */
 export const CLOSING_CTA = {
   location: "footer_cta",
-  variant: "closing_v2",
+  variant: "closing_v3",
 } as const;
 
 export const CLOSING_CTA_LABELS = {
   primary: "Start free",
-  docs: "Read the docs",
-  github: "View on GitHub",
+  how: "See how it works",
 } as const;
 
 export function trackClosingCtaView(): void {

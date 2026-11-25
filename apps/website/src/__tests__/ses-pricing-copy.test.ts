@@ -7,7 +7,7 @@ const repoRoot = resolve(__dirname, "..", "..", "..", "..");
 const readRepo = (relativePath: string) =>
   readFileSync(resolve(repoRoot, relativePath), "utf8");
 
-// The 29 tier-1 marketing source files swept by plan 128 (step 0's 45-hit /
+// The 28 tier-1 marketing source files swept by plan 128 (step 0's 45-hit /
 // 30-file inventory, minus this suite's own sibling agents-page.test.ts).
 // Hardcoded on purpose: a glob would silently stop covering a renamed file
 // and would sweep in the out-of-scope agent surfaces.
@@ -34,7 +34,6 @@ const FILES = [
   "apps/website/src/app/landing/components/product-tabbed-section.tsx",
   "apps/website/src/app/landing/components/sms-teaser-section.tsx",
   "apps/website/src/app/page.tsx",
-  "apps/website/src/app/platform/components/pricing-section.tsx",
   "apps/website/src/app/terms/page.tsx",
   "apps/website/src/app/tools/ses-calculator/page-content.tsx",
   "apps/website/src/app/tools/ses-calculator/page.tsx",

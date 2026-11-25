@@ -4,6 +4,7 @@ import { ArrowRight, CornerDownRight } from "lucide-react";
 import Link from "next/link";
 import { AlsoAlternatives } from "@/app/alternatives/components/also-alternatives";
 import { AlternativesBreadcrumb } from "@/app/alternatives/components/breadcrumb";
+import { ClosingPanel } from "@/app/landing/components/closing-panel";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
@@ -162,29 +163,6 @@ export function AlternativesPageLayout({ page }: { page: AlternativesPage }) {
 
           <AlsoAlternatives currentSlug={page.slug} />
 
-          <section className="rounded-lg border bg-muted/30 p-8 text-center">
-            <h2 className="mb-2 font-heading font-semibold text-xl tracking-tight">
-              If the AWS row is the one that fits
-            </h2>
-            <p className="mx-auto mb-6 max-w-xl text-muted-foreground">
-              Wraps deploys email infrastructure into your own AWS account, then
-              gives you the platform on top. Free to start, no credit card, and
-              the infrastructure keeps running whether or not you keep paying
-              us.
-            </p>
-            <div className="flex flex-col justify-center gap-4 sm:flex-row">
-              <Button asChild size="lg">
-                <Link href="/docs/quickstart/email">
-                  Read the quickstart
-                  <ArrowRight className="ml-2 size-4" />
-                </Link>
-              </Button>
-              <Button asChild size="lg" variant="outline">
-                <Link href="/tools/ses-calculator">Price your volume</Link>
-              </Button>
-            </div>
-          </section>
-
           <div className="mt-12 border-t pt-6 text-center text-muted-foreground text-xs">
             <p>
               Prices verified against vendor pricing pages in {PRICES_VERIFIED}.
@@ -204,6 +182,24 @@ export function AlternativesPageLayout({ page }: { page: AlternativesPage }) {
             </p>
           </div>
         </div>
+        <ClosingPanel
+          actions={
+            <div className="flex flex-wrap gap-3">
+              <Button asChild size="lg" variant="brand">
+                <Link href="/docs/quickstart/email">
+                  Read the quickstart
+                  <ArrowRight className="ml-2 size-4" />
+                </Link>
+              </Button>
+              <Button asChild size="lg" variant="outline">
+                <Link href="/tools/ses-calculator">Price your volume</Link>
+              </Button>
+            </div>
+          }
+          body="Wraps deploys email infrastructure into your own AWS account, then gives you the platform on top. Free to start, no credit card, and the infrastructure keeps running whether or not you keep paying us."
+          kicker="Get started"
+          title="If the AWS row is the one that fits"
+        />
       </main>
 
       <LandingFooter />
@@ -244,7 +240,7 @@ function RankedCard({ entry, rank }: { entry: RankedEntry; rank: number }) {
     >
       <CardContent>
         <div className="mb-3 flex items-start gap-4">
-          <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-muted font-mono font-medium text-muted-foreground text-sm">
+          <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-muted font-sans font-medium text-muted-foreground text-sm">
             {rank}
           </span>
           <div className="min-w-0 flex-1">
@@ -292,7 +288,7 @@ function RankedCard({ entry, rank }: { entry: RankedEntry; rank: number }) {
 
 function Badge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="rounded-full border px-2 py-0.5 font-mono text-3xs text-muted-foreground uppercase tracking-widest">
+    <span className="rounded-none border px-2 py-0.5 font-sans font-semibold text-3xs text-muted-foreground uppercase tracking-widest">
       {children}
     </span>
   );

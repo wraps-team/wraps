@@ -35,7 +35,7 @@ you are working in.
   `pnpm --filter @wraps/e2e exec e2e guide`. Run through `pnpm test:e2e [file]`, which
   keeps e2e's telemetry off. Stop `pnpm dev` first: the runner starts its own `next dev`
   with the env overrides in `apps/e2e/e2e.config.ts` `command.env`
-- **UI, visual, or marketing-copy work** → the `design-context` skill
+- **UI, visual, or marketing-copy work** → the `design-system` skill
 - **Using Wraps as a product** (CLI flags, SDK calls) → `apps/website/public/llms-full.txt`
 
 <!-- NEXT-AGENTS-MD-START -->

@@ -56,7 +56,13 @@ export function UseCasesCarousel({ useCases }: { useCases: UseCase[] }) {
     const cards = scrollContainer.querySelectorAll("[data-card]");
     const card = cards[index] as HTMLElement;
     if (card) {
-      card.scrollIntoView({ behavior: "smooth", inline: "center" });
+      const reduced = window.matchMedia(
+        "(prefers-reduced-motion: reduce)"
+      ).matches;
+      card.scrollIntoView({
+        behavior: reduced ? "auto" : "smooth",
+        inline: "center",
+      });
     }
   };
 
@@ -64,7 +70,7 @@ export function UseCasesCarousel({ useCases }: { useCases: UseCase[] }) {
     <>
       {/* Horizontal scroll container */}
       <div
-        className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-4 pb-4 sm:-mx-6 sm:gap-6 sm:px-6 lg:px-8"
+        className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-4 motion-reduce:scroll-auto pb-4 sm:-mx-6 sm:gap-6 sm:px-6 lg:px-8"
         ref={scrollRef}
       >
         {useCases.map((useCase, index) => {
@@ -72,7 +78,7 @@ export function UseCasesCarousel({ useCases }: { useCases: UseCase[] }) {
           return (
             <div
               className={cn(
-                "w-[85vw] max-w-md shrink-0 snap-center overflow-hidden rounded-lg border border-border bg-card transition-colors duration-300 sm:w-[70vw] lg:w-[400px]",
+                "w-[85vw] max-w-md shrink-0 snap-center overflow-hidden rounded-none border border-border bg-card transition-colors motion-reduce:transition-none duration-300 sm:w-[70vw] lg:w-[400px]",
                 activeIndex === index && "border-brand/40"
               )}
               data-card
@@ -81,7 +87,7 @@ export function UseCasesCarousel({ useCases }: { useCases: UseCase[] }) {
               {/* Card header */}
               <div className="border-border border-b p-6">
                 <div className="mb-4 flex items-center gap-3">
-                  <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
+                  <div className="flex size-10 items-center justify-center rounded-none bg-muted">
                     <Icon className="size-5 text-brand-text" />
                   </div>
                   <h3 className="font-heading font-semibold text-lg tracking-tight">
@@ -110,7 +116,7 @@ export function UseCasesCarousel({ useCases }: { useCases: UseCase[] }) {
           <button
             aria-label={`Go to ${useCase.title}`}
             className={cn(
-              "size-2 rounded-full transition-all",
+              "size-2 rounded-full transition-all motion-reduce:transition-none",
               activeIndex === index
                 ? "w-6 bg-brand"
                 : "bg-muted-foreground/30 hover:bg-muted-foreground/50"

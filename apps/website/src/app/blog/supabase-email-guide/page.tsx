@@ -1,6 +1,5 @@
 import { Badge } from "@wraps/ui/components/ui/badge";
 import { Button } from "@wraps/ui/components/ui/button";
-import { Card, CardContent } from "@wraps/ui/components/ui/card";
 import {
   AlertTriangle,
   ArrowRight,
@@ -17,6 +16,7 @@ import {
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { FlowBox } from "@/app/landing/components/flow-primitives";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { CodeBlock, Collapsible } from "@/components/blog/interactive";
@@ -71,7 +71,7 @@ const faqSchema = {
       name: "Do I need an AWS account to use SES with Supabase?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Yes. AWS SES requires an AWS account. The upside: you own the infrastructure, pay AWS directly at $0.10/1K emails, and keep everything if you switch platforms.",
+        text: "Yes — that's the tradeoff. SES, your domain verification and your raw delivery events live in your AWS account, so you need one. The upside: you own the sending infrastructure, you pay AWS directly for sending, and sending keeps running if you stop using Wraps. If you don't want AWS, Resend is probably your best bet for transactional email.",
       },
     },
     {
@@ -103,10 +103,10 @@ const COST_COMPARISON = [
     note: "Raw API, no platform",
   },
   {
-    provider: "Wraps + SES",
-    cost50k: "$24",
-    cost250k: "$104",
-    cost1m: "$299",
+    provider: "Wraps + AWS",
+    cost50k: "$35",
+    cost250k: "$61",
+    cost1m: "$165",
     contacts: "Unlimited",
     note: "Full platform, your AWS",
   },
@@ -242,7 +242,7 @@ export default function Page() {
               <div>
                 <div className="font-mono text-2xl text-primary">$0.10</div>
                 <div className="text-muted-foreground text-sm">
-                  Per 1,000 emails on SES
+                  Per 1,000 emails on SES (à la carte)
                 </div>
               </div>
               <div>
@@ -670,12 +670,12 @@ export async function POST(req: Request) {
                   {COST_COMPARISON.map((row) => (
                     <tr
                       className={
-                        row.provider === "Wraps + SES" ? "bg-primary/5" : ""
+                        row.provider === "Wraps + AWS" ? "bg-primary/5" : ""
                       }
                       key={row.provider}
                     >
                       <td className="px-4 py-3">
-                        {row.provider === "Wraps + SES" ? (
+                        {row.provider === "Wraps + AWS" ? (
                           <span className="font-medium">{row.provider}</span>
                         ) : (
                           row.provider
@@ -683,21 +683,21 @@ export async function POST(req: Request) {
                       </td>
                       <td
                         className={`px-4 py-3 text-right font-mono ${
-                          row.provider === "Wraps + SES" ? "text-success" : ""
+                          row.provider === "Wraps + AWS" ? "text-success" : ""
                         }`}
                       >
                         {row.cost50k}
                       </td>
                       <td
                         className={`px-4 py-3 text-right font-mono ${
-                          row.provider === "Wraps + SES" ? "text-success" : ""
+                          row.provider === "Wraps + AWS" ? "text-success" : ""
                         }`}
                       >
                         {row.cost250k}
                       </td>
                       <td
                         className={`px-4 py-3 text-right font-mono ${
-                          row.provider === "Wraps + SES" ? "text-success" : ""
+                          row.provider === "Wraps + AWS" ? "text-success" : ""
                         }`}
                       >
                         {row.cost1m}
@@ -711,7 +711,8 @@ export async function POST(req: Request) {
               </table>
             </div>
             <p className="mt-2 text-muted-foreground text-sm">
-              Wraps + SES = Wraps platform fee + AWS SES sending cost. All tiers
+              Wraps + AWS = Pro plan ($29) + the AWS bill (SES sending plus the
+              event pipeline), from the wraps.dev pricing estimator. All tiers
               include unlimited contacts.
             </p>
           </section>
@@ -903,52 +904,48 @@ serve(async () => {
             </div>
 
             <div className="mt-8 grid gap-4 sm:grid-cols-2">
-              <Card>
-                <CardContent>
-                  <h4 className="mb-3 font-semibold">What You Own</h4>
-                  <ul className="space-y-2 text-sm text-muted-foreground">
-                    <li className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-4 w-4 text-success" />
-                      SES configuration and sending reputation
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-4 w-4 text-success" />
-                      Email event data in your DynamoDB
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-4 w-4 text-success" />
-                      Domain verification (DKIM, SPF, DMARC)
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-4 w-4 text-success" />
-                      Everything stays if you leave Wraps
-                    </li>
-                  </ul>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent>
-                  <h4 className="mb-3 font-semibold">What Wraps Adds</h4>
-                  <ul className="space-y-2 text-sm text-muted-foreground">
-                    <li className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-4 w-4 text-primary" />
-                      Template builder with AI generation
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-4 w-4 text-primary" />
-                      Segments, broadcasts, and scheduling
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-4 w-4 text-primary" />
-                      Visual workflow builder with automations
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-4 w-4 text-primary" />
-                      TypeScript SDK with auto credential resolution
-                    </li>
-                  </ul>
-                </CardContent>
-              </Card>
+              <FlowBox label="What you own">
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <Check className="mt-0.5 h-4 w-4 text-success" />
+                    SES configuration and domain verification (DKIM, SPF, DMARC)
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="mt-0.5 h-4 w-4 text-success" />
+                    Email event data in your DynamoDB
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="mt-0.5 h-4 w-4 text-success" />A dedicated
+                    IP at $24.95/mo per IP, billed by AWS, if you want full
+                    control of it
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="mt-0.5 h-4 w-4 text-success" />
+                    No Wraps lock-in: sending keeps running without us. Contacts
+                    and templates are stored by Wraps and can be exported
+                  </li>
+                </ul>
+              </FlowBox>
+              <FlowBox dashed label="What Wraps adds">
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <Check className="mt-0.5 h-4 w-4 text-primary" />
+                    Template builder with AI generation
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="mt-0.5 h-4 w-4 text-primary" />
+                    Segments, broadcasts, and scheduling
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="mt-0.5 h-4 w-4 text-primary" />
+                    Visual workflow builder with automations
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="mt-0.5 h-4 w-4 text-primary" />
+                    TypeScript SDK with auto credential resolution
+                  </li>
+                </ul>
+              </FlowBox>
             </div>
 
             <h3 className="mb-4 mt-8 font-semibold text-xl">Setup: 3 Steps</h3>
@@ -996,11 +993,12 @@ wraps email send --to user@example.com --subject "Hello from Wraps"`}
 
               <Collapsible title="Do I need an AWS account?">
                 <p className="text-muted-foreground text-sm">
-                  Yes — that's the tradeoff. You own everything (SES config,
-                  sending reputation, email data) but you need an AWS account.
-                  The upside: $0.10/1K emails, no vendor lock-in, full
-                  auditability. If you don't want AWS, Resend is probably your
-                  best bet for transactional email.
+                  Yes — that's the tradeoff. SES, your domain verification and
+                  your raw delivery events live in your AWS account, so you need
+                  one. The upside: you own the sending infrastructure, you pay
+                  AWS directly for sending, and sending keeps running if you
+                  stop using Wraps. If you don't want AWS, Resend is probably
+                  your best bet for transactional email.
                 </p>
               </Collapsible>
 
@@ -1033,10 +1031,10 @@ wraps email send --to user@example.com --subject "Hello from Wraps"`}
               <Collapsible title="What if I'm not on AWS yet?">
                 <p className="text-muted-foreground text-sm">
                   Creating an AWS account is free. You only pay for what you use
-                  (SES is $0.10/1K emails). Many Supabase developers already
-                  have AWS accounts for other services. If AWS is a non-starter
-                  for your team, Resend + a separate broadcast tool is the next
-                  best option.
+                  (SES is $0.10/1K emails on à la carte). Many Supabase
+                  developers already have AWS accounts for other services. If
+                  AWS is a non-starter for your team, Resend + a separate
+                  broadcast tool is the next best option.
                 </p>
               </Collapsible>
 
@@ -1078,10 +1076,10 @@ wraps email send --to user@example.com --subject "Hello from Wraps"`}
                 risks. A workflow builder is safer for production.
               </p>
               <p className="pt-2 text-foreground">
-                If you're on AWS (or open to it), SES at $0.10/1K is 4-12x
-                cheaper than managed providers. The question isn't whether to
-                set up email infrastructure — it's whether you want to rent it
-                or own it.
+                If you're on AWS (or open to it), SES at $0.10/1K (à la carte)
+                is 4-12x cheaper than managed providers. The question isn't
+                whether to set up email infrastructure — it's whether you want
+                to rent it or own it.
               </p>
             </div>
           </section>

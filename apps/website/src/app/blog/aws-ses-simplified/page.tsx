@@ -80,7 +80,7 @@ const faqSchema = {
       name: "How much does AWS SES cost with Wraps?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "AWS SES costs $0.10 per 1,000 emails. Wraps infrastructure costs vary by preset: Starter (~$0.05/mo), Production (~$2-5/mo), or Enterprise (~$50-100/mo). You pay AWS directly with no middleman markup.",
+        text: "AWS SES costs $0.10 (à la carte plan) per 1,000 emails. Wraps infrastructure costs vary by preset: Starter (~$0.05/mo), Production (~$2-5/mo), or Enterprise (~$50-100/mo). You pay AWS directly with no middleman markup.",
       },
     },
     {
@@ -220,22 +220,22 @@ export default function Page() {
             </p>
 
             <div className="mt-8 flex flex-wrap gap-4">
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <Clock className="text-success" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Minutes to deploy
                 </span>
               </div>
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <DollarSign className="text-success" size={16} />
                 <span className="text-foreground/80 text-sm">
-                  $0.10 per 1K emails
+                  $0.10 per 1K à la carte
                 </span>
               </div>
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <Shield className="text-success" size={16} />
                 <span className="text-foreground/80 text-sm">
-                  Your AWS, your data
+                  Runs in your AWS
                 </span>
               </div>
             </div>
@@ -291,8 +291,8 @@ export default function Page() {
                   <strong className="text-foreground">
                     once SES is set up, it&apos;s incredibly cheap
                   </strong>{" "}
-                  ($0.10 per 1,000 emails) and you own the infrastructure. The
-                  problem isn&apos;t SES itself.{" "}
+                  ($0.10 (à la carte plan) per 1,000 emails) and you own the
+                  sending infrastructure. The problem isn&apos;t SES itself.{" "}
                   <span className="font-semibold text-success">
                     It&apos;s the setup.
                   </span>
@@ -895,9 +895,9 @@ wraps email destroy`}
 
             <ul className="mb-6 space-y-3">
               {[
-                "You pay AWS directly for sending ($0.10 per 1,000 emails)",
-                "Your data stays in your AWS account",
-                "No vendor lock-in\u2014your infrastructure keeps working even if you stop using Wraps",
+                "You pay AWS directly for sending",
+                "Email content and raw delivery events stay in your AWS account",
+                "No Wraps lock-in: sending keeps running if you stop using Wraps",
               ].map((item) => (
                 <li
                   className="flex items-start gap-3 text-foreground/80 leading-relaxed"

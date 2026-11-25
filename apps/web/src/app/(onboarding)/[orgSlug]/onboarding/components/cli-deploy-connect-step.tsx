@@ -4,6 +4,7 @@ import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Label } from "@wraps/ui/components/ui/label";
 import { Panel, PanelTitle } from "@wraps/ui/components/ui/panel";
+import { buildAgentSetupPrompt } from "@wraps/ui/lib/agent-setup";
 import {
   BotIcon,
   CalendarIcon,
@@ -22,7 +23,10 @@ import { getCloudFormationWebhookSecretAction } from "@/actions/aws-accounts";
 import { SelfhostConnectInstructions } from "@/components/selfhost-connect-instructions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AgentPromptOption } from "./agent-prompt-option";
+import {
+  type AgentDeepLinkTarget,
+  AgentPromptOption,
+} from "./agent-prompt-option";
 
 type CliDeployConnectStepProps = {
   onNext: () => void;
@@ -78,36 +82,6 @@ const PREREQUISITES = [
 ];
 
 const CAL_BOOKING_URL = "https://cal.com/wraps/get-started-with-wraps";
-
-/**
- * Prompt handed to the user's coding agent. Mirrors the CLI path — every command
- * here is one of CLI_STEPS — but calls out the interactive points an agent would
- * otherwise stall on (device code, region/preset prompts, org selection).
- */
-function buildAgentPrompt(orgName?: string, selfHosted = false): string {
-  const orgLine = orgName
-    ? `   If it asks which organization to connect, choose "${orgName}".`
-    : "   If it asks which organization to connect, ask me which one to pick.";
-
-  return `Deploy Wraps email infrastructure into my AWS account and connect it to my Wraps dashboard.
-
-1. Check my AWS credentials: aws sts get-caller-identity
-   If that fails, help me set up credentials before continuing — AWS SSO, access keys, environment variables, and AWS_PROFILE all work.
-2. Install the CLI: npm install -g @wraps.dev/cli
-   (or: curl -fsSL https://get.wraps.dev | sh)
-3. Sign in: ${selfHosted ? "wraps selfhost login" : "wraps auth login"}
-   This is a device-code flow — it prints a code like XXXX-XXXX and tries to open a browser. Show me the code and wait for me to confirm I approved it before moving on.
-4. Deploy the infrastructure: wraps email init
-   It prompts for an AWS region and a preset (starter / production / enterprise), then shows estimated monthly AWS cost. Show me those and let me choose — don't accept the deploy on my behalf.
-5. Connect the deployment to my dashboard: ${selfHosted ? "wraps selfhost connect" : "wraps platform connect"}
-${orgLine}
-6. Confirm it worked: wraps email status --json
-   Report the region, the SES configuration set, and whether the account is still in the SES sandbox (sandbox means I can only send to verified addresses until AWS grants production access).
-
-When you're done, tell me — I'll click "I've finished — check connection" in the Wraps onboarding tab.
-
-Full Wraps docs (agent-readable): https://wraps.dev/llms-full.txt`;
-}
 
 /**
  * Generate CloudFormation Quick Create URL for the hosted platform. Only called
@@ -179,7 +153,7 @@ export function CliDeployConnectStep({
   }, [selectedMethod]);
 
   const agentPrompt = useMemo(
-    () => buildAgentPrompt(orgName, selfHosted),
+    () => buildAgentSetupPrompt({ context: "onboarding", orgName, selfHosted }),
     [orgName, selfHosted]
   );
 
@@ -415,6 +389,16 @@ export function CliDeployConnectStep({
       step: 4,
       step_name: "Deploy & Connect",
       organization_id: organizationId,
+    });
+    trackDeploymentStarted("agent");
+  };
+
+  const handleAgentDeepLinkClicked = (target: AgentDeepLinkTarget) => {
+    posthog.capture("onboarding_agent_deeplink_clicked", {
+      step: 4,
+      step_name: "Deploy & Connect",
+      organization_id: organizationId,
+      target,
     });
     trackDeploymentStarted("agent");
   };
@@ -728,6 +712,7 @@ export function CliDeployConnectStep({
 
             <AgentPromptOption
               onCopyPrompt={handleAgentPromptCopied}
+              onDeepLinkClick={handleAgentDeepLinkClicked}
               prompt={agentPrompt}
             />
 

@@ -101,7 +101,7 @@ const tldrRows = [
     wraps: "Events in your DynamoDB, retention you set",
   },
   {
-    dimension: "Vendor lock-in",
+    dimension: "Lock-in",
     postmark: "Proprietary API, templates, IPs",
     wraps: "Cancel Wraps, keep your SES infra",
   },
@@ -112,41 +112,41 @@ const pricingRows = [
     volume: "10K/mo",
     postmark: "$16.50",
     postmarkDetail: "Pro tier, 10K included",
-    wraps: "$1",
-    wrapsDetail: "Free tier + $1 SES",
-    savings: "94%",
+    wraps: "$1.18",
+    wrapsDetail: "Free tier + $1.18 AWS",
+    savings: "93%",
   },
   {
     volume: "50K/mo",
     postmark: "$68.50",
     postmarkDetail: "Pro + 40K overage @ $1.30/1K",
-    wraps: "$34",
-    wrapsDetail: "$29 Pro + $5 SES",
-    savings: "50%",
+    wraps: "$35.00",
+    wrapsDetail: "$29 Pro + $6.00 AWS",
+    savings: "49%",
   },
   {
     volume: "100K/mo",
     postmark: "$126-$134",
     postmarkDetail: "Pro/Platform + overage",
-    wraps: "$39",
-    wrapsDetail: "$29 Pro + $10 SES",
-    savings: "69-71%",
+    wraps: "$41.50",
+    wrapsDetail: "$29 Pro + $12.50 AWS",
+    savings: "67-69%",
   },
   {
     volume: "500K/mo",
     postmark: "$606-$654",
     postmarkDetail: "Pro/Platform + overage",
-    wraps: "$249",
-    wrapsDetail: "$199 Business + $50 SES",
-    savings: "59-62%",
+    wraps: "$94.10",
+    wrapsDetail: "$29 Pro + $65.10 AWS",
+    savings: "84-86%",
   },
   {
     volume: "1M/mo",
     postmark: "~$1,200-$1,300",
     postmarkDetail: "Pro/Platform + overage (custom deals at 1.5M+)",
-    wraps: "$299",
-    wrapsDetail: "$199 Business + $100 SES",
-    savings: "75%+",
+    wraps: "$165.09",
+    wrapsDetail: "$29 Pro + $136.09 AWS",
+    savings: "86%+",
   },
 ];
 
@@ -547,7 +547,7 @@ export default function PostmarkVsWrapsPage() {
               and the reputation those IPs carry is pooled across every customer
               on them. That pooled reputation is the product, and it is well
               kept. Wraps inverts the arrangement: the sending infrastructure
-              sits in your AWS account and the reputation is yours alone.
+              sits in your AWS account, on an account only you send from.
             </p>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -595,7 +595,8 @@ export default function PostmarkVsWrapsPage() {
                       Cancel Wraps and the SES infrastructure keeps running
                     </li>
                     <li>
-                      Your sending reputation is yours, and Wraps watches it
+                      Wraps watches your account&apos;s bounce and complaint
+                      rates
                     </li>
                   </ul>
                 </CardContent>
@@ -642,7 +643,7 @@ export default function PostmarkVsWrapsPage() {
                         Postmark (Pro/Platform)
                       </th>
                       <th className="p-4 text-left font-medium text-primary">
-                        Wraps + SES
+                        Wraps + AWS
                       </th>
                       <th className="p-4 text-left font-medium">Savings</th>
                     </tr>
@@ -678,8 +679,9 @@ export default function PostmarkVsWrapsPage() {
             <p className="mt-4 text-muted-foreground text-sm">
               Postmark pricing shows their Pro and Platform plans, computed from
               published base + overage rates. Wraps pricing includes the
-              platform fee plus AWS SES at $0.10/1K emails on à la carte (AWS
-              defaults new accounts to $0.16). You pay AWS directly &mdash;
+              platform fee plus the AWS bill: SES at $0.10/1K emails on à la
+              carte (AWS defaults new accounts to $0.16) and the event pipeline
+              (EventBridge, SQS, Lambda, DynamoDB). You pay AWS directly &mdash;
               Wraps never touches your email spend.{" "}
               <a
                 className="text-primary underline"
@@ -804,7 +806,7 @@ export default function PostmarkVsWrapsPage() {
                     "You want the sending infrastructure and the delivery history to live in your account, with retention you set rather than a retention add-on you buy",
                     "You're cost-sensitive at volume. AWS SES is $0.10 per 1,000 \u00e0 la carte, $0.16 on Essentials, against Postmark's $1.20-$1.80 overage rate.",
                     "You want SMS alongside email via AWS End User Messaging, from the same platform",
-                    "You care about vendor lock-in: cancel Wraps and your SES infrastructure keeps running with no DNS changes or sender warmup required",
+                    "You care about lock-in to Wraps: cancel Wraps and your SES infrastructure keeps running with no DNS changes or sender warmup required",
                     "You're a TypeScript team that wants React Email templates with type-safe SDK integration",
                   ].map((point) => (
                     <li className="flex items-start gap-3" key={point}>

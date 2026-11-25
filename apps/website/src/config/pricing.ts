@@ -501,8 +501,6 @@ export const PRICING_COPY = {
     "Free to start, no credit card. Sending costs go straight to AWS — $0.10/1K on à la carte, or $0.16/1K on the new default Essentials plan.",
   awsNote:
     "AWS costs are separate. À la carte is $0.10 per 1,000 emails; AWS now defaults new accounts to Essentials at $0.16. Wraps detects which plan you're on and tells you how to move back. The infrastructure lives in your account, so you can leave anytime and keep everything.",
-  enterpriseNote:
-    "Need custom limits or on-prem deployment? Contact us for Enterprise.",
   foundingMemberTitle: "Founding Member Program — First 50 Customers",
   foundingMemberPerks: [
     "Direct Slack access to the founder",

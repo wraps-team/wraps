@@ -105,7 +105,7 @@ export function PricingComparisonSection() {
             return (
               <button
                 className={cn(
-                  "group flex items-center gap-2 px-4 py-2.5 rounded-full border transition-all duration-200",
+                  "group flex items-center gap-2 px-4 py-2.5 rounded-none border transition-all duration-200",
                   isActive
                     ? "bg-primary border-brand text-primary-foreground shadow-lg shadow-brand/25"
                     : "bg-background border-border hover:border-brand/50 text-muted-foreground hover:text-foreground"
@@ -188,7 +188,7 @@ export function PricingComparisonSection() {
                 </div>
 
                 {/* Savings badge */}
-                <div className="mt-6 inline-flex items-center gap-2 bg-success/10 text-success px-3 py-1.5 rounded-full">
+                <div className="mt-6 inline-flex items-center gap-2 bg-success/10 text-success px-3 py-1.5 rounded-none">
                   <span className="font-bold text-lg">
                     {activeCase.savings}% less
                   </span>

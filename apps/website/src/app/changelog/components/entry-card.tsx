@@ -34,7 +34,7 @@ export function EntryCard({ release, linkTitle, isLatest }: EntryCardProps) {
         <div className="flex flex-wrap items-center gap-2">
           {release.tags.map((tag) => (
             <span
-              className="rounded-full border border-border px-2 py-0.5 font-mono text-3xs text-muted-foreground uppercase tracking-eyebrow"
+              className="rounded-none border border-border px-2 py-0.5 font-mono text-3xs text-muted-foreground uppercase tracking-eyebrow"
               key={tag}
             >
               {TAG_LABELS[tag]}
@@ -44,7 +44,7 @@ export function EntryCard({ release, linkTitle, isLatest }: EntryCardProps) {
             {formatReleaseDate(release.date)}
           </span>
           {isLatest && (
-            <span className="rounded-full border border-brand/40 px-2 py-0.5 font-mono text-3xs text-brand-text uppercase tracking-eyebrow">
+            <span className="rounded-none border border-brand/40 px-2 py-0.5 font-mono text-3xs text-brand-text uppercase tracking-eyebrow">
               Latest
             </span>
           )}

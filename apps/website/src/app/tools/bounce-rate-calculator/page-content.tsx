@@ -117,13 +117,13 @@ function MetricCard({
             <dt className="text-muted-foreground">
               Review line ({reviewLabel})
             </dt>
-            <dd className="font-mono">
+            <dd className="tabular-nums">
               {number.format(result.countAtReview)} {eventName}
             </dd>
           </div>
           <div className="flex justify-between gap-4">
             <dt className="text-muted-foreground">Pause line ({pauseLabel})</dt>
-            <dd className="font-mono">
+            <dd className="tabular-nums">
               {number.format(result.countAtPause)} {eventName}
             </dd>
           </div>
@@ -135,7 +135,7 @@ function MetricCard({
             </span>
           ) : (
             <>
-              <span className="font-mono">
+              <span className="tabular-nums">
                 {number.format(result.headroomToReview)}
               </span>{" "}
               <span className="text-muted-foreground">

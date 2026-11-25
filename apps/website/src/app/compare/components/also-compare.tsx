@@ -32,7 +32,7 @@ const comparisons = [
   {
     competitor: "Klaviyo",
     href: "/compare/klaviyo-vs-wraps",
-    tagline: "Up to 5.6x cheaper at scale",
+    tagline: "A per-contact bill against a flat plan fee",
   },
   {
     competitor: "Mailgun",

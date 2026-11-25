@@ -23,7 +23,7 @@ export function Reveal({
   );
 }
 
-/** The mono label that sits on a box's top border ("Your AWS account"). */
+/** The sans label that sits on a box's top border ("Your AWS account"). */
 export function BoxLabel({
   children,
   tone = "text-muted-foreground",
@@ -33,14 +33,17 @@ export function BoxLabel({
 }) {
   return (
     <span
-      className={`absolute -top-2.5 left-3 bg-background px-2 font-mono text-2xs uppercase tracking-widest ${tone}`}
+      className={`absolute -top-2.5 left-3 bg-background px-2 font-sans font-semibold text-2xs uppercase tracking-eyebrow ${tone}`}
     >
       {children}
     </span>
   );
 }
 
-/** A labelled box inside a flow card. */
+/**
+ * A labelled box inside a flow card. `dashed` is the dashed-brand box that
+ * marks "the one" (your AWS account, Wraps, the recommended plan).
+ */
 export function FlowBox({
   label,
   tone,
@@ -62,7 +65,9 @@ export function FlowBox({
           : "border-border bg-background"
       } ${className}`}
     >
-      <BoxLabel tone={tone}>{label}</BoxLabel>
+      <BoxLabel tone={tone ?? (dashed ? "text-brand-text" : undefined)}>
+        {label}
+      </BoxLabel>
       {children}
     </div>
   );

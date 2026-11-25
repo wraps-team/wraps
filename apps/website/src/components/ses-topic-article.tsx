@@ -1,6 +1,7 @@
 import { Badge } from "@wraps/ui/components/ui/badge";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { FlowBox } from "@/app/landing/components/flow-primitives";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
@@ -284,21 +285,20 @@ export function SesTopicArticle({ topic }: { topic: SesTopic }) {
             </section>
           ))}
 
-          <section
-            aria-labelledby="limits"
-            className="mt-12 rounded-lg border bg-muted/40 p-6"
-          >
-            <h2 className="mb-3 font-bold text-xl tracking-tight" id="limits">
-              {topic.limits.heading}
-            </h2>
-            {topic.limits.body.map((paragraph) => (
-              <p
-                className="mb-3 text-muted-foreground leading-relaxed last:mb-0"
-                key={paragraph}
-              >
-                {paragraph}
-              </p>
-            ))}
+          <section aria-labelledby="limits" className="mt-12">
+            <FlowBox label="Limits">
+              <h2 className="mb-3 font-bold text-xl tracking-tight" id="limits">
+                {topic.limits.heading}
+              </h2>
+              {topic.limits.body.map((paragraph) => (
+                <p
+                  className="mb-3 text-muted-foreground leading-relaxed last:mb-0"
+                  key={paragraph}
+                >
+                  {paragraph}
+                </p>
+              ))}
+            </FlowBox>
           </section>
 
           <section aria-labelledby="faq" className="mt-12">

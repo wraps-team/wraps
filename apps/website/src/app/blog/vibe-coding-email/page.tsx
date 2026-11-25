@@ -77,7 +77,7 @@ const faqSchema = {
       name: "What does this cost?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "AWS SES costs $0.10 per 1,000 emails. Events are included in your Wraps plan. You pay AWS directly for sending — no Wraps markup.",
+        text: "AWS SES costs $0.10 per 1,000 emails on à la carte ($0.16 on the Essentials plan new accounts start on). Events are included in your Wraps plan. You pay AWS directly for sending — no Wraps markup.",
       },
     },
     {
@@ -150,7 +150,7 @@ export default function Page() {
               <div>
                 <div className="font-mono text-2xl text-primary">$0.10</div>
                 <div className="text-muted-foreground text-sm">
-                  Per 1,000 emails
+                  Per 1,000 emails (à la carte)
                 </div>
               </div>
               <div>
@@ -283,8 +283,7 @@ await wraps.track("user.signed_up", {
                   <h4 className="font-medium">Email sends via your SES</h4>
                   <p className="mt-1 text-muted-foreground text-sm">
                     The email goes through SES in your AWS account — your
-                    domain, your sending reputation, $0.10 per 1,000 emails paid
-                    directly to AWS.
+                    domain, with sending billed by AWS directly.
                   </p>
                 </div>
               </div>
@@ -444,9 +443,10 @@ await wraps.track("user.signed_up", {
 
               <Collapsible title="What does this cost?">
                 <p className="text-muted-foreground text-sm">
-                  AWS SES costs $0.10 per 1,000 emails. Events are included in
-                  your Wraps plan. You pay AWS directly for sending — no Wraps
-                  markup.
+                  AWS SES costs $0.10 per 1,000 emails on à la carte ($0.16 on
+                  the Essentials plan new accounts start on). Events are
+                  included in your Wraps plan. You pay AWS directly for sending
+                  — no Wraps markup.
                 </p>
               </Collapsible>
 

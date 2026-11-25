@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { getTier } from "@/config/pricing";
 import {
   DEFAULT_OG_IMAGE,
   pageMetadata,
@@ -7,12 +8,20 @@ import {
   SITE_TITLE,
 } from "@/lib/page-metadata";
 import { CTASection } from "./landing/components/cta-section";
+import { DevelopersBand } from "./landing/components/developers-band";
+import { EconomicsSection } from "./landing/components/economics-section";
+import { faqItems } from "./landing/components/faq-items";
 import { FaqSection } from "./landing/components/faq-section";
 import { LandingFooter } from "./landing/components/footer";
+import { GettingStartedSection } from "./landing/components/getting-started-section";
 import { HeroSection } from "./landing/components/hero-section";
+import { HomeStatsRow } from "./landing/components/home-stats-row";
 import { LandingNavbar } from "./landing/components/navbar";
+import { OwnershipSection } from "./landing/components/ownership-section";
 import { PricingSection } from "./landing/components/pricing-section";
-import { WhatItDoesSection } from "./landing/components/what-it-does-section";
+import { ProductSection } from "./landing/components/product-section";
+import { TeamSection } from "./landing/components/team-section";
+import { WhyOwnSection } from "./landing/components/why-own-section";
 
 export const metadata: Metadata = pageMetadata({
   title: SITE_TITLE,
@@ -28,8 +37,8 @@ const softwareSchema = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   name: "Wraps",
-  applicationCategory: "DeveloperApplication",
-  applicationSubCategory: "Email infrastructure",
+  applicationCategory: "BusinessApplication",
+  applicationSubCategory: "Email marketing platform",
   operatingSystem: "macOS, Linux, Windows",
   url: "https://wraps.dev",
   downloadUrl: "https://www.npmjs.com/package/@wraps.dev/cli",
@@ -39,13 +48,16 @@ const softwareSchema = {
   isAccessibleForFree: true,
   provider: { "@id": "https://wraps.dev/#organization" },
   description:
-    "Deploy email (AWS SES), SMS, and CDN infrastructure into your own AWS account with one command. CLI, TypeScript SDKs, MCP server, and a dashboard. You pay AWS directly.",
+    "Email marketing without the per-contact tax: newsletters, automations, contacts and app emails in one platform for your whole team. Sending runs in your own AWS account, so every email goes through your Amazon SES account at Amazon's own rates and you pay AWS directly. Unlimited contacts on every plan. CLI, TypeScript SDKs and an MCP server for developers and AI agents.",
   featureList: [
-    "One-command AWS SES deployment (npx @wraps.dev/cli email init)",
-    "TypeScript SDKs for email and SMS",
-    "MCP server for AI agents",
-    "Free tier with unlimited sends and a 30-day history",
-    "Self-serve API keys — no sales call",
+    "Newsletters and broadcasts, with segments and scheduling on Pro",
+    "Automations: welcome series and other journeys that run on their own",
+    "Unlimited contacts, sends, domains and team members on every plan; Amazon bills the sending",
+    "Sending runs in your AWS account; Amazon bills you directly",
+    "Connect your AWS account in the browser, or hand setup to your AI agent",
+    "One-command deploy of the sending infrastructure (npx @wraps.dev/cli email init); connecting it to the dashboard is a separate step",
+    "30-day history on the Free plan",
+    "Self-serve, with no sales call on any plan",
   ],
   offers: [
     {
@@ -56,12 +68,12 @@ const softwareSchema = {
       url: "https://wraps.dev/#pricing",
       availability: "https://schema.org/InStock",
       description:
-        "Free forever: unlimited sends, one AWS account, 30-day history. The CLI and SDKs are free and open source with no account at all.",
+        "The Free plan includes unlimited sends (Amazon bills the sending), one AWS account and 30-day history. The CLI and SDKs are free and open source with no account at all.",
     },
     {
       "@type": "Offer",
       name: "Pro",
-      price: "29",
+      price: String(getTier("pro").price),
       priceCurrency: "USD",
       url: "https://wraps.dev/#pricing",
       availability: "https://schema.org/InStock",
@@ -69,68 +81,16 @@ const softwareSchema = {
   ],
 };
 
-// FAQ structured data for rich results
+// FAQ structured data for rich results, generated from the same `faqItems` the
+// accordion renders, so there is one copy of every answer.
 const faqSchema = {
   "@context": "https://schema.org",
   "@type": "FAQPage",
-  mainEntity: [
-    {
-      "@type": "Question",
-      name: "How is this different from using AWS SES directly?",
-      acceptedAnswer: {
-        "@type": "Answer",
-        text: "Wraps deploys all the infrastructure AWS SES needs (IAM roles, EventBridge, DynamoDB, Lambda, SQS) in one command instead of 2+ hours of manual setup. You get event tracking, analytics, and a dashboard out of the box. The TypeScript SDK is just email.send() - no boilerplate.",
-      },
-    },
-    {
-      "@type": "Question",
-      name: "What are the costs for running Wraps?",
-      acceptedAnswer: {
-        "@type": "Answer",
-        text: "With Wraps, you pay AWS directly with no markup: à la carte SES is $0.10 per 1,000 emails, though AWS now defaults new accounts to the Essentials plan at $0.16 (Wraps tells you which plan you're on and how to move back). For example, 50,000 emails/month costs ~$5-8 to AWS. There's a free tier with unlimited sends and no credit card required. Paid plans start at $29/month.",
-      },
-    },
-    {
-      "@type": "Question",
-      name: "Do you store my AWS credentials?",
-      acceptedAnswer: {
-        "@type": "Answer",
-        text: "No! We use OIDC (OpenID Connect) for Vercel deployments or IAM roles for AWS-native deployments. The CLI uses your local AWS credentials for the initial deployment, then creates IAM roles that your app can assume. We never see or store your AWS access keys.",
-      },
-    },
-    {
-      "@type": "Question",
-      name: "What happens if I stop paying for Wraps?",
-      acceptedAnswer: {
-        "@type": "Answer",
-        text: "Your infrastructure keeps running! All resources are in your AWS account. You lose access to the Wraps Platform but can still use the free local console. Your SDK code keeps working, emails keep sending, and you keep paying AWS directly. Zero vendor lock-in.",
-      },
-    },
-    {
-      "@type": "Question",
-      name: "Can I customize the infrastructure deployment?",
-      acceptedAnswer: {
-        "@type": "Answer",
-        text: "Yes! The CLI offers infrastructure presets for different needs—from minimal tracking to full analytics with dedicated IPs. You can also use 'npx @wraps.dev/cli email upgrade' to add features incrementally. For full customization, all infrastructure is deployed as open-source Pulumi code you can fork and modify.",
-      },
-    },
-    {
-      "@type": "Question",
-      name: "Does this work with my existing SES setup?",
-      acceptedAnswer: {
-        "@type": "Answer",
-        text: "Yes! Use 'npx @wraps.dev/cli email connect' to scan your existing SES resources and add Wraps features non-destructively. We never modify existing resources—all our infrastructure uses the 'wraps-email-' prefix.",
-      },
-    },
-    {
-      "@type": "Question",
-      name: "Can I receive emails too?",
-      acceptedAnswer: {
-        "@type": "Answer",
-        text: "Yes! Wraps supports inbound email receiving. Run 'npx @wraps.dev/cli email inbound init' to deploy the infrastructure, then use the SDK to list, read, reply, and forward emails. EventBridge triggers let you build webhooks for real-time processing.",
-      },
-    },
-  ],
+  mainEntity: faqItems.map((item) => ({
+    "@type": "Question",
+    name: item.question,
+    acceptedAnswer: { "@type": "Answer", text: item.answer },
+  })),
 };
 
 export default function LandingPage() {
@@ -145,12 +105,23 @@ export default function LandingPage() {
         {/* Main Content */}
         <main>
           {/*
-            Show what Wraps does, then price it. One line and one visual per
-            beat; anything that needs a paragraph lives on its own page
-            (/platform, /compare, /approaches, /why-wraps).
+            Order follows the design mock's #home view. Sections carry the
+            anchors the nav and the hero link to: #how, #setup, #pricing.
           */}
           <HeroSection />
-          <WhatItDoesSection />
+          <HomeStatsRow />
+          <ProductSection />
+          <EconomicsSection />
+          <OwnershipSection />
+          <GettingStartedSection />
+          <TeamSection />
+          <DevelopersBand />
+          <WhyOwnSection />
+          {/*
+            TODO(customer-proof): customer stories go here once real customers
+            agree to be named. Render nothing until then, and never invent
+            quotes or logos.
+          */}
           <PricingSection />
           <FaqSection />
           <CTASection />

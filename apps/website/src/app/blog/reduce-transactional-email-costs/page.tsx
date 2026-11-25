@@ -274,19 +274,19 @@ export default function Page() {
             </p>
 
             <div className="mt-8 flex flex-wrap gap-4">
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <TrendingDown className="text-success" size={16} />
                 <span className="text-foreground/80 text-sm">
                   $12.50/mo all-in at 100K
                 </span>
               </div>
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <AlertTriangle className="text-success" size={16} />
                 <span className="text-foreground/80 text-sm">
                   You may be on a plan you never chose
                 </span>
               </div>
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <Scissors className="text-success" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Cutting 30K sends saves $3.00

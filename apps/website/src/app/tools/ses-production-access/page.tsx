@@ -133,7 +133,7 @@ export default function SESProductionAccessPage() {
         <main className="container mx-auto px-4 pt-24 pb-12">
           <div className="mx-auto max-w-5xl">
             <div className="mb-10">
-              <div className="mb-5 inline-flex items-center gap-2 font-mono text-2xs text-muted-foreground uppercase tracking-eyebrow">
+              <div className="mb-5 inline-flex items-center gap-2 font-sans font-semibold text-2xs text-muted-foreground uppercase tracking-eyebrow">
                 <span className="size-1.5 rounded-full bg-brand" />
                 <span>wraps · free tool</span>
               </div>

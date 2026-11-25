@@ -173,19 +173,19 @@ export default function Page() {
             </p>
 
             <div className="mt-8 flex flex-wrap gap-4">
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <Shield className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Standards Track, May 2026
                 </span>
               </div>
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <Network className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   Tree walk replaces the PSL
                 </span>
               </div>
-              <div className="flex items-center gap-2 rounded-full border bg-muted/30 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-none border bg-muted/30 px-4 py-2">
                 <FileCheck className="text-brand-text" size={16} />
                 <span className="text-foreground/80 text-sm">
                   pct= removed, np= and t= added

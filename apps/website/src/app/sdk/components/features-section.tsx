@@ -4,9 +4,9 @@ import { SectionKicker } from "@/app/landing/components/section-kicker";
 const features = [
   {
     icon: Lock,
-    title: "Your AWS, Your Data",
+    title: "Sends from your AWS",
     description:
-      "The SDK calls SES directly in your AWS account. Sends go straight from your app to your infrastructure.",
+      "The SDK calls SES directly in your AWS account. Sends go straight from your app to your own sending setup.",
   },
   {
     icon: Package,
@@ -34,9 +34,9 @@ const features = [
   },
   {
     icon: Box,
-    title: "Zero Lock-In",
+    title: "No Wraps lock-in",
     description:
-      "Thin wrappers around AWS services. Eject anytime — your SES templates and infrastructure stay.",
+      "Thin wrappers around AWS services. Stop using Wraps anytime — your SES templates and sending setup stay.",
   },
 ];
 

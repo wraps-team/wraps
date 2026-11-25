@@ -77,7 +77,7 @@ export default function AlternativesHubPage() {
                         </h2>
                         <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
                       </div>
-                      <p className="mb-3 font-mono text-muted-foreground text-xs uppercase tracking-widest">
+                      <p className="mb-3 font-sans font-semibold text-muted-foreground text-xs uppercase tracking-eyebrow">
                         {page.ranked.length} options, ranked
                       </p>
                       <p className="text-muted-foreground text-sm">

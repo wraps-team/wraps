@@ -200,9 +200,9 @@ export default function AWSSetupPageContent() {
               <li className="flex items-start gap-3">
                 <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
                 <div>
-                  <strong>You own your infrastructure</strong>
+                  <strong>Sending runs in your account</strong>
                   <p className="text-muted-foreground text-sm">
-                    Everything runs in your account. No vendor lock-in.
+                    The sending setup lives in your account. No Wraps lock-in.
                   </p>
                 </div>
               </li>
@@ -211,7 +211,8 @@ export default function AWSSetupPageContent() {
                 <div>
                   <strong>Pay AWS directly</strong>
                   <p className="text-muted-foreground text-sm">
-                    Transparent pricing at $0.10 per 1,000 emails.
+                    Transparent pricing at $0.10 per 1,000 emails on à la carte
+                    ($0.16 on Essentials, the default for new accounts).
                   </p>
                 </div>
               </li>

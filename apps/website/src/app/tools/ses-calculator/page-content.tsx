@@ -212,7 +212,7 @@ function SESCalculatorInner() {
                   <button
                     aria-pressed={isActive}
                     className={cn(
-                      "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+                      "rounded-none border px-3 py-1.5 text-sm font-medium transition-colors touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
                       isActive
                         ? "border-primary bg-primary text-primary-foreground"
                         : "border-muted-foreground/25 text-muted-foreground hover:border-foreground/50 hover:text-foreground"
@@ -494,9 +494,11 @@ function SESCalculatorInner() {
                 {/* EventBridge */}
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label htmlFor="eventbridge">Real-time EventBridge</Label>
+                    <Label htmlFor="eventbridge">
+                      Fast EventBridge processing
+                    </Label>
                     <p className="text-muted-foreground text-sm">
-                      Process events in real-time
+                      Process events as they arrive
                     </p>
                   </div>
                   <Switch
@@ -760,7 +762,7 @@ function SESCalculatorInner() {
                           </p>
                         )}
                       </div>
-                      <span className="tabular-nums font-mono text-sm">
+                      <span className="tabular-nums text-sm">
                         {formatCost(item.cost)}
                       </span>
                     </div>
@@ -808,7 +810,7 @@ function SESCalculatorInner() {
                         {isLastMonth && "+ (steady-state)"}:
                       </span>
                       <div className="flex items-center gap-2">
-                        <span className="tabular-nums font-mono">
+                        <span className="tabular-nums">
                           {point.storageGB.toFixed(3)} GB
                         </span>
                         <span className="tabular-nums text-muted-foreground">

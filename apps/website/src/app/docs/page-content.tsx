@@ -63,8 +63,8 @@ export default function DocsPageContent() {
             Get started with Wraps
           </h1>
           <p className="mb-8 max-w-2xl text-lg text-muted-foreground">
-            Deploy email, SMS, and CDN infrastructure to your AWS account. You
-            own everything — we provide the tooling.
+            Deploy email, SMS, and CDN infrastructure to your AWS account. The
+            sending setup is yours — we provide the tooling.
           </p>
 
           <div className="grid gap-6 sm:grid-cols-2">

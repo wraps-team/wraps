@@ -172,6 +172,9 @@ export const SES_VOLUME_BANDS = [
   "Over 100M",
 ] as const;
 
+/** The most AWS Free Tier credit a new AWS account can earn, in dollars. */
+export const AWS_NEW_ACCOUNT_CREDIT = 200;
+
 /**
  * Free-tier facts, shared by the calculator page's FAQ and its markdown twin.
  */

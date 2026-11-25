@@ -22,7 +22,7 @@ function LockedTypePill({ label }: { label: string }) {
     <HoverCard openDelay={200}>
       <HoverCardTrigger asChild>
         <button
-          className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2.5 py-1 font-medium text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+          className="inline-flex items-center gap-1 rounded-none border border-border bg-muted px-2.5 py-1 font-medium text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
           type="button"
         >
           <Lock aria-hidden="true" className="size-3" />
@@ -62,7 +62,7 @@ function EventTypePill({ label }: { label: string }) {
     return <LockedTypePill label={label} />;
   }
   return (
-    <span className="inline-flex items-center rounded-full border border-border bg-background px-2.5 py-1 font-medium text-xs">
+    <span className="inline-flex items-center rounded-none border border-border bg-background px-2.5 py-1 font-medium text-xs">
       {label}
     </span>
   );
