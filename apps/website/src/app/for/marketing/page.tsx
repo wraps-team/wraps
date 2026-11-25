@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { JsonLd } from "@/components/json-ld";
+import { getTier } from "@/config/pricing";
 import { pageMetadata } from "@/lib/page-metadata";
 import { MarketingAudienceSection } from "./components/audience-section";
 import { MarketingCampaignsSection } from "./components/campaigns-section";
@@ -21,7 +22,7 @@ const softwareSchema = {
   operatingSystem: "Web",
   offers: {
     "@type": "Offer",
-    price: "29",
+    price: String(getTier("pro").price),
     priceCurrency: "USD",
   },
   description,

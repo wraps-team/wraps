@@ -103,10 +103,10 @@ const COST_COMPARISON = [
     note: "Raw API, no platform",
   },
   {
-    provider: "Wraps + SES",
-    cost50k: "$24",
-    cost250k: "$104",
-    cost1m: "$299",
+    provider: "Wraps + AWS",
+    cost50k: "$35",
+    cost250k: "$61",
+    cost1m: "$165",
     contacts: "Unlimited",
     note: "Full platform, your AWS",
   },
@@ -670,12 +670,12 @@ export async function POST(req: Request) {
                   {COST_COMPARISON.map((row) => (
                     <tr
                       className={
-                        row.provider === "Wraps + SES" ? "bg-primary/5" : ""
+                        row.provider === "Wraps + AWS" ? "bg-primary/5" : ""
                       }
                       key={row.provider}
                     >
                       <td className="px-4 py-3">
-                        {row.provider === "Wraps + SES" ? (
+                        {row.provider === "Wraps + AWS" ? (
                           <span className="font-medium">{row.provider}</span>
                         ) : (
                           row.provider
@@ -683,21 +683,21 @@ export async function POST(req: Request) {
                       </td>
                       <td
                         className={`px-4 py-3 text-right font-mono ${
-                          row.provider === "Wraps + SES" ? "text-success" : ""
+                          row.provider === "Wraps + AWS" ? "text-success" : ""
                         }`}
                       >
                         {row.cost50k}
                       </td>
                       <td
                         className={`px-4 py-3 text-right font-mono ${
-                          row.provider === "Wraps + SES" ? "text-success" : ""
+                          row.provider === "Wraps + AWS" ? "text-success" : ""
                         }`}
                       >
                         {row.cost250k}
                       </td>
                       <td
                         className={`px-4 py-3 text-right font-mono ${
-                          row.provider === "Wraps + SES" ? "text-success" : ""
+                          row.provider === "Wraps + AWS" ? "text-success" : ""
                         }`}
                       >
                         {row.cost1m}
@@ -711,7 +711,8 @@ export async function POST(req: Request) {
               </table>
             </div>
             <p className="mt-2 text-muted-foreground text-sm">
-              Wraps + SES = Wraps platform fee + AWS SES sending cost. All tiers
+              Wraps + AWS = Pro plan ($29) + the AWS bill (SES sending plus the
+              event pipeline), from the wraps.dev pricing estimator. All tiers
               include unlimited contacts.
             </p>
           </section>

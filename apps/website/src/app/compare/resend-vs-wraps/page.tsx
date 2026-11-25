@@ -107,8 +107,8 @@ const pricingComparison = [
     resendCost: "$20",
     wrapsTier: "Free",
     wrapsPlatform: "$0",
-    awsSes: "$1",
-    wrapsTotal: "$1",
+    awsSes: "$1.18",
+    wrapsTotal: "$1.18",
     savings: "94%",
   },
   {
@@ -117,8 +117,8 @@ const pricingComparison = [
     resendCost: "$20",
     wrapsTier: "Pro",
     wrapsPlatform: "$29",
-    awsSes: "$6",
-    wrapsTotal: "$35",
+    awsSes: "$6.00",
+    wrapsTotal: "$35.00",
     savings: null,
   },
   {
@@ -127,8 +127,8 @@ const pricingComparison = [
     resendCost: "$35-90",
     wrapsTier: "Pro",
     wrapsPlatform: "$29",
-    awsSes: "$13",
-    wrapsTotal: "$42",
+    awsSes: "$12.50",
+    wrapsTotal: "$41.50",
     savings: null,
   },
   {
@@ -137,8 +137,8 @@ const pricingComparison = [
     resendCost: "$350",
     wrapsTier: "Pro",
     wrapsPlatform: "$29",
-    awsSes: "$65",
-    wrapsTotal: "$94",
+    awsSes: "$65.10",
+    wrapsTotal: "$94.10",
     savings: "73%",
   },
 ];
@@ -786,13 +786,12 @@ export default function ResendVsWrapsPage() {
                 contacts billed separately ($40/mo for 5K contacts).
               </p>
               <p>
-                At 50K/mo the two are priced about the same, so price is not the
-                reason to move. What changes is who sets the account up, who
-                watches it, and where the events live: with Wraps they land in
-                your own DynamoDB at the retention you choose, against
-                Resend&apos;s 30-day cap. (Wraps dashboard history runs 30 days
-                to 1 year depending on plan; the underlying events are always
-                yours.)
+                At 50K/mo Resend is the cheaper of the two. What changes is who
+                sets the account up, who watches it, and where the events live:
+                with Wraps they land in your own DynamoDB at the retention you
+                choose, against Resend&apos;s 30-day cap. (Wraps dashboard
+                history runs 30 days to 1 year depending on plan; the underlying
+                events are always yours.)
               </p>
             </div>
           </section>

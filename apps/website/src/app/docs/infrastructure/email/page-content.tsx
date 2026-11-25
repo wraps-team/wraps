@@ -358,7 +358,7 @@ export default function InfrastructureEmailPageContent() {
           <p className="font-medium text-sm">Best for</p>
           <p className="mt-1 text-muted-foreground text-sm">
             MVPs, side projects, and low-volume senders who need reliable email
-            delivery without event history or real-time analytics.
+            delivery without event history or delivery analytics.
           </p>
         </div>
       </section>

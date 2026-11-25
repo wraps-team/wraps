@@ -741,7 +741,9 @@ export default function CustomerIoVsWrapsPage() {
               Wraps pricing: Free ($0/mo), Pro ($29/mo), Business ($199/mo) — a
               flat monthly fee by tier, not by contact or event volume. AWS SES
               costs $0.10 per 1,000 emails on à la carte (AWS defaults new
-              accounts to $0.16), paid directly to AWS.{" "}
+              accounts to $0.16), paid directly to AWS. The AWS figures include
+              the event pipeline (EventBridge, SQS, Lambda, DynamoDB), not only
+              SES.{" "}
               <a
                 className="text-primary underline"
                 href="/tools/ses-calculator"

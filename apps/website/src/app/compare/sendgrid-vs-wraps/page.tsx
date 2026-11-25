@@ -755,8 +755,10 @@ export default function SendGridVsWrapsPage() {
               >
                 sendgrid.com/pricing
               </a>
-              . Wraps AWS cost = $0.10 per 1,000 emails via SES à la carte (AWS
-              defaults new accounts to $0.16/1,000). All prices as of July 2026.{" "}
+              . Wraps AWS cost = SES at $0.10 per 1,000 emails à la carte (AWS
+              defaults new accounts to $0.16/1,000) plus the event pipeline
+              (EventBridge, SQS, Lambda, DynamoDB), from the wraps.dev pricing
+              estimator. All prices as of July 2026.{" "}
               <a
                 className="text-primary underline"
                 href="/tools/ses-calculator"

@@ -469,7 +469,8 @@ TTL: 3600`}
               </h2>
               <p className="mx-auto mb-8 max-w-lg text-muted-foreground">
                 Deploy inbound infrastructure to your AWS account in minutes.
-                Build support inboxes, automate workflows, and own your data.
+                Build support inboxes, automate workflows, and keep inbound mail
+                in your own AWS account.
               </p>
               <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
                 <div className="rounded-xl border bg-muted/30 px-6 py-3 font-mono text-brand-text">

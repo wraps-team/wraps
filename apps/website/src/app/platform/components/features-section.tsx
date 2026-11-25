@@ -5,7 +5,7 @@ const features = [
   {
     icon: BarChart3,
     title: "Delivery Analytics",
-    description: "Opens, clicks, bounces and complaints for every message.",
+    description: "Opens, clicks, bounces and complaints per message.",
   },
   {
     icon: History,

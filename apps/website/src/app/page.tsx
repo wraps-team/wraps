@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { getTier } from "@/config/pricing";
 import {
   DEFAULT_OG_IMAGE,
   pageMetadata,
@@ -61,7 +62,7 @@ const softwareSchema = {
     {
       "@type": "Offer",
       name: "Pro",
-      price: "29",
+      price: String(getTier("pro").price),
       priceCurrency: "USD",
       url: "https://wraps.dev/#pricing",
       availability: "https://schema.org/InStock",

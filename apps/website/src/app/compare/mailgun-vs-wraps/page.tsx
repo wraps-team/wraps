@@ -100,8 +100,8 @@ const pricingComparison = [
     mailgunCost: "$15",
     wrapsTier: "Free",
     wrapsPlatform: "$0",
-    awsSes: "$1",
-    wrapsTotal: "$1",
+    awsSes: "$1.18",
+    wrapsTotal: "$1.18",
     savings: "92%",
   },
   {
@@ -110,8 +110,8 @@ const pricingComparison = [
     mailgunCost: "$35",
     wrapsTier: "Pro",
     wrapsPlatform: "$29",
-    awsSes: "$6",
-    wrapsTotal: "$35",
+    awsSes: "$6.00",
+    wrapsTotal: "$35.00",
     savings: "",
   },
   {
@@ -120,8 +120,8 @@ const pricingComparison = [
     mailgunCost: "$75-90",
     wrapsTier: "Pro",
     wrapsPlatform: "$29",
-    awsSes: "$13",
-    wrapsTotal: "$42",
+    awsSes: "$12.50",
+    wrapsTotal: "$41.50",
     savings: "45-54%",
   },
   {
@@ -130,8 +130,8 @@ const pricingComparison = [
     mailgunCost: "$400",
     wrapsTier: "Pro",
     wrapsPlatform: "$29",
-    awsSes: "$65",
-    wrapsTotal: "$94",
+    awsSes: "$65.10",
+    wrapsTotal: "$94.10",
     savings: "76%",
   },
 ];
@@ -639,8 +639,9 @@ export default function MailgunVsWrapsPage() {
               Mailgun&apos;s paid plans run Basic at $15 for 10K, Foundation at
               $35 for 50K and $75 for 100K, and Scale from $90 at 100K to $400
               at 500K. Wraps charges a flat platform fee and you pay AWS for
-              sending: $0.10 per 1,000 à la carte, or $0.16 per 1,000 on the
-              Essentials plan new AWS accounts default to.
+              sending and the event pipeline: SES is $0.10 per 1,000 à la carte,
+              or $0.16 per 1,000 on the Essentials plan new AWS accounts default
+              to, plus EventBridge, SQS, Lambda and DynamoDB.
             </p>
             <Card className="overflow-hidden py-0">
               <div className="overflow-x-auto">
@@ -698,7 +699,7 @@ export default function MailgunVsWrapsPage() {
               </p>
               <p>
                 At 50K the two are level, which is worth saying plainly. The gap
-                opens above that: at 100K, $42/mo against $75 to $90.
+                opens above that: at 100K, $41.50/mo against $75 to $90.
               </p>
             </div>
           </section>

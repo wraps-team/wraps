@@ -24,10 +24,9 @@ export function MarketingHeroSection() {
 
             <p className="mb-6 max-w-md text-muted-foreground">
               Broadcasts, segments, topics, and a hosted preference center — the
-              lifecycle toolkit you expect, priced on the events you track
-              instead of the contacts you store. Every plan carries unlimited
-              contacts, so a good acquisition month never arrives as an invoice
-              problem.
+              lifecycle toolkit you expect, priced flat by plan instead of by
+              the contacts you store. Every plan carries unlimited contacts, so
+              a good acquisition month never arrives as an invoice problem.
             </p>
 
             <MarketingHeroCTA />
