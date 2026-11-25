@@ -6,6 +6,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@wraps/ui/components/ui/accordion";
+import { Band, SectionHead } from "@/app/landing/components/page-band";
+import { LICENSE_STATEMENT } from "@/config/license";
 
 /*
  * Written for the person who did not choose Wraps and now has to approve it.
@@ -17,9 +19,9 @@ import {
 const faqItems = [
   {
     id: "soc2",
-    question: "Are you SOC 2 certified?",
+    question: "Do you have SOC 2?",
     answer:
-      "No. Not SOC 2, not HIPAA, and there is no BAA. If your process requires a report today, this will not clear it. What is true is narrower: the sending infrastructure runs inside your own AWS account, so your existing AWS posture already covers that half. The gap is the Wraps platform itself — the dashboard, and the contacts and templates in our database.",
+      "We don't have SOC 2 yet. If your process requires a report today, this will not clear it. What is true is narrower: the sending setup runs inside your own AWS account, so your existing AWS posture covers that half. The gap is the Wraps platform itself: the dashboard, and the contacts and templates in our database.",
   },
   {
     id: "sandbox",
@@ -43,19 +45,17 @@ const faqItems = [
     id: "support",
     question: "What is the support commitment?",
     answer:
-      "Free is community support through GitHub and Discord, with no response-time commitment. Pro at $29/mo adds email support. Business at $199/mo adds a priority SLA. There is no phone number and no dedicated CSM at any tier — if your team needs one, say so now rather than after signing.",
+      "Free is community support, with no response-time commitment. Pro at $29/mo adds email support. Business at $199/mo adds priority support. There is no phone number and no dedicated CSM at any tier — if your team needs one, say so now rather than after signing.",
   },
   {
     id: "stop-paying",
     question: "What happens if we stop paying, or you go away?",
-    answer:
-      "Sending keeps working. SES, the Lambdas, the EventBridge rules and the DynamoDB tables are in your account, namespaced wraps-email-*, and nothing about them depends on us being alive. What you lose is the platform: the dashboard, and the contacts, templates and workflows stored in our database. Export those before you leave. The repository is AGPL-3.0 with an enterprise kernel under a separate licence, and the SDKs are MIT, so the code outlives the company either way.",
+    answer: `Sending keeps working. SES, the Lambdas, the EventBridge rules and the DynamoDB tables are in your account, namespaced wraps-email-*, and nothing about them depends on us being alive. What you lose is the platform: the dashboard, and the contacts, templates and workflows stored in our database. Contacts and templates can be exported, so export them before you leave. The code is public, so your reviewer can read it. ${LICENSE_STATEMENT}`,
   },
   {
     id: "wrapper",
     question: "Isn't this just a wrapper around SES? There are free ones.",
-    answer:
-      "Wraps is a wrapper around SES — that is the product and the name, it is AGPL-3.0, and you can self-host the whole stack. So the question is not whether to use a wrapper, it is which one. OpenSend, useSend and MillionSend will give you a Resend-shaped API and a dashboard over your own SES, and the API is table stakes across all of us. What we build past it is the operational layer: bounce and complaint rates against the lines AWS enforces, swept hourly and alerted on, deliverability and blacklist audits, suppression wired in from the first send, and an IAM role you revoke instead of AWS keys sitting in a container. If those do not matter to you, the CLI and SDKs are free and open source and you can stop at the deploy.",
+    answer: `Wraps is a layer over SES. That is the product and the name, and the code is public. ${LICENSE_STATEMENT} So the question is not whether to use one, it is which one. OpenSend, useSend and MillionSend will give you a Resend-shaped API and a dashboard over your own SES, and the API is table stakes across all of us. What we build past it is the operational layer: bounce and complaint rates against the lines AWS enforces, swept hourly and alerted on, deliverability and blacklist audits, suppression wired in from the first send, and an IAM role you revoke instead of AWS keys sitting in a container. If those do not matter to you, the CLI and SDKs are free and you can stop at the deploy.`,
   },
   {
     id: "migration",
@@ -67,13 +67,12 @@ const faqItems = [
 
 export function FaqSection() {
   return (
-    <section className="mb-16">
-      <h2 className="mb-2 font-heading font-semibold text-2xl tracking-tight">
-        Questions your team will ask
-      </h2>
-      <p className="mb-6 max-w-2xl text-muted-foreground">
-        The answers we would give in the room, in the words we would use.
-      </p>
+    <Band>
+      <SectionHead
+        body="The answers we would give in the room, in the words we would use."
+        kicker="04 · Questions"
+        title="Questions your team will ask"
+      />
       <Accordion collapsible type="single">
         {faqItems.map((item) => (
           <AccordionItem key={item.id} value={item.id}>
@@ -84,6 +83,6 @@ export function FaqSection() {
           </AccordionItem>
         ))}
       </Accordion>
-    </section>
+    </Band>
   );
 }
