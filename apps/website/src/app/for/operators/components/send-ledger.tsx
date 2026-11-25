@@ -1,3 +1,5 @@
+import { FlowBox } from "@/app/landing/components/flow-primitives";
+
 // The operator's anchor artifact: one message, every event that touched it,
 // in order. Mirrors the event types the pipeline actually records
 // (Send, Delivery, Open, Click, Bounce, Complaint, Reject).
@@ -43,10 +45,10 @@ const events = [
 
 export function SendLedger() {
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card/80 shadow-sm backdrop-blur">
-      <div className="flex items-center justify-between border-border border-b px-4 py-3">
-        <span className="font-mono text-2xs text-muted-foreground uppercase tracking-eyebrow">
-          message trace
+    <FlowBox label="Message trace · example data">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="font-sans font-semibold text-muted-foreground text-xs">
+          One message, every event
         </span>
         <span className="font-mono text-2xs text-muted-foreground">
           0102f9a1c4e7b3d0
@@ -56,7 +58,7 @@ export function SendLedger() {
       <ol className="divide-y divide-border/60">
         {events.map((event) => (
           <li
-            className="flex items-baseline gap-3 px-4 py-2.5 font-mono text-xs"
+            className="flex items-baseline gap-3 py-2.5 font-mono text-xs"
             key={`${event.at}-${event.type}`}
           >
             <span className="shrink-0 text-muted-foreground tabular-nums">
@@ -72,12 +74,10 @@ export function SendLedger() {
         ))}
       </ol>
 
-      <div className="border-border border-t bg-muted/40 px-4 py-3">
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          The complaint suppressed the contact automatically. The next broadcast
-          cannot select them, whoever builds it.
-        </p>
-      </div>
-    </div>
+      <p className="mt-3 border-border/60 border-t pt-3 text-muted-foreground text-xs leading-relaxed">
+        The complaint suppressed the contact automatically. The next broadcast
+        cannot select them, whoever builds it.
+      </p>
+    </FlowBox>
   );
 }

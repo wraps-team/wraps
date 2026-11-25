@@ -30,8 +30,6 @@ import { WrapsMotif } from "@/components/wraps-motif";
 import {
   GITHUB_URL,
   NAV_MENUS,
-  type NavGroup,
-  type NavMenu,
   SIGN_IN_URL,
   SIGN_UP_URL,
 } from "@/config/site-nav";
@@ -56,14 +54,6 @@ const smoothScrollTo = (targetId: string) => {
 // Check if href is a hash link (starts with # or /#)
 const isHashLink = (href: string) =>
   href.startsWith("#") || href.startsWith("/#");
-
-const visibleGroups = (menu: NavMenu): NavGroup[] =>
-  (menu.groups ?? [])
-    .map((group) => ({
-      ...group,
-      links: group.links.filter((link) => !link.hidden),
-    }))
-    .filter((group) => group.links.length > 0);
 
 export function LandingNavbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -111,7 +101,7 @@ export function LandingNavbar() {
                     </NavigationMenuTrigger>
                     <NavigationMenuContent>
                       <div className="flex gap-2 p-3">
-                        {visibleGroups(menu).map((group) => (
+                        {(menu.groups ?? []).map((group) => (
                           <div
                             className="grid min-w-56 flex-1 content-start gap-0.5"
                             key={group.heading ?? menu.name}
@@ -320,7 +310,7 @@ export function LandingNavbar() {
                             </button>
                           </CollapsibleTrigger>
                           <CollapsibleContent className="space-y-1 pl-4">
-                            {visibleGroups(menu).map((group) => (
+                            {(menu.groups ?? []).map((group) => (
                               <div key={group.heading ?? menu.name}>
                                 {group.heading && (
                                   <span className="block px-4 pt-3 pb-1 font-sans font-semibold text-muted-foreground text-xs uppercase tracking-eyebrow">
