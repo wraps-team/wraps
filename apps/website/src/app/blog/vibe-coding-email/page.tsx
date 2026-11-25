@@ -283,8 +283,7 @@ await wraps.track("user.signed_up", {
                   <h4 className="font-medium">Email sends via your SES</h4>
                   <p className="mt-1 text-muted-foreground text-sm">
                     The email goes through SES in your AWS account — your
-                    domain, your sending reputation, $0.10 per 1,000 emails paid
-                    directly to AWS.
+                    domain, with sending billed by AWS directly.
                   </p>
                 </div>
               </div>

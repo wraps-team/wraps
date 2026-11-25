@@ -1,11 +1,11 @@
 "use client";
 
 import { Button } from "@wraps/ui/components/ui/button";
-import { Card, CardContent } from "@wraps/ui/components/ui/card";
 import { ArrowRight, Check, Copy } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { FlowBox } from "@/app/landing/components/flow-primitives";
 import {
   type ToolCta,
   type ToolCtaContext,
@@ -63,8 +63,8 @@ export function ToolSignupBox({
 
   return (
     <div ref={ref}>
-      <Card className="border-border bg-card">
-        <CardContent>
+      <FlowBox dashed label="Wraps">
+        <div>
           <div
             className={
               layout === "row"
@@ -72,14 +72,14 @@ export function ToolSignupBox({
                 : "flex flex-col gap-5"
             }
           >
-            <div className="flex-1 space-y-3">
+            <div className="min-w-0 flex-1 space-y-3">
               <h3 className="font-heading font-semibold text-xl tracking-tight">
                 {cta.headline}
               </h3>
               <p className="text-muted-foreground">{cta.body}</p>
               {cta.command && (
-                <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 py-1.5 pr-1.5 pl-3">
-                  <code className="overflow-x-auto whitespace-nowrap font-mono text-foreground text-sm">
+                <div className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 py-1.5 pr-1.5 pl-3">
+                  <code className="min-w-0 overflow-x-auto whitespace-nowrap font-mono text-foreground text-sm">
                     {cta.command}
                   </code>
                   <Button
@@ -131,8 +131,8 @@ export function ToolSignupBox({
               </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </FlowBox>
     </div>
   );
 }

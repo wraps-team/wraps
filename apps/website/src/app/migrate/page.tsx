@@ -3,6 +3,7 @@ import { Card } from "@wraps/ui/components/ui/card";
 import { ArrowRight } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ClosingPanel } from "@/app/landing/components/closing-panel";
 import { LandingFooter } from "@/app/landing/components/footer";
 import { LandingNavbar } from "@/app/landing/components/navbar";
 import { SectionKicker } from "@/app/landing/components/section-kicker";
@@ -238,31 +239,27 @@ export default function MigrateHubPage() {
               </Button>
             </div>
           </section>
-
-          <section className="rounded-xl border border-border bg-muted/30 p-8">
-            <h2 className="mb-3 font-heading font-semibold text-2xl tracking-tight">
-              The SES half, in one command
-            </h2>
-            <p className="mb-6 max-w-2xl text-muted-foreground">
-              Whichever guide you are reading, the sending stack is the same
-              work. Wraps deploys SES with its event pipeline into your own AWS
-              account, or adopts the one you already have without touching it.
-            </p>
+        </div>
+        <ClosingPanel
+          actions={
             <div className="flex flex-wrap gap-3">
-              <Button asChild className="cursor-pointer">
+              <Button asChild size="lg" variant="brand">
                 <Link href="/docs/quickstart/email">
                   Deploy SES
                   <ArrowRight aria-hidden="true" className="ml-1.5 size-4" />
                 </Link>
               </Button>
-              <Button asChild className="cursor-pointer" variant="outline">
+              <Button asChild size="lg" variant="outline">
                 <Link href="/docs/guides/migration">
                   General migration guide
                 </Link>
               </Button>
             </div>
-          </section>
-        </div>
+          }
+          body="Whichever guide you are reading, the sending stack is the same work. Wraps deploys SES with its event pipeline into your own AWS account, or adopts the one you already have without touching it."
+          kicker="Next step"
+          title="The SES half, in one command"
+        />
       </main>
 
       <LandingFooter />

@@ -491,7 +491,7 @@ const RESEND_PAGE: AlternativesPage = {
     {
       vendor: "wraps",
       verdict:
-        "The answer specifically to the retention and suspension complaints rather than to price. Sending runs through SES in your own AWS account and delivery events land in your own DynamoDB, so the 30-day purge stops applying and the only party who can freeze your sending is AWS. Workflows are defined in TypeScript and pushed from the CLI, so a lifecycle change is reviewed in a pull request instead of clicked into a canvas. At 100K a month sending is about $10 of SES plus a flat platform fee of $0 to $199 depending on the plan, not on how much you send. It needs an AWS account, which is simultaneously the entire point and the entire cost.",
+        "The answer specifically to the retention and suspension complaints rather than to price. Sending runs through SES in your own AWS account and delivery events land in your own DynamoDB, so the 30-day purge stops applying and the only party who can freeze your sending is AWS. Workflows are defined in TypeScript and pushed from the CLI, so a lifecycle change is reviewed in a pull request instead of clicked into a canvas. At 100K a month that is about $12.50 of AWS (SES plus the event pipeline, on the $0.10 à la carte plan; $18.50 on the Essentials plan AWS gives new accounts) plus a flat platform fee by plan: Free, Pro $29/mo or Business $199/mo. It needs an AWS account, which is simultaneously the entire point and the entire cost.",
     },
     {
       vendor: "ahasend",
@@ -608,7 +608,7 @@ const SENDGRID_PAGE: AlternativesPage = {
     {
       vendor: "wraps",
       verdict:
-        "For teams whose real objection is that a vendor can freeze their transactional email with no self-serve way back. Sending runs through SES in your own AWS account and delivery events land in your own DynamoDB, so suspension risk moves to AWS and log history stops being rented. Templates, broadcasts, segments, and workflows stay a hosted product, and workflows can be defined in TypeScript and pushed from the CLI. At 100K a month that is about $10 of SES plus a $19 to $79 platform fee depending on events tracked. You need an AWS account and SES production access, which is an AWS decision on AWS's timeline.",
+        "For teams whose real objection is that a vendor can freeze their transactional email with no self-serve way back. Sending runs through SES in your own AWS account and delivery events land in your own DynamoDB, so suspension risk moves to AWS and log history stops being rented. Templates, broadcasts, segments, and workflows stay a hosted product, and workflows can be defined in TypeScript and pushed from the CLI. At 100K a month that is about $12.50 of AWS (SES plus the event pipeline, on the $0.10 à la carte plan; $18.50 on the Essentials plan AWS gives new accounts) plus a flat platform fee by plan: Free, Pro $29/mo or Business $199/mo. You need an AWS account and SES production access, which is an AWS decision on AWS's timeline.",
     },
     {
       vendor: "mailgun",
@@ -720,7 +720,7 @@ const POSTMARK_PAGE: AlternativesPage = {
     {
       vendor: "wraps",
       verdict:
-        "The answer when the problem is that Postmark is fine but you now need broadcasts, segments, and lifecycle workflows too, and you do not want two vendors and two bills. Sending runs through SES in your own AWS account at AWS prices, delivery events land in your own DynamoDB, and the platform layer on top is a flat fee with unlimited contacts. Workflows are TypeScript pushed from the CLI, so a journey change reviews like code. At 100K a month that is about $10 of SES plus a flat platform fee of $0, $29 or $199, depending on how much history and governance you need. You need an AWS account and SES production access to get there, and you would be trading Postmark's support culture for a much smaller company's.",
+        "The answer when the problem is that Postmark is fine but you now need broadcasts, segments, and lifecycle workflows too, and you do not want two vendors and two bills. Sending runs through SES in your own AWS account at AWS prices, delivery events land in your own DynamoDB, and the platform layer on top is a flat fee with unlimited contacts. Workflows are TypeScript pushed from the CLI, so a journey change reviews like code. At 100K a month that is about $12.50 of AWS (SES plus the event pipeline, on the $0.10 à la carte plan; $18.50 on the Essentials plan AWS gives new accounts) plus a flat platform fee of $0, $29 or $199, depending on how much history and governance you need. You need an AWS account and SES production access to get there, and you would be trading Postmark's support culture for a much smaller company's.",
     },
     {
       vendor: "mailgun",
@@ -832,7 +832,7 @@ const MAILGUN_PAGE: AlternativesPage = {
     {
       vendor: "wraps",
       verdict:
-        "For teams whose objection is that a provider can suspend them without warning, which is the second most common reason people arrive here. Sending runs through SES in your own AWS account, delivery events land in your own DynamoDB, and the platform fee is flat and separate from what you send, so a traffic spike changes your AWS bill rather than triggering a review. Workflows are TypeScript pushed from the CLI. At 100K that is about $10 of SES plus $19 to $79 of platform, against Mailgun's $75 to $90. You need an AWS account and SES production access, which is an AWS decision on AWS's timeline.",
+        "For teams whose objection is that a provider can suspend them without warning, which is the second most common reason people arrive here. Sending runs through SES in your own AWS account, delivery events land in your own DynamoDB, and the platform fee is flat and separate from what you send, so a traffic spike changes your AWS bill rather than triggering a review. Workflows are TypeScript pushed from the CLI. At 100K that is about $12.50 of AWS (SES plus the event pipeline, on the $0.10 à la carte plan; $18.50 on the Essentials plan AWS gives new accounts) plus a flat platform fee: Free, Pro $29/mo or Business $199/mo, against Mailgun's $75 to $90. You need an AWS account and SES production access, which is an AWS decision on AWS's timeline.",
     },
     {
       vendor: "smtp2go",
@@ -940,7 +940,7 @@ const CUSTOMER_IO_PAGE: AlternativesPage = {
     {
       vendor: "wraps",
       verdict:
-        "The structural answer to per-profile billing rather than a cheaper version of it: contacts are unlimited on every tier, the platform fee is flat, and sending is billed by AWS at $0.10 per 1,000 instead of bundled into a profile count. At 100,000 contacts that is $19 to $199 of platform plus what you actually send, against roughly $955. You keep workflows, broadcasts, segments, and templates, delivery events land in your own DynamoDB, and workflows are defined in TypeScript and pushed from the CLI, so a journey change goes through code review instead of a canvas. The costs are real: you need an AWS account and SES production access, the automation is less sophisticated than Customer.io's, and while sending and events live in your AWS, contacts and workflow state live in ours.",
+        "The structural answer to per-profile billing rather than a cheaper version of it: contacts are unlimited on every tier, the platform fee is flat, and sending is billed by AWS (at $0.10 per 1,000 on the SES à la carte plan, $0.16 on Essentials) instead of bundled into a profile count. At 100,000 contacts that is a flat platform fee of Free, Pro $29/mo or Business $199/mo plus what you actually send, against roughly $955. You keep workflows, broadcasts, segments, and templates, delivery events land in your own DynamoDB, and workflows are defined in TypeScript and pushed from the CLI, so a journey change goes through code review instead of a canvas. The costs are real: you need an AWS account and SES production access, the automation is less sophisticated than Customer.io's, and while sending and events live in your AWS, contacts and workflow state live in ours.",
     },
     {
       vendor: "klaviyo",
@@ -1058,7 +1058,7 @@ const AGENTMAIL_PAGE: AlternativesPage = {
     {
       vendor: "wraps",
       verdict:
-        "The answer when the reason you are shopping is that an API key is the entire authorization model. Each agent gets an address plus an IAM credential whose only permission is invoking one policy Lambda in your own AWS account, so it cannot reach SES directly: kill switch, sender pin, recipient allowlist, hourly and daily caps, and an approval queue for anything that trips them. Defaults are 20 sends an hour, 100 a day, and an empty allowlist, so it starts locked down rather than open. Sending is $0.10 to $0.16 per 1,000 billed by AWS, plus a platform fee of $19 to $79. It needs an AWS account and SES production access, which is real setup cost AgentMail does not charge you.",
+        "The answer when the reason you are shopping is that an API key is the entire authorization model. Each agent gets an address plus an IAM credential whose only permission is invoking one policy Lambda in your own AWS account, so it cannot reach SES directly: kill switch, sender pin, recipient allowlist, hourly and daily caps, and an approval queue for anything that trips them. Defaults are 20 sends an hour, 100 a day, and an empty allowlist, so it starts locked down rather than open. Sending is billed by AWS at $0.10 per 1,000 on the SES à la carte plan or $0.16 on Essentials, plus a flat platform fee: Free, Pro $29/mo or Business $199/mo. It needs an AWS account and SES production access, which is real setup cost AgentMail does not charge you.",
     },
     {
       vendor: "resend",

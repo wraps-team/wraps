@@ -152,8 +152,8 @@ export default function Page() {
               Option two is a vendor SDK. You get the ergonomics immediately,
               and you get them by putting someone else's API key in your
               environment and someone else's servers in your request path. Your
-              sending reputation, your suppression list, and your delivery data
-              stop being yours.
+              sending history, your suppression list, and your delivery data
+              move onto their servers.
             </p>
 
             <p className="text-foreground/80 text-lg leading-relaxed">
@@ -294,11 +294,10 @@ Authorization: AWS4-HMAC-SHA256 Credential=AKIA.../20260715/us-east-1/ses/aws4_r
 
             <Card className="p-6">
               <p className="text-foreground/80 leading-relaxed">
-                The practical consequence: your SES quota, your sending
-                reputation, your suppression list, and your CloudWatch metrics
-                stay exactly where they were. If Wraps disappeared tomorrow,
-                your sends would keep working, because nothing of ours is
-                between your process and{" "}
+                The practical consequence: your SES quota, your SES suppression
+                list, and your CloudWatch metrics stay exactly where they were.
+                If Wraps disappeared tomorrow, your sends would keep working,
+                because nothing of ours is between your process and{" "}
                 <code className="rounded bg-muted px-1.5 py-0.5">
                   email.us-east-1.amazonaws.com
                 </code>
