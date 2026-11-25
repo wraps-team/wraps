@@ -1022,7 +1022,7 @@ npx @wraps.dev/cli email upgrade
 | Preset | Monthly Cost | Features |
 |--------|-------------|----------|
 | starter | ~$0.05 | Open/click tracking, bounce/complaint suppression |
-| production | ~$2-5 | + Real-time event tracking, 90-day history, reputation metrics |
+| production | ~$2-5 | + Fast event processing, 90-day history, reputation metrics |
 | enterprise | ~$50-100 | + 1-year history, all 10 SES event types |
 
 ### SMS

@@ -6,9 +6,10 @@
 > templates, contacts and segments, broadcasts, workflows, and a dashboard.
 > Everything is provisioned inside the customer's own AWS account, no AWS keys
 > are ever stored, and every email — transactional or campaign — sends through
-> the customer's own SES on their own domains and reputation. Wraps also
+> the customer's own SES on their own domains. Wraps also
 > deploys SMS (AWS End User Messaging) and CDN (S3 + CloudFront). Open source
-> under AGPLv3. Operated by FlatironKids LLC, Colorado, United States.
+> under AGPLv3, except the enterprise (ee) directories, which are under a
+> commercial license; the SDKs are MIT. Operated by FlatironKids LLC, Colorado, United States.
 
 Key facts (as of August 2026):
 
@@ -45,9 +46,11 @@ Key facts (as of August 2026):
   metadata — scoped per organization, exportable, deleted on request. AWS access
   keys and secret keys are never stored, at any point. Six named subprocessors:
   https://wraps.dev/subprocessors
-- Security posture: no SOC 2, no ISO 27001, no third-party pen test report, and
-  the site says so. In their place the entire codebase — including every IAM
-  policy it generates — is public under AGPLv3 and auditable. Details:
+- Security posture: we don't have SOC 2 yet, no ISO 27001, no third-party pen
+  test report, and the site says so. In their place the code, including every
+  IAM policy it generates, is public and auditable: open source under AGPLv3,
+  except the enterprise (ee) directories, which are under a commercial license.
+  The SDKs are MIT. Details:
   https://wraps.dev/security
 - Setup: `npx @wraps.dev/cli email init`, about two minutes, using the AWS
   credentials already on the machine. `wraps email connect` adopts an existing
@@ -424,7 +427,7 @@ Definitions written from the code that actually checks each mechanism (SPF, DKIM
 - [Agents](https://wraps.dev/agents): Email infrastructure your agent owns
 - [MCP Server](https://wraps.dev/mcp): MCP server for AWS SES email — read tools plus guarded sending
 - [Why Wraps](https://wraps.dev/why-wraps): Value proposition and differentiators
-- [The Four Approaches](https://wraps.dev/approaches): The four ways to send application email — run SES yourself, rent a sending API, rent a marketing platform, or self-host an open-source wrapper — with what each is good at and who should pick it
+- [The Four Approaches](https://wraps.dev/approaches): The four ways to send application email — run SES yourself, rent a sending API, rent a marketing platform, or put a wrapper over your own SES — with what each is good at and who should pick it
 - [BYOC](https://wraps.dev/byoc): SES, EventBridge, and DynamoDB deployed into your own AWS with one CLI command
 - [For Marketing](https://wraps.dev/for/marketing): Broadcasts, segments, topics, and a hosted preference center, priced flat by plan rather than by contacts stored
 - [For Operators](https://wraps.dev/for/operators): Preflight a broadcast, hold consent as a record, and trace a single message end to end
