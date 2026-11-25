@@ -23,6 +23,13 @@
   --radius-4xl: 0;
 }
 
+/* Brand text on the marketing site's light background: orange-700, 5.18:1 on
+   white (AA for normal text) without reading as brown. Dark mode keeps the
+   shared .dark value. The dashboard keeps the shared theme's darker value. */
+:root {
+  --brand-text: #c2410c;
+}
+
 /* The terminal is dark in both themes. --terminal-muted carries prompt and
    comment text, so it clears 7:1 against --terminal. */
 :root {
