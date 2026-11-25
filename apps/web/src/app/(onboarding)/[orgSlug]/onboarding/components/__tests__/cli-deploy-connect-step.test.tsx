@@ -374,6 +374,36 @@ describe("CliDeployConnectStep — three-path layout", () => {
     });
   });
 
+  it("reports an agent deployment start when an open-in link is clicked", () => {
+    renderWithQueryClient(
+      <CliDeployConnectStep {...defaultProps} selfHosted={false} />
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /copy the agent prompt/i })
+    );
+    const link = screen.getByRole("link", { name: "Open in Cursor" });
+    link.addEventListener("click", (e) => e.preventDefault());
+    fireEvent.click(link);
+    fireEvent.click(link);
+
+    expect(capturesOf("onboarding_agent_deeplink_clicked")).toHaveLength(2);
+    expect(capturesOf("onboarding_agent_deeplink_clicked")[0][1]).toEqual({
+      step: 4,
+      step_name: "Deploy & Connect",
+      organization_id: "org-123",
+      target: "cursor",
+    });
+    expect(capturesOf("onboarding_deployment_started")).toHaveLength(1);
+    expect(mockCapture).toHaveBeenCalledWith("onboarding_deployment_started", {
+      step: 4,
+      step_name: "Deploy & Connect",
+      organization_id: "org-123",
+      method: "agent",
+      layout: "three_path",
+    });
+  });
+
   it("reports nothing when the clipboard write fails", async () => {
     mockWriteText.mockRejectedValue(new Error("not allowed"));
     renderWithQueryClient(
