@@ -19,7 +19,7 @@ export const TWITTER_SITE = "@useWraps";
 /** Root-layout fallback title (the homepage `<title>`) and description. */
 export const SITE_TITLE = "Wraps - The Email Platform for Amazon SES";
 export const SITE_DESCRIPTION =
-  "Newsletters, automations, contacts and app emails in one platform your team can use. It runs on your own AWS account, with unlimited contacts on every plan.";
+  "Newsletters, automations, contacts and app emails in one platform your team can use. Sending runs in your own AWS account, and every plan has unlimited contacts.";
 
 /**
  * The shared 1200x630 card: the homepage's image, and what every other page

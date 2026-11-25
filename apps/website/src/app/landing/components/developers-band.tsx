@@ -12,6 +12,14 @@ import {
 } from "@/components/ui/shadcn-io/code-block";
 import { SectionKicker } from "./section-kicker";
 
+// The band is dark in both themes, so both shiki themes are the dark
+// high-contrast one: vitesse-dark's punctuation and string quotes measure 3.3:1
+// and 2.4:1 on the ink panel, under the 4.5:1 the site holds text to.
+const BAND_THEMES = {
+  light: "github-dark-high-contrast",
+  dark: "github-dark-high-contrast",
+};
+
 const DEPLOY = [
   {
     language: "bash",
@@ -72,7 +80,7 @@ function Snippet({
             lineNumbers={lineNumbers}
             value={item.language}
           >
-            <CodeBlockContent language={item.language}>
+            <CodeBlockContent language={item.language} themes={BAND_THEMES}>
               {item.code}
             </CodeBlockContent>
           </CodeBlockItem>

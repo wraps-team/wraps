@@ -56,7 +56,7 @@ const softwareSchema = {
     "Sending runs in your AWS account; Amazon bills you directly",
     "Connect your AWS account in the browser, or hand setup to your AI agent",
     "One-command deploy of the sending infrastructure (npx @wraps.dev/cli email init); connecting it to the dashboard is a separate step",
-    "Free plan with unlimited sends and a 30-day history",
+    "Unlimited sends, contacts and domains on every plan; 30-day history on the Free plan",
     "Self-serve, with no sales call on any plan",
   ],
   offers: [

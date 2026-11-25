@@ -3,6 +3,9 @@
 import { Button } from "@wraps/ui/components/ui/button";
 import { trackEvent } from "@/utils/analytics";
 
+/** Tags hero clicks from this design, so they are not mixed with the old hero's. */
+const HERO_CTA_VARIANT = "hero_v2";
+
 /**
  * The homepage hero's two buttons. Same `cta_click` events as the other hero
  * CTAs (`hero-cta.tsx`), which stay as they are for the pages that use them.
@@ -16,8 +19,10 @@ export function HomeHeroCtas() {
           onClick={() =>
             trackEvent("cta_click", {
               location: "hero",
-              // Kept as "Start building" so existing funnels keep matching.
-              cta_text: "Start building",
+              // The label the visitor reads. Earlier heroes reported "Start
+              // building" for this button; the variant tells the two apart.
+              cta_text: "Start free",
+              cta_variant: HERO_CTA_VARIANT,
             })
           }
         >
@@ -31,6 +36,7 @@ export function HomeHeroCtas() {
             trackEvent("cta_click", {
               location: "hero",
               cta_text: "See how it works",
+              cta_variant: HERO_CTA_VARIANT,
             })
           }
         >

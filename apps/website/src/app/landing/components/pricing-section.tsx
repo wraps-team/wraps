@@ -83,7 +83,7 @@ export function PricingSection() {
                 </h3>
                 <p className="mt-3 font-heading font-semibold text-4xl text-foreground tracking-tight">
                   ${tier.price}{" "}
-                  <small className="font-sans font-normal text-muted-foreground text-sm">
+                  <small className="font-sans tracking-normal font-normal text-muted-foreground text-sm">
                     {tier.price === 0 ? "you pay AWS directly" : "per month"}
                   </small>
                 </p>

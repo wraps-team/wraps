@@ -73,9 +73,13 @@ export function EconomicsSection() {
               >
                 worked examples in pricing
               </a>
-              : no custom events, 90-day history, no dedicated IP (a dedicated
-              IP is {money(AWS_PRICING.dedicatedIpMonthly)} a month more). The
-              Amazon bill grows with what you send; the Wraps plan doesn&apos;t.
+              : no custom events, no dedicated IP (a dedicated IP is{" "}
+              {money(AWS_PRICING.dedicatedIpMonthly)} a month more). Totals
+              include the event pipeline (EventBridge, SQS, Lambda and
+              DynamoDB), with events kept 90 days in your AWS account. That is
+              AWS-side retention, separate from your Wraps plan&apos;s dashboard
+              history. The Amazon bill grows with what you send; the Wraps plan
+              doesn&apos;t.
             </p>
           </div>
         </div>

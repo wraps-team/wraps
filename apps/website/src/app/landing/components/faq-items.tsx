@@ -7,7 +7,7 @@
 
 import type { ReactNode } from "react";
 import { getTier } from "@/config/pricing";
-import { estimateCost } from "@/lib/ses-cost";
+import { estimateCost, SES_PLANS } from "@/lib/ses-cost";
 
 export type FaqItem = {
   value: string;
@@ -25,6 +25,8 @@ const faqCode =
 // examples use (no custom events, Free plan), so it moves when the rates do.
 const fiftyK = (sesPlan: "alacarte" | "essentials") =>
   `$${estimateCost({ emailsPerMonth: 50_000, eventsPerMonth: 0, tier: "free", sesPlan }).total.toFixed(2)}`;
+const ALACARTE_RATE = SES_PLANS.alacarte.perThousandEmails.toFixed(2);
+const ESSENTIALS_RATE = SES_PLANS.essentials.perThousandEmails.toFixed(2);
 const PRO_PRICE = getTier("pro").price;
 const FIFTY_K_EXAMPLE = `For example, 50,000 emails a month is about ${fiftyK("alacarte")} to AWS on à la carte and ${fiftyK("essentials")} on Essentials, all in.`;
 
@@ -33,7 +35,7 @@ export const faqItems: FaqItem[] = [
     value: "item-1",
     question: "How is this different from using AWS SES directly?",
     answer:
-      "Two things. Setup: Wraps deploys all the infrastructure AWS SES needs (IAM roles, EventBridge, DynamoDB, Lambda, SQS) with one deploy command instead of 2+ hours of manual work, and the TypeScript SDK is just `email.send()`. Then the part that lasts longer — running it. The dashboard is a control plane for the daily job: bounce and complaint rates drawn against the lines AWS reviews and pauses at, swept hourly; suppression you can browse and clear; deliverability and blacklist audits; every message searchable. SES gives you none of that on its own.",
+      "Two things. Setup: Wraps deploys all the infrastructure AWS SES needs (IAM roles, EventBridge, DynamoDB, Lambda, SQS) with one deploy command instead of 2+ hours of manual work, and the TypeScript SDK is just email.send(). Then the part that lasts longer — running it. The dashboard is a control plane for the daily job: bounce and complaint rates drawn against the lines AWS reviews and pauses at, swept hourly; suppression you can browse and clear; deliverability and blacklist audits; every message searchable. SES gives you none of that on its own.",
     richAnswer: (
       <>
         Two things. Setup: Wraps deploys all the infrastructure AWS SES needs
@@ -97,18 +99,19 @@ export const faqItems: FaqItem[] = [
   {
     value: "item-2",
     question: "What are the costs for running Wraps?",
-    answer: `With Wraps, you pay AWS directly with no markup: à la carte SES is $0.10 per 1,000 emails, though AWS now defaults new accounts to Essentials at $0.16 (Wraps tells you which plan you're on). ${FIFTY_K_EXAMPLE} Every plan, including Free, includes unlimited sends, domains, contacts, templates, and team members; AWS bills the sending. Paid plans start at $${PRO_PRICE}/month. No Wraps lock-in: sending keeps running without us.`,
+    answer: `With Wraps, you pay AWS directly with no markup: à la carte SES is $${ALACARTE_RATE} per 1,000 emails, though AWS now defaults new accounts to Essentials at $${ESSENTIALS_RATE} (Wraps tells you which plan you're on). ${FIFTY_K_EXAMPLE} Every plan, including Free, includes unlimited sends, domains, contacts, templates, and team members; AWS bills the sending. Paid plans start at $${PRO_PRICE}/month. No Wraps lock-in: sending keeps running without us.`,
     richAnswer: (
       <>
         With Wraps, you pay AWS directly with no markup:{" "}
         <a className={faqLink} href="/tools/ses-calculator">
-          à la carte SES is $0.10 per 1,000 emails
+          à la carte SES is ${ALACARTE_RATE} per 1,000 emails
         </a>
-        , though AWS now defaults new accounts to Essentials at $0.16 (Wraps
-        tells you which plan you&rsquo;re on). {FIFTY_K_EXAMPLE} Every plan,
-        including Free, includes unlimited sends, domains, contacts, templates,
-        and team members; AWS bills the sending. Paid plans start at $
-        {PRO_PRICE}/month. No Wraps lock-in: sending keeps running without us.
+        , though AWS now defaults new accounts to Essentials at $
+        {ESSENTIALS_RATE} (Wraps tells you which plan you&rsquo;re on).{" "}
+        {FIFTY_K_EXAMPLE} Every plan, including Free, includes unlimited sends,
+        domains, contacts, templates, and team members; AWS bills the sending.
+        Paid plans start at ${PRO_PRICE}/month. No Wraps lock-in: sending keeps
+        running without us.
       </>
     ),
   },

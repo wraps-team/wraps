@@ -138,8 +138,8 @@ export function ProductSection() {
             }
           >
             Unlimited contacts on every plan. Group them by what they did or
-            what you know, and let them pick their own topics. Segments are on
-            Pro.
+            what you know, and let them pick their own topics. Segments and
+            topics are on Pro.
           </Card>
 
           <Card

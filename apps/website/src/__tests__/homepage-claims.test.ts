@@ -98,16 +98,21 @@ describe("homepage claim rules", () => {
   });
 
   it.each(HOMEPAGE_FILES)("%s never calls sending free", (file) => {
-    // Lowercase "free" only: "Free" is a plan name.
+    // Case-insensitive: "Free plan with unlimited sends" is the same claim as
+    // "send free". A line that says who bills the sending is allowed to pair
+    // the Free plan with unlimited sends.
     for (const line of read(file).split("\n")) {
-      if (/^\s*(\/\/|\*)/.test(line)) {
+      if (
+        /^\s*(\/\/|\*)/.test(line) ||
+        /(AWS|Amazon) bills|every plan/i.test(line)
+      ) {
         continue;
       }
       expect(line).not.toMatch(
-        /(?:[Ss]end|[Ss]ends|[Ss]ending|[Nn]ewsletters?)\b[^.]{0,30}\bfree\b/
+        /\b(?:send|sends|sending|newsletters?)\b[^.]{0,30}\bfree\b/i
       );
       expect(line).not.toMatch(
-        /\bfree\b[^.]{0,30}\b(?:[Ss]ends|[Ss]ending|[Nn]ewsletters?)\b/
+        /\bfree\b[^.]{0,40}\b(?:sends|sending|newsletters?)\b/i
       );
     }
   });
@@ -125,7 +130,10 @@ describe("homepage claim rules", () => {
       lines.forEach((line, i) => {
         if (/one[- ]command|1 command/i.test(line)) {
           const near = lines.slice(Math.max(0, i - 2), i + 3).join(" ");
-          expect(near).toMatch(/deploy|infrastructure|email init|connect/i);
+          expect(near).toMatch(/deploy|infrastructure|email init/i);
+          expect(near).not.toMatch(
+            /connect[^.]{0,40}one[- ]command|one[- ]command[^.]{0,40}connect/i
+          );
         }
       });
     }

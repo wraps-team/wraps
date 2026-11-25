@@ -113,13 +113,19 @@ function Notes({ items }: { items: string[] }) {
 
 const ILLUSTRATION = [
   { who: "you", text: "Set up Wraps email for me." },
-  { who: "done", text: "Checked your AWS access and installed Wraps." },
+  {
+    who: "done",
+    text: "Checked your AWS access, installed Wraps, and you approved the sign-in code.",
+  },
   {
     who: "ask",
-    text: "Which region should I use? I'll show the estimated AWS cost before deploying.",
+    text: "Which region and preset should I use? I'll show the estimated AWS cost before deploying.",
   },
-  { who: "you", text: "us-east-1." },
-  { who: "end", text: "Deployed. Next: add your domain in the dashboard." },
+  { who: "you", text: "us-east-1, production." },
+  {
+    who: "end",
+    text: "Deployed and connected to your dashboard. Next: add your domain and request production access.",
+  },
 ] as const;
 
 export function SetupPaths({ links }: { links: SetupAgentLinks }) {
@@ -141,7 +147,10 @@ export function SetupPaths({ links }: { links: SetupAgentLinks }) {
         </Tabs.Trigger>
       </Tabs.List>
 
-      <Tabs.Content className="outline-none" value="browser">
+      <Tabs.Content
+        className="focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-4"
+        value="browser"
+      >
         <div className="grid items-start gap-8 lg:grid-cols-2">
           <div>
             <h3 className="font-heading font-semibold text-foreground text-xl">
@@ -195,7 +204,10 @@ export function SetupPaths({ links }: { links: SetupAgentLinks }) {
         </div>
       </Tabs.Content>
 
-      <Tabs.Content className="outline-none" value="agent">
+      <Tabs.Content
+        className="focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-4"
+        value="agent"
+      >
         <div className="grid items-start gap-8 lg:grid-cols-2">
           <div>
             <h3 className="font-heading font-semibold text-foreground text-xl">
@@ -276,9 +288,9 @@ export function SetupPaths({ links }: { links: SetupAgentLinks }) {
                     {m.who === "end" ? (
                       <>
                         <b className="font-semibold text-foreground">
-                          Deployed.
+                          {m.text.split(". ")[0]}.
                         </b>{" "}
-                        Next: add your domain in the dashboard.
+                        {m.text.split(". ").slice(1).join(". ")}
                       </>
                     ) : (
                       m.text
