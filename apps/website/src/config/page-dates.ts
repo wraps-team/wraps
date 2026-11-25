@@ -167,7 +167,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/glossary/spf": "2026-09-28T11:02:37-06:00",
   "/glossary/suppression-list": "2026-09-28T11:02:37-06:00",
   "/glossary/tls-rpt": "2026-09-28T11:02:37-06:00",
-  "/inbound": "2026-11-25T09:38:55-07:00",
+  "/inbound": "2026-11-25T09:43:23-07:00",
   "/learning": "2026-11-22T11:03:47-07:00",
   "/mcp": "2026-11-22T11:03:47-07:00",
   "/migrate": "2026-11-22T11:03:47-07:00",
