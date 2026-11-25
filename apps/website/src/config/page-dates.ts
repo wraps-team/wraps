@@ -133,7 +133,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/docs/sms-sdk-reference": "2026-11-22T11:03:47-07:00",
   "/docs/telemetry": "2026-11-22T11:03:47-07:00",
   "/dpa": "2026-11-22T11:03:47-07:00",
-  "/for/marketing": "2026-11-25T00:06:02-07:00",
+  "/for/marketing": "2026-11-25T00:06:40-07:00",
   "/for/operators": "2026-11-22T11:03:47-07:00",
   "/glossary": "2026-11-22T11:03:47-07:00",
   "/glossary/bimi": "2026-09-28T11:02:37-06:00",
