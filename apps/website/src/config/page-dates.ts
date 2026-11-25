@@ -58,7 +58,7 @@ export const PAGE_DATES: Record<string, string> = {
   "/compare/klaviyo-vs-wraps": "2026-11-25T09:18:41-07:00",
   "/compare/mailgun-vs-wraps": "2026-11-25T10:02:46-07:00",
   "/compare/postmark-vs-wraps": "2026-11-25T10:02:46-07:00",
-  "/compare/resend-vs-wraps": "2026-11-25T10:02:46-07:00",
+  "/compare/resend-vs-wraps": "2026-11-25T10:10:12-07:00",
   "/compare/sendgrid-vs-wraps": "2026-11-25T10:02:46-07:00",
   "/compare/ses-bounce-handling-hand-rolled-vs-wraps":
     "2026-11-22T11:03:47-07:00",
